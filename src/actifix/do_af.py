@@ -94,22 +94,37 @@ class StatefulTicketManager:
         content = self.paths.list_file.read_text()
         mtime = self.paths.list_file.stat().st_mtime
         
-        # Parse open tickets
-        open_tickets = self._parse_tickets_from_section(content, "Active Items", "Completed Items")
-        
-        # Parse completed tickets  
-        completed_tickets = self._parse_tickets_from_section(content, "Completed Items", None)
+        # Parse active and completed tickets
+        active_tickets = self._parse_tickets_from_section(content, "Active Items", "Completed Items")
+        completed_section_tickets = self._parse_tickets_from_section(content, "Completed Items", None)
+
+        # Split active tickets by completion status
+        open_tickets = [ticket for ticket in active_tickets if not ticket.completed]
+        completed_from_active = [ticket for ticket in active_tickets if ticket.completed]
+
+        completed_by_id = {ticket.ticket_id: ticket for ticket in completed_section_tickets}
+        for ticket in completed_from_active:
+            completed_by_id.setdefault(ticket.ticket_id, ticket)
+        completed_tickets = list(completed_by_id.values())
         
         # Calculate stats efficiently from in-memory data
         all_ticket_ids = set()
         priority_counts = {"P0": 0, "P1": 0, "P2": 0, "P3": 0}
         
-        for ticket in open_tickets + completed_tickets:
+        tickets_by_id: dict[str, TicketInfo] = {}
+        for ticket in active_tickets + completed_tickets:
+            existing = tickets_by_id.get(ticket.ticket_id)
+            if existing is None:
+                tickets_by_id[ticket.ticket_id] = ticket
+            elif ticket.completed and not existing.completed:
+                tickets_by_id[ticket.ticket_id] = ticket
+
+        for ticket in tickets_by_id.values():
             all_ticket_ids.add(ticket.ticket_id)
             priority_counts[ticket.priority] = priority_counts.get(ticket.priority, 0) + 1
-        
-        completed_count = len([t for t in open_tickets + completed_tickets if t.completed])
-        
+
+        completed_count = len([t for t in tickets_by_id.values() if t.completed])
+
         stats = {
             "total": len(all_ticket_ids),
             "open": len(all_ticket_ids) - completed_count,
@@ -218,6 +233,7 @@ class TicketInfo:
     created: str
     duplicate_guard: str
     full_block: str
+    status: str = "Open"
     
     # Checklist state
     documented: bool = False
@@ -262,11 +278,15 @@ def parse_ticket_block(block: str) -> Optional[TicketInfo]:
     msg_match = re.search(r'\[P[0-3]\]\s*\w+:\s*(.+)', block.split('\n')[0])
     message = msg_match.group(1) if msg_match else ""
     
+    # Check status field (if present)
+    status_match = re.search(r'\*\*Status\*\*:\s*([A-Za-z-]+)', block)
+    status = status_match.group(1).strip() if status_match else "Open"
+
     # Check checklist state
     documented = '[x] Documented' in block
     functioning = '[x] Functioning' in block
     tested = '[x] Tested' in block
-    completed = '[x] Completed' in block
+    completed = '[x] Completed' in block or status.lower() == "completed"
     
     return TicketInfo(
         ticket_id=ticket_id,
@@ -278,6 +298,7 @@ def parse_ticket_block(block: str) -> Optional[TicketInfo]:
         created=created,
         duplicate_guard=duplicate_guard,
         full_block=block,
+        status=status,
         documented=documented,
         functioning=functioning,
         tested=tested,
@@ -562,24 +583,35 @@ def get_completed_tickets(paths: Optional[ActifixPaths] = None, use_cache: bool 
     
     content = paths.list_file.read_text()
     
-    # Find Completed Items section
-    if "## Completed Items" not in content:
-        return []
-    
-    completed_start = content.find("## Completed Items")
-    completed_section = content[completed_start:]
-    
-    # Split into ticket blocks (support ## or ### headers)
-    blocks = re.split(r'(?=##+ ACT-)', completed_section)
-    
     tickets = []
-    for block in blocks:
-        if block.strip() and 'ACT-' in block:
-            ticket = parse_ticket_block(block)
-            if ticket:
-                tickets.append(ticket)
-    
-    return tickets
+
+    # Parse completed tickets from Completed Items section
+    if "## Completed Items" in content:
+        completed_start = content.find("## Completed Items")
+        completed_section = content[completed_start:]
+        
+        # Split into ticket blocks (support ## or ### headers)
+        blocks = re.split(r'(?=##+ ACT-)', completed_section)
+        for block in blocks:
+            if block.strip() and 'ACT-' in block:
+                ticket = parse_ticket_block(block)
+                if ticket:
+                    tickets.append(ticket)
+
+    # Include completed tickets that still live in Active Items
+    if "## Active Items" in content:
+        active_start = content.find("## Active Items")
+        active_end = content.find("## Completed Items")
+        active_section = content[active_start:active_end] if active_end != -1 else content[active_start:]
+        blocks = re.split(r'(?=##+ ACT-)', active_section)
+        for block in blocks:
+            if block.strip() and block.lstrip().startswith('## ACT-'):
+                ticket = parse_ticket_block(block)
+                if ticket and ticket.completed:
+                    tickets.append(ticket)
+
+    completed_by_id = {ticket.ticket_id: ticket for ticket in tickets}
+    return list(completed_by_id.values())
 
 
 def get_ticket_stats(paths: Optional[ActifixPaths] = None, use_cache: bool = True) -> dict:
@@ -610,25 +642,27 @@ def get_ticket_stats(paths: Optional[ActifixPaths] = None, use_cache: bool = Tru
         }
     
     content = paths.list_file.read_text()
-    
-    # Count all tickets
-    all_tickets = re.findall(r'##+ (ACT-\d{8}-[A-F0-9]+)', content)
-    
-    # Count completed
-    completed = content.count('[x] Completed')
-    
-    # Count by priority
-    by_priority = {
-        "P0": len(re.findall(r'\[P0\]', content)),
-        "P1": len(re.findall(r'\[P1\]', content)),
-        "P2": len(re.findall(r'\[P2\]', content)),
-        "P3": len(re.findall(r'\[P3\]', content)),
-    }
-    
+
+    blocks = re.split(r'(?=##+ ACT-)', content)
+    tickets_by_id: dict[str, TicketInfo] = {}
+    for block in blocks:
+        if block.strip() and 'ACT-' in block:
+            ticket = parse_ticket_block(block)
+            if ticket:
+                existing = tickets_by_id.get(ticket.ticket_id)
+                if existing is None or (ticket.completed and not existing.completed):
+                    tickets_by_id[ticket.ticket_id] = ticket
+
+    all_ticket_ids = set(tickets_by_id.keys())
+    completed_count = len([ticket for ticket in tickets_by_id.values() if ticket.completed])
+    by_priority = {"P0": 0, "P1": 0, "P2": 0, "P3": 0}
+    for ticket in tickets_by_id.values():
+        by_priority[ticket.priority] = by_priority.get(ticket.priority, 0) + 1
+
     return {
-        "total": len(all_tickets),
-        "open": len(all_tickets) - completed,
-        "completed": completed,
+        "total": len(all_ticket_ids),
+        "open": len(all_ticket_ids) - completed_count,
+        "completed": completed_count,
         "by_priority": by_priority,
     }
 

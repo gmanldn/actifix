@@ -14,7 +14,7 @@ import pytest
 # Add src to path so we can import actifix
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from actifix.do_af import mark_ticket_complete
+from actifix.do_af import mark_ticket_complete, get_open_tickets, get_completed_tickets, get_ticket_stats
 from actifix.state_paths import ActifixPaths
 
 
@@ -251,3 +251,59 @@ def test_normal_completion_still_works(temp_actifix_paths):
     aflog_content = paths.aflog_file.read_text()
     assert "TICKET_COMPLETED" in aflog_content
     assert "ACT-20260101-NORMAL789" in aflog_content
+
+
+def test_completed_status_in_active_items_not_counted_as_open(temp_actifix_paths):
+    """Ensure completed tickets in Active Items are not reported as open."""
+    paths = temp_actifix_paths
+
+    list_content = """# Actifix Ticket List
+
+## Active Items
+
+### ACT-20260102-ABCD1111 - [P1] Completed In Active
+
+- **Priority**: P1
+- **Error Type**: TestError
+- **Source**: `done.py:10`
+- **Run**: test-run
+- **Created**: 2026-01-10T12:00:00Z
+- **Duplicate Guard**: `TEST-done-py:10-aaaa1111`
+- **Status**: Completed
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+### ACT-20260102-BEEF2222 - [P2] Still Open
+
+- **Priority**: P2
+- **Error Type**: TestError
+- **Source**: `open.py:20`
+- **Run**: test-run
+- **Created**: 2026-01-10T12:05:00Z
+- **Duplicate Guard**: `TEST-open-py:20-bbbb2222`
+- **Status**: Open
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+## Completed Items
+
+"""
+    paths.list_file.write_text(list_content)
+
+    open_tickets = get_open_tickets(paths)
+    completed_tickets = get_completed_tickets(paths)
+    stats = get_ticket_stats(paths)
+
+    assert len(open_tickets) == 1
+    assert open_tickets[0].ticket_id == "ACT-20260102-BEEF2222"
+    assert any(ticket.ticket_id == "ACT-20260102-ABCD1111" for ticket in completed_tickets)
+    assert stats["open"] == 1
+    assert stats["completed"] == 1
