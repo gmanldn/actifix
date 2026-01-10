@@ -6,35 +6,29 @@
 
 ACTIFIX is a sophisticated error tracking and management framework that can **track and improve itself**. Unlike traditional error logging systems, ACTIFIX is designed from the ground up for AI-assisted development, comprehensive context capture, and production-grade reliability.
 
-### 🎯 What ACTIFIX Does
-
-**Core Purpose**: Captures errors with rich context and enables AI-assisted debugging through intelligent ticket generation.
-
-**Key Capabilities**:
-- **📊 Comprehensive Error Capture** - Records errors with stack traces, file snippets, and system state
-- **🤖 AI-Ready Integration** - Generates detailed remediation notes for Claude, GPT, and other AI assistants  
-- **🔄 Self-Improvement Mode** - Can track its own development bugs and create improvement tickets
-- **🎯 Auto-Priority Classification** - Automatically assigns P0 (Critical) to P4 (Trivial) priorities
-- **🛡️ Production-Grade Reliability** - Includes fallback queues, atomic writes, and health monitoring
-- **🚫 Smart Deduplication** - Prevents redundant tickets using normalized duplicate guards
-- **🔒 Secret Redaction** - Automatically scrubs API keys, passwords, and PII from captures
+### 🎯 Feature Highlights
+- **Error intelligence:** Rich captures (stack, file snippets, system state), auto-priority (P0–P4), duplicate guards, remediation notes.
+- **AI-native:** Produces consistent, compact tickets ready for Claude, GPT, or any LLM to propose fixes.
+- **Self-development:** Bootstrap once and ACTIFIX will open tickets against its own codebase as you work.
+- **Reliability & safety:** Atomic writes, fallback queues, secret redaction, and health checks to avoid silent failures.
+- **Human-readable artifacts:** Markdown tickets (`ACTIFIX-LIST.md`, `ACTIFIX.md`) plus lifecycle logs (`AFLog.txt`).
 
 ### 💡 Why Choose ACTIFIX?
 
 **For Development Teams:**
-- Replace scattered error logs with organized, prioritized tickets
-- Get AI-ready error descriptions for faster debugging
-- Track development progress and regression prevention
+- Replace scattered error logs with organized, prioritized tickets.
+- Get AI-ready error descriptions for faster debugging.
+- Track development progress and regression prevention.
 
 **For Production Systems:**
-- Capture critical errors with enough context for immediate action
-- Automatically classify severity for proper escalation
-- Maintain audit trails for compliance and post-mortems
+- Capture critical errors with enough context for immediate action.
+- Automatically classify severity for proper escalation.
+- Maintain audit trails for compliance and post-mortems.
 
 **For AI-Assisted Development:**
-- Generate comprehensive context for AI debugging sessions
-- Enable AI assistants to suggest specific fixes with full error context
-- Create self-improving systems that track their own enhancement tickets
+- Generate comprehensive context for AI debugging sessions.
+- Enable AI assistants to suggest specific fixes with full error context.
+- Create self-improving systems that track their own enhancement tickets.
 
 ### 🔄 The Self-Improvement Advantage
 
@@ -140,9 +134,32 @@ Rapid guide to install ACTIFIX, bootstrap error capture, and view the web interf
 - Git
 - Disk space: ~100MB plus room for logs and tickets
 - OS notes:
-  - **macOS:** Install Command Line Tools (`xcode-select --install`), optionally `brew install python`.
+  - **macOS:** Install Command Line Tools (`xcode-select --install`), then `brew install python git` for the latest runtimes.
   - **Linux (Debian/Ubuntu):** `sudo apt update && sudo apt install -y python3 python3-venv python3-pip git`.
-  - **Windows:** Use **WSL2** (Ubuntu recommended), then run the Linux steps inside the WSL shell.
+  - **Windows:** Use **WSL2** (Ubuntu recommended). Install WSL from the Microsoft Store, reboot, open the Ubuntu shell, then follow the Linux steps.
+
+## Platform Setup Cheat-Sheet
+- **macOS:**  
+  ```bash
+  xcode-select --install             # if not already installed
+  brew install python git            # installs python3/pip3
+  git clone https://github.com/gmanldn/actifix.git
+  cd actifix
+  python3 -m venv .venv && source .venv/bin/activate
+  pip install -e . && pip install -e ".[dev]"
+  ```
+- **Linux (Ubuntu/Debian):**  
+  ```bash
+  sudo apt update && sudo apt install -y python3 python3-venv python3-pip git
+  git clone https://github.com/gmanldn/actifix.git
+  cd actifix
+  python3 -m venv .venv && source .venv/bin/activate
+  pip install -e . && pip install -e ".[dev]"
+  ```
+- **Windows via WSL2:**  
+  1) Install WSL2 + Ubuntu.  
+  2) Open Ubuntu shell and run the Linux commands above.  
+  3) To serve the dashboard to Windows, access via `http://localhost:8080` (WSL forwards to Windows).
 
 ## 5-Minute Setup
 1) Clone and enter the repo  
