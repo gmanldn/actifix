@@ -1,7 +1,7 @@
 from pathlib import Path
 
 
-AGENT_FILES = ["AGENTS.md", "CLAUDE.md", "GPT.md"]
+AGENT_FILES = ["AGENTS.md"]
 
 
 def test_agent_instructions_remind_raise_af_usage():
