@@ -392,6 +392,45 @@ const LoggingBlade = () => {
   );
 };
 
+// Dashboard Hero Component
+const DashboardHero = () => {
+  const { data: health } = useFetch('/health', 7000);
+  const { data: system } = useFetch('/system', 10000);
+
+  return h('section', { className: 'dashboard-hero' },
+    h('div', { className: 'hero-intro' },
+      h('span', { className: 'hero-eyebrow' }, 'Actifix Dashboard'),
+      h('h1', { className: 'hero-title' }, 'Live reliability cockpit, powered by Actifix'),
+      h('p', { className: 'hero-copy' }, 'Stay ahead of incidents with clear, real-time insight into tickets, uptime, and logging—all in one dashboard.'),
+      h('div', { className: 'hero-tags' },
+        h('span', { className: 'hero-pill' }, 'Real-time health'),
+        h('span', { className: 'hero-pill' }, 'Ticket intelligence'),
+        h('span', { className: 'hero-pill' }, 'Audit-ready logs')
+      )
+    ),
+    h('div', { className: 'hero-panel' },
+      h('div', { className: 'hero-metric-card' },
+        h('span', { className: 'hero-metric-label' }, 'Actifix status'),
+        h('div', { 
+          className: 'hero-metric-value',
+          style: { color: getStatusColor(health?.status || 'INFO') }
+        }, health?.status || 'Loading'),
+        h('span', { className: 'hero-metric-sub' }, health?.healthy ? 'System steady' : 'Review signals')
+      ),
+      h('div', { className: 'hero-metric-card' },
+        h('span', { className: 'hero-metric-label' }, 'Open tickets'),
+        h('div', { className: 'hero-metric-value' }, health?.metrics?.open_tickets ?? 'N/A'),
+        h('span', { className: 'hero-metric-sub' }, 'Tracked by Actifix')
+      ),
+      h('div', { className: 'hero-metric-card' },
+        h('span', { className: 'hero-metric-label' }, 'Uptime'),
+        h('div', { className: 'hero-metric-value' }, system?.server?.uptime || 'N/A'),
+        h('span', { className: 'hero-metric-sub' }, 'Current session')
+      )
+    )
+  );
+};
+
 // Header Component
 const Header = () => {
   const [connected, setConnected] = useState(false);
@@ -415,8 +454,8 @@ const Header = () => {
     h('div', { className: 'header-left' },
       h('img', { src: './assets/pangolin.svg', alt: 'Actifix', className: 'header-logo' }),
       h('div', { className: 'header-title' },
-        h('h1', null, 'ACTIFIX'),
-        h('span', { className: 'header-subtitle' }, 'Error Tracking Dashboard')
+        h('h1', null, 'ACTIFIX DASHBOARD'),
+        h('span', { className: 'header-subtitle' }, 'Live error intelligence')
       )
     ),
     h('div', { className: 'header-right' },
@@ -443,6 +482,7 @@ const App = () => {
   return h('div', { className: 'dashboard' },
     h(Header),
     h('main', { className: 'dashboard-content' },
+      h(DashboardHero),
       h('div', { className: 'blade-grid' },
         h(SystemInfoBlade),
         h(HealthStatsBlade),

@@ -197,13 +197,13 @@ Then check `actifix/ACTIFIX-LIST.md` and `actifix/ACTIFIX.md` for the captured t
 - `python -m actifix.main quarantine list|repair`: inspect or repair quarantined items.
 - `python -m actifix.main test`: lightweight self-test smoke.
 
-## Web Interface (Static Demo)
-The repo ships a CDN-based React page you can serve locally:
+## Web Interface (Actifix Dashboard)
+The repo ships a CDN-based React dashboard you can serve locally:
 ```bash
 cd actifix-frontend
 python3 -m http.server 8080
 ```
-Open http://localhost:8080 to view the dashboard-style demo. No build step is required.
+Open http://localhost:8080 to view the Actifix dashboard. No build step is required.
 
 ## Directory Layout & Environment
 - Defaults: tickets in `actifix/`, state in `.actifix/`, logs in `logs/`.

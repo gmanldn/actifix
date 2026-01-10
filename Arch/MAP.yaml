@@ -39,6 +39,7 @@ modules:
   summary: Public API surface and package exports
   entrypoints:
   - src/actifix/__init__.py
+  - src/actifix/api.py
   contracts:
   - expose stable API
   - centralize package exports

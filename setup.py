@@ -96,7 +96,8 @@ class SetupLogger:
             handlers=[
                 logging.FileHandler(self.log_file, mode='a'),
                 logging.StreamHandler(sys.stdout) if self.verbose else logging.NullHandler()
-            ]
+            ],
+            force=True
         )
         self.logger = logging.getLogger(__name__)
         
@@ -232,11 +233,24 @@ class PlatformDetector:
     @staticmethod
     def check_tool_available(tool: str) -> bool:
         """Check if a command-line tool is available."""
-        try:
-            subprocess.run([tool, '--version'], capture_output=True, timeout=10)
-            return True
-        except (subprocess.TimeoutExpired, subprocess.SubprocessError, FileNotFoundError):
-            return False
+        candidates = [tool]
+        if tool == 'python':
+            candidates.extend(['python3', sys.executable])
+        elif tool == 'pip':
+            candidates.extend(['pip3'])
+
+        for candidate in candidates:
+            if shutil.which(candidate):
+                return True
+
+        if tool == 'pip':
+            try:
+                subprocess.run([sys.executable, '-m', 'pip', '--version'], capture_output=True, timeout=10, check=True)
+                return True
+            except (subprocess.TimeoutExpired, subprocess.SubprocessError, FileNotFoundError):
+                return False
+
+        return False
             
     @staticmethod
     def check_disk_space(required_mb: int = 500) -> bool:
@@ -788,8 +802,8 @@ def main():
     
     # Ensure we're in the correct directory
     if not Path('pyproject.toml').exists() or not Path('src/actifix').exists():
-        print(f"{Colors.FAIL}Error: This script must be run from the ACTIFIX project root directory{Colors.ENDC}")
-        print(f"Expected to find: pyproject.toml and src/actifix/")
+        print(f"{Colors.FAIL}Error: This script must be run from the ACTIFIX project root directory{Colors.ENDC}", file=sys.stderr)
+        print(f"Expected to find: pyproject.toml and src/actifix/", file=sys.stderr)
         sys.exit(1)
         
     # Run setup

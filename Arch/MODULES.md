@@ -19,7 +19,7 @@ This file catalogs the architectural modules of the Actifix system. It provides 
 **Domain:** runtime  
 **Owner:** runtime  
 **Summary:** Public API surface and package exports  
-**Entrypoints:** src/actifix/__init__.py  
+**Entrypoints:** src/actifix/__init__.py, src/actifix/api.py  
 **Contracts:** expose stable API; centralize package exports  
 **Depends on:** core.raise_af, bootstrap.main, runtime.state, infra.health  
 

@@ -350,7 +350,7 @@ class TestSetupIntegration(unittest.TestCase):
                 timeout=60
             )
             # Note: This might fail due to missing dependencies, but shouldn't crash
-            self.assertIn([0, 1], [result.returncode])  # Allow either success or expected failure
+            self.assertIn(result.returncode, [0, 1])  # Allow either success or expected failure
         except subprocess.TimeoutExpired:
             self.fail("setup.py --test timed out")
 
