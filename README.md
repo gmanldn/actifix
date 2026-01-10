@@ -40,6 +40,8 @@ cd actifix
 # Pure stdlib; no pip install required to start using the framework
 ```
 
+> `python start.py` now watches `pyproject.toml` once per minute and restarts the static frontend server automatically when the project version changes so the UI refreshes after pushes.
+
 ### Capture Your First Error
 ```python
 import sys
@@ -88,6 +90,10 @@ tail -n 50 actifix/AFLog.txt  # lifecycle log for debugging capture
 - `create_initial_ticket()`: Seed the project with a starter ticket in self-development mode.
 
 See `src/actifix/` for implementation details: `raise_af.py` (capture engine), `bootstrap.py` (self-development), and `state_paths.py` (state management).
+
+## Raise_AF Ticketing Requirement
+
+All work must begin by logging the condition through `actifix.raise_af.record_error(...)` so a ticket appears in `actifix/ACTIFIX-LIST.md` with the proper priority and context. This ensures the RaiseAF ticketing workflow remains the single source of truth for every change and keeps the AI/automation pipeline honest.
 
 ## Configuration (Environment Variables)
 

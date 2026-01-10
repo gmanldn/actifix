@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 import socket
 import subprocess
 import sys
@@ -35,6 +36,7 @@ SRC_DIR = ROOT / "src"
 FRONTEND_DIR = ROOT / "actifix-frontend"
 DEFAULT_FRONTEND_PORT = 8080
 DEFAULT_API_PORT = 5001
+VERSION_LINE_RE = re.compile(r'^version\s*=\s*["\'](?P<version>[^"\']+)["\']', re.MULTILINE)
 
 
 def log(message: str) -> None:
@@ -104,6 +106,83 @@ def start_api_server(port: int, project_root: Path) -> threading.Thread:
             log(f"API server error: {e}")
     
     thread = threading.Thread(target=run_server, daemon=True)
+    thread.start()
+    return thread
+
+
+def read_project_version(project_root: Path) -> Optional[str]:
+    """Return the current project version from pyproject.toml."""
+    pyproject_path = project_root / "pyproject.toml"
+    if not pyproject_path.exists():
+        return None
+
+    try:
+        text = pyproject_path.read_text(encoding="utf-8")
+    except OSError:
+        return None
+
+    match = VERSION_LINE_RE.search(text)
+    if match:
+        return match.group("version").strip()
+    return None
+
+
+class FrontendManager:
+    """Thread-safe helper for managing the frontend server process."""
+
+    def __init__(self, port: int) -> None:
+        self.port = port
+        self._lock = threading.Lock()
+        self._server: Optional[subprocess.Popen] = None
+
+    def start(self) -> subprocess.Popen:
+        with self._lock:
+            self._server = start_frontend(self.port)
+            return self._server
+
+    def restart(self) -> Optional[subprocess.Popen]:
+        with self._lock:
+            self._terminate_current()
+            self._server = start_frontend(self.port)
+            return self._server
+
+    def get_process(self) -> Optional[subprocess.Popen]:
+        with self._lock:
+            return self._server
+
+    def _terminate_current(self) -> None:
+        if self._server and self._server.poll() is None:
+            try:
+                log("Stopping frontend to apply refreshed version...")
+                self._server.terminate()
+                self._server.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                self._server.kill()
+            finally:
+                self._server = None
+
+
+def start_version_monitor(
+    manager: FrontendManager,
+    project_root: Path,
+    interval_seconds: float = 60.0,
+) -> threading.Thread:
+    """Monitor pyproject version changes and bounce the frontend when needed."""
+
+    def monitor_loop() -> None:
+        last_version = read_project_version(project_root)
+        while True:
+            time.sleep(interval_seconds)
+            current_version = read_project_version(project_root)
+            if current_version != last_version:
+                log(
+                    f"Detected version change "
+                    f"{last_version or 'unknown'} -> {current_version or 'unknown'}; bouncing frontend."
+                )
+                manager.restart()
+                last_version = current_version
+
+    thread = threading.Thread(target=monitor_loop, daemon=True)
     thread.start()
     return thread
 
@@ -196,7 +275,9 @@ def main(argv: Optional[list[str]] = None) -> int:
         log(f"API available at http://localhost:{args.api_port}/api/")
 
     log(f"Starting Actifix static frontend on port {args.frontend_port}...")
-    server = start_frontend(args.frontend_port)
+    frontend_manager = FrontendManager(args.frontend_port)
+    frontend_manager.start()
+    start_version_monitor(frontend_manager, ROOT)
     url = f"http://localhost:{args.frontend_port}"
     log(f"Frontend available at {url}")
 
@@ -221,15 +302,18 @@ def main(argv: Optional[list[str]] = None) -> int:
         # Keep process alive until interrupted
         while True:
             time.sleep(1.0)
-            if server.poll() is not None:
-                return server.returncode or 0
+            current_server = frontend_manager.get_process()
+            if current_server and current_server.poll() is not None:
+                return current_server.returncode or 0
     except KeyboardInterrupt:
         log("\nStopping servers...")
-        server.terminate()
-        try:
-            server.wait(timeout=5)
-        except subprocess.TimeoutExpired:
-            server.kill()
+        current_server = frontend_manager.get_process()
+        if current_server:
+            current_server.terminate()
+            try:
+                current_server.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                current_server.kill()
         log("Stopped.")
         return 0
 
