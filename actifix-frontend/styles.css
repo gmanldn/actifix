@@ -131,6 +131,28 @@ body {
   color: var(--text-muted);
 }
 
+.version-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.15rem 0.85rem;
+  border-radius: 999px;
+  border: 1px solid;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  font-family: 'JetBrains Mono', monospace;
+  text-transform: uppercase;
+}
+
+.version-label {
+  font-weight: 600;
+}
+
+.version-sub {
+  font-size: 9px;
+  opacity: 0.8;
+}
+
 /* COMPACT NAVIGATION RAIL */
 .nav-rail {
   position: fixed;

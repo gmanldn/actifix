@@ -142,7 +142,10 @@ def test_process_next_ticket_handlers(tmp_path):
     do_af._global_manager = None
 
     ticket_id = "ACT-20250103-AAAAA"
-    active = [_ticket_block(ticket_id)]
+    active = [
+        _ticket_block(ticket_id),
+        _ticket_block("ACT-20250103-BBBBB")
+    ]
     _write_list(paths, active, [])
 
     def handler(ticket: TicketInfo) -> bool:

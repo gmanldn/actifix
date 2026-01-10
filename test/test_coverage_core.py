@@ -13,6 +13,7 @@ from types import SimpleNamespace
 import pytest
 
 import actifix
+import actifix.api as api
 from actifix.api import create_app
 from actifix.bootstrap import (
     ActifixContext,
@@ -135,6 +136,30 @@ def test_api_system_without_psutil(tmp_path, monkeypatch):
         assert data["resources"]["memory"] is None
         assert data["resources"]["cpu_percent"] is None
 
+
+def test_api_version_endpoint(tmp_path):
+    app = create_app(tmp_path)
+    app.config["TESTING"] = True
+    with app.test_client() as client:
+        response = client.get("/api/version")
+        data = response.get_json()
+        assert data["version"] == actifix.__version__
+        assert isinstance(data["git_checked"], bool)
+        assert "branch" in data
+        assert "clean" in data
+        assert "dirty" in data
+
+
+def test_api_version_endpoint_git_unchecked(tmp_path, monkeypatch):
+    monkeypatch.setattr(api, "_run_git_command", lambda *args, **kwargs: None)
+    app = create_app(tmp_path)
+    app.config["TESTING"] = True
+    with app.test_client() as client:
+        response = client.get("/api/version")
+        data = response.get_json()
+        assert data["git_checked"] is False
+        assert data["clean"] is False
+        assert data["dirty"] is False
 
 def test_bootstrap_context_creates_paths(tmp_path):
     paths = bootstrap(project_root=tmp_path)
