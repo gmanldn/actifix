@@ -30,9 +30,8 @@ SRC_DIR = ROOT / "src" / "actifix"
 
 
 def load_map() -> Dict[str, Any]:
-    """Load MAP.yaml using PyYAML."""
-    with open(ARCH_DIR / "MAP.yaml") as f:
-        return yaml.safe_load(f)
+    """Load MAP.yaml using YAML parser (JSON-compatible)."""
+    return yaml.safe_load((ARCH_DIR / "MAP.yaml").read_text())
 
 
 class TestArchitectureDocumentationExists:

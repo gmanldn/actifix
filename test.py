@@ -80,7 +80,7 @@ def run_pytest(coverage: bool, quick: bool, pattern: Optional[str]) -> Dict[str,
         cmd += ["-k", pattern]
     
     if coverage:
-        cmd += ["--cov=actifix", "--cov-report=term-missing"]
+        cmd += ["--cov=src/actifix", "--cov-report=term-missing"]
     
     env = os.environ.copy()
     env.setdefault("PYTHONPATH", str(ROOT / "src"))
