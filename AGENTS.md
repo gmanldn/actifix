@@ -590,3 +590,818 @@ else:
     # Process valid content
     process_ticket(block)
 ```
+
+---
+
+## 3.4 Application Layer
+
+### `src/actifix/raise_af.py` - Error Capture and Ticket Creation
+
+**Purpose:** The ONLY entry point for recording errors. All errors flow through this module.
+
+**Primary Exports:**
+
+```python
+class TicketPriority(str, Enum):
+    P0 = "P0"  # Critical - system down, data loss risk
+    P1 = "P1"  # High - major feature broken
+    P2 = "P2"  # Medium - feature degraded
+    P3 = "P3"  # Low - minor issue
+    P4 = "P4"  # Trivial - cosmetic/enhancement
+
+@dataclass
+class ActifixEntry:
+    entry_id: str           # Unique entry ID (e.g., "AF-20260110-abc123")
+    timestamp: str          # ISO 8601 timestamp
+    source: str             # Source file/module
+    error_type: str         # Exception class name or error category
+    message: str            # Human-readable error message
+    stack_trace: str        # Full stack trace
+    file_context: Dict      # Surrounding code context
+    system_state: Dict      # Memory, CPU, disk state
+    priority: TicketPriority
+    duplicate_guard: str    # Hash for deduplication
+    correlation_id: str     # For request tracing
+    ai_notes: str          # AI remediation hints
+```
+
+**Interface Contract:**
+
+| Function | Input | Output | Side Effects | Exceptions |
+|----------|-------|--------|--------------|------------|
+| `record_error(message, source, correlation_id, error_type, priority, extra_context)` | str, str, Optional[str], str, Optional[TicketPriority], Optional[Dict] | Optional[str] | Creates ticket, logs | None (fails silently) |
+| `generate_entry_id()` | None | str | None | None |
+| `generate_ticket_id()` | None | str | None | None |
+| `generate_duplicate_guard(source, message, error_type)` | str, str, str | str | None | None |
+| `check_duplicate_guard(guard, base_dir)` | str, Path | bool | None | None |
+| `classify_priority(error_type, message, source)` | str, str, str | TicketPriority | None | None |
+| `capture_stack_trace()` | None | str | None | None |
+| `capture_file_context(source, max_lines)` | str, int | Dict | None | None |
+| `capture_system_state()` | None | Dict | None | None |
+| `redact_secrets_from_text(text)` | str | str | None | None |
+
+**Duplicate Guard System:**
+```python
+# Duplicate guard is a hash of: source + message + error_type
+# If a guard already exists in ACTIFIX-LIST.md OR Completed section:
+#   - The error is NOT recorded again
+#   - This prevents infinite loops of the same error
+```
+
+**Priority Classification Rules:**
+```python
+# P0 - Critical:
+#   - "critical", "fatal", "emergency" in message
+#   - SystemExit, KeyboardInterrupt exceptions
+#   - Data corruption indicators
+
+# P1 - High:
+#   - Database errors, authentication failures
+#   - Core functionality broken
+
+# P2 - Medium:
+#   - Standard exceptions (ValueError, TypeError, etc.)
+#   - Default priority
+
+# P3 - Low:
+#   - Warnings promoted to errors
+#   - Non-critical integrations
+
+# P4 - Trivial:
+#   - Cosmetic issues, deprecation warnings
+```
+
+**Critical Rules:**
+1. **ALL errors MUST flow through `record_error()`** - no exceptions
+2. `record_error()` **NEVER raises** - it logs failures internally
+3. Secrets are **automatically redacted** from all captured context
+4. Duplicate guards prevent the same error from creating multiple tickets
+5. The fallback queue ensures errors are recorded even if main storage fails
+
+**Fallback Queue Mechanism:**
+```python
+# If writing to ACTIFIX-LIST.md fails:
+1. Entry is queued to .actifix/fallback_queue.json
+2. On next successful operation, replay_fallback_queue() is called
+3. Queued entries are written to main storage
+4. This ensures NO error is ever lost
+```
+
+**Expected Usage Pattern:**
+```python
+from actifix.raise_af import record_error, TicketPriority
+
+# Basic error recording
+record_error(
+    message="Database connection failed",
+    source="db/connection.py"
+)
+
+# With explicit priority and correlation
+record_error(
+    message="Payment processing failed",
+    source="payments/stripe.py",
+    correlation_id="req-abc123",
+    error_type="PaymentError",
+    priority=TicketPriority.P1,
+    extra_context={"customer_id": "cust_xxx", "amount": 99.99}
+)
+
+# From exception handler
+try:
+    risky_operation()
+except Exception as e:
+    record_error(
+        message=str(e),
+        source=__file__,
+        error_type=type(e).__name__
+    )
+```
+
+### `src/actifix/do_af.py` - Ticket Processing and Remediation
+
+**Purpose:** Process tickets, coordinate fixes, and track completion.
+
+**Primary Exports:**
+
+```python
+@dataclass
+class TicketInfo:
+    ticket_id: str          # e.g., "AF-20260110-001"
+    entry_id: str           # Original entry ID
+    priority: str           # P0-P4
+    source: str             # Source file
+    message: str            # Error message
+    created: str            # ISO timestamp
+    status: str             # "open" or "completed"
+    duplicate_guard: str    # For dedup checking
+    raw_block: str          # Original markdown block
+
+class StatefulTicketManager:
+    """Cached ticket management with TTL-based invalidation."""
+    def get_open_tickets(self) -> list[TicketInfo]: ...
+    def get_completed_tickets(self) -> list[TicketInfo]: ...
+    def get_stats(self) -> dict: ...
+    def invalidate_cache(self) -> None: ...
+```
+
+**Interface Contract:**
+
+| Function | Input | Output | Side Effects | Exceptions |
+|----------|-------|--------|--------------|------------|
+| `get_open_tickets(paths, use_cache)` | Optional[ActifixPaths], bool | list[TicketInfo] | None | None |
+| `get_completed_tickets(paths, use_cache)` | Optional[ActifixPaths], bool | list[TicketInfo] | None | None |
+| `get_ticket_stats(paths, use_cache)` | Optional[ActifixPaths], bool | dict | None | None |
+| `mark_ticket_complete(ticket_id, resolution, paths)` | str, str, Optional[ActifixPaths] | bool | Moves ticket | None |
+| `process_next_ticket(processor_fn, paths)` | Callable, Optional[ActifixPaths] | Optional[str] | Processes ticket | None |
+| `process_tickets(processor_fn, max_tickets, paths)` | Callable, int, Optional[ActifixPaths] | dict | Batch process | None |
+| `parse_ticket_block(block)` | str | Optional[TicketInfo] | None | None |
+| `get_ticket_manager(paths, cache_ttl)` | Optional[ActifixPaths], int | StatefulTicketManager | Creates singleton | None |
+
+**Ticket Processing Flow:**
+```
+1. get_open_tickets() returns tickets sorted by priority (P0 first)
+2. process_next_ticket() picks highest priority ticket
+3. processor_fn(ticket) is called - returns resolution string
+4. If successful, mark_ticket_complete() moves ticket to Completed section
+5. AFLog.txt records the completion event
+```
+
+**Processor Function Contract:**
+```python
+def my_processor(ticket: TicketInfo) -> str:
+    """
+    Process a ticket and return resolution description.
+    
+    Args:
+        ticket: The ticket to process
+        
+    Returns:
+        Resolution string (e.g., "Fixed null check in line 42")
+        
+    Raises:
+        Any exception - ticket remains open, error is logged
+    """
+    # Analyze the error
+    # Apply fix
+    # Run tests
+    return "Applied fix: added null check"
+```
+
+**Concurrency and Locking:**
+```python
+# File-level locking prevents concurrent ticket modifications
+# Lock is acquired via _ticket_lock() context manager
+# Lock timeout: 10 seconds (configurable)
+# On timeout: operation fails gracefully, no corruption
+```
+
+**Critical Rules:**
+1. **ALWAYS** process tickets by priority order (P0 before P1, etc.)
+2. **NEVER** mark a ticket complete without validation
+3. Cache invalidation is **automatic** when list file changes
+4. The ticket manager is a **singleton** - use `get_ticket_manager()`
+5. Locking ensures **no concurrent modifications** to ticket list
+
+**Expected Usage Pattern:**
+```python
+from actifix.do_af import (
+    get_open_tickets, 
+    mark_ticket_complete,
+    process_tickets,
+    get_ticket_stats
+)
+
+# Get current stats
+stats = get_ticket_stats()
+print(f"Open: {stats['open']}, Completed: {stats['completed']}")
+
+# Process tickets with custom handler
+def auto_fix(ticket):
+    if "null" in ticket.message.lower():
+        return "Added null safety check"
+    raise ValueError("Cannot auto-fix this ticket")
+
+results = process_tickets(
+    processor_fn=auto_fix,
+    max_tickets=5
+)
+print(f"Processed: {results['processed']}, Failed: {results['failed']}")
+
+# Manual completion
+mark_ticket_complete(
+    ticket_id="AF-20260110-001",
+    resolution="Fixed manually by adding input validation"
+)
+```
+
+### `src/actifix/health.py` - System Health Monitoring
+
+**Purpose:** Monitor system health, detect SLA breaches, and report status.
+
+**Primary Export:**
+
+```python
+@dataclass
+class ActifixHealthCheck:
+    status: str             # "OK", "WARNING", "ERROR", "SLA_BREACH"
+    open_tickets: int       # Count of open tickets
+    completed_tickets: int  # Count of completed tickets
+    p0_count: int          # Critical tickets
+    p1_count: int          # High priority tickets
+    sla_breaches: list     # Tickets breaching SLA
+    storage_health: bool   # Storage backend healthy
+    last_error: Optional[str]
+    checked_at: datetime
+```
+
+**Interface Contract:**
+
+| Function | Input | Output | Side Effects | Exceptions |
+|----------|-------|--------|--------------|------------|
+| `get_health(paths)` | Optional[ActifixPaths] | ActifixHealthCheck | None | None |
+| `check_sla_breaches(paths)` | Optional[ActifixPaths] | list[dict] | None | None |
+| `run_health_check(paths, print_report)` | Optional[ActifixPaths], bool | ActifixHealthCheck | Prints if requested | None |
+| `format_health_report(health)` | ActifixHealthCheck | str | None | None |
+
+**SLA Thresholds (Default):**
+```python
+SLA_HOURS = {
+    "P0": 1,    # 1 hour - Critical
+    "P1": 4,    # 4 hours - High
+    "P2": 24,   # 24 hours - Medium
+    "P3": 72,   # 72 hours - Low
+    "P4": 168,  # 1 week - Trivial
+}
+```
+
+**Health Status Logic:**
+```python
+def determine_status(health):
+    if health.sla_breaches:
+        return "SLA_BREACH"
+    if health.p0_count > 0:
+        return "ERROR"
+    if health.p1_count > 0 or health.open_tickets > 10:
+        return "WARNING"
+    return "OK"
+```
+
+**Critical Rules:**
+1. Health checks are **non-blocking** - never raises exceptions
+2. SLA breaches are calculated from ticket `created` timestamp
+3. Run health check **at startup** and **periodically** (recommended: every 5 min)
+4. `status == "SLA_BREACH"` requires immediate attention
+
+**Expected Usage Pattern:**
+```python
+from actifix.health import get_health, run_health_check, format_health_report
+
+# Quick status check
+health = get_health()
+if health.status != "OK":
+    print(f"⚠️  System health: {health.status}")
+    print(f"   P0 tickets: {health.p0_count}")
+    print(f"   SLA breaches: {len(health.sla_breaches)}")
+
+# Full report
+health = run_health_check(print_report=True)
+
+# Custom reporting
+report = format_health_report(health)
+send_to_monitoring_system(report)
+```
+
+---
+
+## 3.5 Presentation Layer
+
+### `src/actifix/api.py` - REST API Server
+
+**Purpose:** HTTP API for frontend and external integrations.
+
+**Interface Contract:**
+
+| Endpoint | Method | Response | Purpose |
+|----------|--------|----------|---------|
+| `/api/ping` | GET | `{"status": "ok"}` | Health check |
+| `/api/health` | GET | `ActifixHealthCheck` | Full health status |
+| `/api/version` | GET | Version info | Git commit, version |
+| `/api/stats` | GET | Ticket statistics | Open/completed counts |
+| `/api/tickets` | GET | List of tickets | All open and completed |
+| `/api/logs` | GET | Recent log entries | Last N log lines |
+| `/api/system` | GET | System resources | CPU, memory, disk |
+| `/api/modules` | GET | Module catalog | Architecture info |
+
+**Response Format (all endpoints):**
+```python
+{
+    "success": bool,
+    "data": {...},        # Actual response data
+    "error": str | None,  # Error message if failed
+    "timestamp": str      # ISO timestamp
+}
+```
+
+**API Server Functions:**
+
+| Function | Input | Output | Purpose |
+|----------|-------|--------|---------|
+| `create_app(project_root)` | Optional[Path] | Flask app | Create configured app |
+| `run_api_server(host, port, debug, project_root)` | str, int, bool, Optional[Path] | None | Start server |
+
+**Critical Rules:**
+1. **ALWAYS** return JSON with consistent structure
+2. **NEVER** expose internal paths or sensitive data in responses
+3. **ALWAYS** include CORS headers for frontend access
+4. API errors return HTTP 200 with `success: false` (not 500)
+5. System resources (CPU/memory) must **never return null**
+
+**Expected Usage Pattern:**
+```python
+from actifix.api import create_app, run_api_server
+
+# Create app for testing
+app = create_app()
+with app.test_client() as client:
+    response = client.get('/api/health')
+    assert response.status_code == 200
+
+# Run production server
+run_api_server(host="0.0.0.0", port=5001)
+```
+
+### `src/actifix/main.py` - CLI Interface
+
+**Purpose:** Command-line interface for all actifix operations.
+
+**CLI Commands:**
+
+| Command | Arguments | Purpose |
+|---------|-----------|---------|
+| `actifix init` | `--project-root` | Initialize actifix in project |
+| `actifix health` | `--json` | Show health status |
+| `actifix record` | `--message`, `--source`, `--priority` | Record an error manually |
+| `actifix process` | `--max-tickets` | Process pending tickets |
+| `actifix stats` | `--json` | Show ticket statistics |
+| `actifix quarantine` | `list`, `remove` | Manage quarantine |
+| `actifix test` | None | Run self-tests |
+
+**Exit Codes:**
+```python
+EXIT_SUCCESS = 0    # Command completed successfully
+EXIT_ERROR = 1      # Command failed
+EXIT_USAGE = 2      # Invalid usage/arguments
+```
+
+**Critical Rules:**
+1. **ALWAYS** exit with appropriate code
+2. **NEVER** suppress errors - log and exit with code 1
+3. `--json` flag outputs machine-readable JSON
+4. Commands are **idempotent** where possible
+
+---
+
+# PART 4: DATA CONTRACTS AND FILE FORMATS
+
+## 4.1 ACTIFIX-LIST.md Format
+
+**Location:** `actifix/ACTIFIX-LIST.md`
+
+**Structure:**
+```markdown
+# ACTIFIX-LIST
+
+## Open Tickets
+
+### [AF-YYYYMMDD-XXXXXX] Priority: PX
+- **Source:** path/to/file.py
+- **Error Type:** ExceptionType
+- **Message:** Human readable error message
+- **Created:** 2026-01-10T12:00:00Z
+- **Duplicate Guard:** hash_value
+- **Correlation ID:** corr-id-value
+
+<details>
+<summary>Stack Trace</summary>
+
+```
+Full stack trace here
+```
+
+</details>
+
+<details>
+<summary>AI Notes</summary>
+
+Suggested remediation steps...
+
+</details>
+
+---
+
+## Completed Items
+
+### [AF-YYYYMMDD-XXXXXX] Priority: PX ✅
+- **Resolved:** 2026-01-10T14:00:00Z
+- **Resolution:** Description of fix applied
+
+(original ticket content preserved below)
+```
+
+**Parsing Contract:**
+```python
+# Block delimiter: "---" on its own line
+# Ticket ID pattern: r'\[AF-\d{8}-[a-f0-9]+\]'
+# Priority pattern: r'Priority: P[0-4]'
+# Required fields: Source, Message, Created, Duplicate Guard
+```
+
+## 4.2 ACTIFIX.md Format (Recent Errors)
+
+**Location:** `actifix/ACTIFIX.md`
+
+**Structure:**
+```markdown
+# Recent Errors (Last 20)
+
+## [AF-YYYYMMDD-XXXXXX] 2026-01-10T12:00:00Z
+**Source:** path/to/file.py
+**Message:** Error message
+
+---
+```
+
+**Rolling Window:**
+- Maximum 20 entries
+- LIFO order (newest first)
+- Truncated when limit exceeded
+
+## 4.3 AFLog.txt Format
+
+**Location:** `actifix/AFLog.txt`
+
+**Structure:**
+```
+[2026-01-10T12:00:00Z] TICKET_CREATED | AF-20260110-abc123 | P2 | source.py | message
+[2026-01-10T12:30:00Z] TICKET_COMPLETED | AF-20260110-abc123 | Resolution text
+[2026-01-10T12:31:00Z] HEALTH_CHECK | OK | open=5 completed=42
+[2026-01-10T12:32:00Z] QUARANTINE_CREATED | Q-20260110-def456 | reason
+```
+
+**Event Types:**
+- `TICKET_CREATED` - New ticket recorded
+- `TICKET_COMPLETED` - Ticket marked complete
+- `HEALTH_CHECK` - Periodic health check
+- `QUARANTINE_CREATED` - Content quarantined
+- `ERROR` - Internal error (meta)
+
+## 4.4 Quarantine File Format
+
+**Location:** `actifix/quarantine/Q-YYYYMMDD-XXXXXX.json`
+
+**Structure:**
+```json
+{
+  "quarantine_id": "Q-20260110-abc123",
+  "timestamp": "2026-01-10T12:00:00Z",
+  "reason": "Invalid ticket block: missing required field",
+  "source": "ACTIFIX-LIST.md",
+  "content": "Original content that was quarantined"
+}
+```
+
+---
+
+# PART 5: ERROR FLOW AND LIFECYCLE
+
+## 5.1 Error Capture Flow
+
+```
+Exception Occurs
+       │
+       ▼
+bootstrap.py (exception handler)
+       │
+       ▼
+raise_af.record_error()
+       │
+       ├──► check_duplicate_guard() ──► Already exists? ──► SKIP
+       │
+       ▼
+generate_entry_id()
+       │
+       ▼
+capture_stack_trace()
+capture_file_context()
+capture_system_state()
+       │
+       ▼
+classify_priority()
+       │
+       ▼
+redact_secrets_from_text()
+       │
+       ▼
+_append_ticket() ──► FAIL? ──► _queue_to_fallback()
+       │
+       ▼
+_append_recent()
+       │
+       ▼
+log_event(AFLog.txt)
+       │
+       ▼
+Return entry_id
+```
+
+## 5.2 Ticket Lifecycle
+
+```
+CREATED ──► OPEN ──► PROCESSING ──► COMPLETED
+   │          │          │              │
+   │          │          │              ▼
+   │          │          │         (in Completed section)
+   │          │          │
+   │          │          └──► FAILED (remains OPEN)
+   │          │
+   │          └──► STALE (SLA breach)
+   │
+   └──► DUPLICATE (not created)
+```
+
+## 5.3 Recovery Flow (Startup)
+
+```
+bootstrap()
+    │
+    ▼
+replay_fallback_queue()
+    │
+    ▼
+check_storage_health()
+    │
+    ├──► UNHEALTHY ──► Log warning, continue with degraded mode
+    │
+    ▼
+run_health_check()
+    │
+    ├──► SLA_BREACH ──► Alert (log prominently)
+    │
+    ▼
+System ready
+```
+
+---
+
+# PART 6: TESTING FRAMEWORK
+
+## 6.1 Test Categories
+
+| Category | Location | Purpose | Run Command |
+|----------|----------|---------|-------------|
+| Unit | `test/test_*.py` | Module isolation | `pytest test/` |
+| Integration | `test/test_comprehensive.py` | Cross-module | `pytest -k comprehensive` |
+| Architecture | `test/test_architecture_validation.py` | Dependency rules | `pytest -k architecture` |
+| System | `src/actifix/testing/system.py` | End-to-end | `python test.py` |
+
+## 6.2 Test Requirements
+
+**Coverage Requirements:**
+```python
+MINIMUM_COVERAGE = 95  # Percent
+CRITICAL_PATHS = [
+    "raise_af.record_error",
+    "do_af.mark_ticket_complete",
+    "persistence.atomic_write",
+]
+# Critical paths require 100% coverage
+```
+
+**Test Isolation:**
+```python
+# Every test MUST:
+1. Use isolated temporary directories
+2. Reset all singletons (reset_actifix_paths(), reset_config())
+3. Not depend on external state
+4. Clean up after execution
+```
+
+## 6.3 Test Utilities
+
+**`src/actifix/testing/__init__.py` exports:**
+
+```python
+def assert_true(condition: bool, message: str) -> None: ...
+def assert_equals(actual, expected, message: str = "") -> None: ...
+def assert_raises(exception_type, callable, *args, **kwargs) -> None: ...
+```
+
+**`src/actifix/testing/system.py` exports:**
+
+```python
+def build_system_tests(paths: ActifixPaths) -> list[tuple]: ...
+# Returns: [(name, func, description, tags), ...]
+```
+
+## 6.4 Running Tests
+
+```bash
+# Full suite (REQUIRED before commit)
+python test.py
+
+# With coverage
+python test.py --coverage
+
+# Quick mode (skips slow tests)
+python test.py --quick
+
+# Specific pattern
+pytest test/ -k "raise_af"
+
+# Architecture validation only
+pytest test/test_architecture_validation.py -v
+```
+
+---
+
+# PART 7: COMMON PATTERNS AND ANTI-PATTERNS
+
+## 7.1 Correct Patterns ✅
+
+**Error Recording:**
+```python
+# ✅ CORRECT: Use record_error for all errors
+from actifix.raise_af import record_error
+
+try:
+    dangerous_operation()
+except Exception as e:
+    record_error(message=str(e), source=__file__)
+    raise  # Re-raise after recording
+```
+
+**Path Access:**
+```python
+# ✅ CORRECT: Use ActifixPaths
+from actifix.state_paths import get_actifix_paths
+
+paths = get_actifix_paths()
+list_file = paths.list_file
+```
+
+**File Writing:**
+```python
+# ✅ CORRECT: Use atomic operations
+from actifix.log_utils import atomic_write
+
+atomic_write(path, content)
+```
+
+## 7.2 Anti-Patterns ❌
+
+**Manual Error Handling:**
+```python
+# ❌ WRONG: Silently catching errors
+try:
+    operation()
+except Exception:
+    pass  # Error lost forever!
+```
+
+**Manual Path Construction:**
+```python
+# ❌ WRONG: Hardcoding paths
+log_file = Path("actifix/ACTIFIX-LIST.md")  # May not exist!
+```
+
+**Non-Atomic Writes:**
+```python
+# ❌ WRONG: Can corrupt on crash
+with open(path, "w") as f:
+    f.write(content)
+```
+
+**Bypassing Duplicate Guards:**
+```python
+# ❌ WRONG: Creates infinite loops
+entry = ActifixEntry(...)
+_append_ticket(entry)  # Skips duplicate check!
+```
+
+---
+
+# PART 8: QUICK REFERENCE
+
+## 8.1 Import Cheat Sheet
+
+```python
+# Bootstrap
+from actifix.bootstrap import bootstrap, shutdown, ActifixContext
+
+# Paths
+from actifix.state_paths import get_actifix_paths, ensure_actifix_dirs
+
+# Config
+from actifix.config import load_config, get_config
+
+# Error Recording (MOST IMPORTANT)
+from actifix.raise_af import record_error, TicketPriority
+
+# Ticket Processing
+from actifix.do_af import get_open_tickets, mark_ticket_complete, get_ticket_stats
+
+# Health
+from actifix.health import get_health, run_health_check
+
+# Quarantine
+from actifix.quarantine import quarantine_content, validate_ticket_block
+
+# Persistence
+from actifix.persistence.storage import FileStorageBackend
+from actifix.persistence.atomic import atomic_write, safe_read
+from actifix.persistence.manager import PersistenceManager
+
+# Logging
+from actifix.log_utils import atomic_write, idempotent_append
+```
+
+## 8.2 Common Operations
+
+```python
+# Initialize system
+with ActifixContext() as paths:
+    # System ready
+
+# Record an error
+record_error("Something failed", source=__file__)
+
+# Check health
+health = get_health()
+if health.status != "OK":
+    print(f"Warning: {health.status}")
+
+# Process tickets
+stats = get_ticket_stats()
+print(f"Open: {stats['open']}")
+
+# Mark complete
+mark_ticket_complete("AF-20260110-abc123", "Fixed by adding null check")
+```
+
+## 8.3 File Locations
+
+| File | Path | Purpose |
+|------|------|---------|
+| Ticket List | `actifix/ACTIFIX-LIST.md` | All tickets |
+| Recent Errors | `actifix/ACTIFIX.md` | Last 20 errors |
+| Audit Log | `actifix/AFLog.txt` | Event history |
+| Quarantine | `actifix/quarantine/` | Isolated content |
+| State | `.actifix/` | Internal state |
+| Logs | `logs/` | Application logs |
+
+---
+
+**END OF AGENTS.md**
+
+*This document must be kept in sync with CLAUDE.md and GPT.md*
