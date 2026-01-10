@@ -491,6 +491,5206 @@ Error Message: MULTIUSER-ATOMIC-002: Add Cross-Process Lock to ACTIFIX-LIST.md R
 ...
 </details>
 
+### ACT-20260110-FA6A3 - [P0] ArchitectureAccuracy: ARCH-ACC-001: Validate MAP.yaml modules match actual Python files in src/actifix/
+- **Priority**: P0
+- **Error Type**: ArchitectureAccuracy
+- **Source**: `Arch/MAP.yaml:modules`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:08.953919+00:00
+- **Duplicate Guard**: `ACTIFIX-Arch-MAP-yaml:modules-59e14da1`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-D42C7 - [P0] ArchitectureAccuracy: ARCH-ACC-002: Ensure all DEPGRAPH.json nodes exist as modules in MAP.yaml
+- **Priority**: P0
+- **Error Type**: ArchitectureAccuracy
+- **Source**: `Arch/DEPGRAPH.json:nodes`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:08.961700+00:00
+- **Duplicate Guard**: `ACTIFIX-Arch-DEPGRAPH-json:nodes-cda3bc39`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-BCA1D - [P0] ArchitectureAccuracy: ARCH-ACC-003: Verify all entrypoints in MAP.yaml resolve to existing files
+- **Priority**: P0
+- **Error Type**: ArchitectureAccuracy
+- **Source**: `Arch/MAP.yaml:entrypoints`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:08.985974+00:00
+- **Duplicate Guard**: `ACTIFIX-Arch-MAP-yaml:entrypoints-df5a28cf`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-39B89 - [P0] ArchitectureAccuracy: ARCH-ACC-004: Validate dependency edges in DEPGRAPH.json match depends_on in MAP.yaml
+- **Priority**: P0
+- **Error Type**: ArchitectureAccuracy
+- **Source**: `Arch/DEPGRAPH.json:edges`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.011571+00:00
+- **Duplicate Guard**: `ACTIFIX-Arch-DEPGRAPH-json:edges-49d3c0d5`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-4C293 - [P1] ArchitectureAccuracy: ARCH-ACC-005: Check all contracts reference valid module IDs
+- **Priority**: P1
+- **Error Type**: ArchitectureAccuracy
+- **Source**: `Arch/MAP.yaml:contracts`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.019180+00:00
+- **Duplicate Guard**: `ACTIFIX-Arch-MAP-yaml:contracts-d3cc325a`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-C37A1 - [P1] ArchitectureAccuracy: ARCH-ACC-006: Ensure domain definitions cover all module domains
+- **Priority**: P1
+- **Error Type**: ArchitectureAccuracy
+- **Source**: `Arch/MAP.yaml:domains`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.024022+00:00
+- **Duplicate Guard**: `ACTIFIX-Arch-MAP-yaml:domains-3d2db191`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-5671C - [P1] ArchitectureAccuracy: ARCH-ACC-007: Validate owner fields are consistent across MAP.yaml modules
+- **Priority**: P1
+- **Error Type**: ArchitectureAccuracy
+- **Source**: `Arch/MAP.yaml:owners`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.029331+00:00
+- **Duplicate Guard**: `ACTIFIX-Arch-MAP-yaml:owners-253ede56`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-08824 - [P1] ArchitectureAccuracy: ARCH-ACC-008: Verify MODULES.md content matches MAP.yaml module definitions
+- **Priority**: P1
+- **Error Type**: ArchitectureAccuracy
+- **Source**: `Arch/MODULES.md:sync`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.035127+00:00
+- **Duplicate Guard**: `ACTIFIX-Arch-MODULES-md:sync-e2146714`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-BBB8D - [P1] ArchitectureAccuracy: ARCH-ACC-009: Check ARCHITECTURE_CORE.md principles are enforced by tests
+- **Priority**: P1
+- **Error Type**: ArchitectureAccuracy
+- **Source**: `Arch/ARCHITECTURE_CORE.md:enforcement`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.041390+00:00
+- **Duplicate Guard**: `ACTIFIX-Arch-ARCHITECTURE_CORE-md:enforcement-76284538`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-0AEE3 - [P1] ArchitectureAccuracy: ARCH-ACC-010: Validate module summaries accurately describe functionality
+- **Priority**: P1
+- **Error Type**: ArchitectureAccuracy
+- **Source**: `Arch/MAP.yaml:summaries`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.047565+00:00
+- **Duplicate Guard**: `ACTIFIX-Arch-MAP-yaml:summaries-8fd960d3`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-D0362 - [P1] ArchitectureAccuracy: ARCH-ACC-011: Ensure persistence subsystem modules are all documented
+- **Priority**: P1
+- **Error Type**: ArchitectureAccuracy
+- **Source**: `Arch/MAP.yaml:persistence`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.053937+00:00
+- **Duplicate Guard**: `ACTIFIX-Arch-MAP-yaml:persistence-2105e10f`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-2DF32 - [P1] ArchitectureAccuracy: ARCH-ACC-012: Verify testing subsystem modules are properly cataloged
+- **Priority**: P1
+- **Error Type**: ArchitectureAccuracy
+- **Source**: `Arch/MAP.yaml:testing`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.060063+00:00
+- **Duplicate Guard**: `ACTIFIX-Arch-MAP-yaml:testing-6773669e`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-8B649 - [P0] ArchitectureAccuracy: ARCH-ACC-013: Check core error handling modules (raise_af, do_af) documentation
+- **Priority**: P0
+- **Error Type**: ArchitectureAccuracy
+- **Source**: `Arch/MAP.yaml:core`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.064753+00:00
+- **Duplicate Guard**: `ACTIFIX-Arch-MAP-yaml:core-6068dcce`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-66C0A - [P1] ArchitectureAccuracy: ARCH-ACC-014: Validate bootstrap.main entrypoint documentation accuracy
+- **Priority**: P1
+- **Error Type**: ArchitectureAccuracy
+- **Source**: `Arch/MAP.yaml:bootstrap`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.070403+00:00
+- **Duplicate Guard**: `ACTIFIX-Arch-MAP-yaml:bootstrap-2a7ee6d7`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-7E7A0 - [P1] ArchitectureAccuracy: ARCH-ACC-015: Ensure infra.logging contract is documented with all requirements
+- **Priority**: P1
+- **Error Type**: ArchitectureAccuracy
+- **Source**: `Arch/MAP.yaml:logging_contract`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.074962+00:00
+- **Duplicate Guard**: `ACTIFIX-Arch-MAP-yaml:logging_contract-dd60d04e`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-ED862 - [P1] ArchitectureAccuracy: ARCH-ACC-016: Verify quarantine module isolation behavior is documented
+- **Priority**: P1
+- **Error Type**: ArchitectureAccuracy
+- **Source**: `Arch/MAP.yaml:quarantine`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.080056+00:00
+- **Duplicate Guard**: `ACTIFIX-Arch-MAP-yaml:quarantine-13239fa8`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-7C912 - [P1] ArchitectureAccuracy: ARCH-ACC-017: Check health monitoring module contracts are accurate
+- **Priority**: P1
+- **Error Type**: ArchitectureAccuracy
+- **Source**: `Arch/MAP.yaml:health`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.085753+00:00
+- **Duplicate Guard**: `ACTIFIX-Arch-MAP-yaml:health-14a27c2b`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-8ADFD - [P1] ArchitectureAccuracy: ARCH-ACC-018: Validate state_paths module path resolution documentation
+- **Priority**: P1
+- **Error Type**: ArchitectureAccuracy
+- **Source**: `Arch/MAP.yaml:state_paths`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.090200+00:00
+- **Duplicate Guard**: `ACTIFIX-Arch-MAP-yaml:state_paths-19a3c34b`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-C6725 - [P1] ArchitectureAccuracy: ARCH-ACC-019: Ensure config module validation behavior is documented
+- **Priority**: P1
+- **Error Type**: ArchitectureAccuracy
+- **Source**: `Arch/MAP.yaml:config`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.094540+00:00
+- **Duplicate Guard**: `ACTIFIX-Arch-MAP-yaml:config-6e8d3f7a`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-28776 - [P1] ArchitectureAccuracy: ARCH-ACC-020: Verify all __init__.py exports match documented public API
+- **Priority**: P1
+- **Error Type**: ArchitectureAccuracy
+- **Source**: `Arch/MAP.yaml:public_api`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.098670+00:00
+- **Duplicate Guard**: `ACTIFIX-Arch-MAP-yaml:public_api-11def78c`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-AEB34 - [P1] TestingInfrastructure: ARCH-TEST-001: Add property-based tests for MAP.yaml schema validation
+- **Priority**: P1
+- **Error Type**: TestingInfrastructure
+- **Source**: `test/test_architecture_property.py:map_schema`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.103132+00:00
+- **Duplicate Guard**: `ACTIFIX-test-test_architecture_property-py:map_s-752616d3`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-3E0F8 - [P1] TestingInfrastructure: ARCH-TEST-002: Implement fuzzing tests for DEPGRAPH.json parser
+- **Priority**: P1
+- **Error Type**: TestingInfrastructure
+- **Source**: `test/test_architecture_fuzz.py:depgraph`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.107162+00:00
+- **Duplicate Guard**: `ACTIFIX-test-test_architecture_fuzz-py:depgraph-de33712a`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-8BA1A - [P1] TestingInfrastructure: ARCH-TEST-003: Add snapshot tests for generated MODULES.md content
+- **Priority**: P1
+- **Error Type**: TestingInfrastructure
+- **Source**: `test/test_architecture_snapshot.py:modules`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.111083+00:00
+- **Duplicate Guard**: `ACTIFIX-test-test_architecture_snapshot-py:modul-714089b9`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-17302 - [P1] TestingInfrastructure: ARCH-TEST-004: Create regression test suite for architecture document changes
+- **Priority**: P1
+- **Error Type**: TestingInfrastructure
+- **Source**: `test/test_architecture_regression.py:main`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.115093+00:00
+- **Duplicate Guard**: `ACTIFIX-test-test_architecture_regression-py:mai-fab3f86c`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-4E382 - [P1] TestingInfrastructure: ARCH-TEST-005: Implement contract violation detection tests
+- **Priority**: P1
+- **Error Type**: TestingInfrastructure
+- **Source**: `test/test_architecture_contracts.py:violations`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.119740+00:00
+- **Duplicate Guard**: `ACTIFIX-test-test_architecture_contracts-py:viol-c2e8e578`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-2620F - [P1] TestingInfrastructure: ARCH-TEST-006: Add tests for circular dependency detection in DEPGRAPH
+- **Priority**: P1
+- **Error Type**: TestingInfrastructure
+- **Source**: `test/test_architecture_cycles.py:detection`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.123901+00:00
+- **Duplicate Guard**: `ACTIFIX-test-test_architecture_cycles-py:detecti-5e9b7069`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-8E402 - [P1] TestingInfrastructure: ARCH-TEST-007: Create tests for orphan module detection (undocumented code)
+- **Priority**: P1
+- **Error Type**: TestingInfrastructure
+- **Source**: `test/test_architecture_orphans.py:detection`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.127998+00:00
+- **Duplicate Guard**: `ACTIFIX-test-test_architecture_orphans-py:detect-c327b6e7`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-E1DF5 - [P1] TestingInfrastructure: ARCH-TEST-008: Implement tests for domain boundary violations
+- **Priority**: P1
+- **Error Type**: TestingInfrastructure
+- **Source**: `test/test_architecture_domains.py:boundaries`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.132417+00:00
+- **Duplicate Guard**: `ACTIFIX-test-test_architecture_domains-py:bounda-768c0ff2`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-236A5 - [P1] TestingInfrastructure: ARCH-TEST-009: Add tests for architecture freshness timestamp validation
+- **Priority**: P1
+- **Error Type**: TestingInfrastructure
+- **Source**: `test/test_architecture_freshness.py:timestamps`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.137260+00:00
+- **Duplicate Guard**: `ACTIFIX-test-test_architecture_freshness-py:time-0be12d96`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-6EAB5 - [P1] TestingInfrastructure: ARCH-TEST-010: Create tests for generator version compatibility
+- **Priority**: P1
+- **Error Type**: TestingInfrastructure
+- **Source**: `test/test_architecture_version.py:compat`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.141234+00:00
+- **Duplicate Guard**: `ACTIFIX-test-test_architecture_version-py:compat-905de2dd`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-1141A - [P1] TestingInfrastructure: ARCH-TEST-011: Implement tests for module import path resolution
+- **Priority**: P1
+- **Error Type**: TestingInfrastructure
+- **Source**: `test/test_architecture_imports.py:resolution`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.145204+00:00
+- **Duplicate Guard**: `ACTIFIX-test-test_architecture_imports-py:resolu-a9278dbd`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-6DCA8 - [P1] TestingInfrastructure: ARCH-TEST-012: Add tests for entrypoint file existence validation
+- **Priority**: P1
+- **Error Type**: TestingInfrastructure
+- **Source**: `test/test_architecture_entrypoints.py:existence`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.149465+00:00
+- **Duplicate Guard**: `ACTIFIX-test-test_architecture_entrypoints-py:ex-5660e54f`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-63EA3 - [P1] TestingInfrastructure: ARCH-TEST-013: Create tests for cross-document consistency (MAP ↔ DEPGRAPH)
+- **Priority**: P1
+- **Error Type**: TestingInfrastructure
+- **Source**: `test/test_architecture_consistency.py:cross_doc`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.154065+00:00
+- **Duplicate Guard**: `ACTIFIX-test-test_architecture_consistency-py:cr-54d26d81`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-75511 - [P1] TestingInfrastructure: ARCH-TEST-014: Implement tests for schema version migration
+- **Priority**: P1
+- **Error Type**: TestingInfrastructure
+- **Source**: `test/test_architecture_migration.py:schema`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.158661+00:00
+- **Duplicate Guard**: `ACTIFIX-test-test_architecture_migration-py:sche-7123c70d`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-DD8C5 - [P1] TestingInfrastructure: ARCH-TEST-015: Add tests for architecture document atomic writes
+- **Priority**: P1
+- **Error Type**: TestingInfrastructure
+- **Source**: `test/test_architecture_atomic.py:writes`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.162888+00:00
+- **Duplicate Guard**: `ACTIFIX-test-test_architecture_atomic-py:writes-524622f5`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-92E42 - [P1] TestingInfrastructure: ARCH-TEST-016: Create tests for malformed document recovery
+- **Priority**: P1
+- **Error Type**: TestingInfrastructure
+- **Source**: `test/test_architecture_recovery.py:malformed`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.167382+00:00
+- **Duplicate Guard**: `ACTIFIX-test-test_architecture_recovery-py:malfo-d4de1035`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-D142D - [P1] TestingInfrastructure: ARCH-TEST-017: Implement tests for concurrent document access
+- **Priority**: P1
+- **Error Type**: TestingInfrastructure
+- **Source**: `test/test_architecture_concurrent.py:access`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.172090+00:00
+- **Duplicate Guard**: `ACTIFIX-test-test_architecture_concurrent-py:acc-00c6b652`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-C85C3 - [P1] TestingInfrastructure: ARCH-TEST-018: Add tests for large dependency graph handling (100+ nodes)
+- **Priority**: P1
+- **Error Type**: TestingInfrastructure
+- **Source**: `test/test_architecture_scale.py:large_graph`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.176091+00:00
+- **Duplicate Guard**: `ACTIFIX-test-test_architecture_scale-py:large_gr-35cc2912`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-4C920 - [P1] TestingInfrastructure: ARCH-TEST-019: Create tests for architecture diff generation
+- **Priority**: P1
+- **Error Type**: TestingInfrastructure
+- **Source**: `test/test_architecture_diff.py:generation`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.180182+00:00
+- **Duplicate Guard**: `ACTIFIX-test-test_architecture_diff-py:generatio-e6213fff`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-FC229 - [P1] TestingInfrastructure: ARCH-TEST-020: Implement tests for architecture validation CLI commands
+- **Priority**: P1
+- **Error Type**: TestingInfrastructure
+- **Source**: `test/test_architecture_cli.py:validation`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.184372+00:00
+- **Duplicate Guard**: `ACTIFIX-test-test_architecture_cli-py:validation-ebc161ea`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-799B2 - [P1] DocAutomation: ARCH-AUTO-001: Create auto-regeneration script for MAP.yaml from code analysis
+- **Priority**: P1
+- **Error Type**: DocAutomation
+- **Source**: `scripts/update_architecture_docs.py:map_regen`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.188990+00:00
+- **Duplicate Guard**: `ACTIFIX-scripts-update_architecture_docs-py:map_-7b11f040`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-4149D - [P1] DocAutomation: ARCH-AUTO-002: Implement DEPGRAPH.json auto-update from import analysis
+- **Priority**: P1
+- **Error Type**: DocAutomation
+- **Source**: `scripts/update_architecture_docs.py:depgraph_regen`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.193594+00:00
+- **Duplicate Guard**: `ACTIFIX-scripts-update_architecture_docs-py:depg-97ed08c3`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-32BE5 - [P1] DocAutomation: ARCH-AUTO-003: Add MODULES.md auto-generation from MAP.yaml
+- **Priority**: P1
+- **Error Type**: DocAutomation
+- **Source**: `scripts/update_architecture_docs.py:modules_regen`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.197684+00:00
+- **Duplicate Guard**: `ACTIFIX-scripts-update_architecture_docs-py:modu-b3e2c43b`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-3C5D3 - [P1] DocAutomation: ARCH-AUTO-004: Create pre-commit hook for architecture staleness detection
+- **Priority**: P1
+- **Error Type**: DocAutomation
+- **Source**: `scripts/hooks/pre_commit_arch.py:staleness`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.202365+00:00
+- **Duplicate Guard**: `ACTIFIX-scripts-hooks-pre_commit_arch-py:stalene-ef8744a9`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-4800B - [P1] DocAutomation: ARCH-AUTO-005: Implement CI pipeline step for architecture freshness check
+- **Priority**: P1
+- **Error Type**: DocAutomation
+- **Source**: `scripts/ci/check_architecture.py:freshness`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.206779+00:00
+- **Duplicate Guard**: `ACTIFIX-scripts-ci-check_architecture-py:freshne-1f461b33`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-66EFA - [P2] DocAutomation: ARCH-AUTO-006: Add automatic architecture snapshot on version tags
+- **Priority**: P2
+- **Error Type**: DocAutomation
+- **Source**: `scripts/ci/snapshot_architecture.py:versioned`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.211403+00:00
+- **Duplicate Guard**: `ACTIFIX-scripts-ci-snapshot_architecture-py:vers-c53cba58`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-08AD2 - [P2] DocAutomation: ARCH-AUTO-007: Create watcher script for code changes triggering doc updates
+- **Priority**: P2
+- **Error Type**: DocAutomation
+- **Source**: `scripts/watch_architecture.py:watcher`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.215867+00:00
+- **Duplicate Guard**: `ACTIFIX-scripts-watch_architecture-py:watcher-22ae07b7`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-7A23D - [P2] DocAutomation: ARCH-AUTO-008: Implement incremental update for changed modules only
+- **Priority**: P2
+- **Error Type**: DocAutomation
+- **Source**: `scripts/update_architecture_docs.py:incremental`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.221224+00:00
+- **Duplicate Guard**: `ACTIFIX-scripts-update_architecture_docs-py:incr-2755651a`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-13A3C - [P1] DocAutomation: ARCH-AUTO-009: Add dependency extraction from Python AST analysis
+- **Priority**: P1
+- **Error Type**: DocAutomation
+- **Source**: `scripts/extract_dependencies.py:ast_analysis`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.225132+00:00
+- **Duplicate Guard**: `ACTIFIX-scripts-extract_dependencies-py:ast_anal-02655e24`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-22E86 - [P2] DocAutomation: ARCH-AUTO-010: Create contract extraction from docstrings and type hints
+- **Priority**: P2
+- **Error Type**: DocAutomation
+- **Source**: `scripts/extract_contracts.py:docstrings`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.229101+00:00
+- **Duplicate Guard**: `ACTIFIX-scripts-extract_contracts-py:docstrings-b859f4cf`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-D1A97 - [P2] DocAutomation: ARCH-AUTO-011: Implement owner detection from git blame analysis
+- **Priority**: P2
+- **Error Type**: DocAutomation
+- **Source**: `scripts/detect_owners.py:git_blame`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.233273+00:00
+- **Duplicate Guard**: `ACTIFIX-scripts-detect_owners-py:git_blame-43729093`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-F89FA - [P2] DocAutomation: ARCH-AUTO-012: Add domain classification using directory structure
+- **Priority**: P2
+- **Error Type**: DocAutomation
+- **Source**: `scripts/classify_domains.py:directory`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.238211+00:00
+- **Duplicate Guard**: `ACTIFIX-scripts-classify_domains-py:directory-832a8e47`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-7ECDD - [P2] DocAutomation: ARCH-AUTO-013: Create summary generation using code analysis and LLM
+- **Priority**: P2
+- **Error Type**: DocAutomation
+- **Source**: `scripts/generate_summaries.py:llm_assist`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.242622+00:00
+- **Duplicate Guard**: `ACTIFIX-scripts-generate_summaries-py:llm_assist-92ddf9eb`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-5DCE9 - [P2] DocAutomation: ARCH-AUTO-014: Implement entrypoint detection from module __all__ exports
+- **Priority**: P2
+- **Error Type**: DocAutomation
+- **Source**: `scripts/detect_entrypoints.py:exports`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.246841+00:00
+- **Duplicate Guard**: `ACTIFIX-scripts-detect_entrypoints-py:exports-644f2060`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-C7661 - [P2] DocAutomation: ARCH-AUTO-015: Add automatic contract enforcement rule generation
+- **Priority**: P2
+- **Error Type**: DocAutomation
+- **Source**: `scripts/generate_contracts.py:rules`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.251159+00:00
+- **Duplicate Guard**: `ACTIFIX-scripts-generate_contracts-py:rules-60ea3969`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-2C5D9 - [P2] DocAutomation: ARCH-AUTO-016: Create parallel processing for large codebase analysis
+- **Priority**: P2
+- **Error Type**: DocAutomation
+- **Source**: `scripts/update_architecture_docs.py:parallel`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.255773+00:00
+- **Duplicate Guard**: `ACTIFIX-scripts-update_architecture_docs-py:para-06aed8ee`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-5F8C2 - [P2] DocAutomation: ARCH-AUTO-017: Implement caching for expensive code analysis operations
+- **Priority**: P2
+- **Error Type**: DocAutomation
+- **Source**: `scripts/update_architecture_docs.py:caching`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.261147+00:00
+- **Duplicate Guard**: `ACTIFIX-scripts-update_architecture_docs-py:cach-ff26ad6c`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-2AD42 - [P2] DocAutomation: ARCH-AUTO-018: Add dry-run mode for architecture update preview
+- **Priority**: P2
+- **Error Type**: DocAutomation
+- **Source**: `scripts/update_architecture_docs.py:dry_run`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.265176+00:00
+- **Duplicate Guard**: `ACTIFIX-scripts-update_architecture_docs-py:dry_-07e5ebbb`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-43E93 - [P2] DocAutomation: ARCH-AUTO-019: Create diff report for proposed architecture changes
+- **Priority**: P2
+- **Error Type**: DocAutomation
+- **Source**: `scripts/update_architecture_docs.py:diff_report`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.269753+00:00
+- **Duplicate Guard**: `ACTIFIX-scripts-update_architecture_docs-py:diff-b38f475f`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-FEDA2 - [P2] DocAutomation: ARCH-AUTO-020: Implement rollback mechanism for failed architecture updates
+- **Priority**: P2
+- **Error Type**: DocAutomation
+- **Source**: `scripts/update_architecture_docs.py:rollback`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.274077+00:00
+- **Duplicate Guard**: `ACTIFIX-scripts-update_architecture_docs-py:roll-bb326529`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-4EC13 - [P1] AIContext: ARCH-AI-001: Optimize architecture context extraction for 200k token window
+- **Priority**: P1
+- **Error Type**: AIContext
+- **Source**: `src/actifix/ai/context_builder.py:optimize`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.278131+00:00
+- **Duplicate Guard**: `ACTIFIX-src-actifix-ai-context_builder-py:optimi-bfe13d27`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-7120A - [P1] AIContext: ARCH-AI-002: Implement token budget management for architecture context
+- **Priority**: P1
+- **Error Type**: AIContext
+- **Source**: `src/actifix/ai/token_budget.py:management`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.282352+00:00
+- **Duplicate Guard**: `ACTIFIX-src-actifix-ai-token_budget-py:managemen-aa23fb36`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-C8719 - [P1] AIContext: ARCH-AI-003: Create priority-based context truncation for architecture docs
+- **Priority**: P1
+- **Error Type**: AIContext
+- **Source**: `src/actifix/ai/context_truncation.py:priority`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.286712+00:00
+- **Duplicate Guard**: `ACTIFIX-src-actifix-ai-context_truncation-py:pri-2102b7a9`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-0F5DF - [P1] AIContext: ARCH-AI-004: Add module relevance scoring for error context building
+- **Priority**: P1
+- **Error Type**: AIContext
+- **Source**: `src/actifix/ai/relevance_scoring.py:modules`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.291022+00:00
+- **Duplicate Guard**: `ACTIFIX-src-actifix-ai-relevance_scoring-py:modu-4bbb8663`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-B3AF9 - [P1] AIContext: ARCH-AI-005: Implement dependency chain extraction for debugging context
+- **Priority**: P1
+- **Error Type**: AIContext
+- **Source**: `src/actifix/ai/dependency_chain.py:extraction`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.294989+00:00
+- **Duplicate Guard**: `ACTIFIX-src-actifix-ai-dependency_chain-py:extra-6ae6da52`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-B412B - [P1] AIContext: ARCH-AI-006: Create focused context slices per module domain
+- **Priority**: P1
+- **Error Type**: AIContext
+- **Source**: `src/actifix/ai/domain_context.py:slices`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.299103+00:00
+- **Duplicate Guard**: `ACTIFIX-src-actifix-ai-domain_context-py:slices-fd01bb25`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-C3BE7 - [P1] AIContext: ARCH-AI-007: Add contract-aware context building for violation analysis
+- **Priority**: P1
+- **Error Type**: AIContext
+- **Source**: `src/actifix/ai/contract_context.py:violations`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.303605+00:00
+- **Duplicate Guard**: `ACTIFIX-src-actifix-ai-contract_context-py:viola-b95816b7`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-F2033 - [P1] AIContext: ARCH-AI-008: Implement hierarchical context compression for large architectures
+- **Priority**: P1
+- **Error Type**: AIContext
+- **Source**: `src/actifix/ai/context_compression.py:hierarchical`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.308103+00:00
+- **Duplicate Guard**: `ACTIFIX-src-actifix-ai-context_compression-py:hi-a343b7dd`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-CFF23 - [P1] AIContext: ARCH-AI-009: Create semantic chunking for architecture documents
+- **Priority**: P1
+- **Error Type**: AIContext
+- **Source**: `src/actifix/ai/semantic_chunking.py:architecture`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.312116+00:00
+- **Duplicate Guard**: `ACTIFIX-src-actifix-ai-semantic_chunking-py:arch-8205e103`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-E236F - [P1] AIContext: ARCH-AI-010: Add context freshness indicators for AI prompts
+- **Priority**: P1
+- **Error Type**: AIContext
+- **Source**: `src/actifix/ai/freshness_indicators.py:prompts`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.316397+00:00
+- **Duplicate Guard**: `ACTIFIX-src-actifix-ai-freshness_indicators-py:p-4a22bae7`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-B3366 - [P1] AIContext: ARCH-AI-011: Implement multi-document context merging strategy
+- **Priority**: P1
+- **Error Type**: AIContext
+- **Source**: `src/actifix/ai/context_merging.py:strategy`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.321591+00:00
+- **Duplicate Guard**: `ACTIFIX-src-actifix-ai-context_merging-py:strate-250f5c99`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-C35FB - [P1] AIContext: ARCH-AI-012: Create context caching for repeated architecture queries
+- **Priority**: P1
+- **Error Type**: AIContext
+- **Source**: `src/actifix/ai/context_cache.py:caching`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.353913+00:00
+- **Duplicate Guard**: `ACTIFIX-src-actifix-ai-context_cache-py:caching-2613d176`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-BCE11 - [P1] AIContext: ARCH-AI-013: Add architecture navigation hints for AI agents
+- **Priority**: P1
+- **Error Type**: AIContext
+- **Source**: `src/actifix/ai/navigation_hints.py:agents`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.378947+00:00
+- **Duplicate Guard**: `ACTIFIX-src-actifix-ai-navigation_hints-py:agent-43086565`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-B9941 - [P1] AIContext: ARCH-AI-014: Implement error-to-module mapping for targeted context
+- **Priority**: P1
+- **Error Type**: AIContext
+- **Source**: `src/actifix/ai/error_mapping.py:targeted`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.403895+00:00
+- **Duplicate Guard**: `ACTIFIX-src-actifix-ai-error_mapping-py:targeted-3d3c3b75`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-1FA05 - [P1] AIContext: ARCH-AI-015: Create architecture question-answering context templates
+- **Priority**: P1
+- **Error Type**: AIContext
+- **Source**: `src/actifix/ai/qa_templates.py:architecture`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.408268+00:00
+- **Duplicate Guard**: `ACTIFIX-src-actifix-ai-qa_templates-py:architect-2432b1f8`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-09AD6 - [P1] AIContext: ARCH-AI-016: Add cross-reference resolution for architecture queries
+- **Priority**: P1
+- **Error Type**: AIContext
+- **Source**: `src/actifix/ai/cross_reference.py:resolution`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.433247+00:00
+- **Duplicate Guard**: `ACTIFIX-src-actifix-ai-cross_reference-py:resolu-68e7cf10`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-29696 - [P1] AIContext: ARCH-AI-017: Implement context diff for architecture change explanation
+- **Priority**: P1
+- **Error Type**: AIContext
+- **Source**: `src/actifix/ai/context_diff.py:explanation`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.457712+00:00
+- **Duplicate Guard**: `ACTIFIX-src-actifix-ai-context_diff-py:explanati-a217d618`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-1E590 - [P1] AIContext: ARCH-AI-018: Create module dependency visualization for AI prompts
+- **Priority**: P1
+- **Error Type**: AIContext
+- **Source**: `src/actifix/ai/dependency_viz.py:prompts`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.483775+00:00
+- **Duplicate Guard**: `ACTIFIX-src-actifix-ai-dependency_viz-py:prompts-5f7bdc69`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-2F145 - [P1] AIContext: ARCH-AI-019: Add architecture compliance checklist for AI validation
+- **Priority**: P1
+- **Error Type**: AIContext
+- **Source**: `src/actifix/ai/compliance_checklist.py:validation`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.489744+00:00
+- **Duplicate Guard**: `ACTIFIX-src-actifix-ai-compliance_checklist-py:v-ab54699b`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-CA38A - [P1] AIContext: ARCH-AI-020: Implement structured output format for architecture queries
+- **Priority**: P1
+- **Error Type**: AIContext
+- **Source**: `src/actifix/ai/structured_output.py:architecture`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.494609+00:00
+- **Duplicate Guard**: `ACTIFIX-src-actifix-ai-structured_output-py:arch-3abe38d1`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-A2FA9 - [P1] SchemaValidation: ARCH-SCHEMA-001: Create JSON Schema for DEPGRAPH.json validation
+- **Priority**: P1
+- **Error Type**: SchemaValidation
+- **Source**: `Arch/schemas/depgraph.schema.json:create`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.518448+00:00
+- **Duplicate Guard**: `ACTIFIX-Arch-schemas-depgraph-schema-json:create-7697496a`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-12059 - [P1] SchemaValidation: ARCH-SCHEMA-002: Create JSON Schema for MAP.yaml validation
+- **Priority**: P1
+- **Error Type**: SchemaValidation
+- **Source**: `Arch/schemas/map.schema.json:create`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.544127+00:00
+- **Duplicate Guard**: `ACTIFIX-Arch-schemas-map-schema-json:create-3dafa5ad`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-0566D - [P1] SchemaValidation: ARCH-SCHEMA-003: Implement schema validation in update_architecture_docs.py
+- **Priority**: P1
+- **Error Type**: SchemaValidation
+- **Source**: `scripts/update_architecture_docs.py:schema_validate`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.569280+00:00
+- **Duplicate Guard**: `ACTIFIX-scripts-update_architecture_docs-py:sche-71916b79`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-A54FB - [P1] SchemaValidation: ARCH-SCHEMA-004: Add schema version field to all architecture documents
+- **Priority**: P1
+- **Error Type**: SchemaValidation
+- **Source**: `Arch/MAP.yaml:schema_version`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.573909+00:00
+- **Duplicate Guard**: `ACTIFIX-Arch-MAP-yaml:schema_version-187397ae`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-947CF - [P1] SchemaValidation: ARCH-SCHEMA-005: Create Markdown structure validator for MODULES.md
+- **Priority**: P1
+- **Error Type**: SchemaValidation
+- **Source**: `src/actifix/arch/md_validator.py:modules`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.599090+00:00
+- **Duplicate Guard**: `ACTIFIX-src-actifix-arch-md_validator-py:modules-c103e04c`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-2B046 - [P1] SchemaValidation: ARCH-SCHEMA-006: Implement cross-file consistency checker (MAP ↔ DEPGRAPH)
+- **Priority**: P1
+- **Error Type**: SchemaValidation
+- **Source**: `src/actifix/arch/consistency_checker.py:cross_file`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.624105+00:00
+- **Duplicate Guard**: `ACTIFIX-src-actifix-arch-consistency_checker-py:-f0ac5a99`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-4C7F8 - [P2] SchemaValidation: ARCH-SCHEMA-007: Add checksum-based integrity verification for Arch/ files
+- **Priority**: P2
+- **Error Type**: SchemaValidation
+- **Source**: `src/actifix/arch/integrity.py:checksum`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.649959+00:00
+- **Duplicate Guard**: `ACTIFIX-src-actifix-arch-integrity-py:checksum-0edd4298`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-4FC18 - [P2] SchemaValidation: ARCH-SCHEMA-008: Create schema migration tool for version upgrades
+- **Priority**: P2
+- **Error Type**: SchemaValidation
+- **Source**: `scripts/migrate_arch_schema.py:migration`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.676348+00:00
+- **Duplicate Guard**: `ACTIFIX-scripts-migrate_arch_schema-py:migration-c0bed893`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-6DF40 - [P2] SchemaValidation: ARCH-SCHEMA-009: Implement strict mode validation (fail on any warning)
+- **Priority**: P2
+- **Error Type**: SchemaValidation
+- **Source**: `src/actifix/arch/strict_validator.py:strict`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.700669+00:00
+- **Duplicate Guard**: `ACTIFIX-src-actifix-arch-strict_validator-py:str-e0888d1c`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-72B42 - [P2] SchemaValidation: ARCH-SCHEMA-010: Add custom validation rules engine for architecture
+- **Priority**: P2
+- **Error Type**: SchemaValidation
+- **Source**: `src/actifix/arch/rules_engine.py:custom`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.725504+00:00
+- **Duplicate Guard**: `ACTIFIX-src-actifix-arch-rules_engine-py:custom-59c67608`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-90730 - [P2] SchemaValidation: ARCH-SCHEMA-011: Create validation report generator with fix suggestions
+- **Priority**: P2
+- **Error Type**: SchemaValidation
+- **Source**: `src/actifix/arch/validation_report.py:fixes`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.768188+00:00
+- **Duplicate Guard**: `ACTIFIX-src-actifix-arch-validation_report-py:fi-3d14a5d4`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-C78B1 - [P2] SchemaValidation: ARCH-SCHEMA-012: Implement incremental validation for changed files only
+- **Priority**: P2
+- **Error Type**: SchemaValidation
+- **Source**: `src/actifix/arch/incremental_validate.py:changed`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.796012+00:00
+- **Duplicate Guard**: `ACTIFIX-src-actifix-arch-incremental_validate-py-dc5f8e63`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-00D7E - [P2] SchemaValidation: ARCH-SCHEMA-013: Add schema documentation generator from JSON Schema
+- **Priority**: P2
+- **Error Type**: SchemaValidation
+- **Source**: `scripts/generate_schema_docs.py:docs`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.834429+00:00
+- **Duplicate Guard**: `ACTIFIX-scripts-generate_schema_docs-py:docs-dac83716`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-C8595 - [P2] SchemaValidation: ARCH-SCHEMA-014: Create backward compatibility checker for schema changes
+- **Priority**: P2
+- **Error Type**: SchemaValidation
+- **Source**: `src/actifix/arch/compat_checker.py:backward`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.859082+00:00
+- **Duplicate Guard**: `ACTIFIX-src-actifix-arch-compat_checker-py:backw-9c4befd4`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-BF099 - [P2] SchemaValidation: ARCH-SCHEMA-015: Implement schema extension mechanism for custom fields
+- **Priority**: P2
+- **Error Type**: SchemaValidation
+- **Source**: `Arch/schemas/extensions.schema.json:mechanism`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.864924+00:00
+- **Duplicate Guard**: `ACTIFIX-Arch-schemas-extensions-schema-json:mech-f3a86793`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-24D65 - [P2] SchemaValidation: ARCH-SCHEMA-016: Add required field validation with helpful error messages
+- **Priority**: P2
+- **Error Type**: SchemaValidation
+- **Source**: `src/actifix/arch/required_fields.py:validation`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.870551+00:00
+- **Duplicate Guard**: `ACTIFIX-src-actifix-arch-required_fields-py:vali-660a6da9`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-DD405 - [P2] SchemaValidation: ARCH-SCHEMA-017: Create enum validation for domain, owner, priority fields
+- **Priority**: P2
+- **Error Type**: SchemaValidation
+- **Source**: `src/actifix/arch/enum_validator.py:fields`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.875066+00:00
+- **Duplicate Guard**: `ACTIFIX-src-actifix-arch-enum_validator-py:field-046413ab`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-6BF01 - [P2] SchemaValidation: ARCH-SCHEMA-018: Implement path pattern validation for entrypoints
+- **Priority**: P2
+- **Error Type**: SchemaValidation
+- **Source**: `src/actifix/arch/path_validator.py:entrypoints`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.879700+00:00
+- **Duplicate Guard**: `ACTIFIX-src-actifix-arch-path_validator-py:entry-2bcc8b5f`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-570E5 - [P2] SchemaValidation: ARCH-SCHEMA-019: Add relationship validation (enforced_by must be valid module)
+- **Priority**: P2
+- **Error Type**: SchemaValidation
+- **Source**: `src/actifix/arch/relationship_validator.py:contracts`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.884309+00:00
+- **Duplicate Guard**: `ACTIFIX-src-actifix-arch-relationship_validator--620df635`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-51EBE - [P1] SchemaValidation: ARCH-SCHEMA-020: Create comprehensive schema validation test suite
+- **Priority**: P1
+- **Error Type**: SchemaValidation
+- **Source**: `test/test_arch_schema.py:comprehensive`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.889116+00:00
+- **Duplicate Guard**: `ACTIFIX-test-test_arch_schema-py:comprehensive-d48cd869`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-917A4 - [P2] FreshnessDetection: ARCH-FRESH-001: Implement timestamp-based freshness checks for Arch/ files
+- **Priority**: P2
+- **Error Type**: FreshnessDetection
+- **Source**: `src/actifix/arch/freshness.py:timestamps`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.893305+00:00
+- **Duplicate Guard**: `ACTIFIX-src-actifix-arch-freshness-py:timestamps-841713cf`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-B757B - [P2] FreshnessDetection: ARCH-FRESH-002: Add file modification tracking vs architecture docs
+- **Priority**: P2
+- **Error Type**: FreshnessDetection
+- **Source**: `src/actifix/arch/modification_tracking.py:files`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.897860+00:00
+- **Duplicate Guard**: `ACTIFIX-src-actifix-arch-modification_tracking-p-15df610e`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-7EC70 - [P2] FreshnessDetection: ARCH-FRESH-003: Create automatic staleness alerts via health system
+- **Priority**: P2
+- **Error Type**: FreshnessDetection
+- **Source**: `src/actifix/health.py:arch_staleness`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.902944+00:00
+- **Duplicate Guard**: `ACTIFIX-src-actifix-health-py:arch_staleness-85909e52`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-8EBA4 - [P2] FreshnessDetection: ARCH-FRESH-004: Implement git-based change detection for source files
+- **Priority**: P2
+- **Error Type**: FreshnessDetection
+- **Source**: `src/actifix/arch/git_changes.py:detection`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.907434+00:00
+- **Duplicate Guard**: `ACTIFIX-src-actifix-arch-git_changes-py:detectio-5b5780f6`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-597C4 - [P2] FreshnessDetection: ARCH-FRESH-005: Add regeneration triggers on significant code changes
+- **Priority**: P2
+- **Error Type**: FreshnessDetection
+- **Source**: `src/actifix/arch/regen_triggers.py:code_changes`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.911486+00:00
+- **Duplicate Guard**: `ACTIFIX-src-actifix-arch-regen_triggers-py:code_-2c94f853`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-F5C45 - [P2] FreshnessDetection: ARCH-FRESH-006: Create freshness dashboard endpoint for monitoring
+- **Priority**: P2
+- **Error Type**: FreshnessDetection
+- **Source**: `src/actifix/arch/freshness_dashboard.py:endpoint`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.915702+00:00
+- **Duplicate Guard**: `ACTIFIX-src-actifix-arch-freshness_dashboard-py:-ec086ee8`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-1F6BD - [P2] FreshnessDetection: ARCH-FRESH-007: Implement configurable freshness thresholds (hours/days)
+- **Priority**: P2
+- **Error Type**: FreshnessDetection
+- **Source**: `src/actifix/arch/freshness.py:thresholds`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.920449+00:00
+- **Duplicate Guard**: `ACTIFIX-src-actifix-arch-freshness-py:thresholds-987489dd`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-97F0D - [P2] FreshnessDetection: ARCH-FRESH-008: Add source file hash comparison for staleness detection
+- **Priority**: P2
+- **Error Type**: FreshnessDetection
+- **Source**: `src/actifix/arch/hash_comparison.py:staleness`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.924642+00:00
+- **Duplicate Guard**: `ACTIFIX-src-actifix-arch-hash_comparison-py:stal-48b6af95`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-BEB4F - [P2] FreshnessDetection: ARCH-FRESH-009: Create per-module freshness tracking (not just global)
+- **Priority**: P2
+- **Error Type**: FreshnessDetection
+- **Source**: `src/actifix/arch/module_freshness.py:tracking`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.929583+00:00
+- **Duplicate Guard**: `ACTIFIX-src-actifix-arch-module_freshness-py:tra-980e3123`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-39105 - [P2] FreshnessDetection: ARCH-FRESH-010: Implement freshness warning in test.py output
+- **Priority**: P2
+- **Error Type**: FreshnessDetection
+- **Source**: `test.py:freshness_warning`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.957439+00:00
+- **Duplicate Guard**: `ACTIFIX-test-py:freshness_warning-dfcc7129`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-F2B26 - [P2] FreshnessDetection: ARCH-FRESH-011: Add freshness check to pre-commit hooks
+- **Priority**: P2
+- **Error Type**: FreshnessDetection
+- **Source**: `scripts/hooks/pre_commit_arch.py:freshness_check`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:09.982768+00:00
+- **Duplicate Guard**: `ACTIFIX-scripts-hooks-pre_commit_arch-py:freshne-da004eac`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-F41FA - [P2] FreshnessDetection: ARCH-FRESH-012: Create staleness report with affected modules list
+- **Priority**: P2
+- **Error Type**: FreshnessDetection
+- **Source**: `src/actifix/arch/staleness_report.py:affected`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:10.006643+00:00
+- **Duplicate Guard**: `ACTIFIX-src-actifix-arch-staleness_report-py:aff-fdf47e61`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-6B5DD - [P2] FreshnessDetection: ARCH-FRESH-013: Implement auto-ticket creation for stale architecture
+- **Priority**: P2
+- **Error Type**: FreshnessDetection
+- **Source**: `src/actifix/arch/auto_ticket.py:stale_arch`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:10.037508+00:00
+- **Duplicate Guard**: `ACTIFIX-src-actifix-arch-auto_ticket-py:stale_ar-8bdfef7f`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-7BCD9 - [P2] FreshnessDetection: ARCH-FRESH-014: Add freshness metadata to MAP.yaml (last_verified_at)
+- **Priority**: P2
+- **Error Type**: FreshnessDetection
+- **Source**: `Arch/MAP.yaml:last_verified_at`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:10.062672+00:00
+- **Duplicate Guard**: `ACTIFIX-Arch-MAP-yaml:last_verified_at-a71b94e2`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-2EB9A - [P2] FreshnessDetection: ARCH-FRESH-015: Create freshness trend tracking over time
+- **Priority**: P2
+- **Error Type**: FreshnessDetection
+- **Source**: `src/actifix/arch/freshness_trends.py:tracking`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:10.087510+00:00
+- **Duplicate Guard**: `ACTIFIX-src-actifix-arch-freshness_trends-py:tra-b3afeab4`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-21B86 - [P2] FreshnessDetection: ARCH-FRESH-016: Implement CI failure on architecture too stale
+- **Priority**: P2
+- **Error Type**: FreshnessDetection
+- **Source**: `scripts/ci/check_architecture.py:ci_failure`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:10.113912+00:00
+- **Duplicate Guard**: `ACTIFIX-scripts-ci-check_architecture-py:ci_fail-87442db6`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-A7743 - [P2] FreshnessDetection: ARCH-FRESH-017: Add notification when architecture becomes stale
+- **Priority**: P2
+- **Error Type**: FreshnessDetection
+- **Source**: `src/actifix/arch/notifications.py:stale_alert`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:10.138391+00:00
+- **Duplicate Guard**: `ACTIFIX-src-actifix-arch-notifications-py:stale_-a980f260`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-093C6 - [P2] FreshnessDetection: ARCH-FRESH-018: Create freshness exemption mechanism for stable modules
+- **Priority**: P2
+- **Error Type**: FreshnessDetection
+- **Source**: `src/actifix/arch/freshness_exemptions.py:stable`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:10.164658+00:00
+- **Duplicate Guard**: `ACTIFIX-src-actifix-arch-freshness_exemptions-py-61b42506`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-90D4C - [P2] FreshnessDetection: ARCH-FRESH-019: Implement freshness score (0-100) for architecture health
+- **Priority**: P2
+- **Error Type**: FreshnessDetection
+- **Source**: `src/actifix/arch/freshness_score.py:health`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:10.189522+00:00
+- **Duplicate Guard**: `ACTIFIX-src-actifix-arch-freshness_score-py:heal-626f2bfe`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-493AD - [P2] FreshnessDetection: ARCH-FRESH-020: Add freshness validation to health.py comprehensive check
+- **Priority**: P2
+- **Error Type**: FreshnessDetection
+- **Source**: `src/actifix/health.py:freshness_validation`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:10.212905+00:00
+- **Duplicate Guard**: `ACTIFIX-src-actifix-health-py:freshness_validati-1614dd6b`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-37FD1 - [P2] CrossReferenceValidation: ARCH-XREF-001: Validate module-to-node consistency (MAP ↔ DEPGRAPH)
+- **Priority**: P2
+- **Error Type**: CrossReferenceValidation
+- **Source**: `src/actifix/arch/xref_validator.py:module_node`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:10.218823+00:00
+- **Duplicate Guard**: `ACTIFIX-src-actifix-arch-xref_validator-py:modul-5e367dfc`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-3BF1B - [P2] CrossReferenceValidation: ARCH-XREF-002: Check contract enforcement references valid modules
+- **Priority**: P2
+- **Error Type**: CrossReferenceValidation
+- **Source**: `src/actifix/arch/xref_validator.py:contracts`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:10.224033+00:00
+- **Duplicate Guard**: `ACTIFIX-src-actifix-arch-xref_validator-py:contr-d9311ab6`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-D8DE2 - [P2] CrossReferenceValidation: ARCH-XREF-003: Validate dependency declarations vs actual Python imports
+- **Priority**: P2
+- **Error Type**: CrossReferenceValidation
+- **Source**: `src/actifix/arch/import_validator.py:declarations`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:10.229728+00:00
+- **Duplicate Guard**: `ACTIFIX-src-actifix-arch-import_validator-py:dec-283c43a2`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-8C79A - [P2] CrossReferenceValidation: ARCH-XREF-004: Check owner/domain consistency across all modules
+- **Priority**: P2
+- **Error Type**: CrossReferenceValidation
+- **Source**: `src/actifix/arch/xref_validator.py:owner_domain`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:10.234961+00:00
+- **Duplicate Guard**: `ACTIFIX-src-actifix-arch-xref_validator-py:owner-e71efde7`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-37A17 - [P2] CrossReferenceValidation: ARCH-XREF-005: Validate entrypoint-to-file existence in MAP.yaml
+- **Priority**: P2
+- **Error Type**: CrossReferenceValidation
+- **Source**: `src/actifix/arch/xref_validator.py:entrypoints`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:10.240903+00:00
+- **Duplicate Guard**: `ACTIFIX-src-actifix-arch-xref_validator-py:entry-f8594893`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-895CB - [P2] CrossReferenceValidation: ARCH-XREF-006: Check MODULES.md module list matches MAP.yaml modules
+- **Priority**: P2
+- **Error Type**: CrossReferenceValidation
+- **Source**: `src/actifix/arch/xref_validator.py:modules_md`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:10.272446+00:00
+- **Duplicate Guard**: `ACTIFIX-src-actifix-arch-xref_validator-py:modul-cd075765`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-E5042 - [P2] CrossReferenceValidation: ARCH-XREF-007: Validate edge reasons in DEPGRAPH.json are meaningful
+- **Priority**: P2
+- **Error Type**: CrossReferenceValidation
+- **Source**: `src/actifix/arch/xref_validator.py:edge_reasons`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:10.278552+00:00
+- **Duplicate Guard**: `ACTIFIX-src-actifix-arch-xref_validator-py:edge_-c2dd5c37`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-7138A - [P2] CrossReferenceValidation: ARCH-XREF-008: Check applies_to in contracts references existing modules
+- **Priority**: P2
+- **Error Type**: CrossReferenceValidation
+- **Source**: `src/actifix/arch/xref_validator.py:applies_to`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:10.306301+00:00
+- **Duplicate Guard**: `ACTIFIX-src-actifix-arch-xref_validator-py:appli-b7f26c09`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-EDA78 - [P2] CrossReferenceValidation: ARCH-XREF-009: Validate enforced_by in contracts references valid enforcers
+- **Priority**: P2
+- **Error Type**: CrossReferenceValidation
+- **Source**: `src/actifix/arch/xref_validator.py:enforced_by`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:10.331366+00:00
+- **Duplicate Guard**: `ACTIFIX-src-actifix-arch-xref_validator-py:enfor-9de52494`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-E6033 - [P2] CrossReferenceValidation: ARCH-XREF-010: Check domain IDs in modules match defined domains
+- **Priority**: P2
+- **Error Type**: CrossReferenceValidation
+- **Source**: `src/actifix/arch/xref_validator.py:domain_ids`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:10.337548+00:00
+- **Duplicate Guard**: `ACTIFIX-src-actifix-arch-xref_validator-py:domai-3b0b1cfd`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-711AD - [P2] CrossReferenceValidation: ARCH-XREF-011: Validate test files reference documented modules
+- **Priority**: P2
+- **Error Type**: CrossReferenceValidation
+- **Source**: `src/actifix/arch/xref_validator.py:test_modules`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:10.360861+00:00
+- **Duplicate Guard**: `ACTIFIX-src-actifix-arch-xref_validator-py:test_-9efb4aef`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-F8914 - [P2] CrossReferenceValidation: ARCH-XREF-012: Check AGENTS.md references match actual Arch/ structure
+- **Priority**: P2
+- **Error Type**: CrossReferenceValidation
+- **Source**: `src/actifix/arch/xref_validator.py:agents_md`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:10.385657+00:00
+- **Duplicate Guard**: `ACTIFIX-src-actifix-arch-xref_validator-py:agent-f13b920d`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-55024 - [P2] CrossReferenceValidation: ARCH-XREF-013: Validate README.md architecture references are current
+- **Priority**: P2
+- **Error Type**: CrossReferenceValidation
+- **Source**: `src/actifix/arch/xref_validator.py:readme`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:10.415365+00:00
+- **Duplicate Guard**: `ACTIFIX-src-actifix-arch-xref_validator-py:readm-2d81b645`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-98606 - [P2] CrossReferenceValidation: ARCH-XREF-014: Check docs/ references to architecture are accurate
+- **Priority**: P2
+- **Error Type**: CrossReferenceValidation
+- **Source**: `src/actifix/arch/xref_validator.py:docs`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:10.440273+00:00
+- **Duplicate Guard**: `ACTIFIX-src-actifix-arch-xref_validator-py:docs-b1e8e7dc`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-331AB - [P2] CrossReferenceValidation: ARCH-XREF-015: Validate import statements match declared dependencies
+- **Priority**: P2
+- **Error Type**: CrossReferenceValidation
+- **Source**: `src/actifix/arch/import_validator.py:imports`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:10.466061+00:00
+- **Duplicate Guard**: `ACTIFIX-src-actifix-arch-import_validator-py:imp-db8810ab`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-0BA9B - [P2] CrossReferenceValidation: ARCH-XREF-016: Check for undeclared cross-domain dependencies
+- **Priority**: P2
+- **Error Type**: CrossReferenceValidation
+- **Source**: `src/actifix/arch/domain_validator.py:cross_domain`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:10.491944+00:00
+- **Duplicate Guard**: `ACTIFIX-src-actifix-arch-domain_validator-py:cro-7b7dffd1`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-BEE01 - [P2] CrossReferenceValidation: ARCH-XREF-017: Validate circular dependency detection accuracy
+- **Priority**: P2
+- **Error Type**: CrossReferenceValidation
+- **Source**: `src/actifix/arch/cycle_validator.py:accuracy`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:10.516932+00:00
+- **Duplicate Guard**: `ACTIFIX-src-actifix-arch-cycle_validator-py:accu-9d414bb7`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-542C9 - [P2] CrossReferenceValidation: ARCH-XREF-018: Check transitive dependency completeness
+- **Priority**: P2
+- **Error Type**: CrossReferenceValidation
+- **Source**: `src/actifix/arch/transitive_validator.py:completeness`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:10.543615+00:00
+- **Duplicate Guard**: `ACTIFIX-src-actifix-arch-transitive_validator-py-e8e1dbff`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-633E7 - [P2] CrossReferenceValidation: ARCH-XREF-019: Validate label fields in DEPGRAPH match module names
+- **Priority**: P2
+- **Error Type**: CrossReferenceValidation
+- **Source**: `src/actifix/arch/xref_validator.py:labels`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:10.568898+00:00
+- **Duplicate Guard**: `ACTIFIX-src-actifix-arch-xref_validator-py:label-3f69d826`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-82F4B - [P2] CrossReferenceValidation: ARCH-XREF-020: Create cross-reference validation report generator
+- **Priority**: P2
+- **Error Type**: CrossReferenceValidation
+- **Source**: `src/actifix/arch/xref_report.py:generator`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:10.595909+00:00
+- **Duplicate Guard**: `ACTIFIX-src-actifix-arch-xref_report-py:generato-cb2334af`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-06E48 - [P2] Visualization: ARCH-VIZ-001: Create interactive dependency graph viewer (HTML/JS)
+- **Priority**: P2
+- **Error Type**: Visualization
+- **Source**: `actifix-frontend/arch_viewer.html:interactive`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:10.621456+00:00
+- **Duplicate Guard**: `ACTIFIX-actifix-frontend-arch_viewer-html:intera-8fa3efd1`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-747D5 - [P2] Visualization: ARCH-VIZ-002: Generate Mermaid diagrams for module relationships
+- **Priority**: P2
+- **Error Type**: Visualization
+- **Source**: `scripts/generate_mermaid.py:relationships`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:10.648909+00:00
+- **Duplicate Guard**: `ACTIFIX-scripts-generate_mermaid-py:relationship-77c2eabe`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-D0AF7 - [P2] Visualization: ARCH-VIZ-003: Implement architecture diff visualization
+- **Priority**: P2
+- **Error Type**: Visualization
+- **Source**: `scripts/arch_diff_viz.py:visualization`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:10.673095+00:00
+- **Duplicate Guard**: `ACTIFIX-scripts-arch_diff_viz-py:visualization-8007ee85`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-7362A - [P2] Visualization: ARCH-VIZ-004: Create change impact analysis visualization tool
+- **Priority**: P2
+- **Error Type**: Visualization
+- **Source**: `scripts/impact_analysis.py:visualization`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:10.698179+00:00
+- **Duplicate Guard**: `ACTIFIX-scripts-impact_analysis-py:visualization-c54aff57`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-96202 - [P2] Visualization: ARCH-VIZ-005: Add domain-based clustering in dependency graph
+- **Priority**: P2
+- **Error Type**: Visualization
+- **Source**: `actifix-frontend/arch_viewer.html:clustering`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:10.723739+00:00
+- **Duplicate Guard**: `ACTIFIX-actifix-frontend-arch_viewer-html:cluste-1b495beb`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-31268 - [P2] Visualization: ARCH-VIZ-006: Implement module search and highlight in graph
+- **Priority**: P2
+- **Error Type**: Visualization
+- **Source**: `actifix-frontend/arch_viewer.html:search`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:10.747835+00:00
+- **Duplicate Guard**: `ACTIFIX-actifix-frontend-arch_viewer-html:search-8cd46793`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-D5809 - [P3] Visualization: ARCH-VIZ-007: Create contract visualization overlay
+- **Priority**: P3
+- **Error Type**: Visualization
+- **Source**: `actifix-frontend/arch_viewer.html:contracts`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:10.772604+00:00
+- **Duplicate Guard**: `ACTIFIX-actifix-frontend-arch_viewer-html:contra-0a006de9`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-7BF87 - [P3] Visualization: ARCH-VIZ-008: Add dependency path highlighting (A to B)
+- **Priority**: P3
+- **Error Type**: Visualization
+- **Source**: `actifix-frontend/arch_viewer.html:path_highlight`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:10.798355+00:00
+- **Duplicate Guard**: `ACTIFIX-actifix-frontend-arch_viewer-html:path_h-d501e78d`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-49C72 - [P3] Visualization: ARCH-VIZ-009: Implement zoom and pan for large graphs
+- **Priority**: P3
+- **Error Type**: Visualization
+- **Source**: `actifix-frontend/arch_viewer.html:zoom_pan`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:10.823933+00:00
+- **Duplicate Guard**: `ACTIFIX-actifix-frontend-arch_viewer-html:zoom_p-238aff15`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-603F0 - [P3] Visualization: ARCH-VIZ-010: Create module detail popup on click
+- **Priority**: P3
+- **Error Type**: Visualization
+- **Source**: `actifix-frontend/arch_viewer.html:detail_popup`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:10.848861+00:00
+- **Duplicate Guard**: `ACTIFIX-actifix-frontend-arch_viewer-html:detail-468b2932`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-09F18 - [P3] Visualization: ARCH-VIZ-011: Add freshness indicators to graph nodes
+- **Priority**: P3
+- **Error Type**: Visualization
+- **Source**: `actifix-frontend/arch_viewer.html:freshness`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:10.856390+00:00
+- **Duplicate Guard**: `ACTIFIX-actifix-frontend-arch_viewer-html:freshn-bfb3ca0f`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-8D7AD - [P3] Visualization: ARCH-VIZ-012: Implement export to PNG/SVG for documentation
+- **Priority**: P3
+- **Error Type**: Visualization
+- **Source**: `actifix-frontend/arch_viewer.html:export`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:10.861331+00:00
+- **Duplicate Guard**: `ACTIFIX-actifix-frontend-arch_viewer-html:export-9a8c968c`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-EAB07 - [P3] Visualization: ARCH-VIZ-013: Create tree view alternative to graph view
+- **Priority**: P3
+- **Error Type**: Visualization
+- **Source**: `actifix-frontend/arch_viewer.html:tree_view`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:10.865948+00:00
+- **Duplicate Guard**: `ACTIFIX-actifix-frontend-arch_viewer-html:tree_v-c5525e1f`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-919D0 - [P3] Visualization: ARCH-VIZ-014: Add module statistics panel (dependencies count, etc.)
+- **Priority**: P3
+- **Error Type**: Visualization
+- **Source**: `actifix-frontend/arch_viewer.html:stats`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:10.871465+00:00
+- **Duplicate Guard**: `ACTIFIX-actifix-frontend-arch_viewer-html:stats-19f7ec6f`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-EFFDD - [P3] Visualization: ARCH-VIZ-015: Implement domain filter toggles
+- **Priority**: P3
+- **Error Type**: Visualization
+- **Source**: `actifix-frontend/arch_viewer.html:domain_filters`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:10.876301+00:00
+- **Duplicate Guard**: `ACTIFIX-actifix-frontend-arch_viewer-html:domain-8f1ec635`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-CC789 - [P3] Visualization: ARCH-VIZ-016: Create historical architecture comparison view
+- **Priority**: P3
+- **Error Type**: Visualization
+- **Source**: `actifix-frontend/arch_viewer.html:history`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:10.881636+00:00
+- **Duplicate Guard**: `ACTIFIX-actifix-frontend-arch_viewer-html:histor-7aab9e29`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-9AFDC - [P3] Visualization: ARCH-VIZ-017: Add keyboard navigation for accessibility
+- **Priority**: P3
+- **Error Type**: Visualization
+- **Source**: `actifix-frontend/arch_viewer.html:keyboard_nav`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:10.887280+00:00
+- **Duplicate Guard**: `ACTIFIX-actifix-frontend-arch_viewer-html:keyboa-2ae557c2`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-100E5 - [P3] Visualization: ARCH-VIZ-018: Implement dark/light theme for viewer
+- **Priority**: P3
+- **Error Type**: Visualization
+- **Source**: `actifix-frontend/arch_viewer.html:theme`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:10.891925+00:00
+- **Duplicate Guard**: `ACTIFIX-actifix-frontend-arch_viewer-html:theme-5a676121`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-04EE8 - [P3] Visualization: ARCH-VIZ-019: Create embeddable widget for documentation
+- **Priority**: P3
+- **Error Type**: Visualization
+- **Source**: `actifix-frontend/arch_widget.html:embeddable`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:10.896246+00:00
+- **Duplicate Guard**: `ACTIFIX-actifix-frontend-arch_widget-html:embedd-42d1c5de`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-C818B - [P3] Visualization: ARCH-VIZ-020: Add responsive design for mobile viewing
+- **Priority**: P3
+- **Error Type**: Visualization
+- **Source**: `actifix-frontend/arch_viewer.html:responsive`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:10.900809+00:00
+- **Duplicate Guard**: `ACTIFIX-actifix-frontend-arch_viewer-html:respon-e04c4aad`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-4D2EE - [P1] SelfHealing: ARCH-HEAL-001: Implement automated architecture corruption detection
+- **Priority**: P1
+- **Error Type**: SelfHealing
+- **Source**: `src/actifix/arch/corruption_detector.py:detection`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:10.906693+00:00
+- **Duplicate Guard**: `ACTIFIX-src-actifix-arch-corruption_detector-py:-47f584a4`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-7E1C4 - [P1] SelfHealing: ARCH-HEAL-002: Create self-repair for common YAML syntax errors
+- **Priority**: P1
+- **Error Type**: SelfHealing
+- **Source**: `src/actifix/arch/self_repair.py:yaml_syntax`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:10.912000+00:00
+- **Duplicate Guard**: `ACTIFIX-src-actifix-arch-self_repair-py:yaml_syn-dce3198f`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-DA08F - [P1] SelfHealing: ARCH-HEAL-003: Add quarantine system for corrupted architecture files
+- **Priority**: P1
+- **Error Type**: SelfHealing
+- **Source**: `src/actifix/arch/arch_quarantine.py:corrupted`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:10.941212+00:00
+- **Duplicate Guard**: `ACTIFIX-src-actifix-arch-arch_quarantine-py:corr-81cd0cbf`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-72573 - [P1] SelfHealing: ARCH-HEAL-004: Implement recovery from malformed JSON in DEPGRAPH
+- **Priority**: P1
+- **Error Type**: SelfHealing
+- **Source**: `src/actifix/arch/recovery.py:json_malformed`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:10.966767+00:00
+- **Duplicate Guard**: `ACTIFIX-src-actifix-arch-recovery-py:json_malfor-bf8e43a0`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-D91E3 - [P2] SelfHealing: ARCH-HEAL-005: Create audit logging for all architecture changes
+- **Priority**: P2
+- **Error Type**: SelfHealing
+- **Source**: `src/actifix/arch/audit_log.py:changes`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:10.972324+00:00
+- **Duplicate Guard**: `ACTIFIX-src-actifix-arch-audit_log-py:changes-87930d49`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-376DD - [P2] SelfHealing: ARCH-HEAL-006: Add automatic backup before architecture updates
+- **Priority**: P2
+- **Error Type**: SelfHealing
+- **Source**: `src/actifix/arch/backup.py:auto_backup`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:10.977413+00:00
+- **Duplicate Guard**: `ACTIFIX-src-actifix-arch-backup-py:auto_backup-c523a43c`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-85988 - [P2] SelfHealing: ARCH-HEAL-007: Implement rollback to last known good architecture
+- **Priority**: P2
+- **Error Type**: SelfHealing
+- **Source**: `src/actifix/arch/rollback.py:last_good`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:10.981841+00:00
+- **Duplicate Guard**: `ACTIFIX-src-actifix-arch-rollback-py:last_good-ffdd44e9`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-FF56B - [P2] SelfHealing: ARCH-HEAL-008: Create orphan module detection and cleanup
+- **Priority**: P2
+- **Error Type**: SelfHealing
+- **Source**: `src/actifix/arch/orphan_cleanup.py:detection`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:10.987173+00:00
+- **Duplicate Guard**: `ACTIFIX-src-actifix-arch-orphan_cleanup-py:detec-36c8edab`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-D5B5E - [P2] SelfHealing: ARCH-HEAL-009: Add duplicate module detection and merge suggestion
+- **Priority**: P2
+- **Error Type**: SelfHealing
+- **Source**: `src/actifix/arch/duplicate_detector.py:merge`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:10.992072+00:00
+- **Duplicate Guard**: `ACTIFIX-src-actifix-arch-duplicate_detector-py:m-0cc21d34`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-04768 - [P2] SelfHealing: ARCH-HEAL-010: Implement missing dependency auto-detection
+- **Priority**: P2
+- **Error Type**: SelfHealing
+- **Source**: `src/actifix/arch/missing_deps.py:auto_detect`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:10.996648+00:00
+- **Duplicate Guard**: `ACTIFIX-src-actifix-arch-missing_deps-py:auto_de-e210b6dd`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-B3FDA - [P2] SelfHealing: ARCH-HEAL-011: Create broken reference auto-fix suggestions
+- **Priority**: P2
+- **Error Type**: SelfHealing
+- **Source**: `src/actifix/arch/broken_refs.py:suggestions`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:11.001558+00:00
+- **Duplicate Guard**: `ACTIFIX-src-actifix-arch-broken_refs-py:suggesti-1db8f9b4`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-CFE92 - [P2] SelfHealing: ARCH-HEAL-012: Add schema upgrade path for outdated documents
+- **Priority**: P2
+- **Error Type**: SelfHealing
+- **Source**: `src/actifix/arch/schema_upgrade.py:path`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:11.006692+00:00
+- **Duplicate Guard**: `ACTIFIX-src-actifix-arch-schema_upgrade-py:path-1264e0ef`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-1609A - [P2] SelfHealing: ARCH-HEAL-013: Implement stale entry auto-removal (configurable)
+- **Priority**: P2
+- **Error Type**: SelfHealing
+- **Source**: `src/actifix/arch/stale_removal.py:auto_remove`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:11.011256+00:00
+- **Duplicate Guard**: `ACTIFIX-src-actifix-arch-stale_removal-py:auto_r-03e5975e`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-E7738 - [P2] SelfHealing: ARCH-HEAL-014: Create consistency restoration after partial updates
+- **Priority**: P2
+- **Error Type**: SelfHealing
+- **Source**: `src/actifix/arch/consistency_restore.py:partial`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:11.016232+00:00
+- **Duplicate Guard**: `ACTIFIX-src-actifix-arch-consistency_restore-py:-857eb76c`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-07B59 - [P2] SelfHealing: ARCH-HEAL-015: Add healing report with actions taken
+- **Priority**: P2
+- **Error Type**: SelfHealing
+- **Source**: `src/actifix/arch/healing_report.py:actions`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:11.021318+00:00
+- **Duplicate Guard**: `ACTIFIX-src-actifix-arch-healing_report-py:actio-28d5d6a9`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-AC1F1 - [P2] SelfHealing: ARCH-HEAL-016: Implement health check integration for architecture
+- **Priority**: P2
+- **Error Type**: SelfHealing
+- **Source**: `src/actifix/health.py:arch_health_check`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:11.049822+00:00
+- **Duplicate Guard**: `ACTIFIX-src-actifix-health-py:arch_health_check-9e05779f`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-BBFC3 - [P2] SelfHealing: ARCH-HEAL-017: Create automated ticket for unrecoverable issues
+- **Priority**: P2
+- **Error Type**: SelfHealing
+- **Source**: `src/actifix/arch/auto_ticket.py:unrecoverable`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:11.075098+00:00
+- **Duplicate Guard**: `ACTIFIX-src-actifix-arch-auto_ticket-py:unrecove-3b4024f4`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-9BB30 - [P2] SelfHealing: ARCH-HEAL-018: Add graceful degradation when architecture is corrupted
+- **Priority**: P2
+- **Error Type**: SelfHealing
+- **Source**: `src/actifix/arch/graceful_degradation.py:corrupted`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:11.107900+00:00
+- **Duplicate Guard**: `ACTIFIX-src-actifix-arch-graceful_degradation-py-8446c5c9`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-8D8D2 - [P2] SelfHealing: ARCH-HEAL-019: Implement repair verification after self-healing
+- **Priority**: P2
+- **Error Type**: SelfHealing
+- **Source**: `src/actifix/arch/repair_verify.py:after_heal`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:11.113188+00:00
+- **Duplicate Guard**: `ACTIFIX-src-actifix-arch-repair_verify-py:after_-076a91b7`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-3D228 - [P2] SelfHealing: ARCH-HEAL-020: Create architecture health scoring system
+- **Priority**: P2
+- **Error Type**: SelfHealing
+- **Source**: `src/actifix/arch/health_score.py:system`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:11.137986+00:00
+- **Duplicate Guard**: `ACTIFIX-src-actifix-arch-health_score-py:system-654b9be5`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-351CA - [P2] DeveloperExperience: ARCH-DX-001: Create CLI tool for architecture querying (arch-query)
+- **Priority**: P2
+- **Error Type**: DeveloperExperience
+- **Source**: `scripts/arch_query.py:cli`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:11.162691+00:00
+- **Duplicate Guard**: `ACTIFIX-scripts-arch_query-py:cli-48c66915`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-44675 - [P2] DeveloperExperience: ARCH-DX-002: Add VSCode extension for architecture visualization
+- **Priority**: P2
+- **Error Type**: DeveloperExperience
+- **Source**: `vscode-extension/arch-viz.ts:extension`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:11.186641+00:00
+- **Duplicate Guard**: `ACTIFIX-vscode-extension-arch-viz-ts:extension-7d667374`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-F08B8 - [P2] DeveloperExperience: ARCH-DX-003: Implement architecture linting with auto-fix capability
+- **Priority**: P2
+- **Error Type**: DeveloperExperience
+- **Source**: `scripts/arch_lint.py:autofix`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:11.191849+00:00
+- **Duplicate Guard**: `ACTIFIX-scripts-arch_lint-py:autofix-f609e10b`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-7ADF7 - [P2] DeveloperExperience: ARCH-DX-004: Create pre-commit hooks for architecture compliance
+- **Priority**: P2
+- **Error Type**: DeveloperExperience
+- **Source**: `scripts/hooks/pre_commit_arch.py:compliance`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:11.217192+00:00
+- **Duplicate Guard**: `ACTIFIX-scripts-hooks-pre_commit_arch-py:complia-64cda13c`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-F3D1C - [P2] DeveloperExperience: ARCH-DX-005: Add comprehensive API documentation for arch/ module
+- **Priority**: P2
+- **Error Type**: DeveloperExperience
+- **Source**: `docs/ARCH_API.md:comprehensive`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:11.222940+00:00
+- **Duplicate Guard**: `ACTIFIX-docs-ARCH_API-md:comprehensive-e2fe6c88`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-72281 - [P2] DeveloperExperience: ARCH-DX-006: Create architecture changelog generator
+- **Priority**: P2
+- **Error Type**: DeveloperExperience
+- **Source**: `scripts/arch_changelog.py:generator`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:11.248102+00:00
+- **Duplicate Guard**: `ACTIFIX-scripts-arch_changelog-py:generator-cf07d525`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-310C8 - [P2] DeveloperExperience: ARCH-DX-007: Implement 'arch status' command for quick overview
+- **Priority**: P2
+- **Error Type**: DeveloperExperience
+- **Source**: `scripts/arch_query.py:status`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:11.272505+00:00
+- **Duplicate Guard**: `ACTIFIX-scripts-arch_query-py:status-5b3963f8`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-52C3A - [P2] DeveloperExperience: ARCH-DX-008: Add 'arch validate' command with detailed output
+- **Priority**: P2
+- **Error Type**: DeveloperExperience
+- **Source**: `scripts/arch_query.py:validate`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:11.297817+00:00
+- **Duplicate Guard**: `ACTIFIX-scripts-arch_query-py:validate-0ba613a0`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-50077 - [P2] DeveloperExperience: ARCH-DX-009: Create 'arch regen' command for document regeneration
+- **Priority**: P2
+- **Error Type**: DeveloperExperience
+- **Source**: `scripts/arch_query.py:regen`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:11.323484+00:00
+- **Duplicate Guard**: `ACTIFIX-scripts-arch_query-py:regen-dc9463a0`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-00C39 - [P2] DeveloperExperience: ARCH-DX-010: Implement 'arch diff' command for comparing versions
+- **Priority**: P2
+- **Error Type**: DeveloperExperience
+- **Source**: `scripts/arch_query.py:diff`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:11.350074+00:00
+- **Duplicate Guard**: `ACTIFIX-scripts-arch_query-py:diff-b5514482`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-4984F - [P2] DeveloperExperience: ARCH-DX-011: Add 'arch deps MODULE' command for dependency listing
+- **Priority**: P2
+- **Error Type**: DeveloperExperience
+- **Source**: `scripts/arch_query.py:deps`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:11.379675+00:00
+- **Duplicate Guard**: `ACTIFIX-scripts-arch_query-py:deps-cb15f1c4`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-E7923 - [P2] DeveloperExperience: ARCH-DX-012: Create 'arch contracts' command for contract inspection
+- **Priority**: P2
+- **Error Type**: DeveloperExperience
+- **Source**: `scripts/arch_query.py:contracts`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:11.405578+00:00
+- **Duplicate Guard**: `ACTIFIX-scripts-arch_query-py:contracts-ee8fa5a3`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-E3A73 - [P3] DeveloperExperience: ARCH-DX-013: Implement rich terminal output with colors and tables
+- **Priority**: P3
+- **Error Type**: DeveloperExperience
+- **Source**: `scripts/arch_query.py:rich_output`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:11.431468+00:00
+- **Duplicate Guard**: `ACTIFIX-scripts-arch_query-py:rich_output-747c2265`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-027D4 - [P3] DeveloperExperience: ARCH-DX-014: Add progress bars for long-running operations
+- **Priority**: P3
+- **Error Type**: DeveloperExperience
+- **Source**: `scripts/arch_query.py:progress`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:11.456472+00:00
+- **Duplicate Guard**: `ACTIFIX-scripts-arch_query-py:progress-7a158284`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-89229 - [P3] DeveloperExperience: ARCH-DX-015: Create interactive mode for architecture exploration
+- **Priority**: P3
+- **Error Type**: DeveloperExperience
+- **Source**: `scripts/arch_query.py:interactive`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:11.501976+00:00
+- **Duplicate Guard**: `ACTIFIX-scripts-arch_query-py:interactive-ff551fac`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-38AF3 - [P3] DeveloperExperience: ARCH-DX-016: Implement tab completion for CLI commands
+- **Priority**: P3
+- **Error Type**: DeveloperExperience
+- **Source**: `scripts/arch_query.py:completion`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:11.508279+00:00
+- **Duplicate Guard**: `ACTIFIX-scripts-arch_query-py:completion-8ced4e58`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-72866 - [P3] DeveloperExperience: ARCH-DX-017: Add JSON output option for scripting
+- **Priority**: P3
+- **Error Type**: DeveloperExperience
+- **Source**: `scripts/arch_query.py:json_output`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:11.533971+00:00
+- **Duplicate Guard**: `ACTIFIX-scripts-arch_query-py:json_output-b0810c84`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-3882A - [P3] DeveloperExperience: ARCH-DX-018: Create onboarding guide for new developers
+- **Priority**: P3
+- **Error Type**: DeveloperExperience
+- **Source**: `docs/ARCH_ONBOARDING.md:guide`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:11.573190+00:00
+- **Duplicate Guard**: `ACTIFIX-docs-ARCH_ONBOARDING-md:guide-27b0b0ac`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-8782C - [P3] DeveloperExperience: ARCH-DX-019: Implement example queries and usage patterns
+- **Priority**: P3
+- **Error Type**: DeveloperExperience
+- **Source**: `docs/ARCH_EXAMPLES.md:examples`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:11.617550+00:00
+- **Duplicate Guard**: `ACTIFIX-docs-ARCH_EXAMPLES-md:examples-da57837a`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+### ACT-20260110-4B3CE - [P3] DeveloperExperience: ARCH-DX-020: Add troubleshooting guide for common issues
+- **Priority**: P3
+- **Error Type**: DeveloperExperience
+- **Source**: `docs/ARCH_TROUBLESHOOTING.md:guide`
+- **Run**: architecture-robustness-initiative
+- **Created**: 2026-01-10T12:38:11.622919+00:00
+- **Duplicate Guard**: `ACTIFIX-docs-ARCH_TROUBLESHOOTING-md:guide-369b486d`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [ ] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
 ## Completed Items
 ### ACT-20251220-61FD39 - [P3] Enhancement: Log when ACTIFIX_CAPTURE_ENABLED disables ticket intake
 
