@@ -352,6 +352,44 @@ def process_tickets(
     return processed
 
 
+def get_completed_tickets(paths: Optional[ActifixPaths] = None) -> list[TicketInfo]:
+    """
+    Get all completed tickets from ACTIFIX-LIST.md.
+    
+    Args:
+        paths: Optional paths override.
+    
+    Returns:
+        List of completed TicketInfo.
+    """
+    if paths is None:
+        paths = get_actifix_paths()
+    
+    if not paths.list_file.exists():
+        return []
+    
+    content = paths.list_file.read_text()
+    
+    # Find Completed Items section
+    if "## Completed Items" not in content:
+        return []
+    
+    completed_start = content.find("## Completed Items")
+    completed_section = content[completed_start:]
+    
+    # Split into ticket blocks (support ## or ### headers)
+    blocks = re.split(r'(?=##+ ACT-)', completed_section)
+    
+    tickets = []
+    for block in blocks:
+        if block.strip() and 'ACT-' in block:
+            ticket = parse_ticket_block(block)
+            if ticket:
+                tickets.append(ticket)
+    
+    return tickets
+
+
 def get_ticket_stats(paths: Optional[ActifixPaths] = None) -> dict:
     """
     Get statistics about tickets.

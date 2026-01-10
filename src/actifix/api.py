@@ -1,0 +1,272 @@
+"""
+Actifix API Server - Flask-based REST API for frontend dashboard.
+
+Provides endpoints for health, stats, tickets, logs, and system information.
+"""
+
+import os
+import platform
+import sys
+import time
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Optional
+
+try:
+    from flask import Flask, jsonify, request
+    from flask_cors import CORS
+    FLASK_AVAILABLE = True
+except ImportError:
+    FLASK_AVAILABLE = False
+    Flask = None
+    CORS = None
+
+from .health import get_health, check_sla_breaches
+from .do_af import get_open_tickets, get_ticket_stats, get_completed_tickets
+from .state_paths import get_actifix_paths
+
+# Server start time for uptime calculation
+SERVER_START_TIME = time.time()
+
+
+def create_app(project_root: Optional[Path] = None) -> "Flask":
+    """
+    Create and configure the Flask API application.
+    
+    Args:
+        project_root: Optional project root path.
+    
+    Returns:
+        Configured Flask application.
+    """
+    if not FLASK_AVAILABLE:
+        raise ImportError(
+            "Flask and flask-cors are required for the API server. "
+            "Install with: pip install flask flask-cors"
+        )
+    
+    app = Flask(__name__)
+    CORS(app)  # Enable CORS for frontend
+    
+    # Store project root in app config
+    app.config['PROJECT_ROOT'] = project_root or Path.cwd()
+    
+    @app.route('/api/health', methods=['GET'])
+    def api_health():
+        """Get comprehensive health check data."""
+        paths = get_actifix_paths(project_root=app.config['PROJECT_ROOT'])
+        health = get_health(paths)
+        
+        return jsonify({
+            'healthy': health.healthy,
+            'status': health.status,
+            'timestamp': health.timestamp.isoformat(),
+            'metrics': {
+                'open_tickets': health.open_tickets,
+                'completed_tickets': health.completed_tickets,
+                'sla_breaches': health.sla_breaches,
+                'oldest_ticket_age_hours': health.oldest_ticket_age_hours,
+            },
+            'filesystem': {
+                'files_exist': health.files_exist,
+                'files_writable': health.files_writable,
+            },
+            'warnings': health.warnings,
+            'errors': health.errors,
+            'details': health.details,
+        })
+    
+    @app.route('/api/stats', methods=['GET'])
+    def api_stats():
+        """Get ticket statistics."""
+        paths = get_actifix_paths(project_root=app.config['PROJECT_ROOT'])
+        stats = get_ticket_stats(paths)
+        breaches = check_sla_breaches(paths)
+        
+        return jsonify({
+            'total': stats.get('total', 0),
+            'open': stats.get('open', 0),
+            'completed': stats.get('completed', 0),
+            'by_priority': stats.get('by_priority', {}),
+            'sla_breaches': breaches,
+        })
+    
+    @app.route('/api/tickets', methods=['GET'])
+    def api_tickets():
+        """Get recent tickets list."""
+        paths = get_actifix_paths(project_root=app.config['PROJECT_ROOT'])
+        limit = request.args.get('limit', 20, type=int)
+        
+        open_tickets = get_open_tickets(paths)
+        completed_tickets = get_completed_tickets(paths)
+        
+        # Format tickets for API response
+        def format_ticket(ticket, status='open'):
+            return {
+                'ticket_id': ticket.ticket_id,
+                'error_type': ticket.error_type,
+                'message': ticket.message[:100] + '...' if len(ticket.message) > 100 else ticket.message,
+                'source': ticket.source,
+                'priority': ticket.priority,
+                'created': ticket.created,
+                'status': status,
+            }
+        
+        all_tickets = [
+            format_ticket(t, 'open') for t in open_tickets
+        ] + [
+            format_ticket(t, 'completed') for t in completed_tickets
+        ]
+        
+        # Sort by created date (newest first)
+        all_tickets.sort(key=lambda x: x['created'], reverse=True)
+        
+        return jsonify({
+            'tickets': all_tickets[:limit],
+            'total_open': len(open_tickets),
+            'total_completed': len(completed_tickets),
+        })
+    
+    @app.route('/api/logs', methods=['GET'])
+    def api_logs():
+        """Get log file contents."""
+        paths = get_actifix_paths(project_root=app.config['PROJECT_ROOT'])
+        log_type = request.args.get('type', 'audit')
+        lines = request.args.get('lines', 100, type=int)
+        
+        log_files = {
+            'audit': paths.log_file,  # AFLog.txt
+            'errors': paths.rollup_file,  # ACTIFIX.md
+            'list': paths.list_file,  # ACTIFIX-LIST.md
+        }
+        
+        # Also check for setup.log
+        setup_log = app.config['PROJECT_ROOT'] / 'logs' / 'setup.log'
+        if setup_log.exists():
+            log_files['setup'] = setup_log
+        
+        log_file = log_files.get(log_type)
+        
+        if not log_file or not log_file.exists():
+            return jsonify({
+                'content': [],
+                'file': str(log_file) if log_file else 'unknown',
+                'error': 'Log file not found',
+            })
+        
+        try:
+            content = log_file.read_text(encoding='utf-8', errors='replace')
+            log_lines = content.strip().split('\n')
+            
+            # Get last N lines
+            recent_lines = log_lines[-lines:] if len(log_lines) > lines else log_lines
+            
+            # Parse lines into structured format
+            parsed_lines = []
+            for line in recent_lines:
+                level = 'INFO'
+                if 'ERROR' in line.upper() or '✗' in line:
+                    level = 'ERROR'
+                elif 'WARNING' in line.upper() or '⚠' in line:
+                    level = 'WARNING'
+                elif 'SUCCESS' in line.upper() or '✓' in line:
+                    level = 'SUCCESS'
+                
+                parsed_lines.append({
+                    'text': line,
+                    'level': level,
+                })
+            
+            return jsonify({
+                'content': parsed_lines,
+                'file': str(log_file),
+                'total_lines': len(log_lines),
+            })
+        except Exception as e:
+            return jsonify({
+                'content': [],
+                'file': str(log_file),
+                'error': str(e),
+            })
+    
+    @app.route('/api/system', methods=['GET'])
+    def api_system():
+        """Get system information."""
+        uptime_seconds = time.time() - SERVER_START_TIME
+        
+        # Format uptime
+        hours, remainder = divmod(int(uptime_seconds), 3600)
+        minutes, seconds = divmod(remainder, 60)
+        uptime_str = f"{hours}h {minutes}m {seconds}s"
+        
+        # Get memory info if available
+        memory_info = {}
+        try:
+            import psutil
+            mem = psutil.virtual_memory()
+            memory_info = {
+                'total_gb': round(mem.total / (1024**3), 2),
+                'used_gb': round(mem.used / (1024**3), 2),
+                'percent': mem.percent,
+            }
+            cpu_percent = psutil.cpu_percent(interval=0.1)
+        except ImportError:
+            cpu_percent = None
+        
+        paths = get_actifix_paths(project_root=app.config['PROJECT_ROOT'])
+        
+        return jsonify({
+            'platform': {
+                'system': platform.system(),
+                'release': platform.release(),
+                'machine': platform.machine(),
+                'python_version': platform.python_version(),
+            },
+            'project': {
+                'root': str(app.config['PROJECT_ROOT']),
+                'actifix_dir': str(paths.base_dir),
+            },
+            'server': {
+                'uptime': uptime_str,
+                'uptime_seconds': int(uptime_seconds),
+                'start_time': datetime.fromtimestamp(SERVER_START_TIME, tz=timezone.utc).isoformat(),
+            },
+            'resources': {
+                'memory': memory_info if memory_info else None,
+                'cpu_percent': cpu_percent,
+            },
+            'timestamp': datetime.now(timezone.utc).isoformat(),
+        })
+    
+    @app.route('/api/ping', methods=['GET'])
+    def api_ping():
+        """Simple ping endpoint for connectivity check."""
+        return jsonify({
+            'status': 'ok',
+            'timestamp': datetime.now(timezone.utc).isoformat(),
+        })
+    
+    return app
+
+
+def run_api_server(
+    host: str = '127.0.0.1',
+    port: int = 5001,
+    project_root: Optional[Path] = None,
+    debug: bool = False,
+) -> None:
+    """
+    Run the API server.
+    
+    Args:
+        host: Host to bind to.
+        port: Port to bind to.
+        project_root: Optional project root path.
+        debug: Enable debug mode.
+    """
+    app = create_app(project_root)
+    app.run(host=host, port=port, debug=debug, threaded=True)
+
+
+if __name__ == '__main__':
+    run_api_server(debug=True)

@@ -7,14 +7,14 @@ Actifix Launcher
 
 Lightweight starter for the generic Actifix system. It prepares the
 Actifix scaffold, enables error capture, runs a quick health check, and
-serves the static web interface from `actifix-frontend` via Python's
-http.server.
+serves both the static web interface and API backend.
 
 Usage:
-    python start.py                     # init + health + start web UI
+    python start.py                     # init + health + start web UI + API
     python start.py --setup-only        # init only, no servers
     python start.py --health-only       # health check and exit
     python start.py --frontend-port 8081
+    python start.py --api-port 5002
 """
 
 from __future__ import annotations
@@ -24,6 +24,7 @@ import os
 import socket
 import subprocess
 import sys
+import threading
 import time
 import webbrowser
 from pathlib import Path
@@ -32,7 +33,8 @@ from typing import Optional
 ROOT = Path(__file__).resolve().parent
 SRC_DIR = ROOT / "src"
 FRONTEND_DIR = ROOT / "actifix-frontend"
-DEFAULT_PORT = 8080
+DEFAULT_FRONTEND_PORT = 8080
+DEFAULT_API_PORT = 5001
 
 
 def log(message: str) -> None:
@@ -76,7 +78,34 @@ def is_port_in_use(port: int) -> bool:
 def start_frontend(port: int) -> subprocess.Popen:
     """Launch the static frontend server."""
     cmd = [sys.executable, "-m", "http.server", str(port)]
-    return subprocess.Popen(cmd, cwd=FRONTEND_DIR)
+    return subprocess.Popen(cmd, cwd=FRONTEND_DIR, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
+def start_api_server(port: int, project_root: Path) -> threading.Thread:
+    """Launch the API server in a background thread."""
+    def run_server():
+        try:
+            from actifix.api import create_app
+            app = create_app(project_root)
+            # Use werkzeug's run_simple for better control
+            from werkzeug.serving import run_simple
+            run_simple(
+                '127.0.0.1', 
+                port, 
+                app, 
+                use_reloader=False, 
+                use_debugger=False,
+                threaded=True,
+            )
+        except ImportError as e:
+            log(f"API server failed to start: {e}")
+            log("Install Flask with: pip install flask flask-cors")
+        except Exception as e:
+            log(f"API server error: {e}")
+    
+    thread = threading.Thread(target=run_server, daemon=True)
+    thread.start()
+    return thread
 
 
 def run_health_check() -> bool:
@@ -92,8 +121,14 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
     parser.add_argument(
         "--frontend-port",
         type=int,
-        default=DEFAULT_PORT,
-        help=f"Port for static frontend (default: {DEFAULT_PORT})",
+        default=DEFAULT_FRONTEND_PORT,
+        help=f"Port for static frontend (default: {DEFAULT_FRONTEND_PORT})",
+    )
+    parser.add_argument(
+        "--api-port",
+        type=int,
+        default=DEFAULT_API_PORT,
+        help=f"Port for API server (default: {DEFAULT_API_PORT})",
     )
     parser.add_argument(
         "--setup-only",
@@ -109,6 +144,11 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
         "--no-browser",
         action="store_true",
         help="Do not open the browser automatically",
+    )
+    parser.add_argument(
+        "--no-api",
+        action="store_true",
+        help="Do not start the API server",
     )
     return parser.parse_args(argv)
 
@@ -142,6 +182,19 @@ def main(argv: Optional[list[str]] = None) -> int:
         log(f"Port {args.frontend_port} is already in use. Stop the existing process or choose another port.")
         return 1
 
+    if not args.no_api and is_port_in_use(args.api_port):
+        log(f"API port {args.api_port} is already in use. Stop the existing process or choose another port.")
+        return 1
+
+    # Start API server first (in background thread)
+    api_thread = None
+    if not args.no_api:
+        log(f"Starting Actifix API server on port {args.api_port}...")
+        api_thread = start_api_server(args.api_port, ROOT)
+        # Give the API server a moment to start
+        time.sleep(0.5)
+        log(f"API available at http://localhost:{args.api_port}/api/")
+
     log(f"Starting Actifix static frontend on port {args.frontend_port}...")
     server = start_frontend(args.frontend_port)
     url = f"http://localhost:{args.frontend_port}"
@@ -153,6 +206,17 @@ def main(argv: Optional[list[str]] = None) -> int:
         except Exception:
             log("Browser launch failed; open the URL manually.")
 
+    log("")
+    log("=" * 50)
+    log("  ACTIFIX DASHBOARD")
+    log("=" * 50)
+    log(f"  Frontend: http://localhost:{args.frontend_port}")
+    if not args.no_api:
+        log(f"  API:      http://localhost:{args.api_port}/api/")
+    log("")
+    log("  Press Ctrl+C to stop")
+    log("=" * 50)
+
     try:
         # Keep process alive until interrupted
         while True:
@@ -160,7 +224,7 @@ def main(argv: Optional[list[str]] = None) -> int:
             if server.poll() is not None:
                 return server.returncode or 0
     except KeyboardInterrupt:
-        log("Stopping frontend server...")
+        log("\nStopping servers...")
         server.terminate()
         try:
             server.wait(timeout=5)
