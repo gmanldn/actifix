@@ -23,3 +23,18 @@
 2026-01-10 18:08:52,909 - INFO - Cleanup completed
 2026-01-10 18:08:53,575 - INFO - === ACTIFIX Universal Setup ===
 2026-01-10 18:08:53,575 - ERROR - Setup interrupted by user
+2026-01-10 18:12:55,218 - INFO - === CLEANUP AND ROLLBACK ===
+2026-01-10 18:12:55,218 - INFO - Removed virtual environment: /var/folders/27/ggng5p_n6xx5ptf65skddqgw0000gn/T/tmp6_wqfdeq/test_venv
+2026-01-10 18:12:55,219 - INFO - Cleanup completed
+2026-01-10 18:12:55,697 - INFO - === ACTIFIX Universal Setup ===
+2026-01-10 18:12:55,698 - ERROR - Setup interrupted by user
+2026-01-10 18:13:19,224 - INFO - === CLEANUP AND ROLLBACK ===
+2026-01-10 18:13:19,224 - INFO - Removed virtual environment: /var/folders/27/ggng5p_n6xx5ptf65skddqgw0000gn/T/tmpj9jy71x2/test_venv
+2026-01-10 18:13:19,224 - INFO - Cleanup completed
+2026-01-10 18:13:19,919 - INFO - === ACTIFIX Universal Setup ===
+2026-01-10 18:13:19,920 - ERROR - Setup interrupted by user
+2026-01-10 18:13:47,961 - INFO - === CLEANUP AND ROLLBACK ===
+2026-01-10 18:13:47,961 - INFO - Removed virtual environment: /var/folders/27/ggng5p_n6xx5ptf65skddqgw0000gn/T/tmp4nznkx0b/test_venv
+2026-01-10 18:13:47,961 - INFO - Cleanup completed
+2026-01-10 18:13:48,452 - INFO - === ACTIFIX Universal Setup ===
+2026-01-10 18:13:48,452 - ERROR - Setup interrupted by user

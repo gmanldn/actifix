@@ -21,12 +21,188 @@ import contextlib
 import re
 import threading
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional, Callable, Iterator
 
 from .log_utils import atomic_write, log_event
 from .state_paths import ActifixPaths, get_actifix_paths, init_actifix_files
+
+
+# --- Token-Efficient State Cache ---
+
+@dataclass
+class TicketCacheState:
+    """Cached ticket state to reduce file I/O and token usage."""
+    
+    open_tickets: list['TicketInfo'] = field(default_factory=list)
+    completed_tickets: list['TicketInfo'] = field(default_factory=list)
+    stats: dict = field(default_factory=dict)
+    last_modified: float = 0.0
+    cached_at: datetime = field(default_factory=datetime.now)
+    cache_ttl_seconds: int = 60  # 1 minute default TTL
+    
+    def is_valid(self, list_file_path: Path) -> bool:
+        """Check if cache is still valid based on file modification and TTL."""
+        # Check TTL
+        age = (datetime.now() - self.cached_at).total_seconds()
+        if age > self.cache_ttl_seconds:
+            return False
+        
+        # Check file modification
+        if not list_file_path.exists():
+            return False
+        
+        current_mtime = list_file_path.stat().st_mtime
+        return current_mtime == self.last_modified
+    
+    def invalidate(self):
+        """Force cache invalidation."""
+        self.last_modified = 0.0
+        self.cached_at = datetime.min
+
+
+class StatefulTicketManager:
+    """
+    Token-efficient ticket manager with state caching.
+    
+    Maintains internal knowledge about ACTIFIX-LIST structure to minimize
+    redundant file reads and reduce token usage in AI operations.
+    """
+    
+    def __init__(self, paths: Optional[ActifixPaths] = None, cache_ttl: int = 60):
+        self.paths = paths or get_actifix_paths()
+        self.cache = TicketCacheState(cache_ttl_seconds=cache_ttl)
+        self._lock = threading.Lock()
+    
+    def _refresh_cache(self) -> None:
+        """Refresh cache from ACTIFIX-LIST.md."""
+        if not self.paths.list_file.exists():
+            self.cache = TicketCacheState(
+                cache_ttl_seconds=self.cache.cache_ttl_seconds,
+                stats={
+                    "total": 0,
+                    "open": 0,
+                    "completed": 0,
+                    "by_priority": {"P0": 0, "P1": 0, "P2": 0, "P3": 0},
+                }
+            )
+            return
+        
+        # Read and parse once
+        content = self.paths.list_file.read_text()
+        mtime = self.paths.list_file.stat().st_mtime
+        
+        # Parse open tickets
+        open_tickets = self._parse_tickets_from_section(content, "Active Items", "Completed Items")
+        
+        # Parse completed tickets  
+        completed_tickets = self._parse_tickets_from_section(content, "Completed Items", None)
+        
+        # Calculate stats efficiently from in-memory data
+        all_ticket_ids = set()
+        priority_counts = {"P0": 0, "P1": 0, "P2": 0, "P3": 0}
+        
+        for ticket in open_tickets + completed_tickets:
+            all_ticket_ids.add(ticket.ticket_id)
+            priority_counts[ticket.priority] = priority_counts.get(ticket.priority, 0) + 1
+        
+        completed_count = len([t for t in open_tickets + completed_tickets if t.completed])
+        
+        stats = {
+            "total": len(all_ticket_ids),
+            "open": len(all_ticket_ids) - completed_count,
+            "completed": completed_count,
+            "by_priority": priority_counts,
+        }
+        
+        # Update cache atomically
+        self.cache = TicketCacheState(
+            open_tickets=open_tickets,
+            completed_tickets=completed_tickets,
+            stats=stats,
+            last_modified=mtime,
+            cached_at=datetime.now(),
+            cache_ttl_seconds=self.cache.cache_ttl_seconds,
+        )
+    
+    def _parse_tickets_from_section(
+        self, 
+        content: str, 
+        section_name: str, 
+        next_section: Optional[str]
+    ) -> list['TicketInfo']:
+        """Parse tickets from a specific section of ACTIFIX-LIST.md."""
+        if f"## {section_name}" not in content:
+            return []
+        
+        start = content.find(f"## {section_name}")
+        if next_section:
+            end = content.find(f"## {next_section}")
+            section = content[start:end] if end != -1 else content[start:]
+        else:
+            section = content[start:]
+        
+        blocks = re.split(r'(?=##+ ACT-)', section)
+        tickets = []
+        
+        for block in blocks:
+            if block.strip() and 'ACT-' in block:
+                ticket = parse_ticket_block(block)
+                if ticket:
+                    tickets.append(ticket)
+        
+        # Sort open tickets by priority
+        if section_name == "Active Items":
+            priority_order = {"P0": 0, "P1": 1, "P2": 2, "P3": 3}
+            tickets.sort(key=lambda t: priority_order.get(t.priority, 4))
+        
+        return tickets
+    
+    def get_open_tickets(self) -> list['TicketInfo']:
+        """Get open tickets with caching."""
+        with self._lock:
+            if not self.cache.is_valid(self.paths.list_file):
+                self._refresh_cache()
+            return self.cache.open_tickets.copy()
+    
+    def get_completed_tickets(self) -> list['TicketInfo']:
+        """Get completed tickets with caching."""
+        with self._lock:
+            if not self.cache.is_valid(self.paths.list_file):
+                self._refresh_cache()
+            return self.cache.completed_tickets.copy()
+    
+    def get_stats(self) -> dict:
+        """Get ticket stats with caching."""
+        with self._lock:
+            if not self.cache.is_valid(self.paths.list_file):
+                self._refresh_cache()
+            return self.cache.stats.copy()
+    
+    def invalidate_cache(self) -> None:
+        """Force cache invalidation (e.g., after modifying tickets)."""
+        with self._lock:
+            self.cache.invalidate()
+
+
+# Global instance for singleton pattern
+_global_manager: Optional[StatefulTicketManager] = None
+_manager_lock = threading.Lock()
+
+
+def get_ticket_manager(
+    paths: Optional[ActifixPaths] = None,
+    cache_ttl: int = 60
+) -> StatefulTicketManager:
+    """Get or create the global stateful ticket manager."""
+    global _global_manager
+    
+    with _manager_lock:
+        if _global_manager is None or (paths and _global_manager.paths != paths):
+            _global_manager = StatefulTicketManager(paths=paths, cache_ttl=cache_ttl)
+        return _global_manager
 
 
 @dataclass
@@ -109,16 +285,22 @@ def parse_ticket_block(block: str) -> Optional[TicketInfo]:
     )
 
 
-def get_open_tickets(paths: Optional[ActifixPaths] = None) -> list[TicketInfo]:
+def get_open_tickets(paths: Optional[ActifixPaths] = None, use_cache: bool = True) -> list[TicketInfo]:
     """
     Get all open (incomplete) tickets from ACTIFIX-LIST.md.
     
     Args:
         paths: Optional paths override.
+        use_cache: Use cached data if available (default: True for efficiency).
     
     Returns:
         List of open TicketInfo, sorted by priority (P0 first).
     """
+    if use_cache:
+        manager = get_ticket_manager(paths=paths)
+        return manager.get_open_tickets()
+    
+    # Fallback to direct file read (backward compatibility)
     if paths is None:
         paths = get_actifix_paths()
     
@@ -242,6 +424,10 @@ def mark_ticket_complete(
         
         atomic_write(paths.list_file, updated)
         
+        # Invalidate cache after modification
+        manager = get_ticket_manager(paths=paths)
+        manager.invalidate_cache()
+        
         log_event(
             paths.aflog_file,
             "TICKET_COMPLETED",
@@ -352,16 +538,22 @@ def process_tickets(
     return processed
 
 
-def get_completed_tickets(paths: Optional[ActifixPaths] = None) -> list[TicketInfo]:
+def get_completed_tickets(paths: Optional[ActifixPaths] = None, use_cache: bool = True) -> list[TicketInfo]:
     """
     Get all completed tickets from ACTIFIX-LIST.md.
     
     Args:
         paths: Optional paths override.
+        use_cache: Use cached data if available (default: True for efficiency).
     
     Returns:
         List of completed TicketInfo.
     """
+    if use_cache:
+        manager = get_ticket_manager(paths=paths)
+        return manager.get_completed_tickets()
+    
+    # Fallback to direct file read (backward compatibility)
     if paths is None:
         paths = get_actifix_paths()
     
@@ -390,21 +582,28 @@ def get_completed_tickets(paths: Optional[ActifixPaths] = None) -> list[TicketIn
     return tickets
 
 
-def get_ticket_stats(paths: Optional[ActifixPaths] = None) -> dict:
+def get_ticket_stats(paths: Optional[ActifixPaths] = None, use_cache: bool = True) -> dict:
     """
     Get statistics about tickets.
     
     Args:
         paths: Optional paths override.
+        use_cache: Use cached data if available (default: True for efficiency).
     
     Returns:
         Dict with ticket statistics.
     """
+    if use_cache:
+        manager = get_ticket_manager(paths=paths)
+        return manager.get_stats()
+    
+    # Fallback to direct file read (backward compatibility)
     if paths is None:
         paths = get_actifix_paths()
     
     if not paths.list_file.exists():
         return {
+            "total": 0,
             "open": 0,
             "completed": 0,
             "by_priority": {"P0": 0, "P1": 0, "P2": 0, "P3": 0},
