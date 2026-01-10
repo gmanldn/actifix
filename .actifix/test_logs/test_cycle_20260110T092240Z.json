@@ -1,0 +1,75 @@
+{
+  "cycle": "actifix-system",
+  "run_id": "20260110T092240Z",
+  "started_at": "2026-01-10T09:22:40.997912+00:00",
+  "finished_at": "2026-01-10T09:22:42.057389+00:00",
+  "plan": {
+    "name": "actifix-system",
+    "total": 8,
+    "declared_at": "2026-01-10T09:22:41.001342+00:00",
+    "min_coverage": 0.0,
+    "tags": [
+      [
+        "system",
+        "dependencies"
+      ],
+      [
+        "system",
+        "bootstrap"
+      ],
+      [
+        "config"
+      ],
+      [
+        "persistence"
+      ],
+      [
+        "persistence"
+      ],
+      [
+        "persistence",
+        "health"
+      ],
+      [
+        "persistence"
+      ],
+      [
+        "health"
+      ]
+    ]
+  },
+  "result": {
+    "success": true,
+    "total": 8,
+    "executed": 8,
+    "passed": 8,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 0,
+    "plan_matched": true,
+    "plan_mismatch_reason": "",
+    "failed_tests": [],
+    "error_tests": [],
+    "duration_seconds": 0.005781
+  },
+  "stages": [
+    {
+      "stage": "system-tests",
+      "success": true,
+      "details": {
+        "passed": 8,
+        "failed": 0,
+        "errors": 0,
+        "duration": 0.005781
+      }
+    },
+    {
+      "stage": "pytest",
+      "success": true,
+      "details": {
+        "returncode": 0,
+        "command": "/Library/Frameworks/Python.framework/Versions/3.14/bin/python3 -m pytest -q test"
+      }
+    }
+  ]
+}
