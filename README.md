@@ -122,6 +122,7 @@ actifix/
 - **Developer safety net**: Keep capture on in local/dev; Actifix auto-opens tickets for regressions and flaky behaviors while you work.  
 - **AI-assisted debugging**: Feed the ticket Markdown (with remediation notes) to your copilot for suggested fixes.  
 - **Self-hosted improvement**: Run `bootstrap_actifix_development()` inside this repo; Actifix will ticket its own issues while you add features.
+- **High-value ticket generator**: Run `python scripts/generate_high_value_tickets.py --count 10 --priority P0` to flood `actifix/ACTIFIX-LIST.md` with critical/demo tickets for validation or AI pilot exercises.
 
 ## Roadmap Snapshot
 
