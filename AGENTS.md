@@ -1,6 +1,6 @@
 # Coding Agent Instructions (AGENTS/CLAUDE/GPT)
 
-This file provides essential context and rules for all coding agents working with the PokerTool codebase.
+This file provides essential context and rules for all coding agents working with the Actifix codebase.
 It is synchronized across `AGENTS.md`, `CLAUDE.md`, and `GPT.md`.
 
 ---
@@ -8,6 +8,8 @@ It is synchronized across `AGENTS.md`, `CLAUDE.md`, and `GPT.md`.
 ## MANDATORY REQUIREMENTS
 
 ### 1. Every Completed Task MUST Be Committed and Pushed
+
+**CRITICAL: Always make a branch, do the work in the ticket, commit, merge to develop, then delete the branch at all times**
 
 **CRITICAL: All work must be committed to the `develop` branch and pushed before a task is considered complete.**
 
