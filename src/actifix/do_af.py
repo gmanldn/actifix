@@ -164,6 +164,9 @@ def mark_ticket_complete(
     """
     Mark a ticket as complete in ACTIFIX-LIST.md.
     
+    Implements idempotency guard: if ticket already has [x] Completed,
+    skip the operation and log skip event to AFLog.
+    
     Args:
         ticket_id: Ticket ID to mark complete.
         summary: Optional completion summary.
@@ -171,7 +174,7 @@ def mark_ticket_complete(
         use_lock: Guard writes with the DoAF lock (set False if already held).
     
     Returns:
-        True if marked complete, False if not found.
+        True if marked complete, False if not found or already completed.
     """
     if paths is None:
         paths = get_actifix_paths()
@@ -184,7 +187,7 @@ def mark_ticket_complete(
     
         # Find the ticket block (support ## or ### headers)
         header_pattern = re.compile(
-            rf'(##+\s+{re.escape(ticket_id)}.*?)'
+            rf'(##+\s+{re.escape(ticket_id)}.*?)'\
             r'((?=##+\s+ACT-)|(?=##\s+Completed Items)|\Z)',
             re.DOTALL,
         )
@@ -193,6 +196,17 @@ def mark_ticket_complete(
             return False
         
         ticket_block = match.group(1)
+        
+        # Idempotency guard: check if already completed
+        if '[x] Completed' in ticket_block:
+            log_event(
+                paths.aflog_file,
+                "TICKET_ALREADY_COMPLETED",
+                f"Skipped already-completed ticket: {ticket_id}",
+                ticket_id=ticket_id,
+                extra={"reason": "idempotency_guard"}
+            )
+            return False  # Already completed, skip
         
         # Update checkboxes
         new_block = ticket_block
