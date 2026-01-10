@@ -18,3 +18,8 @@
 2026-01-10 17:51:38,707 - INFO - Cleanup completed
 2026-01-10 17:51:39,626 - INFO - === ACTIFIX Universal Setup ===
 2026-01-10 17:51:39,627 - ERROR - Setup interrupted by user
+2026-01-10 18:08:52,908 - INFO - === CLEANUP AND ROLLBACK ===
+2026-01-10 18:08:52,909 - INFO - Removed virtual environment: /var/folders/27/ggng5p_n6xx5ptf65skddqgw0000gn/T/tmpvhykq998/test_venv
+2026-01-10 18:08:52,909 - INFO - Cleanup completed
+2026-01-10 18:08:53,575 - INFO - === ACTIFIX Universal Setup ===
+2026-01-10 18:08:53,575 - ERROR - Setup interrupted by user
