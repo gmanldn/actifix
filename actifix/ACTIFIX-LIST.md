@@ -11,6 +11,1360 @@ Tickets generated from errors. Update checkboxes as work progresses.
 
 <!-- New tickets are inserted here by RaiseAF -->
 
+### ACT-20251220-75CA0A - [P1] Enhancement: Add atomic writes + fsync for Actifix artifacts to prevent partial writes
+
+- **Priority**: P1
+- **Error Type**: Enhancement
+- **Source**: `Actifix/log_utils.py`
+- **Run**: actifix-reliability-md-scan
+- **Created**: 2025-12-20T23:34:27.478845+00:00
+- **Duplicate Guard**: `ACTIFIX-Actifix-log_utils-py-8190a3be`
+
+**Checklist:**
+
+- [x] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+- Summary: Implemented atomic_write() and atomic_write_bytes() functions with write-to-temp-then-rename pattern and fsync for durability. Cross-platform support (Windows, macOS, Linux). Full test coverage in test_actifix_log_utils.py.
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+<details>
+<summary>AI Remediation Notes</summary>
+
+Error Type: Enhancement
+Error Message: Add atomic writes + fsync for Actifix artifacts to prevent partial writes
+Source Location: Actifix/log_utils.py
+Priority: P1
+
+REMEDIATION REQUIREMENTS:
+
+1. Read and follow ALL project documentation (CLAUDE.md, DEVELO
+
+...
+...
+</details>
+
+### ACT-20251220-F333DB - [P1] Enhancement: Introduce cross-process file locking for Actifix artifact updates
+
+- **Priority**: P1
+- **Error Type**: Enhancement
+- **Source**: `Actifix/thread_safe.py`
+- **Run**: actifix-reliability-md-scan
+- **Created**: 2025-12-20T23:34:28.478845+00:00
+- **Duplicate Guard**: `ACTIFIX-Actifix-thread_safe-py-97ea7de0`
+
+**Checklist:**
+
+- [x] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+- Summary: Implemented CrossProcessLock class using filelock library with stale lock detection and recovery. Thread-safe coordination via RLock. Multi-file lock acquisition with consistent ordering for deadlock prevention. Full test coverage in test_actifix_thread_safe.py.
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+<details>
+<summary>AI Remediation Notes</summary>
+
+Error Type: Enhancement
+Error Message: Introduce cross-process file locking for Actifix artifact updates
+Source Location: Actifix/thread_safe.py
+Priority: P1
+
+REMEDIATION REQUIREMENTS:
+
+1. Read and follow ALL project documentation (CLAUDE.md, DEVELO
+
+...
+...
+</details>
+
+### ACT-20251220-617FDB - [P1] Enhancement: Add DoAF run lock with stale lock recovery to prevent concurrent runs
+
+- **Priority**: P1
+- **Error Type**: Enhancement
+- **Source**: `Actifix/DoAF.py`
+- **Run**: actifix-reliability-md-scan
+- **Created**: 2025-12-20T23:34:34.478845+00:00
+- **Duplicate Guard**: `ACTIFIX-Actifix-DoAF-py-8ff53c7d`
+
+**Checklist:**
+
+- [x] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+- Summary: Implemented doaf_run_lock() context manager with stale lock recovery (10-minute threshold). Uses JSON lock file with PID/timestamp/hostname. Lock acquisition with configurable timeout. Full test coverage verified.
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+<details>
+<summary>AI Remediation Notes</summary>
+
+Error Type: Enhancement
+Error Message: Add DoAF run lock with stale lock recovery to prevent concurrent runs
+Source Location: Actifix/DoAF.py
+Priority: P1
+
+REMEDIATION REQUIREMENTS:
+
+1. Read and follow ALL project documentation (CLAUDE.md, DEVELO
+
+...
+...
+</details>
+
+### ACT-20251220-A81C40 - [P2] Enhancement: Trim AFLog by line boundaries to avoid corrupt entries
+
+- **Priority**: P2
+- **Error Type**: Enhancement
+- **Source**: `Actifix/log_utils.py`
+- **Run**: actifix-reliability-md-scan
+- **Created**: 2025-12-20T23:34:42.478845+00:00
+- **Duplicate Guard**: `ACTIFIX-Actifix-log_utils-py-7ab569d1`
+
+**Checklist:**
+
+- [x] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+- Summary: Implemented trim_to_line_boundary() function in log_utils.py. Trims content at line boundaries to avoid corrupt/partial log entries. Used by append_with_guard() when file exceeds max size.
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+<details>
+<summary>AI Remediation Notes</summary>
+
+Error Type: Enhancement
+Error Message: Trim AFLog by line boundaries to avoid corrupt entries
+Source Location: Actifix/log_utils.py
+Priority: P2
+
+REMEDIATION REQUIREMENTS:
+
+1. Read and follow ALL project documentation (CLAUDE.md, DEVELO
+
+...
+...
+</details>
+
+### ACT-20251220-C1CF83 - [P2] Enhancement: Use temp+rename for ACTIFIX-LOG.md appends for durability
+
+- **Priority**: P2
+- **Error Type**: Enhancement
+- **Source**: `Actifix/DoAF.py`
+- **Run**: actifix-reliability-md-scan
+- **Created**: 2025-12-20T23:34:43.478845+00:00
+- **Duplicate Guard**: `ACTIFIX-Actifix-DoAF-py-ca484b53`
+
+**Checklist:**
+
+- [x] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+- Summary: Updated _update_log() in DoAF.py to use atomic_write() from log_utils.py for durable ACTIFIX-LOG.md writes. Uses temp+rename pattern with fsync.
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+<details>
+<summary>AI Remediation Notes</summary>
+
+Error Type: Enhancement
+Error Message: Use temp+rename for ACTIFIX-LOG.md appends for durability
+Source Location: Actifix/DoAF.py
+Priority: P2
+
+REMEDIATION REQUIREMENTS:
+
+1. Read and follow ALL project documentation (CLAUDE.md, DEVELO
+
+...
+...
+</details>
+
+### ACT-20251220-5B54D7 - [P1] Enhancement: Add test timeout handling in DoAF to avoid hung runs
+
+- **Priority**: P1
+- **Error Type**: Enhancement
+- **Source**: `Actifix/DoAF.py`
+- **Run**: actifix-reliability-md-scan
+- **Created**: 2025-12-20T23:34:44.478845+00:00
+- **Duplicate Guard**: `ACTIFIX-Actifix-DoAF-py-d32da429`
+
+**Checklist:**
+
+- [x] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+- Summary: Test timeout of 600s (10 minutes) implemented in DoAF._run_tests().
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+<details>
+<summary>AI Remediation Notes</summary>
+
+Error Type: Enhancement
+Error Message: Add test timeout handling in DoAF to avoid hung runs
+Source Location: Actifix/DoAF.py
+Priority: P1
+
+REMEDIATION REQUIREMENTS:
+
+1. Read and follow ALL project documentation (CLAUDE.md, DEVELO
+
+...
+...
+</details>
+
+### ACT-20251220-C0323D - [P2] Enhancement: Add git preflight checks in DoAF (dirty/detached/remote)
+
+- **Priority**: P2
+- **Error Type**: Enhancement
+- **Source**: `Actifix/DoAF.py`
+- **Run**: actifix-reliability-md-scan
+- **Created**: 2025-12-20T23:34:45.478845+00:00
+- **Duplicate Guard**: `ACTIFIX-Actifix-DoAF-py-88801190`
+
+**Checklist:**
+
+- [x] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+- Summary: Implemented git_preflight_checks() in DoAF.py with GitPreflightResult dataclass. Checks for dirty working tree, detached HEAD, and remote tracking branch. Returns structured result with warnings and errors.
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+<details>
+<summary>AI Remediation Notes</summary>
+
+Error Type: Enhancement
+Error Message: Add git preflight checks in DoAF (dirty/detached/remote)
+Source Location: Actifix/DoAF.py
+Priority: P2
+
+REMEDIATION REQUIREMENTS:
+
+1. Read and follow ALL project documentation (CLAUDE.md, DEVELO
+
+...
+...
+</details>
+
+### ACT-20251220-E574C8 - [P2] Enhancement: Classify Claude client failures and log to AFLog with context
+
+- **Priority**: P2
+- **Error Type**: Enhancement
+- **Source**: `Actifix/claude_client.py`
+- **Run**: actifix-reliability-md-scan
+- **Created**: 2025-12-20T23:34:46.478845+00:00
+- **Duplicate Guard**: `ACTIFIX-Actifix-claude_client-py-f33c77a6`
+
+**Checklist:**
+
+- [x] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+- Summary: Added FailureType enum (timeout, os_error, cli_not_available, cli_error, unknown) and log_failure_to_aflog() function. Updated send_prompt() to log all failures to AFLog.txt with classification and context.
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+<details>
+<summary>AI Remediation Notes</summary>
+
+Error Type: Enhancement
+Error Message: Classify Claude client failures and log to AFLog with context
+Source Location: Actifix/claude_client.py
+Priority: P2
+
+REMEDIATION REQUIREMENTS:
+
+1. Read and follow ALL project documentation (CLAUDE.md, DEVELO
+
+...
+...
+</details>
+
+### ACT-20251220-C4948E - [P2] Enhancement: Add backup freshness check to Actifix health report
+
+- **Priority**: P2
+- **Error Type**: Enhancement
+- **Source**: `Actifix/health.py`
+- **Run**: actifix-reliability-md-scan
+- **Created**: 2025-12-20T23:34:47.478845+00:00
+- **Duplicate Guard**: `ACTIFIX-Actifix-health-py-ae1f4a65`
+
+**Checklist:**
+
+- [x] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+- Summary: Implemented check_backup_freshness() in health.py. Scans backup directory for .tar.gz and .zip files, tracks newest/oldest backup age in hours, warns when newest backup exceeds 24-hour threshold.
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+<details>
+<summary>AI Remediation Notes</summary>
+
+Error Type: Enhancement
+Error Message: Add backup freshness check to Actifix health report
+Source Location: Actifix/health.py
+Priority: P2
+
+REMEDIATION REQUIREMENTS:
+
+1. Read and follow ALL project documentation (CLAUDE.md, DEVELO
+
+...
+...
+</details>
+
+### ACT-20251220-A42DBD - [P2] Enhancement: Schedule hourly backups with AFLog audit entries
+
+- **Priority**: P2
+- **Error Type**: Enhancement
+- **Source**: `Actifix/backup.py`
+- **Run**: actifix-reliability-md-scan
+- **Created**: 2025-12-20T23:34:48.478845+00:00
+- **Duplicate Guard**: `ACTIFIX-Actifix-backup-py-04c8b7ef`
+
+**Checklist:**
+
+- [x] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+- Summary: Added _log_to_aflog() helper in backup.py. Updated create_backup(), restore_from_backup(), and cleanup_old_backups() to log all operations to AFLog.txt with event types: BACKUP_CREATED, BACKUP_RESTORED, BACKUP_RESTORE_FAILED, BACKUP_RESTORE_PARTIAL, BACKUP_CLEANUP.
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+<details>
+<summary>AI Remediation Notes</summary>
+
+Error Type: Enhancement
+Error Message: Schedule hourly backups with AFLog audit entries
+Source Location: Actifix/backup.py
+Priority: P2
+
+REMEDIATION REQUIREMENTS:
+
+1. Read and follow ALL project documentation (CLAUDE.md, DEVELO
+
+...
+...
+</details>
+
+### ACT-20251220-ACAB3E - [P3] Enhancement: Add restore drill command to validate backups in temp dir
+
+- **Priority**: P3
+- **Error Type**: Enhancement
+- **Source**: `Actifix/backup.py`
+- **Run**: actifix-reliability-md-scan
+- **Created**: 2025-12-20T23:34:49.478845+00:00
+- **Duplicate Guard**: `ACTIFIX-Actifix-backup-py-93225275`
+
+**Checklist:**
+
+- [x] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+- Summary: Implemented restore_drill() function and CLI 'drill' command in backup.py. Validates backup integrity by restoring to temp directory, checking file readability and content. Logs results to AFLog.
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+<details>
+<summary>AI Remediation Notes</summary>
+
+Error Type: Enhancement
+Error Message: Add restore drill command to validate backups in temp dir
+Source Location: Actifix/backup.py
+Priority: P3
+
+REMEDIATION REQUIREMENTS:
+
+1. Read and follow ALL project documentation (CLAUDE.md, DEVELO
+
+...
+...
+</details>
+
+### ACT-20251220-BE34AC - [P3] Enhancement: Emit backup retention audit report and cleanup summary
+
+- **Priority**: P3
+- **Error Type**: Enhancement
+- **Source**: `Actifix/backup.py`
+- **Run**: actifix-reliability-md-scan
+- **Created**: 2025-12-20T23:34:51.478845+00:00
+- **Duplicate Guard**: `ACTIFIX-Actifix-backup-py-1c46f40c`
+
+**Checklist:**
+
+- [x] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+- Summary: Implemented get_retention_report() function and CLI 'report' command in backup.py. Generates audit report with total backups, age distribution buckets, recommendations, and logs to AFLog.
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+<details>
+<summary>AI Remediation Notes</summary>
+
+Error Type: Enhancement
+Error Message: Emit backup retention audit report and cleanup summary
+Source Location: Actifix/backup.py
+Priority: P3
+
+REMEDIATION REQUIREMENTS:
+
+1. Read and follow ALL project documentation (CLAUDE.md, DEVELO
+
+...
+...
+</details>
+
+### ACT-20251220-5DE656 - [P3] Enhancement: Warn when ACTIFIX-LIST size exceeds threshold
+
+- **Priority**: P3
+- **Error Type**: Enhancement
+- **Source**: `Actifix/health.py`
+- **Run**: actifix-reliability-md-scan
+- **Created**: 2025-12-20T23:34:52.478845+00:00
+- **Duplicate Guard**: `ACTIFIX-Actifix-health-py-fa152ece`
+
+**Checklist:**
+
+- [x] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+- Summary: Implemented check_list_size() in health.py. Checks ACTIFIX-LIST.md file size with warning threshold at 500KB and critical threshold at 1MB. Integrated into get_health() health check routine.
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+<details>
+<summary>AI Remediation Notes</summary>
+
+Error Type: Enhancement
+Error Message: Warn when ACTIFIX-LIST size exceeds threshold
+Source Location: Actifix/health.py
+Priority: P3
+
+REMEDIATION REQUIREMENTS:
+
+1. Read and follow ALL project documentation (CLAUDE.md, DEVELO
+
+...
+...
+</details>
+
+### ACT-20251220-CD6689 - [P2] Enhancement: Add strict schema validator + lint command for ACTIFIX-LIST
+
+- **Priority**: P2
+- **Error Type**: Enhancement
+- **Source**: `Actifix/health.py`
+- **Run**: actifix-reliability-md-scan
+- **Created**: 2025-12-20T23:34:53.478845+00:00
+- **Duplicate Guard**: `ACTIFIX-Actifix-health-py-74e53777`
+
+**Checklist:**
+
+- [x] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+- Summary: Implemented validate_ticket_schema() and lint_actifix_list() methods in ActifixHealthCheck class. Added lint_tickets() convenience function. Validates required fields (ticket ID, priority, error type, source, created, checklist) and checks for complete checklists.
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+<details>
+<summary>AI Remediation Notes</summary>
+
+Error Type: Enhancement
+Error Message: Add strict schema validator + lint command for ACTIFIX-LIST
+Source Location: Actifix/health.py
+Priority: P2
+
+REMEDIATION REQUIREMENTS:
+
+1. Read and follow ALL project documentation (CLAUDE.md, DEVELO
+
+...
+...
+</details>
+
+### ACT-20251220-5D1C76 - [P3] Enhancement: Add ticket format_version field to support future migrations
+
+- **Priority**: P3
+- **Error Type**: Enhancement
+- **Source**: `Actifix/RaiseAF.py`
+- **Run**: actifix-reliability-md-scan
+- **Created**: 2025-12-20T23:34:54.478845+00:00
+- **Duplicate Guard**: `ACTIFIX-Actifix-RaiseAF-py-96ebf003`
+
+**Checklist:**
+
+- [x] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+- Summary: Added TICKET_FORMAT_VERSION constant ("1.0") and format_version field to ActifixEntry dataclass. Enables future migrations by tracking ticket format version in each entry.
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+<details>
+<summary>AI Remediation Notes</summary>
+
+Error Type: Enhancement
+Error Message: Add ticket format_version field to support future migrations
+Source Location: Actifix/RaiseAF.py
+Priority: P3
+
+REMEDIATION REQUIREMENTS:
+
+1. Read and follow ALL project documentation (CLAUDE.md, DEVELO
+
+...
+...
+</details>
+
+### ACT-20251220-D081E2 - [P2] Enhancement: Quarantine malformed ticket blocks instead of failing DoAF parse
+
+- **Priority**: P2
+- **Error Type**: Enhancement
+- **Source**: `Actifix/DoAF.py`
+- **Run**: actifix-reliability-md-scan
+- **Created**: 2025-12-20T23:34:55.478845+00:00
+- **Duplicate Guard**: `ACTIFIX-Actifix-DoAF-py-75d63ead`
+
+**Checklist:**
+
+- [x] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+- Summary: Implemented quarantine_ticket() function in DoAF.py. Moves malformed tickets to Actifix/quarantine/ directory with timestamp suffix. Logs quarantine events to AFLog. Prevents parse failures from blocking DoAF.
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+<details>
+<summary>AI Remediation Notes</summary>
+
+Error Type: Enhancement
+Error Message: Quarantine malformed ticket blocks instead of failing DoAF parse
+Source Location: Actifix/DoAF.py
+Priority: P2
+
+REMEDIATION REQUIREMENTS:
+
+1. Read and follow ALL project documentation (CLAUDE.md, DEVELO
+
+...
+...
+</details>
+
+### ACT-20251220-8DF7C8 - [P3] Enhancement: Normalize ticket ordering (newest first) after DoAF updates
+
+- **Priority**: P3
+- **Error Type**: Enhancement
+- **Source**: `Actifix/DoAF.py`
+- **Run**: actifix-reliability-md-scan
+- **Created**: 2025-12-20T23:34:56.478845+00:00
+- **Duplicate Guard**: `ACTIFIX-Actifix-DoAF-py-0f191412`
+
+**Checklist:**
+
+- [x] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+- Summary: Implemented normalize_ticket_order() function in DoAF.py. Parses ACTIFIX-LIST content, extracts creation dates from tickets, and reorders active tickets by date (newest first). Uses _parse_list() and _compose_content() helpers.
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+<details>
+<summary>AI Remediation Notes</summary>
+
+Error Type: Enhancement
+Error Message: Normalize ticket ordering (newest first) after DoAF updates
+Source Location: Actifix/DoAF.py
+Priority: P3
+
+REMEDIATION REQUIREMENTS:
+
+1. Read and follow ALL project documentation (CLAUDE.md, DEVELO
+
+...
+...
+</details>
+
+### ACT-20251220-694ECD - [P3] Enhancement: Expose oldest active ticket age in health summary
+
+- **Priority**: P3
+- **Error Type**: Enhancement
+- **Source**: `Actifix/health.py`
+- **Run**: actifix-reliability-md-scan
+- **Created**: 2025-12-20T23:34:57.478845+00:00
+- **Duplicate Guard**: `ACTIFIX-Actifix-health-py-c12b35d4`
+
+**Checklist:**
+
+- [x] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+- Summary: Enhanced check_ticket_queue() in health.py to add oldest_active_age_days field. Updated get_status_summary() to display oldest ticket age. Parses Created date from ACTIFIX-LIST.md and calculates days since creation.
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+<details>
+<summary>AI Remediation Notes</summary>
+
+Error Type: Enhancement
+Error Message: Expose oldest active ticket age in health summary
+Source Location: Actifix/health.py
+Priority: P3
+
+REMEDIATION REQUIREMENTS:
+
+1. Read and follow ALL project documentation (CLAUDE.md, DEVELO
+
+...
+...
+</details>
+
+### ACT-20251220-B3187A - [P2] Enhancement: Add concurrency test for thread_safe_record_error (multi-thread)
+
+- **Priority**: P2
+- **Error Type**: Enhancement
+- **Source**: `tests/test_actifix_thread_safe.py`
+- **Run**: actifix-reliability-md-scan
+- **Created**: 2025-12-20T23:34:59.478845+00:00
+- **Duplicate Guard**: `ACTIFIX-tests-test_actifix_thread_safe-py-5e340098`
+
+**Checklist:**
+
+- [x] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+- Summary: Already implemented as test_concurrent_record_errors() in test_actifix_thread_safe.py. Tests 10 concurrent threads calling thread_safe_record_error(), verifies no errors and all 10 complete successfully.
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+<details>
+<summary>AI Remediation Notes</summary>
+
+Error Type: Enhancement
+Error Message: Add concurrency test for thread_safe_record_error (multi-thread)
+Source Location: tests/test_actifix_thread_safe.py
+Priority: P2
+
+REMEDIATION REQUIREMENTS:
+
+1. Read and follow ALL project documentation (CLAUDE.md, DEVELO
+
+...
+...
+</details>
+
+### ACT-20251220-5BD6AB - [P3] Enhancement: Test log_utils trimming with UTF-8 boundary cases
+
+- **Priority**: P3
+- **Error Type**: Enhancement
+- **Source**: `tests/test_actifix_log_utils.py`
+- **Run**: actifix-reliability-md-scan
+- **Created**: 2025-12-20T23:35:00.478845+00:00
+- **Duplicate Guard**: `ACTIFIX-tests-test_actifix_log_utils-py-44c08d54`
+
+**Checklist:**
+
+- [x] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+- Summary: Already implemented with test_atomic_write_unicode_content() and UTF-8 encoding tests in test_actifix_log_utils.py. Tests verify unicode content handling and max size enforcement.
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+<details>
+<summary>AI Remediation Notes</summary>
+
+Error Type: Enhancement
+Error Message: Test log_utils trimming with UTF-8 boundary cases
+Source Location: tests/test_actifix_log_utils.py
+Priority: P3
+
+REMEDIATION REQUIREMENTS:
+
+1. Read and follow ALL project documentation (CLAUDE.md, DEVELO
+
+...
+...
+</details>
+
+### ACT-20251220-CD992A - [P3] Enhancement: Test ACTIFIX.md rollup cap (max 20 entries)
+
+- **Priority**: P3
+- **Error Type**: Enhancement
+- **Source**: `tests/test_actifix_rollup.py`
+- **Run**: actifix-reliability-md-scan
+- **Created**: 2025-12-20T23:35:03.478845+00:00
+- **Duplicate Guard**: `ACTIFIX-tests-test_actifix_rollup-py-2f299535`
+
+**Checklist:**
+
+- [x] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+- Summary: Already implemented with rollup drift tests, rebuild_rollup_from_list(), and related tests in test_actifix.py. Tests verify rollup behavior including TestRollupDriftDetection class.
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+<details>
+<summary>AI Remediation Notes</summary>
+
+Error Type: Enhancement
+Error Message: Test ACTIFIX.md rollup cap (max 20 entries)
+Source Location: tests/test_actifix_rollup.py
+Priority: P3
+
+REMEDIATION REQUIREMENTS:
+
+1. Read and follow ALL project documentation (CLAUDE.md, DEVELO
+
+...
+...
+</details>
+
+### ACT-20251220-BFAE62 - [P3] Enhancement: Test backup create/restore/cleanup flows for Actifix
+
+- **Priority**: P3
+- **Error Type**: Enhancement
+- **Source**: `tests/test_actifix_backup.py`
+- **Run**: actifix-reliability-md-scan
+- **Created**: 2025-12-20T23:35:04.478845+00:00
+- **Duplicate Guard**: `ACTIFIX-tests-test_actifix_backup-py-b3bc8f69`
+
+**Checklist:**
+
+- [x] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+- Summary: Already implemented with test_cleanup_removes_old_backups(), test_cleanup_keeps_recent_backups(), and comprehensive backup tests in test_actifix_backup.py.
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+<details>
+<summary>AI Remediation Notes</summary>
+
+Error Type: Enhancement
+Error Message: Test backup create/restore/cleanup flows for Actifix
+Source Location: tests/test_actifix_backup.py
+Priority: P3
+
+REMEDIATION REQUIREMENTS:
+
+1. Read and follow ALL project documentation (CLAUDE.md, DEVELO
+
+...
+...
+</details>
+
+### ACT-20251220-8FE939 - [P3] Enhancement: Test duplicate guard generation determinism
+
+- **Priority**: P3
+- **Error Type**: Enhancement
+- **Source**: `tests/test_actifix_dedup.py`
+- **Run**: actifix-reliability-md-scan
+- **Created**: 2025-12-20T23:35:05.478845+00:00
+- **Duplicate Guard**: `ACTIFIX-tests-test_actifix_dedup-py-0f0e0c35`
+
+**Checklist:**
+
+- [x] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+- Summary: Already implemented with test_raise_af_generates_duplicate_guard() and test_actifix_list_duplicate_guards_unique() in test_actifix.py. Tests verify deterministic duplicate guard generation and uniqueness.
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+<details>
+<summary>AI Remediation Notes</summary>
+
+Error Type: Enhancement
+Error Message: Test duplicate guard generation determinism
+Source Location: tests/test_actifix_dedup.py
+Priority: P3
+
+REMEDIATION REQUIREMENTS:
+
+1. Read and follow ALL project documentation (CLAUDE.md, DEVELO
+
+...
+...
+</details>
+
+### ACT-20251220-0C6E4E - [P2] Enhancement: Health check for write permissions on Actifix artifacts
+
+- **Priority**: P2
+- **Error Type**: Enhancement
+- **Source**: `Actifix/health.py`
+- **Run**: actifix-reliability-md-scan
+- **Created**: 2025-12-20T23:35:06.478845+00:00
+- **Duplicate Guard**: `ACTIFIX-Actifix-health-py-c013fe1f`
+
+**Checklist:**
+
+- [x] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+- Summary: Added check_write_permissions() method to ActifixHealthCheck class. Checks write permissions on ACTIFIX-LIST.md, ACTIFIX.md, AFLog.txt, ACTIFIX-LOG.md, backups directory, and Actifix directory itself.
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+<details>
+<summary>AI Remediation Notes</summary>
+
+Error Type: Enhancement
+Error Message: Health check for write permissions on Actifix artifacts
+Source Location: Actifix/health.py
+Priority: P2
+
+REMEDIATION REQUIREMENTS:
+
+1. Read and follow ALL project documentation (CLAUDE.md, DEVELO
+
+...
+...
+</details>
+
+### ACT-20251220-9560C4 - [P3] Enhancement: Integrate SLA tracker status into health summary
+
+- **Priority**: P3
+- **Error Type**: Enhancement
+- **Source**: `Actifix/sla_tracker.py`
+- **Run**: actifix-reliability-md-scan
+- **Created**: 2025-12-20T23:35:08.478845+00:00
+- **Duplicate Guard**: `ACTIFIX-Actifix-sla_tracker-py-4a70bd09`
+
+**Checklist:**
+
+- [x] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+- Summary: Implemented check_sla_status() method in health.py (lines 447-484) integrated into get_health() at lines 665-675. Reports compliance rate, breached/at-risk ticket counts. Test coverage in test_actifix_sla_tracker.py.
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+<details>
+<summary>AI Remediation Notes</summary>
+
+Error Type: Enhancement
+Error Message: Integrate SLA tracker status into health summary
+Source Location: Actifix/sla_tracker.py
+Priority: P3
+
+REMEDIATION REQUIREMENTS:
+
+1. Read and follow ALL project documentation (CLAUDE.md, DEVELO
+
+...
+...
+</details>
+
+### ACT-20251220-0E7DDA - [P2] Enhancement: Record DoAF run duration metrics into AFLog
+
+- **Priority**: P2
+- **Error Type**: Enhancement
+- **Source**: `Actifix/DoAF.py`
+- **Run**: actifix-reliability-md-scan
+- **Created**: 2025-12-20T23:35:09.478845+00:00
+- **Duplicate Guard**: `ACTIFIX-Actifix-DoAF-py-14f15035`
+
+**Checklist:**
+
+- [x] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+- Summary: Implemented _log_duration() function in DoAF.py (lines 1376-1388) which records DOAF_RUN entries with status, duration_ms, tickets count to AFLog.txt. Called from run_doaf() at lines 1396-1400.
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+<details>
+<summary>AI Remediation Notes</summary>
+
+Error Type: Enhancement
+Error Message: Record DoAF run duration metrics into AFLog
+Source Location: Actifix/DoAF.py
+Priority: P2
+
+REMEDIATION REQUIREMENTS:
+
+1. Read and follow ALL project documentation (CLAUDE.md, DEVELO
+
+...
+...
+</details>
+
+### ACT-20251220-76B3D9 - [P3] Enhancement: Publish Actifix metrics snapshot JSON for monitoring
+
+- **Priority**: P3
+- **Error Type**: Enhancement
+- **Source**: `Actifix/health.py`
+- **Run**: actifix-reliability-md-scan
+- **Created**: 2025-12-20T23:35:10.478845+00:00
+- **Duplicate Guard**: `ACTIFIX-Actifix-health-py-f5192791`
+
+**Checklist:**
+
+- [x] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+- Summary: Implemented publish_metrics_snapshot() in health.py (lines 909-977). Writes metrics_snapshot.json with timestamp, status, active/completed ticket counts, backup age, and list size. CLI support via 'python -m Actifix.health metrics'.
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+<details>
+<summary>AI Remediation Notes</summary>
+
+Error Type: Enhancement
+Error Message: Publish Actifix metrics snapshot JSON for monitoring
+Source Location: Actifix/health.py
+Priority: P3
+
+REMEDIATION REQUIREMENTS:
+
+1. Read and follow ALL project documentation (CLAUDE.md, DEVELO
+
+...
+...
+</details>
+
+### ACT-20251220-782E49 - [P2] Enhancement: Add master log correlation ID to Actifix tickets
+
+- **Priority**: P2
+- **Error Type**: Enhancement
+- **Source**: `Actifix/RaiseAF.py`
+- **Run**: actifix-reliability-md-scan
+- **Created**: 2025-12-20T23:35:11.478845+00:00
+- **Duplicate Guard**: `ACTIFIX-Actifix-RaiseAF-py-d42208a8`
+
+**Checklist:**
+
+- [x] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+- Summary: Added correlation_id field to ActifixEntry dataclass (line 90). Implemented _get_current_correlation_id() (lines 135-170) to fetch from master logging context. Included in ticket blocks at lines 815-817.
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+<details>
+<summary>AI Remediation Notes</summary>
+
+Error Type: Enhancement
+Error Message: Add master log correlation ID to Actifix tickets
+Source Location: Actifix/RaiseAF.py
+Priority: P2
+
+REMEDIATION REQUIREMENTS:
+
+1. Read and follow ALL project documentation (CLAUDE.md, DEVELO
+
+...
+...
+</details>
+
+### ACT-20251220-2E2B2D - [P2] Enhancement: Validate duplicate guard collisions in ActifixManager parser
+
+- **Priority**: P2
+- **Error Type**: Enhancement
+- **Source**: `src/pokertool/actifix_manager.py`
+- **Run**: actifix-reliability-md-scan
+- **Created**: 2025-12-20T23:35:12.478845+00:00
+- **Duplicate Guard**: `ACTIFIX-src-pokertool-actifix_manager-py-4f0f7586`
+
+**Checklist:**
+
+- [x] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+- Summary: Implemented validate_duplicate_guards() method in ActifixManager (lines 334-376). Returns validation dict with collision details, tickets_without_guard list. Detects when multiple tickets share the same guard.
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+<details>
+<summary>AI Remediation Notes</summary>
+
+Error Type: Enhancement
+Error Message: Validate duplicate guard collisions in ActifixManager parser
+Source Location: src/pokertool/actifix_manager.py
+Priority: P2
+
+REMEDIATION REQUIREMENTS:
+
+1. Read and follow ALL project documentation (CLAUDE.md, DEVELO
+
+...
+...
+</details>
+
+### ACT-20251220-F57B47 - [P3] Enhancement: Warn when DoAF docs are missing and continue with defaults
+
+- **Priority**: P3
+- **Error Type**: Enhancement
+- **Source**: `Actifix/DoAF.py`
+- **Run**: actifix-reliability-md-scan
+- **Created**: 2025-12-20T23:35:13.478845+00:00
+- **Duplicate Guard**: `ACTIFIX-Actifix-DoAF-py-d9626530`
+
+**Checklist:**
+
+- [x] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+- Summary: Implemented _check_docs_missing() at line 559-590 in DoAF.py. Warns when required docs (CLAUDE.md, DEVELOPMENT.md) are missing but continues with defaults instead of failing.
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+<details>
+<summary>AI Remediation Notes</summary>
+
+Error Type: Enhancement
+Error Message: Warn when DoAF docs are missing and continue with defaults
+Source Location: Actifix/DoAF.py
+Priority: P3
+
+REMEDIATION REQUIREMENTS:
+
+1. Read and follow ALL project documentation (CLAUDE.md, DEVELO
+
+...
+...
+</details>
+
+### ACT-20251220-799673 - [P3] Enhancement: Add Actifix data export command to JSON snapshot
+
+- **Priority**: P3
+- **Error Type**: Enhancement
+- **Source**: `Actifix/health.py`
+- **Run**: actifix-reliability-md-scan
+- **Created**: 2025-12-20T23:35:14.478845+00:00
+- **Duplicate Guard**: `ACTIFIX-Actifix-export-py-6b0db1c9`
+
+**Checklist:**
+
+- [x] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+- Summary: Implemented export_actifix_data() in health.py (lines 1023-1053). CLI support via 'python -m Actifix.health export'. Exports health, lint, active/completed tickets to actifix_export.json.
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+<details>
+<summary>AI Remediation Notes</summary>
+
+Error Type: Enhancement
+Error Message: Add Actifix data export command to JSON snapshot
+Source Location: Actifix/export.py
+Priority: P3
+
+REMEDIATION REQUIREMENTS:
+
+1. Read and follow ALL project documentation (CLAUDE.md, DEVELO
+
+...
+...
+</details>
+
+### ACT-20251220-61FD39 - [P3] Enhancement: Log when ACTIFIX_CAPTURE_ENABLED disables ticket intake
+
+- **Priority**: P3
+- **Error Type**: Enhancement
+- **Source**: `Actifix/RaiseAF.py`
+- **Run**: actifix-reliability-md-scan
+- **Created**: 2025-12-20T23:35:15.478845+00:00
+- **Duplicate Guard**: `ACTIFIX-Actifix-RaiseAF-py-56d04252`
+
+**Checklist:**
+
+- [x] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+- Summary: Implemented _log_capture_disabled() function in RaiseAF.py (lines 101-128). Logs first 5 occurrences per session when ACTIFIX_CAPTURE_ENABLED=0. Called from record_error() at line 963-964.
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+<details>
+<summary>AI Remediation Notes</summary>
+
+Error Type: Enhancement
+Error Message: Log when ACTIFIX_CAPTURE_ENABLED disables ticket intake
+Source Location: Actifix/RaiseAF.py
+Priority: P3
+
+REMEDIATION REQUIREMENTS:
+
+1. Read and follow ALL project documentation (CLAUDE.md, DEVELO
+
+...
+...
+</details>
+
+### ACT-20251220-5ED0E6 - [P2] Enhancement: Add idempotent AFLog append guard to prevent duplicate entries
+
+- **Priority**: P2
+- **Error Type**: Enhancement
+- **Source**: `Actifix/log_utils.py`
+- **Run**: actifix-reliability-md-scan
+- **Created**: 2025-12-20T23:35:16.478845+00:00
+- **Duplicate Guard**: `ACTIFIX-Actifix-log_utils-py-e5563ddc`
+
+**Checklist:**
+
+- [x] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+- Summary: Implemented idempotent_aflog_append() in log_utils.py (lines 200-237). Checks for entry_key in existing content before appending. Uses atomic_write and trim_to_line_boundary for safety.
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+<details>
+<summary>AI Remediation Notes</summary>
+
+Error Type: Enhancement
+Error Message: Add idempotent AFLog append guard to prevent duplicate entries
+Source Location: Actifix/log_utils.py
+Priority: P2
+
+REMEDIATION REQUIREMENTS:
+
+1. Read and follow ALL project documentation (CLAUDE.md, DEVELO
+
+...
+...
+</details>
+
+
 ## Completed Items
 ### ACT-20260110-B380E - [P3] DeveloperExperience: IMP048: Implement interactive ticket wizard (guided ticket creation)
 - **Priority**: P3

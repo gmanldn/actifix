@@ -1,1 +1,7 @@
 .DS_Store
+.coverage
+__pycache__/
+.pytest_cache/
+.actifix/test_logs/
+src/actifix/**/__pycache__/
+test/**/__pycache__/
