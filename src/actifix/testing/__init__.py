@@ -16,9 +16,15 @@ from enum import Enum
 from pathlib import Path
 from typing import Callable, Optional, Any
 
-from .bootstrap import get_state, get_correlation_id
-from .log_utils import log_event, atomic_write
-from .state_paths import get_actifix_paths, ActifixPaths
+from ..log_utils import log_event, atomic_write
+from ..state_paths import get_actifix_paths, ActifixPaths
+
+try:
+    from ..bootstrap import get_correlation_id  # type: ignore
+except Exception:
+    def get_correlation_id() -> str:
+        """Fallback correlation ID when bootstrap metadata is unavailable."""
+        return "actifix-test-cycle"
 
 
 class TestStatus(Enum):
@@ -133,6 +139,28 @@ class TestRunner:
         
         # Progress callback
         self._progress_callback: Optional[Callable[[int, int, TestCase], None]] = None
+
+    def _emit_progress(
+        self,
+        current_index: int,
+        total: int,
+        test_case: TestCase,
+        status: TestStatus,
+    ) -> None:
+        """
+        Invoke the progress callback with backward compatibility.
+        
+        Supports both 3-argument (index, total, test_case) and
+        4-argument (index, total, test_case, status) callbacks.
+        """
+        if not self._progress_callback:
+            return
+        
+        try:
+            self._progress_callback(current_index, total, test_case, status)
+        except TypeError:
+            # Fallback for older callbacks that don't accept status
+            self._progress_callback(current_index, total, test_case)
     
     def add_test(
         self,
@@ -259,7 +287,7 @@ class TestRunner:
         for index, test in enumerate(self._plan.tests):
             # Report progress
             if self._progress_callback:
-                self._progress_callback(index + 1, total, test)
+                self._emit_progress(index + 1, total, test, TestStatus.RUNNING)
             else:
                 print(f"[{index + 1}/{total}] {test.name}...", end=" ", flush=True)
             
@@ -275,7 +303,9 @@ class TestRunner:
                 test.status = TestStatus.PASSED
                 passed += 1
                 
-                if not self._progress_callback:
+                if self._progress_callback:
+                    self._emit_progress(index + 1, total, test, TestStatus.PASSED)
+                else:
                     print(f"PASS ({test.duration_seconds:.3f}s)")
                 
             except AssertionError as e:
@@ -286,7 +316,9 @@ class TestRunner:
                 failed += 1
                 failed_tests.append(test.name)
                 
-                if not self._progress_callback:
+                if self._progress_callback:
+                    self._emit_progress(index + 1, total, test, TestStatus.FAILED)
+                else:
                     print(f"FAIL: {e}")
                 
             except Exception as e:
@@ -297,7 +329,9 @@ class TestRunner:
                 errors += 1
                 error_tests.append(test.name)
                 
-                if not self._progress_callback:
+                if self._progress_callback:
+                    self._emit_progress(index + 1, total, test, TestStatus.ERROR)
+                else:
                     print(f"ERROR: {e}")
             
             test.finished_at = datetime.now(timezone.utc)

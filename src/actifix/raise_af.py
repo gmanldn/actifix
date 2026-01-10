@@ -35,10 +35,10 @@ from enum import Enum
 from pathlib import Path
 from typing import List, Optional, Dict, Any
 
-from .state_paths import get_actifix_state_dir
+from .state_paths import get_actifix_state_dir, get_actifix_paths, ActifixPaths
 
 
-class TicketPriority(Enum):
+class TicketPriority(str, Enum):
     """Priority levels for ACTIFIX tickets."""
     P0 = "P0"  # Critical - system down, data loss
     P1 = "P1"  # High - core functionality broken
@@ -67,6 +67,11 @@ class ActifixEntry:
     format_version: str = "1.0"
     # Correlation ID for tracing
     correlation_id: Optional[str] = None
+
+    @property
+    def ticket_id(self) -> str:
+        """Alias for compatibility with older ticket structures."""
+        return self.entry_id
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for serialization."""
@@ -142,10 +147,15 @@ def _get_current_correlation_id() -> Optional[str]:
 def generate_entry_id() -> str:
     """Generate a short unique ID for Actifix tickets."""
     now = datetime.now(timezone.utc)
-    return f"ACT-{now.strftime('%Y%m%d')}-{uuid.uuid4().hex[:6].upper()}"
+    return f"ACT-{now.strftime('%Y%m%d')}-{uuid.uuid4().hex[:5].upper()}"
 
 
-def generate_duplicate_guard(source: str, message: str, error_type: str) -> str:
+def generate_ticket_id() -> str:
+    """Backward-compatible ticket ID generator."""
+    return generate_entry_id()
+
+
+def generate_duplicate_guard(source: str, message: str, error_type: str = "unknown") -> str:
     """Generate a unique duplicate guard for deduplication."""
     # Normalize message for deduplication
     normalized = re.sub(r'\d+', 'N', message)
@@ -177,6 +187,9 @@ def redact_secrets_from_text(text: str) -> str:
 
     # Patterns to redact (pattern, replacement)
     patterns = [
+        # sk- style API keys
+        (r'(sk-[A-Za-z0-9]{16,})', r'***API_KEY_REDACTED***'),
+
         # API Keys (generic patterns)
         (r'(?i)(api[_-]?key|apikey|api_secret|api_token)\s*[=:]\s*["\']?([a-zA-Z0-9_\-]{16,})["\']?',
          r'\1=***REDACTED***'),
@@ -680,14 +693,15 @@ def _append_ticket(entry: ActifixEntry, base_dir: Path) -> bool:
 def record_error(
     message: str,
     source: str,
-    run_label: str,
-    base_dir: Path = ACTIFIX_DIR,
+    run_label: str = "unspecified",
+    base_dir: Optional[Path] = None,
     error_type: str = "unknown",
-    priority: Optional[TicketPriority] = None,
+    priority: Optional[TicketPriority | str] = None,
     stack_trace: Optional[str] = None,
     capture_context: bool = True,
     skip_duplicate_check: bool = False,
-    skip_ai_notes: bool = False
+    skip_ai_notes: bool = False,
+    paths: Optional[ActifixPaths] = None,
 ) -> Optional[ActifixEntry]:
     """
     Record an error across Actifix files with detailed context.
@@ -703,10 +717,17 @@ def record_error(
         capture_context: Whether to capture file and system context
         skip_duplicate_check: Skip duplicate checking (use for testing only)
         skip_ai_notes: Skip AI notes generation (for performance)
+        paths: Optional ActifixPaths override (takes precedence over base_dir)
 
     Returns:
         ActifixEntry with all captured context, or None if duplicate detected
     """
+    # Resolve paths
+    active_paths = paths
+    if active_paths is None:
+        active_paths = get_actifix_paths(base_dir=base_dir) if base_dir else get_actifix_paths()
+    base_dir_path = active_paths.base_dir
+    
     # Clean inputs
     clean_message = message.strip()
     clean_source = source.strip() or "unknown"
@@ -716,28 +737,38 @@ def record_error(
     # Capture is opt-in: only raise tickets when explicitly enabled
     env_flag = os.getenv(ACTIFIX_CAPTURE_ENV_VAR, "").strip().lower()
     capture_enabled = env_flag in {"1", "true", "yes", "on", "debug"}
+    
+    if paths is not None and env_flag not in {"0", "false", "no", "off"}:
+        # Explicit paths imply caller wants capture even if env is unset
+        capture_enabled = True
     if not capture_enabled:
         _log_capture_disabled(clean_source, clean_error_type)
         return None
 
-    ensure_scaffold(base_dir)
+    ensure_scaffold(base_dir_path)
 
     # Generate duplicate guard early for checking
     duplicate_guard = generate_duplicate_guard(clean_source, clean_message, clean_error_type)
 
     # LOOP PREVENTION: Check if this error already has a ticket
     if not skip_duplicate_check:
-        if check_duplicate_guard(duplicate_guard, base_dir):
+        if check_duplicate_guard(duplicate_guard, base_dir_path):
             # Duplicate detected - don't create another ticket
             return None
 
         # Also check completed guards to prevent recreating fixed issues
-        completed_guards = get_completed_guards(base_dir)
+        completed_guards = get_completed_guards(base_dir_path)
         if duplicate_guard in completed_guards:
             # This error was already fixed - don't recreate
             return None
 
     # Auto-classify priority if not provided
+    if isinstance(priority, str):
+        try:
+            priority = TicketPriority(priority)
+        except Exception:
+            priority = None
+    
     if priority is None:
         priority = classify_priority(clean_error_type, clean_message, clean_source)
 
@@ -774,8 +805,8 @@ def record_error(
     if not skip_ai_notes:
         entry.ai_remediation_notes = generate_ai_remediation_notes(entry)
 
-    _append_ticket(entry, base_dir)
-    _append_recent(entry, base_dir)
+    _append_ticket(entry, base_dir_path)
+    _append_recent(entry, base_dir_path)
 
     return entry
 
