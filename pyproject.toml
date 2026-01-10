@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "actifix"
-version = "2.6.5"
+version = "2.6.6"
 description = "Automated Error Tracking and Remediation System"
 readme = "src/actifix/README.md"
 license = {text = "MIT"}

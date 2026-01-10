@@ -1,6 +1,6 @@
 schema_version: arch-map.v1
 meta:
-  generated_at: '2026-01-10T10:07:22.863527+00:00'
+  generated_at: '2026-01-10T16:09:32.656387+00:00'
   generator: update_architecture_docs.py
   generator_version: 2.0.0
   source_commit: current_development
@@ -33,6 +33,20 @@ modules:
   - runtime.config
   - infra.logging
   - infra.health
+- id: runtime.api
+  domain: runtime
+  owner: runtime
+  summary: Public API surface and package exports
+  entrypoints:
+  - src/actifix/__init__.py
+  contracts:
+  - expose stable API
+  - centralize package exports
+  depends_on:
+  - core.raise_af
+  - bootstrap.main
+  - runtime.state
+  - infra.health
 - id: runtime.config
   domain: runtime
   owner: runtime
@@ -56,6 +70,16 @@ modules:
   - recoverable state management
   depends_on:
   - infra.logging
+- id: runtime.dock_icon
+  domain: runtime
+  owner: runtime
+  summary: macOS dock icon helper utilities
+  entrypoints:
+  - src/actifix/dock_icon.py
+  contracts:
+  - safe no-op on non-macOS
+  - avoid side effects on import
+  depends_on: []
 - id: infra.logging
   domain: infra
   owner: infra
@@ -91,6 +115,22 @@ modules:
   - idempotent operations
   depends_on:
   - infra.logging
+- id: infra.persistence.api
+  domain: infra
+  owner: persistence
+  summary: Persistence package public API and exports
+  entrypoints:
+  - src/actifix/persistence/__init__.py
+  contracts:
+  - re-export persistence interfaces
+  - keep API stable
+  depends_on:
+  - infra.persistence.atomic
+  - infra.persistence.storage
+  - infra.persistence.queue
+  - infra.persistence.manager
+  - infra.persistence.health
+  - infra.persistence.paths
 - id: infra.persistence.storage
   domain: infra
   owner: persistence

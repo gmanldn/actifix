@@ -1,6 +1,6 @@
 # Actifix Architecture Modules
 
-Generated: 2026-01-10T10:07:22.862795+00:00
+Generated: 2026-01-10T16:09:32.641775+00:00
 Source Commit: Current Development
 
 This file catalogs the architectural modules of the Actifix system. It provides a domain-driven breakdown of functionality, ownership, and dependencies.
@@ -13,6 +13,15 @@ This file catalogs the architectural modules of the Actifix system. It provides 
 **Entrypoints:** src/actifix/main.py, src/actifix/bootstrap.py  
 **Contracts:** ensures environment setup; launches core services in correct order  
 **Depends on:** runtime.config, infra.logging, infra.health  
+
+## runtime.api
+
+**Domain:** runtime  
+**Owner:** runtime  
+**Summary:** Public API surface and package exports  
+**Entrypoints:** src/actifix/__init__.py  
+**Contracts:** expose stable API; centralize package exports  
+**Depends on:** core.raise_af, bootstrap.main, runtime.state, infra.health  
 
 ## runtime.config
 
@@ -32,6 +41,15 @@ This file catalogs the architectural modules of the Actifix system. It provides 
 **Contracts:** atomic state operations; recoverable state management  
 **Depends on:** infra.logging  
 
+## runtime.dock_icon
+
+**Domain:** runtime  
+**Owner:** runtime  
+**Summary:** macOS dock icon helper utilities  
+**Entrypoints:** src/actifix/dock_icon.py  
+**Contracts:** safe no-op on non-macOS; avoid side effects on import  
+**Depends on:** None  
+
 ## infra.logging
 
 **Domain:** infra  
@@ -48,6 +66,15 @@ This file catalogs the architectural modules of the Actifix system. It provides 
 **Entrypoints:** src/actifix/health.py  
 **Contracts:** detect degraded states; surface system health; continuous monitoring  
 **Depends on:** infra.logging  
+
+## infra.persistence.api
+
+**Domain:** infra  
+**Owner:** persistence  
+**Summary:** Persistence package public API and exports  
+**Entrypoints:** src/actifix/persistence/__init__.py  
+**Contracts:** re-export persistence interfaces; keep API stable  
+**Depends on:** infra.persistence.atomic, infra.persistence.storage, infra.persistence.queue, infra.persistence.manager, infra.persistence.health, infra.persistence.paths  
 
 ## infra.persistence.atomic
 

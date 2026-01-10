@@ -1,7 +1,7 @@
 {
   "schema_version": "arch-depgraph.v1",
   "meta": {
-    "generated_at": "2026-01-10T10:07:22.875851+00:00",
+    "generated_at": "2026-01-10T16:09:32.670481+00:00",
     "generator": "update_architecture_docs.py",
     "generator_version": "2.0.0",
     "source_commit": "current_development"
@@ -14,6 +14,12 @@
       "label": "main"
     },
     {
+      "id": "runtime.api",
+      "domain": "runtime",
+      "owner": "runtime",
+      "label": "api"
+    },
+    {
       "id": "runtime.config",
       "domain": "runtime",
       "owner": "runtime",
@@ -24,6 +30,12 @@
       "domain": "runtime",
       "owner": "runtime",
       "label": "state"
+    },
+    {
+      "id": "runtime.dock_icon",
+      "domain": "runtime",
+      "owner": "runtime",
+      "label": "dock_icon"
     },
     {
       "id": "infra.logging",
@@ -42,6 +54,12 @@
       "domain": "infra",
       "owner": "persistence",
       "label": "atomic"
+    },
+    {
+      "id": "infra.persistence.api",
+      "domain": "infra",
+      "owner": "persistence",
+      "label": "api"
     },
     {
       "id": "infra.persistence.storage",
@@ -127,6 +145,26 @@
       "reason": "bootstrap.main depends on infra.health"
     },
     {
+      "from": "runtime.api",
+      "to": "core.raise_af",
+      "reason": "runtime.api depends on core.raise_af"
+    },
+    {
+      "from": "runtime.api",
+      "to": "bootstrap.main",
+      "reason": "runtime.api depends on bootstrap.main"
+    },
+    {
+      "from": "runtime.api",
+      "to": "runtime.state",
+      "reason": "runtime.api depends on runtime.state"
+    },
+    {
+      "from": "runtime.api",
+      "to": "infra.health",
+      "reason": "runtime.api depends on infra.health"
+    },
+    {
       "from": "runtime.config",
       "to": "infra.logging",
       "reason": "runtime.config depends on infra.logging"
@@ -145,6 +183,36 @@
       "from": "infra.persistence.atomic",
       "to": "infra.logging",
       "reason": "infra.persistence.atomic depends on infra.logging"
+    },
+    {
+      "from": "infra.persistence.api",
+      "to": "infra.persistence.atomic",
+      "reason": "infra.persistence.api depends on infra.persistence.atomic"
+    },
+    {
+      "from": "infra.persistence.api",
+      "to": "infra.persistence.storage",
+      "reason": "infra.persistence.api depends on infra.persistence.storage"
+    },
+    {
+      "from": "infra.persistence.api",
+      "to": "infra.persistence.queue",
+      "reason": "infra.persistence.api depends on infra.persistence.queue"
+    },
+    {
+      "from": "infra.persistence.api",
+      "to": "infra.persistence.manager",
+      "reason": "infra.persistence.api depends on infra.persistence.manager"
+    },
+    {
+      "from": "infra.persistence.api",
+      "to": "infra.persistence.health",
+      "reason": "infra.persistence.api depends on infra.persistence.health"
+    },
+    {
+      "from": "infra.persistence.api",
+      "to": "infra.persistence.paths",
+      "reason": "infra.persistence.api depends on infra.persistence.paths"
     },
     {
       "from": "infra.persistence.storage",

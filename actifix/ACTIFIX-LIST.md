@@ -472,7 +472,7 @@ Error Message: MULTIUSER-ATOMIC-002: Add Cross-Process Lock to ACTIFIX-LIST.md R
 - [x] Functioning
 - [x] Tested
 - [x] Completed
-- Summary: Validated via scripts/validate_architecture.py - all MAP.yaml entrypoints exist as actual files
+- Summary: Added missing module entrypoints (package APIs, dock icon) and enforced full coverage of src/actifix Python files in MAP.yaml.
 
 <details>
 <summary>Stack Trace Preview</summary>

@@ -35,6 +35,15 @@ This file catalogs the architectural modules of the Actifix system. It provides 
 **Contracts:** ensures environment setup; launches core services in correct order  
 **Depends on:** runtime.config, infra.logging, infra.health  
 
+## runtime.api
+
+**Domain:** runtime  
+**Owner:** runtime  
+**Summary:** Public API surface and package exports  
+**Entrypoints:** src/actifix/__init__.py  
+**Contracts:** expose stable API; centralize package exports  
+**Depends on:** core.raise_af, bootstrap.main, runtime.state, infra.health  
+
 ## runtime.config
 
 **Domain:** runtime  
@@ -53,6 +62,15 @@ This file catalogs the architectural modules of the Actifix system. It provides 
 **Contracts:** atomic state operations; recoverable state management  
 **Depends on:** infra.logging  
 
+## runtime.dock_icon
+
+**Domain:** runtime  
+**Owner:** runtime  
+**Summary:** macOS dock icon helper utilities  
+**Entrypoints:** src/actifix/dock_icon.py  
+**Contracts:** safe no-op on non-macOS; avoid side effects on import  
+**Depends on:** None  
+
 ## infra.logging
 
 **Domain:** infra  
@@ -69,6 +87,15 @@ This file catalogs the architectural modules of the Actifix system. It provides 
 **Entrypoints:** src/actifix/health.py  
 **Contracts:** detect degraded states; surface system health; continuous monitoring  
 **Depends on:** infra.logging  
+
+## infra.persistence.api
+
+**Domain:** infra  
+**Owner:** persistence  
+**Summary:** Persistence package public API and exports  
+**Entrypoints:** src/actifix/persistence/__init__.py  
+**Contracts:** re-export persistence interfaces; keep API stable  
+**Depends on:** infra.persistence.atomic, infra.persistence.storage, infra.persistence.queue, infra.persistence.manager, infra.persistence.health, infra.persistence.paths  
 
 ## infra.persistence.atomic
 
@@ -218,6 +245,15 @@ def update_map_yaml():
                 "depends_on": ["runtime.config", "infra.logging", "infra.health"]
             },
             {
+                "id": "runtime.api",
+                "domain": "runtime",
+                "owner": "runtime",
+                "summary": "Public API surface and package exports",
+                "entrypoints": ["src/actifix/__init__.py"],
+                "contracts": ["expose stable API", "centralize package exports"],
+                "depends_on": ["core.raise_af", "bootstrap.main", "runtime.state", "infra.health"]
+            },
+            {
                 "id": "runtime.config",
                 "domain": "runtime",
                 "owner": "runtime",
@@ -234,6 +270,15 @@ def update_map_yaml():
                 "entrypoints": ["src/actifix/state_paths.py"],
                 "contracts": ["atomic state operations", "recoverable state management"],
                 "depends_on": ["infra.logging"]
+            },
+            {
+                "id": "runtime.dock_icon",
+                "domain": "runtime",
+                "owner": "runtime",
+                "summary": "macOS dock icon helper utilities",
+                "entrypoints": ["src/actifix/dock_icon.py"],
+                "contracts": ["safe no-op on non-macOS", "avoid side effects on import"],
+                "depends_on": []
             },
             {
                 "id": "infra.logging",
@@ -261,6 +306,22 @@ def update_map_yaml():
                 "entrypoints": ["src/actifix/persistence/atomic.py"],
                 "contracts": ["atomic writes", "append with size limits", "idempotent operations"],
                 "depends_on": ["infra.logging"]
+            },
+            {
+                "id": "infra.persistence.api",
+                "domain": "infra",
+                "owner": "persistence",
+                "summary": "Persistence package public API and exports",
+                "entrypoints": ["src/actifix/persistence/__init__.py"],
+                "contracts": ["re-export persistence interfaces", "keep API stable"],
+                "depends_on": [
+                    "infra.persistence.atomic",
+                    "infra.persistence.storage",
+                    "infra.persistence.queue",
+                    "infra.persistence.manager",
+                    "infra.persistence.health",
+                    "infra.persistence.paths"
+                ]
             },
             {
                 "id": "infra.persistence.storage",

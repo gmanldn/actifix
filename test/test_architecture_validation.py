@@ -217,6 +217,22 @@ class TestModulesMatchCodebase:
         missing = critical - documented_modules
         assert not missing, f"Critical modules not documented: {missing}"
 
+    def test_all_python_files_documented(self, map_data):
+        """Every Python file in src/actifix must appear in MAP.yaml entrypoints."""
+        documented_entrypoints = set()
+        for module in map_data["modules"]:
+            documented_entrypoints.update(module["entrypoints"])
+
+        actual_files = set()
+        for path in SRC_DIR.rglob("*.py"):
+            if "__pycache__" in path.parts:
+                continue
+            relative = path.relative_to(ROOT).as_posix()
+            actual_files.add(relative)
+
+        missing = actual_files - documented_entrypoints
+        assert not missing, f"Undocumented entrypoints: {sorted(missing)}"
+
 
 class TestDependencyGraphConsistency:
     """Verify dependency graph is consistent with module definitions."""
