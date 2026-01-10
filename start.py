@@ -166,12 +166,15 @@ def start_version_monitor(
     manager: FrontendManager,
     project_root: Path,
     interval_seconds: float = 60.0,
+    stop_event: Optional[threading.Event] = None,
 ) -> threading.Thread:
     """Monitor pyproject version changes and bounce the frontend when needed."""
 
     def monitor_loop() -> None:
         last_version = read_project_version(project_root)
         while True:
+            if stop_event and stop_event.is_set():
+                break
             time.sleep(interval_seconds)
             current_version = read_project_version(project_root)
             if current_version != last_version:
