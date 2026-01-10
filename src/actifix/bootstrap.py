@@ -14,8 +14,10 @@ import os
 import sys
 import traceback
 from pathlib import Path
+from typing import Optional
 
 from .raise_af import record_error, ACTIFIX_CAPTURE_ENV_VAR
+from .state_paths import get_actifix_paths, init_actifix_files, ActifixPaths
 
 
 def enable_actifix_capture():
@@ -115,6 +117,41 @@ def bootstrap_actifix_development():
     print("[Actifix] Self-development mode active - actifix will track its own development issues!")
     
     return original_handler
+
+
+def bootstrap(project_root: Optional[Path] = None) -> ActifixPaths:
+    """
+    Initialize Actifix paths for a project.
+
+    Args:
+        project_root: Optional project root to initialize.
+
+    Returns:
+        Initialized ActifixPaths.
+    """
+    paths = get_actifix_paths(project_root=project_root)
+    init_actifix_files(paths)
+    return paths
+
+
+def shutdown() -> None:
+    """Shutdown hook for Actifix lifecycle (no-op placeholder)."""
+    return None
+
+
+class ActifixContext:
+    """Context manager to bootstrap Actifix lifecycle."""
+
+    def __init__(self, project_root: Optional[Path] = None):
+        self.project_root = project_root
+        self.paths: Optional[ActifixPaths] = None
+
+    def __enter__(self) -> ActifixPaths:
+        self.paths = bootstrap(self.project_root)
+        return self.paths
+
+    def __exit__(self, exc_type, exc_value, exc_traceback) -> None:
+        shutdown()
 
 
 def create_initial_ticket():
