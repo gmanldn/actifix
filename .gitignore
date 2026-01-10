@@ -4,6 +4,7 @@ __pycache__/
 .pytest_cache/
 .actifix/test_logs/
 .actifix/
+.state/
 actifix/ACTIFIX-LIST.md
 actifix/ACTIFIX.md
 actifix/ACTIFIX-LOG.md

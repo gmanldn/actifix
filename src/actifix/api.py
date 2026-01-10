@@ -301,7 +301,7 @@ def create_app(project_root: Optional[Path] = None) -> "Flask":
         lines = request.args.get('lines', 100, type=int)
         
         log_files = {
-            'audit': paths.log_file,  # AFLog.txt
+            'audit': paths.aflog_file,  # AFLog.txt
             'errors': paths.rollup_file,  # ACTIFIX.md
             'list': paths.list_file,  # ACTIFIX-LIST.md
         }
