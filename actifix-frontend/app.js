@@ -108,7 +108,7 @@ const ErrorDisplay = ({ message }) => {
 };
 
 // Navigation Rail Component
-const NavigationRail = ({ activeView, onViewChange }) => {
+const NavigationRail = ({ activeView, onViewChange, logAlert }) => {
   const navItems = [
     { id: 'overview', icon: '📊', label: 'Overview' },
     { id: 'tickets', icon: '🎫', label: 'Tickets' },
@@ -123,7 +123,11 @@ const NavigationRail = ({ activeView, onViewChange }) => {
       navItems.map(item =>
         h('button', {
           key: item.id,
-          className: `nav-rail-item ${activeView === item.id ? 'active' : ''}`,
+          className: [
+            'nav-rail-item',
+            activeView === item.id ? 'active' : '',
+            item.id === 'logs' && logAlert ? 'flash' : '',
+          ].join(' ').trim(),
           onClick: () => onViewChange(item.id),
           title: item.label
         }, item.icon)
@@ -159,8 +163,24 @@ const VersionBadge = () => {
   );
 };
 
+const FixToolbar = ({ onFix, isFixing, status }) => {
+  const label = status || 'Ready to fix the next ticket';
+  return h('div', { className: 'fix-toolbar' },
+    h('button', {
+      type: 'button',
+      className: `btn fix-button ${isFixing ? 'working' : ''}`,
+      onClick: () => onFix?.(),
+      disabled: isFixing,
+    },
+      h('span', null, isFixing ? 'Fixing ticket…' : 'Fix highest priority ticket'),
+      h('span', { className: 'fix-button-sub' }, isFixing ? 'Ultrathink engaged' : 'Ready')
+    ),
+    h('span', { className: 'fix-status' }, label)
+  );
+};
+
 // Header Component
-const Header = () => {
+const Header = ({ onFix, isFixing, fixStatus }) => {
   const [connected, setConnected] = useState(false);
   const [time, setTime] = useState(new Date().toLocaleTimeString());
   const { data: health } = useFetch('/health', 10000);
@@ -196,19 +216,21 @@ const Header = () => {
       )
     ),
     h('div', { className: 'header-right' },
-      // Quick stats
-      h('div', { className: 'stat-card', style: { padding: '4px 12px', minWidth: '60px' } },
-        h('div', { className: 'stat-value', style: { fontSize: '16px' } }, health?.metrics?.open_tickets ?? '—'),
-        h('div', { className: 'stat-label', style: { fontSize: '9px' } }, 'OPEN')
+      h('div', { className: 'header-stats' },
+        h('div', { className: 'stat-card', style: { padding: '4px 12px', minWidth: '60px' } },
+          h('div', { className: 'stat-value', style: { fontSize: '16px' } }, health?.metrics?.open_tickets ?? '—'),
+          h('div', { className: 'stat-label', style: { fontSize: '9px' } }, 'OPEN')
+        ),
+        h('div', { className: 'stat-card', style: { padding: '4px 12px', minWidth: '60px' } },
+          h('div', { className: 'stat-value', style: { fontSize: '16px' } }, health?.metrics?.completed_tickets ?? '—'),
+          h('div', { className: 'stat-label', style: { fontSize: '9px' } }, 'DONE')
+        ),
+        h('div', { className: `connection-status ${connected ? 'connected' : 'disconnected'}` },
+          h('span', { className: 'connection-dot' }),
+          h('span', null, connected ? 'API ' : 'OFF')
+        )
       ),
-      h('div', { className: 'stat-card', style: { padding: '4px 12px', minWidth: '60px' } },
-        h('div', { className: 'stat-value', style: { fontSize: '16px' } }, health?.metrics?.completed_tickets ?? '—'),
-        h('div', { className: 'stat-label', style: { fontSize: '9px' } }, 'DONE')
-      ),
-      h('div', { className: `connection-status ${connected ? 'connected' : 'disconnected'}` },
-        h('span', { className: 'connection-dot' }),
-        h('span', null, connected ? 'API ' : 'OFF')
-      ),
+      h(FixToolbar, { onFix, isFixing, status: fixStatus }),
       h(VersionBadge),
       h('span', { className: 'header-time' }, time)
     )
@@ -458,15 +480,23 @@ const LogsView = () => {
     loading && !data ? h(LoadingSpinner) :
     error ? h(ErrorDisplay, { message: error }) :
     h('div', { className: 'log-container', ref: logContainerRef },
-      filteredLogs.length > 0 ? filteredLogs.map((log, i) =>
-        h('div', {
-          key: i,
-          className: `log-line log-${log.level.toLowerCase()}`
+      filteredLogs.length > 0 ? filteredLogs.map((log, i) => {
+        const levelClass = log.level ? `log-${log.level.toLowerCase()}` : 'log-info';
+        const meta = log.ticket && log.ticket !== '-' ? log.ticket : null;
+        return h('div', {
+          key: `${log.timestamp || 'ts'}-${i}`,
+          className: `log-line ${levelClass}`
         },
           h('span', { className: 'log-level-indicator' }),
-          h('span', { className: 'log-text' }, log.text)
-        )
-      ) : h('div', { style: { padding: '24px', textAlign: 'center', color: 'var(--text-dim)' } }, 'No log entries')
+          h('div', { className: 'log-line-body' },
+            h('div', { className: 'log-line-meta' },
+              h('span', { className: 'log-event-label' }, log.event || 'LOG'),
+              meta && h('span', { className: 'log-ticket' }, meta)
+            ),
+            h('span', { className: 'log-text' }, log.text || '')
+          )
+        );
+      }) : h('div', { style: { padding: '24px', textAlign: 'center', color: 'var(--text-dim)' } }, 'No log entries')
     )
   );
 };
@@ -604,6 +634,60 @@ const ModulesView = () => {
 // Main App Component
 const App = () => {
   const [activeView, setActiveView] = useState('overview');
+  const [isFixing, setIsFixing] = useState(false);
+  const [fixStatus, setFixStatus] = useState('Ready to fix the next ticket');
+  const [logAlert, setLogAlert] = useState(false);
+  const logFlashTimer = useRef(null);
+
+  useEffect(() => {
+    return () => {
+      if (logFlashTimer.current) {
+        clearTimeout(logFlashTimer.current);
+      }
+    };
+  }, []);
+
+  const triggerLogFlash = () => {
+    setLogAlert(true);
+    if (logFlashTimer.current) {
+      clearTimeout(logFlashTimer.current);
+    }
+    logFlashTimer.current = setTimeout(() => {
+      setLogAlert(false);
+    }, 4200);
+  };
+
+  const handleFix = async () => {
+    if (isFixing) return;
+    setIsFixing(true);
+    setFixStatus('Fixing the highest priority ticket…');
+    triggerLogFlash();
+
+    try {
+      const response = await fetch(`${API_BASE}/fix-ticket`, {
+        method: 'POST',
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data?.reason || `HTTP ${response.status}`);
+      }
+
+      if (data.processed) {
+        setFixStatus(data.action || `Resolved ${data.ticket_id}`);
+      } else {
+        const reasonMap = {
+          no_open_tickets: 'No open tickets available',
+          mark_failed: 'Unable to close the ticket',
+        };
+        const reasonMessage = reasonMap[data.reason] || data.reason || 'No action taken';
+        setFixStatus(`Standby: ${reasonMessage}`);
+      }
+    } catch (error) {
+      setFixStatus(`Error: ${error.message}`);
+    } finally {
+      setIsFixing(false);
+    }
+  };
 
   const renderView = () => {
     switch (activeView) {
@@ -616,8 +700,8 @@ const App = () => {
   };
 
   return h('div', { className: 'dashboard' },
-    h(NavigationRail, { activeView, onViewChange: setActiveView }),
-    h(Header),
+    h(NavigationRail, { activeView, onViewChange: setActiveView, logAlert }),
+    h(Header, { onFix: handleFix, isFixing, fixStatus }),
     h('main', { className: 'dashboard-content' },
       renderView()
     ),

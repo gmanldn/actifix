@@ -24,7 +24,12 @@ except ImportError:
 
 from . import __version__
 from .health import get_health, check_sla_breaches
-from .do_af import get_open_tickets, get_ticket_stats, get_completed_tickets
+from .do_af import (
+    get_open_tickets,
+    get_ticket_stats,
+    get_completed_tickets,
+    fix_highest_priority_ticket,
+)
 from .state_paths import get_actifix_paths
 
 # Server start time for uptime calculation
@@ -118,6 +123,56 @@ def _gather_version_info(project_root: Path) -> Dict[str, Optional[str]]:
     }
 
 
+def _map_event_type_to_level(event_type: str, message: str) -> str:
+    """Map ACTIFIX event types to log levels used by the frontend."""
+    normalized = (event_type or "").upper()
+    if "✓" in message or "SUCCESS" in message.upper():
+        return "SUCCESS"
+    if "✗" in message:
+        return "ERROR"
+    if "⚠" in message:
+        return "WARNING"
+    if normalized in {"ERROR", "DISPATCH_FAILED"} or "ERROR" in message.upper():
+        return "ERROR"
+    if normalized in {"ASCII_BANNER"}:
+        return "BANNER"
+    if normalized in {"ACTION_DECIDED"}:
+        return "ACTION"
+    if normalized in {"THOUGHT_PROCESS"}:
+        return "THOUGHT"
+    if normalized in {"TESTING"}:
+        return "TEST"
+    if normalized in {"TICKET_CLOSED", "DISPATCH_SUCCESS", "TICKET_COMPLETED"}:
+        return "SUCCESS"
+    if normalized in {"WARNING", "TICKET_ALREADY_COMPLETED"} or "WARNING" in message.upper():
+        return "WARNING"
+    return "INFO"
+
+
+def _parse_log_line(line: str) -> Optional[dict]:
+    """Parse a single AFLog line into structured fields."""
+    stripped = line.strip()
+    if not stripped:
+        return None
+
+    parts = [part.strip() for part in stripped.split(" | ")]
+    timestamp = parts[0] if len(parts) >= 1 else ""
+    event_type = parts[1] if len(parts) >= 2 else "LOG"
+    ticket_id = parts[2] if len(parts) >= 3 else "-"
+    message = parts[3] if len(parts) >= 4 else stripped
+    extra = parts[4] if len(parts) >= 5 else None
+    level = _map_event_type_to_level(event_type, message)
+
+    return {
+        "timestamp": timestamp,
+        "event": event_type,
+        "ticket": ticket_id,
+        "text": message,
+        "extra": extra,
+        "level": level,
+    }
+
+
 def create_app(project_root: Optional[Path] = None) -> "Flask":
     """
     Create and configure the Flask API application.
@@ -163,7 +218,7 @@ def create_app(project_root: Optional[Path] = None) -> "Flask":
             'warnings': health.warnings,
             'errors': health.errors,
             'details': health.details,
-        })
+    })
     
     @app.route('/api/version', methods=['GET'])
     def api_version():
@@ -222,6 +277,21 @@ def create_app(project_root: Optional[Path] = None) -> "Flask":
             'total_open': len(open_tickets),
             'total_completed': len(completed_tickets),
         })
+
+    @app.route('/api/fix-ticket', methods=['POST'])
+    def api_fix_ticket():
+        """Fix the highest priority open ticket with detailed logging."""
+        paths = get_actifix_paths(project_root=app.config['PROJECT_ROOT'])
+        result = fix_highest_priority_ticket(paths)
+        return jsonify({
+            'processed': result.get('processed', False),
+            'ticket_id': result.get('ticket_id'),
+            'priority': result.get('priority'),
+            'reason': result.get('reason'),
+            'thought': result.get('thought'),
+            'action': result.get('action'),
+            'testing': result.get('testing'),
+        })
     
     @app.route('/api/logs', methods=['GET'])
     def api_logs():
@@ -260,18 +330,9 @@ def create_app(project_root: Optional[Path] = None) -> "Flask":
             # Parse lines into structured format
             parsed_lines = []
             for line in recent_lines:
-                level = 'INFO'
-                if 'ERROR' in line.upper() or '✗' in line:
-                    level = 'ERROR'
-                elif 'WARNING' in line.upper() or '⚠' in line:
-                    level = 'WARNING'
-                elif 'SUCCESS' in line.upper() or '✓' in line:
-                    level = 'SUCCESS'
-                
-                parsed_lines.append({
-                    'text': line,
-                    'level': level,
-                })
+                parsed = _parse_log_line(line)
+                if parsed:
+                    parsed_lines.append(parsed)
             
             return jsonify({
                 'content': parsed_lines,
