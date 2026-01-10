@@ -10,7 +10,7 @@ import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List, Dict
 
 try:
     from flask import Flask, jsonify, request
@@ -27,6 +27,56 @@ from .state_paths import get_actifix_paths
 
 # Server start time for uptime calculation
 SERVER_START_TIME = time.time()
+SYSTEM_OWNERS = {"runtime", "infra", "core", "persistence", "testing", "tooling"}
+
+
+def _load_modules(project_root: Path) -> Dict[str, List[Dict[str, str]]]:
+    """Parse Arch/MODULES.md into system/user buckets."""
+    modules_md = project_root / "Arch" / "MODULES.md"
+    if not modules_md.exists():
+        return {"system": [], "user": []}
+
+    name = None
+    domain = None
+    owner = None
+    summary = None
+    modules: List[Dict[str, str]] = []
+
+    try:
+        for line in modules_md.read_text(encoding="utf-8").splitlines():
+            if line.startswith("## "):
+                # flush previous
+                if name:
+                    modules.append({
+                        "name": name,
+                        "domain": domain or "",
+                        "owner": owner or "",
+                        "summary": summary or "",
+                    })
+                name = line.replace("## ", "").strip()
+                domain = owner = summary = None
+                continue
+            if line.startswith("**Domain:**"):
+                domain = line.replace("**Domain:**", "").strip()
+            elif line.startswith("**Owner:**"):
+                owner = line.replace("**Owner:**", "").strip()
+            elif line.startswith("**Summary:**"):
+                summary = line.replace("**Summary:**", "").strip()
+
+        if name:
+            modules.append({
+                "name": name,
+                "domain": domain or "",
+                "owner": owner or "",
+                "summary": summary or "",
+            })
+    except Exception:
+        return {"system": [], "user": []}
+
+    system = [m for m in modules if (m.get("owner") or "").lower() in SYSTEM_OWNERS]
+    user = [m for m in modules if m not in system]
+
+    return {"system": system, "user": user}
 
 
 def create_app(project_root: Optional[Path] = None) -> "Flask":
@@ -237,6 +287,12 @@ def create_app(project_root: Optional[Path] = None) -> "Flask":
             },
             'timestamp': datetime.now(timezone.utc).isoformat(),
         })
+
+    @app.route('/api/modules', methods=['GET'])
+    def api_modules():
+        """List system/user modules from architecture catalog."""
+        modules = _load_modules(app.config['PROJECT_ROOT'])
+        return jsonify(modules)
     
     @app.route('/api/ping', methods=['GET'])
     def api_ping():
