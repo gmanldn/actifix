@@ -119,6 +119,12 @@ def main(argv: Optional[list[str]] = None) -> int:
     os.environ.setdefault("PYTHONDONTWRITEBYTECODE", "1")
     clean_bytecode_cache()
     ensure_scaffold()
+    try:
+        from actifix.dock_icon import setup_dock_icon
+        setup_dock_icon()
+    except Exception:
+        # Dock icon setup is best-effort; ignore failures on non-macOS
+        pass
 
     if args.health_only:
         healthy = run_health_check()
