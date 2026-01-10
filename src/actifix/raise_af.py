@@ -17,7 +17,7 @@ Key Features:
 - 200k context window management for AI integration
 - Configurable for any project/framework
 
-Version: 2.0.0 (Generic)
+Version: 2.5.2 (Generic)
 """
 
 import argparse
@@ -96,6 +96,7 @@ ACTIFIX_CAPTURE_ENV_VAR = "ACTIFIX_CAPTURE_ENABLED"
 
 # Fallback queue for when ACTIFIX-LIST.md is unwritable
 FALLBACK_QUEUE_FILE = get_actifix_state_dir() / "actifix_fallback_queue.json"
+LEGACY_FALLBACK_QUEUE = ".actifix_fallback_queue.json"
 
 # Module-level counter for capture disabled logging (avoid log spam)
 _capture_disabled_log_count = 0
@@ -524,23 +525,54 @@ def _append_recent(entry: ActifixEntry, base_dir: Path) -> None:
     _write_recent_entries(actifix_md, trimmed)
 
 
+def _get_fallback_queue_file(base_dir: Path) -> Path:
+    """
+    Resolve the canonical fallback queue file in the state directory.
+
+    Uses ActifixPaths to honor ACTIFIX_STATE_DIR overrides and ensures the
+    directory exists. A legacy queue file in the base directory is still
+    read for backward compatibility and then migrated.
+    """
+    paths = get_actifix_paths(base_dir=base_dir)
+    queue_file = paths.fallback_queue_file
+    queue_file.parent.mkdir(parents=True, exist_ok=True)
+    return queue_file
+
+
+def _load_existing_queue(primary: Path, legacy: Path) -> tuple[list, Path]:
+    """Load queue contents from primary or legacy locations."""
+    for candidate in (primary, legacy):
+        if candidate.exists():
+            try:
+                return json.loads(candidate.read_text(encoding="utf-8")), candidate
+            except Exception:
+                return [], primary
+    return [], primary
+
+
+def _persist_queue(queue: list, target: Path, legacy: Path) -> None:
+    """Write queue to primary location and clean up legacy path if needed."""
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(json.dumps(queue, indent=2, default=str), encoding="utf-8")
+    if legacy.exists() and legacy != target:
+        try:
+            legacy.unlink()
+        except Exception:
+            pass
+
+
 def _queue_to_fallback(entry: ActifixEntry, base_dir: Path) -> bool:
     """Queue entry to fallback file when ACTIFIX-LIST.md is unwritable."""
-    queue_file = base_dir / ".actifix_fallback_queue.json"
+    queue_file = _get_fallback_queue_file(base_dir)
+    legacy_file = base_dir / LEGACY_FALLBACK_QUEUE
     try:
-        # Read existing queue
-        queue = []
-        if queue_file.exists():
-            try:
-                queue = json.loads(queue_file.read_text(encoding="utf-8"))
-            except Exception:
-                queue = []
+        queue, source_path = _load_existing_queue(queue_file, legacy_file)
 
         # Add entry to queue
         queue.append(entry.to_dict())
 
         # Write back
-        queue_file.write_text(json.dumps(queue, indent=2, default=str), encoding="utf-8")
+        _persist_queue(queue, queue_file, legacy_file)
         return True
     except Exception:
         return False
@@ -548,12 +580,11 @@ def _queue_to_fallback(entry: ActifixEntry, base_dir: Path) -> bool:
 
 def replay_fallback_queue(base_dir: Path = ACTIFIX_DIR) -> int:
     """Replay entries from fallback queue to ACTIFIX-LIST.md."""
-    queue_file = base_dir / ".actifix_fallback_queue.json"
-    if not queue_file.exists():
-        return 0
+    queue_file = _get_fallback_queue_file(base_dir)
+    legacy_file = base_dir / LEGACY_FALLBACK_QUEUE
 
     try:
-        queue = json.loads(queue_file.read_text(encoding="utf-8"))
+        queue, source_path = _load_existing_queue(queue_file, legacy_file)
         if not queue:
             return 0
 
@@ -581,9 +612,11 @@ def replay_fallback_queue(base_dir: Path = ACTIFIX_DIR) -> int:
 
         # Update queue with only failed entries
         if failed:
-            queue_file.write_text(json.dumps(failed, indent=2, default=str), encoding="utf-8")
+            _persist_queue(failed, queue_file, legacy_file)
         else:
             queue_file.unlink(missing_ok=True)
+            if source_path != queue_file:
+                source_path.unlink(missing_ok=True)
 
         return replayed
     except Exception:

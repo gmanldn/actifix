@@ -204,6 +204,9 @@ class TestActifixBasic:
         from actifix.raise_af import _append_ticket, ActifixEntry, TicketPriority
         from datetime import datetime, timezone
         
+        state_dir = temp_actifix_dir / ".actifix_state"
+        monkeypatch.setenv("ACTIFIX_STATE_DIR", str(state_dir))
+
         # Create a test entry
         entry = ActifixEntry(
             message="Test fallback error",
@@ -228,8 +231,8 @@ class TestActifixBasic:
             result = _append_ticket(entry, temp_actifix_dir)
             
             # Check fallback queue was created
-            queue_file = temp_actifix_dir / ".actifix_fallback_queue.json"
-            assert queue_file.exists()
+            queue_file = state_dir / "actifix_fallback_queue.json"
+            assert queue_file.exists(), f"Missing fallback queue at {queue_file}"
             
         finally:
             # Restore write permissions for cleanup
