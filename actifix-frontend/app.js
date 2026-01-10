@@ -1,14 +1,14 @@
 /**
- * Actifix Dashboard - Modern reliability cockpit
- *
- * Updated layout for 2026-style hero, action buttons, and detail panels.
+ * Actifix Dashboard - COMPACT & ELEGANT 2026 Edition
+ * 
+ * Redesigned for maximum information density with modern aesthetics
  */
 
 const { useState, useEffect, useRef, createElement: h } = React;
 
 // API Configuration
 const API_BASE = 'http://localhost:5001/api';
-const REFRESH_INTERVAL = 5000; // 5 seconds
+const REFRESH_INTERVAL = 5000;
 const LOG_REFRESH_INTERVAL = 3000;
 
 // ============================================================================
@@ -18,43 +18,44 @@ const LOG_REFRESH_INTERVAL = 3000;
 const formatTime = (isoString) => {
   if (!isoString) return 'N/A';
   const date = new Date(isoString);
-  return date.toLocaleTimeString();
+  return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 };
 
-const formatDateTime = (isoString) => {
+const formatRelativeTime = (isoString) => {
   if (!isoString) return 'N/A';
   const date = new Date(isoString);
-  return date.toLocaleString();
+  const now = new Date();
+  const diff = now - date;
+  const seconds = Math.floor(diff / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+  
+  if (days > 0) return `${days}d ago`;
+  if (hours > 0) return `${hours}h ago`;
+  if (minutes > 0) return `${minutes}m ago`;
+  return `${seconds}s ago`;
 };
 
 const getPriorityColor = (priority) => {
   const colors = {
-    'P0': '#ff4444',
-    'P1': '#ff8800',
-    'P2': '#ffcc00',
-    'P3': '#88cc00',
+    'P0': '#ef4444',
+    'P1': '#f59e0b',
+    'P2': '#eab308',
+    'P3': '#10b981',
+    'P4': '#6b7280',
   };
-  return colors[priority] || '#888888';
+  return colors[priority] || '#6b7280';
 };
 
 const getStatusColor = (status) => {
   const colors = {
-    'OK': '#00cc66',
-    'WARNING': '#ffcc00',
-    'ERROR': '#ff4444',
-    'SLA_BREACH': '#ff8800',
+    'OK': '#10b981',
+    'WARNING': '#f59e0b',
+    'ERROR': '#ef4444',
+    'SLA_BREACH': '#ef4444',
   };
-  return colors[status] || '#888888';
-};
-
-const getLogLevelColor = (level) => {
-  const colors = {
-    'ERROR': '#ff4444',
-    'WARNING': '#ffcc00',
-    'SUCCESS': '#00cc66',
-    'INFO': '#888888',
-  };
-  return colors[level] || '#888888';
+  return colors[status] || '#6b7280';
 };
 
 // ============================================================================
@@ -93,52 +94,6 @@ const useFetch = (endpoint, interval = REFRESH_INTERVAL) => {
 // Components
 // ============================================================================
 
-const Blade = ({ title, icon, children, className = '', fullWidth = false }) => {
-  return h('div', { className: `blade ${className} ${fullWidth ? 'blade-full' : ''}` },
-    h('div', { className: 'blade-header' },
-      h('span', { className: 'blade-icon' }, icon),
-      h('h2', { className: 'blade-title' }, title)
-    ),
-    h('div', { className: 'blade-content' }, children)
-  );
-};
-
-const StatusIndicator = ({ status, size = 'medium' }) => {
-  const color = getStatusColor(status);
-  return h('div', {
-    className: `status-indicator status-${size}`,
-    style: {
-      backgroundColor: color,
-      boxShadow: `0 0 12px ${color}`,
-    }
-  });
-};
-
-const MetricCard = ({ label, value, subvalue, color }) => {
-  return h('div', { className: 'metric-card' },
-    h('div', { className: 'metric-value', style: color ? { color } : {} }, value),
-    h('div', { className: 'metric-label' }, label),
-    subvalue && h('div', { className: 'metric-subvalue' }, subvalue)
-  );
-};
-
-const PriorityBadge = ({ priority }) => {
-  return h('span', {
-    className: 'priority-badge',
-    style: {
-      backgroundColor: getPriorityColor(priority),
-      color: priority === 'P2' || priority === 'P3' ? '#000' : '#fff',
-    }
-  }, priority);
-};
-
-const StatusBadge = ({ status }) => {
-  const isOpen = status === 'open';
-  return h('span', {
-    className: `status-badge ${isOpen ? 'status-open' : 'status-completed'}`
-  }, isOpen ? 'OPEN' : 'DONE');
-};
-
 const LoadingSpinner = () => {
   return h('div', { className: 'loading-spinner' },
     h('div', { className: 'spinner' })
@@ -152,514 +107,63 @@ const ErrorDisplay = ({ message }) => {
   );
 };
 
-const ModulesBlade = () => {
-  const { data, loading, error } = useFetch('/modules', 15000);
-
-  if (loading) return h(LoadingSpinner);
-  if (error) return h(ErrorDisplay, { message: error });
-
-  const systemModules = data?.system || [];
-  const userModules = data?.user || [];
-
-  const renderGroup = (title, modules) => (
-    h('div', { className: 'modules-group' },
-      h('div', { className: 'modules-group-header' }, title),
-      modules.length === 0
-        ? h('div', { className: 'modules-empty' }, 'No modules reported')
-        : modules.map((m, idx) =>
-            h('div', { key: `${title}-${idx}`, className: 'module-chip' },
-              h('div', { className: 'module-name' }, m.name || 'unknown'),
-              h('div', { className: 'module-meta' },
-                h('span', null, m.domain || '—'),
-                h('span', null, m.owner || '—')
-              ),
-              m.summary && h('div', { className: 'module-summary' }, m.summary)
-            )
-          )
-    )
-  );
-
-  return h('div', { className: 'modules-grid' },
-    renderGroup('System Modules', systemModules),
-    renderGroup('User Modules', userModules),
-  );
-};
-
-// ============================================================================
-// Blade Components
-// ============================================================================
-
-const SystemInfoBlade = () => {
-  const { data, loading, error } = useFetch('/system');
-
-  if (loading) return h(Blade, { title: 'System Information', icon: '🖥️' }, h(LoadingSpinner));
-  if (error) return h(Blade, { title: 'System Information', icon: '🖥️' }, h(ErrorDisplay, { message: error }));
-
-  const { platform, project, server, resources } = data || {};
-
-  return h(Blade, { title: 'System Information', icon: '🖥️' },
-    h('div', { className: 'info-grid' },
-      h('div', { className: 'info-section' },
-        h('h3', null, 'Platform'),
-        h('div', { className: 'info-row' },
-          h('span', { className: 'info-label' }, 'OS'),
-          h('span', { className: 'info-value' }, `${platform?.system || 'N/A'} ${platform?.release || ''}`)
-        ),
-        h('div', { className: 'info-row' },
-          h('span', { className: 'info-label' }, 'Machine'),
-          h('span', { className: 'info-value' }, platform?.machine || 'N/A')
-        ),
-        h('div', { className: 'info-row' },
-          h('span', { className: 'info-label' }, 'Python'),
-          h('span', { className: 'info-value' }, platform?.python_version || 'N/A')
-        )
-      ),
-      h('div', { className: 'info-section' },
-        h('h3', null, 'Server'),
-        h('div', { className: 'info-row' },
-          h('span', { className: 'info-label' }, 'Uptime'),
-          h('span', { className: 'info-value uptime' }, server?.uptime || 'N/A')
-        ),
-        h('div', { className: 'info-row' },
-          h('span', { className: 'info-label' }, 'Started'),
-          h('span', { className: 'info-value' }, formatTime(server?.start_time))
-        )
-      ),
-      resources?.memory && h('div', { className: 'info-section' },
-        h('h3', null, 'Resources'),
-        h('div', { className: 'info-row' },
-          h('span', { className: 'info-label' }, 'Memory'),
-          h('span', { className: 'info-value' }, `${resources.memory.used_gb}/${resources.memory.total_gb} GB (${resources.memory.percent}%)`)
-        ),
-        resources.cpu_percent !== null && h('div', { className: 'info-row' },
-          h('span', { className: 'info-label' }, 'CPU'),
-          h('span', { className: 'info-value' }, `${resources.cpu_percent}%`)
-        )
-      ),
-      h('div', { className: 'info-section' },
-        h('h3', null, 'Project'),
-        h('div', { className: 'info-row project-path' },
-          h('span', { className: 'info-label' }, 'Root'),
-          h('span', { className: 'info-value mono' }, project?.root || 'N/A')
-        )
-      )
-    )
-  );
-};
-
-const HealthStatsBlade = () => {
-  const { data, loading, error } = useFetch('/health');
-
-  if (loading) return h(Blade, { title: 'Health & Statistics', icon: '📊' }, h(LoadingSpinner));
-  if (error) return h(Blade, { title: 'Health & Statistics', icon: '📊' }, h(ErrorDisplay, { message: error }));
-
-  const { healthy, status, metrics, filesystem, warnings, errors: healthErrors } = data || {};
-
-  return h(Blade, { title: 'Health & Statistics', icon: '📊' },
-    h('div', { className: 'health-header' },
-      h(StatusIndicator, { status, size: 'large' }),
-      h('div', { className: 'health-status' },
-        h('span', { className: 'health-status-text', style: { color: getStatusColor(status) } }, status),
-        h('span', { className: 'health-status-sub' }, healthy ? 'System Healthy' : 'Issues Detected')
-      )
-    ),
-    h('div', { className: 'metrics-grid' },
-      h(MetricCard, {
-        label: 'Open Tickets',
-        value: metrics?.open_tickets || 0,
-        color: metrics?.open_tickets > 0 ? '#ffcc00' : '#00cc66'
-      }),
-      h(MetricCard, {
-        label: 'Completed',
-        value: metrics?.completed_tickets || 0,
-        color: '#00cc66'
-      }),
-      h(MetricCard, {
-        label: 'SLA Breaches',
-        value: metrics?.sla_breaches || 0,
-        color: metrics?.sla_breaches > 0 ? '#ff4444' : '#00cc66'
-      }),
-      h(MetricCard, {
-        label: 'Oldest Ticket',
-        value: `${metrics?.oldest_ticket_age_hours || 0}h`,
-        subvalue: 'age'
-      })
-    ),
-    h('div', { className: 'filesystem-status' },
-      h('div', { className: `fs-indicator ${filesystem?.files_exist ? 'fs-ok' : 'fs-error'}` },
-        h('span', null, filesystem?.files_exist ? '✓' : '✗'),
-        ' Files Exist'
-      ),
-      h('div', { className: `fs-indicator ${filesystem?.files_writable ? 'fs-ok' : 'fs-error'}` },
-        h('span', null, filesystem?.files_writable ? '✓' : '✗'),
-        ' Writable'
-      )
-    ),
-    (warnings?.length > 0 || healthErrors?.length > 0) && h('div', { className: 'health-alerts' },
-      healthErrors?.map((err, i) => h('div', { key: `err-${i}`, className: 'alert alert-error' }, '✗ ', err)),
-      warnings?.map((warn, i) => h('div', { key: `warn-${i}`, className: 'alert alert-warning' }, '⚠ ', warn))
-    )
-  );
-};
-
-const TicketsBlade = () => {
-  const { data, loading, error } = useFetch('/tickets');
-
-  if (loading) return h(Blade, { title: 'Recent Tickets', icon: '🎫' }, h(LoadingSpinner));
-  if (error) return h(Blade, { title: 'Recent Tickets', icon: '🎫' }, h(ErrorDisplay, { message: error }));
-
-  const { tickets, total_open, total_completed } = data || { tickets: [] };
-
-  return h(Blade, { title: 'Recent Tickets', icon: '🎫' },
-    h('div', { className: 'tickets-summary' },
-      h('span', { className: 'ticket-count open' }, `${total_open || 0} open`),
-      h('span', { className: 'ticket-divider' }, '•'),
-      h('span', { className: 'ticket-count completed' }, `${total_completed || 0} completed`)
-    ),
-    tickets?.length > 0 ? h('div', { className: 'tickets-list' },
-      tickets.slice(0, 10).map((ticket, i) =>
-        h('div', { key: ticket.ticket_id || i, className: 'ticket-item' },
-          h('div', { className: 'ticket-header' },
-            h(PriorityBadge, { priority: ticket.priority }),
-            h(StatusBadge, { status: ticket.status }),
-            h('span', { className: 'ticket-id' }, ticket.ticket_id?.slice(0, 8) || 'N/A')
-          ),
-          h('div', { className: 'ticket-type' }, ticket.error_type || 'Unknown'),
-          h('div', { className: 'ticket-message' }, ticket.message || ''),
-          h('div', { className: 'ticket-meta' },
-            h('span', { className: 'ticket-source' }, ticket.source || ''),
-            h('span', { className: 'ticket-time' }, formatTime(ticket.created))
-          )
-        )
-      )
-    ) : h('div', { className: 'no-tickets' }, 'No tickets found')
-  );
-};
-
-const LoggingBlade = () => {
-  const [logType, setLogType] = useState('audit');
-  const [autoScroll, setAutoScroll] = useState(true);
-  const [filter, setFilter] = useState('');
-  const logContainerRef = useRef(null);
-
-  const { data, loading, error } = useFetch(`/logs?type=${logType}&lines=200`, LOG_REFRESH_INTERVAL);
-
-  useEffect(() => {
-    if (autoScroll && logContainerRef.current) {
-      logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
-    }
-  }, [data, autoScroll]);
-
-  const logTypes = [
-    { id: 'audit', label: 'Audit Log' },
-    { id: 'errors', label: 'Error Rollup' },
-    { id: 'list', label: 'Ticket List' },
-    { id: 'setup', label: 'Setup Log' },
+// Navigation Rail Component
+const NavigationRail = ({ activeView, onViewChange }) => {
+  const navItems = [
+    { id: 'overview', icon: '📊', label: 'Overview' },
+    { id: 'tickets', icon: '🎫', label: 'Tickets' },
+    { id: 'logs', icon: '📜', label: 'Logs' },
+    { id: 'system', icon: '⚙️', label: 'System' },
+    { id: 'modules', icon: '🧩', label: 'Modules' },
   ];
 
-  const filteredLogs = data?.content?.filter(log => {
-    if (!filter) return true;
-    return log.text.toLowerCase().includes(filter.toLowerCase());
-  }) || [];
-
-  return h(Blade, { title: 'Master Logging', icon: '📜', fullWidth: true, className: 'logging-blade' },
-    h('div', { className: 'log-controls' },
-      h('div', { className: 'log-tabs' },
-        logTypes.map(type =>
-          h('button', {
-            key: type.id,
-            className: `log-tab ${logType === type.id ? 'active' : ''}`,
-            onClick: () => setLogType(type.id)
-          }, type.label)
-        )
-      ),
-      h('div', { className: 'log-actions' },
-        h('input', {
-          type: 'text',
-          className: 'log-filter',
-          placeholder: 'Filter logs...',
-          value: filter,
-          onChange: (e) => setFilter(e.target.value)
-        }),
+  return h('nav', { className: 'nav-rail' },
+    h('img', { src: './assets/pangolin.svg', alt: 'Actifix', className: 'nav-rail-logo' }),
+    h('div', { className: 'nav-rail-items' },
+      navItems.map(item =>
         h('button', {
-          className: `auto-scroll-btn ${autoScroll ? 'active' : ''}`,
-          onClick: () => setAutoScroll(!autoScroll),
-          title: autoScroll ? 'Auto-scroll ON' : 'Auto-scroll OFF'
-        }, '↓')
+          key: item.id,
+          className: `nav-rail-item ${activeView === item.id ? 'active' : ''}`,
+          onClick: () => onViewChange(item.id),
+          title: item.label
+        }, item.icon)
       )
-    ),
-    h('div', { className: 'log-info' },
-      h('span', null, `File: ${data?.file || 'N/A'}`),
-      h('span', null, `Lines: ${filteredLogs.length}/${data?.total_lines || 0}`)
-    ),
-    loading && !data ? h(LoadingSpinner) :
-    error ? h(ErrorDisplay, { message: error }) :
-    h('div', { className: 'log-container', ref: logContainerRef },
-      filteredLogs.length > 0 ? filteredLogs.map((log, i) =>
-        h('div', {
-          key: i,
-          className: `log-line log-${log.level.toLowerCase()}`
-        },
-          h('span', {
-            className: 'log-level-indicator',
-            style: { backgroundColor: getLogLevelColor(log.level) }
-          }),
-          h('span', { className: 'log-text' }, log.text)
-        )
-      ) : h('div', { className: 'no-logs' }, 'No log entries found')
     )
   );
 };
 
-// ============================================================================
-// Control Panel Components
-// ============================================================================
+const VersionBadge = () => {
+  const { data, loading } = useFetch('/version', 60000);
+  const version = data?.version || '—';
+  const gitChecked = data?.git_checked ?? false;
+  const clean = data?.clean ?? false;
+  const branchLabel = data?.branch ? `branch ${data.branch}` : 'branch unknown';
+  const statusLabel = loading
+    ? 'Checking git…'
+    : gitChecked
+      ? clean
+        ? 'Git clean'
+        : 'Git dirty'
+      : 'Git unchecked';
+  const accentColor = gitChecked && clean ? '#2ee6b8' : '#ff5f5f';
 
-const PANEL_OPTIONS = [
-  { id: 'system', label: 'System Pulse', description: 'Live reliability indicators', icon: '⚙️' },
-  { id: 'logging', label: 'Logging Stream', description: 'Tail audit-ready feeds', icon: '📜' },
-  { id: 'details', label: 'System Intelligence', description: 'Deep metadata & project context', icon: '🧭' },
-  { id: 'creator', label: 'Creator', description: 'Generate tickets and workflows', icon: '🛠️' },
-  { id: 'modules', label: 'Modules', description: 'Active system + user modules', icon: '🧩' },
-];
-
-const ControlPanel = ({ activePanel, onSelect }) => {
-  return h('section', { className: 'control-panel' },
-    h('div', { className: 'control-panel-grid' },
-      PANEL_OPTIONS.map(option =>
-        h('button', {
-          key: option.id,
-          className: `panel-button ${activePanel === option.id ? 'active' : ''}`,
-          onClick: () => onSelect(option.id)
-        },
-          h('span', { className: 'panel-icon' }, option.icon),
-          h('div', { className: 'panel-copy' },
-            h('span', { className: 'panel-label' }, option.label),
-            h('span', { className: 'panel-description' }, option.description)
-          ),
-          h('span', { className: 'panel-kicker' }, activePanel === option.id ? 'ACTIVE' : 'VIEW')
-        )
-      )
-    ),
-    h('p', { className: 'panel-note' }, 'Use the buttons above to surface the system, logging, and intelligence overlays.')
-  );
-};
-
-const SystemDetailList = () => {
-  const { data, loading, error } = useFetch('/system', 10000);
-
-  if (loading) return h('div', { className: 'detail-loader' }, h(LoadingSpinner));
-  if (error) return h('div', { className: 'detail-error' }, h(ErrorDisplay, { message: error }));
-
-  const platform = data?.platform || {};
-  const project = data?.project || {};
-  const server = data?.server || {};
-  const resources = data?.resources || {};
-
-  const detailSections = [
-    {
-      title: 'Platform',
-      items: [
-        { label: 'OS', value: [platform.system, platform.release].filter(Boolean).join(' ') || 'N/A' },
-        { label: 'Machine', value: platform.machine || 'N/A' },
-        { label: 'Python', value: platform.python_version || 'N/A' },
-      ]
-    },
-    {
-      title: 'Project',
-      items: [
-        { label: 'Root', value: project.root || 'N/A' },
-        { label: 'Actifix Dir', value: project.actifix_dir || 'N/A' },
-      ]
-    },
-    {
-      title: 'Server',
-      items: [
-        { label: 'Uptime', value: server.uptime || 'N/A' },
-        { label: 'Started', value: formatDateTime(server.start_time) },
-        { label: 'Snapshot', value: formatDateTime(data?.timestamp) },
-      ]
-    },
-    {
-      title: 'Resources',
-      items: [
-        { label: 'Memory', value: resources.memory ? `${resources.memory.used_gb}/${resources.memory.total_gb} GB (${resources.memory.percent}%)` : 'N/A' },
-        { label: 'CPU', value: resources.cpu_percent !== null && resources.cpu_percent !== undefined ? `${resources.cpu_percent}%` : 'N/A' },
-      ]
+  return h('span', {
+    className: 'version-indicator',
+    style: {
+      borderColor: accentColor,
+      color: accentColor,
     }
-  ];
-
-  return h('div', { className: 'detail-grid' },
-    detailSections.map(section =>
-      h('div', { key: section.title, className: 'detail-group' },
-        h('div', { className: 'detail-title' }, section.title),
-        section.items.map(item =>
-          h('div', { key: item.label, className: 'detail-item' },
-            h('span', { className: 'detail-label' }, item.label),
-            h('span', { className: 'detail-value' }, item.value)
-          )
-        )
-      )
-    )
+  },
+    h('span', { className: 'version-label' }, `v${version}`),
+    h('span', { className: 'version-sub' }, `${statusLabel} • ${branchLabel}`)
   );
 };
 
-const SystemPulsePanel = () => {
-  const { data: health, loading: healthLoading, error: healthError } = useFetch('/health', 6000);
-  const { data: system, loading: systemLoading, error: systemError } = useFetch('/system', 11000);
-
-  if (healthLoading || systemLoading) {
-    return h('div', { className: 'panel-shell panel-loading' }, h(LoadingSpinner));
-  }
-
-  const errMessage = healthError || systemError;
-  if (errMessage) {
-    return h('div', { className: 'panel-shell panel-error' }, h(ErrorDisplay, { message: errMessage }));
-  }
-
-  const metrics = health?.metrics || {};
-  const systemTimestamp = formatDateTime(system?.timestamp);
-
-  return h('section', { className: 'panel-shell' },
-    h('div', { className: 'panel-shell-header' },
-      h('span', { className: 'panel-shell-icon' }, '⚙️'),
-      h('div', { className: 'panel-shell-title-group' },
-        h('span', { className: 'panel-shell-title' }, 'System Pulse'),
-        h('span', { className: 'panel-shell-sub' }, 'Realtime reliability summary')
-      ),
-      h(StatusIndicator, { status: health?.status || 'INFO', size: 'large' })
-    ),
-    h('div', { className: 'panel-shell-metrics' },
-      h(MetricCard, {
-        label: 'Open Tickets',
-        value: metrics.open_tickets ?? 0,
-        color: metrics.open_tickets > 0 ? '#ffcc00' : '#00cc66'
-      }),
-      h(MetricCard, {
-        label: 'Completed',
-        value: metrics.completed_tickets ?? 0,
-        color: '#00cc66'
-      }),
-      h(MetricCard, {
-        label: 'SLA Breaches',
-        value: metrics.sla_breaches ?? 0,
-        color: metrics.sla_breaches > 0 ? '#ff4444' : '#00cc66'
-      }),
-      h(MetricCard, {
-        label: 'Snapshot',
-        value: systemTimestamp,
-        subvalue: `As of`,
-      })
-    ),
-    h('div', { className: 'panel-shell-list' },
-      h('div', { className: 'panel-shell-column' },
-        h('div', { className: 'panel-shell-label' }, 'Platform'),
-        h('span', null, [system?.platform?.system, system?.platform?.release].filter(Boolean).join(' ') || 'N/A')
-      ),
-      h('div', { className: 'panel-shell-column' },
-        h('div', { className: 'panel-shell-label' }, 'Uptime'),
-        h('span', null, system?.server?.uptime || 'N/A')
-      ),
-      h('div', { className: 'panel-shell-column' },
-        h('div', { className: 'panel-shell-label' }, 'Memory Usage'),
-        h('span', null, system?.resources?.memory ? `${system.resources.memory.used_gb}/${system.resources.memory.total_gb} GB` : 'N/A')
-      ),
-      h('div', { className: 'panel-shell-column' },
-        h('div', { className: 'panel-shell-label' }, 'CPU Load'),
-        h('span', null, system?.resources?.cpu_percent !== null ? `${system.resources.cpu_percent}%` : 'N/A')
-      )
-    )
-  );
-};
-
-const PanelContent = ({ activePanel }) => {
-  if (activePanel === 'logging') {
-    return h('section', { className: 'panel-shell panel-shell--logs' },
-      h('div', { className: 'panel-shell-heading' }, 'Logging Stream'),
-      h(LoggingBlade)
-    );
-  }
-
-  if (activePanel === 'details') {
-    return h('section', { className: 'panel-shell panel-shell--details' },
-      h('div', { className: 'panel-shell-heading' }, 'System Intelligence'),
-      h(SystemDetailList)
-    );
-  }
-
-  if (activePanel === 'creator') {
-    return h('section', { className: 'panel-shell panel-shell--details' },
-      h('div', { className: 'panel-shell-heading' }, 'Creator'),
-      h('div', { className: 'detail-grid' },
-        h('div', { className: 'detail-section' },
-          h('h3', null, 'Ticket Generation'),
-          h('p', { className: 'panel-description' }, 'Use the Raise_AF workflow to open tickets before coding.'),
-          h('code', { className: 'mono-block' }, 'python scripts/generate_high_value_tickets.py --count 5'),
-          h('p', { className: 'panel-description' }, 'Or call directly: actifix.raise_af.record_error(...)')
-        ),
-        h('div', { className: 'detail-section' },
-          h('h3', null, 'Self-Improvement'),
-          h('p', { className: 'panel-description' }, 'Bootstrap self-development to have Actifix ticket itself while you build.'),
-          h('code', { className: 'mono-block' }, 'import actifix; actifix.bootstrap_actifix_development()')
-        )
-      )
-    );
-  }
-
-  if (activePanel === 'modules') {
-    return h('section', { className: 'panel-shell panel-shell--details' },
-      h('div', { className: 'panel-shell-heading' }, 'Modules'),
-      h(ModulesBlade)
-    );
-  }
-
-  return h(SystemPulsePanel);
-};
-
-// ============================================================================
-// Dashboard Layout
-// ============================================================================
-
-const DashboardHero = () => {
-  const { data: health } = useFetch('/health', 8000);
-  const { data: system } = useFetch('/system', 12000);
-
-  return h('section', { className: 'dashboard-hero' },
-    h('div', { className: 'hero-intro' },
-      h('span', { className: 'hero-eyebrow' }, 'actiFIX reliability cockpit'),
-      h('h1', { className: 'hero-title' }, 'Live incident control, elevated for 2026'),
-      h('p', { className: 'hero-copy' }, 'A minimalist command center with crisp typography, vivid gradients, and micro-interactions that keep your focus on real-time health, logging, and system intelligence.'),
-      h('div', { className: 'hero-tags' },
-        h('span', { className: 'hero-pill' }, 'Real-time health'),
-        h('span', { className: 'hero-pill' }, 'Audit-ready logging'),
-        h('span', { className: 'hero-pill' }, 'System intelligence')
-      )
-    ),
-    h('div', { className: 'hero-panel' },
-      h('div', { className: 'hero-metric-card' },
-        h('span', { className: 'hero-metric-label' }, 'status'),
-        h('div', {
-          className: 'hero-metric-value',
-          style: { color: getStatusColor(health?.status || 'INFO') }
-        }, health?.status || 'Loading'),
-        h('span', { className: 'hero-metric-sub' }, health?.healthy ? 'System steady' : 'Investigate')
-      ),
-      h('div', { className: 'hero-metric-card' },
-        h('span', { className: 'hero-metric-label' }, 'open tickets'),
-        h('div', { className: 'hero-metric-value' }, health?.metrics?.open_tickets ?? '—'),
-        h('span', { className: 'hero-metric-sub' }, 'tracked by actifix')
-      ),
-      h('div', { className: 'hero-metric-card' },
-        h('span', { className: 'hero-metric-label' }, 'uptime'),
-        h('div', { className: 'hero-metric-value' }, system?.server?.uptime || 'N/A'),
-        h('span', { className: 'hero-metric-sub' }, 'current session')
-      )
-    )
-  );
-};
-
+// Header Component
 const Header = () => {
   const [connected, setConnected] = useState(false);
+  const [time, setTime] = useState(new Date().toLocaleTimeString());
+  const { data: health } = useFetch('/health', 10000);
 
   useEffect(() => {
     const checkConnection = async () => {
@@ -676,48 +180,451 @@ const Header = () => {
     return () => clearInterval(timer);
   }, []);
 
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setTime(new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
   return h('header', { className: 'dashboard-header' },
     h('div', { className: 'header-left' },
       h('img', { src: './assets/pangolin.svg', alt: 'Actifix', className: 'header-logo' }),
       h('div', { className: 'header-title' },
         h('h1', null, 'ACTIFIX'),
-        h('span', { className: 'header-subtitle' }, 'Live error intelligence')
+        h('span', { className: 'header-subtitle' }, 'Live Error Intelligence')
       )
     ),
     h('div', { className: 'header-right' },
+      // Quick stats
+      h('div', { className: 'stat-card', style: { padding: '4px 12px', minWidth: '60px' } },
+        h('div', { className: 'stat-value', style: { fontSize: '16px' } }, health?.metrics?.open_tickets ?? '—'),
+        h('div', { className: 'stat-label', style: { fontSize: '9px' } }, 'OPEN')
+      ),
+      h('div', { className: 'stat-card', style: { padding: '4px 12px', minWidth: '60px' } },
+        h('div', { className: 'stat-value', style: { fontSize: '16px' } }, health?.metrics?.completed_tickets ?? '—'),
+        h('div', { className: 'stat-label', style: { fontSize: '9px' } }, 'DONE')
+      ),
       h('div', { className: `connection-status ${connected ? 'connected' : 'disconnected'}` },
         h('span', { className: 'connection-dot' }),
-        h('span', null, connected ? 'API Connected' : 'API Disconnected')
+        h('span', null, connected ? 'API ' : 'OFF')
       ),
-      h('span', { className: 'header-time' }, new Date().toLocaleTimeString())
+      h(VersionBadge),
+      h('span', { className: 'header-time' }, time)
     )
   );
 };
 
-const App = () => {
-  const [activePanel, setActivePanel] = useState('system');
-  const [time, setTime] = useState(new Date().toLocaleTimeString());
+// Footer Component
+const Footer = () => {
+  return h('footer', { className: 'dashboard-footer' },
+    h('span', null, '© 2026 Actifix - Compact Dashboard'),
+    h('span', null, `Last updated: ${new Date().toLocaleTimeString()}`)
+  );
+};
+
+// Metric Tile Component
+const MetricTile = ({ label, value, subvalue, icon, color, trend }) => {
+  return h('div', { className: 'metric-tile' },
+    h('div', { className: 'metric-tile-header' },
+      h('span', { className: 'metric-tile-label' }, label),
+      icon && h('span', { className: 'metric-tile-icon' }, icon)
+    ),
+    h('div', { className: 'metric-tile-value', style: color ? { color } : {} }, value),
+    subvalue && h('div', { className: 'metric-tile-subvalue' }, subvalue),
+    trend && h('div', { className: 'metric-tile-trend' }, trend)
+  );
+};
+
+// Overview View Component
+const OverviewView = () => {
+  const { data: health, loading: hLoading, error: hError } = useFetch('/health');
+  const { data: system, loading: sLoading, error: sError } = useFetch('/system');
+  const { data: tickets, loading: tLoading, error: tError } = useFetch('/tickets');
+
+  if (hLoading || sLoading) return h(LoadingSpinner);
+  if (hError || sError) return h(ErrorDisplay, { message: hError || sError });
+
+  const metrics = health?.metrics || {};
+  const status = health?.status || 'UNKNOWN';
+
+  return h('div', null,
+    // Stats Grid
+    h('div', { className: 'stats-grid' },
+      h(MetricTile, {
+        label: 'STATUS',
+        value: status,
+        icon: '📡',
+        color: getStatusColor(status),
+        subvalue: health?.healthy ? 'All Systems Go' : 'Issues Detected'
+      }),
+      h(MetricTile, {
+        label: 'OPEN TICKETS',
+        value: metrics.open_tickets ?? 0,
+        icon: '🎫',
+        color: metrics.open_tickets > 0 ? '#f59e0b' : '#10b981',
+        subvalue: `${metrics.completed_tickets ?? 0} completed`
+      }),
+      h(MetricTile, {
+        label: 'SLA BREACHES',
+        value: metrics.sla_breaches ?? 0,
+        icon: '⚡',
+        color: metrics.sla_breaches > 0 ? '#ef4444' : '#10b981',
+        subvalue: metrics.sla_breaches > 0 ? 'Action Required!' : 'All Good'
+      }),
+      h(MetricTile, {
+        label: 'OLDEST TICKET',
+        value: `${metrics.oldest_ticket_age_hours ?? 0}h`,
+        icon: '⏱️',
+        subvalue: 'ticket age'
+      }),
+      h(MetricTile, {
+        label: 'UPTIME',
+        value: system?.server?.uptime?.split(' ')[0] || 'N/A',
+        icon: '⏰',
+        subvalue: system?.server?.uptime || 'N/A'
+      }),
+      h(MetricTile, {
+        label: 'MEMORY',
+        value: system?.resources?.memory ? `${system.resources.memory.percent}%` : 'N/A',
+        icon: '💾',
+        color: system?.resources?.memory?.percent > 80 ? '#ef4444' : '#10b981',
+        subvalue: system?.resources?.memory ? `${system.resources.memory.used_gb}/${system.resources.memory.total_gb} GB` : 'N/A'
+      }),
+      h(MetricTile, {
+        label: 'CPU',
+        value: system?.resources?.cpu_percent !== null ? `${system.resources.cpu_percent}%` : 'N/A',
+        icon: '🔥',
+        color: system?.resources?.cpu_percent > 80 ? '#ef4444' : '#10b981'
+      }),
+      h(MetricTile, {
+        label: 'PLATFORM',
+        value: system?.platform?.system || 'N/A',
+        icon: '🖥️',
+        subvalue: system?.platform?.release || ''
+      })
+    ),
+
+    // Recent Tickets Panel
+    h('div', { className: 'panel' },
+      h('div', { className: 'panel-header' },
+        h('div', { className: 'panel-title' },
+          h('span', { className: 'panel-title-icon' }, '🎫'),
+          'RECENT TICKETS'
+        ),
+        h('div', { className: 'panel-actions' },
+          h('span', { className: 'text-muted', style: { fontSize: '11px' } },
+            `${tickets?.total_open ?? 0} open • ${tickets?.total_completed ?? 0} done`
+          )
+        )
+      ),
+      tickets?.tickets && tickets.tickets.length > 0 ? h('div', { className: 'ticket-list' },
+        tickets.tickets.slice(0, 15).map((ticket, i) =>
+          h('div', { key: ticket.ticket_id || i, className: 'ticket-item' },
+            h('div', { className: 'ticket-item-header' },
+              h('span', {
+                className: `priority-badge ${ticket.priority.toLowerCase()}`
+              }, ticket.priority),
+              h('span', {
+                className: `status-badge ${ticket.status}`
+              }, ticket.status),
+              h('span', { className: 'ticket-id' }, ticket.ticket_id?.slice(0, 12) || 'N/A'),
+              h('span', { className: 'text-dim', style: { fontSize: '10px', marginLeft: 'auto' } },
+                formatRelativeTime(ticket.created)
+              )
+            ),
+            h('div', { className: 'ticket-type' }, ticket.error_type || 'Unknown'),
+            h('div', { className: 'ticket-message' }, ticket.message || ''),
+            h('div', { className: 'ticket-meta' },
+              h('span', null, '📁 ', ticket.source || 'unknown')
+            )
+          )
+        )
+      ) : h('div', { style: { padding: '24px', textAlign: 'center', color: 'var(--text-dim)' } }, 'No tickets found')
+    )
+  );
+};
+
+// Tickets View Component
+const TicketsView = () => {
+  const { data, loading, error } = useFetch('/tickets');
+
+  if (loading) return h(LoadingSpinner);
+  if (error) return h(ErrorDisplay, { message: error });
+
+  const tickets = data?.tickets || [];
+
+  return h('div', { className: 'panel' },
+    h('div', { className: 'panel-header' },
+      h('div', { className: 'panel-title' },
+        h('span', { className: 'panel-title-icon' }, '🎫'),
+        'ALL TICKETS'
+      ),
+      h('div', { className: 'panel-actions' },
+        h('span', { className: 'text-muted', style: { fontSize: '11px' } },
+          `${data?.total_open ?? 0} open • ${data?.total_completed ?? 0} completed`
+        )
+      )
+    ),
+    tickets.length > 0 ? h('div', { className: 'ticket-list' },
+      tickets.map((ticket, i) =>
+        h('div', { key: ticket.ticket_id || i, className: 'ticket-item' },
+          h('div', { className: 'ticket-item-header' },
+            h('span', {
+              className: `priority-badge ${ticket.priority.toLowerCase()}`
+            }, ticket.priority),
+            h('span', {
+              className: `status-badge ${ticket.status}`
+            }, ticket.status),
+            h('span', { className: 'ticket-id' }, ticket.ticket_id?.slice(0, 12) || 'N/A'),
+            h('span', { className: 'text-dim', style: { fontSize: '10px', marginLeft: 'auto' } },
+              formatRelativeTime(ticket.created)
+            )
+          ),
+          h('div', { className: 'ticket-type' }, ticket.error_type || 'Unknown'),
+          h('div', { className: 'ticket-message' }, ticket.message || ''),
+          h('div', { className: 'ticket-meta' },
+            h('span', null, '📁 ', ticket.source || 'unknown'),
+            h('span', null, '🏷️ ', ticket.created ? formatTime(ticket.created) : 'N/A')
+          )
+        )
+      )
+    ) : h('div', { style: { padding: '24px', textAlign: 'center', color: 'var(--text-dim)' } }, 'No tickets found')
+  );
+};
+
+// Logs View Component
+const LogsView = () => {
+  const [logType, setLogType] = useState('audit');
+  const [autoScroll, setAutoScroll] = useState(true);
+  const [filter, setFilter] = useState('');
+  const logContainerRef = useRef(null);
+
+  const { data, loading, error } = useFetch(`/logs?type=${logType}&lines=300`, LOG_REFRESH_INTERVAL);
 
   useEffect(() => {
-    const timer = setInterval(() => {
-      setTime(new Date().toLocaleTimeString());
-    }, 1000);
-    return () => clearInterval(timer);
-  }, []);
+    if (autoScroll && logContainerRef.current) {
+      logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
+    }
+  }, [data, autoScroll]);
 
-  return h('div', { className: 'dashboard' },
-    h(Header),
-    h('main', { className: 'dashboard-content' },
-      h(ControlPanel, { activePanel, onSelect: setActivePanel }),
-      h(DashboardHero),
-      h(PanelContent, { activePanel })
+  const logTypes = [
+    { id: 'audit', label: 'Audit' },
+    { id: 'errors', label: 'Errors' },
+    { id: 'list', label: 'List' },
+    { id: 'setup', label: 'Setup' },
+  ];
+
+  const filteredLogs = data?.content?.filter(log => {
+    if (!filter) return true;
+    return log.text.toLowerCase().includes(filter.toLowerCase());
+  }) || [];
+
+  return h('div', { className: 'panel' },
+    h('div', { className: 'panel-header' },
+      h('div', { className: 'panel-title' },
+        h('span', { className: 'panel-title-icon' }, '📜'),
+        'LIVE LOGS'
+      )
     ),
-    h('footer', { className: 'dashboard-footer' },
-      h('span', null, '© 2026 Actifix'),
-      h('span', null, `Last updated: ${time}`)
+    h('div', { className: 'log-controls' },
+      h('div', { className: 'log-tabs' },
+        logTypes.map(type =>
+          h('button', {
+            key: type.id,
+            className: `log-tab ${logType === type.id ? 'active' : ''}`,
+            onClick: () => setLogType(type.id)
+          }, type.label)
+        )
+      ),
+      h('div', { style: { display: 'flex', gap: '8px', alignItems: 'center' } },
+        h('input', {
+          type: 'text',
+          className: 'log-filter',
+          placeholder: 'Filter logs...',
+          value: filter,
+          onChange: (e) => setFilter(e.target.value)
+        }),
+        h('button', {
+          className: `btn ${autoScroll ? 'btn-primary' : ''}`,
+          onClick: () => setAutoScroll(!autoScroll),
+          title: autoScroll ? 'Auto-scroll ON' : 'Auto-scroll OFF'
+        }, autoScroll ? '▼' : '▽'),
+        h('span', { className: 'text-dim', style: { fontSize: '10px' } },
+          `${filteredLogs.length}/${data?.total_lines || 0}`
+        )
+      )
+    ),
+    loading && !data ? h(LoadingSpinner) :
+    error ? h(ErrorDisplay, { message: error }) :
+    h('div', { className: 'log-container', ref: logContainerRef },
+      filteredLogs.length > 0 ? filteredLogs.map((log, i) =>
+        h('div', {
+          key: i,
+          className: `log-line log-${log.level.toLowerCase()}`
+        },
+          h('span', { className: 'log-level-indicator' }),
+          h('span', { className: 'log-text' }, log.text)
+        )
+      ) : h('div', { style: { padding: '24px', textAlign: 'center', color: 'var(--text-dim)' } }, 'No log entries')
     )
   );
 };
 
+// System View Component
+const SystemView = () => {
+  const { data, loading, error } = useFetch('/system');
+
+  if (loading) return h(LoadingSpinner);
+  if (error) return h(ErrorDisplay, { message: error });
+
+  const platform = data?.platform || {};
+  const project = data?.project || {};
+  const server = data?.server || {};
+  const resources = data?.resources || {};
+
+  return h('div', null,
+    h('div', { className: 'stats-grid' },
+      h(MetricTile, {
+        label: 'PYTHON',
+        value: platform.python_version?.split('.').slice(0, 2).join('.') || 'N/A',
+        icon: '🐍',
+        subvalue: platform.python_version || 'N/A'
+      }),
+      h(MetricTile, {
+        label: 'SYSTEM',
+        value: platform.system || 'N/A',
+        icon: '💻',
+        subvalue: platform.release || ''
+      }),
+      h(MetricTile, {
+        label: 'MACHINE',
+        value: platform.machine || 'N/A',
+        icon: '⚙️'
+      }),
+      h(MetricTile, {
+        label: 'UPTIME',
+        value: server.uptime?.split(' ')[0] || 'N/A',
+        icon: '⏰',
+        subvalue: server.uptime || ''
+      }),
+      h(MetricTile, {
+        label: 'MEMORY',
+        value: resources.memory ? `${resources.memory.percent}%` : 'N/A',
+        icon: '💾',
+        color: resources.memory?.percent > 80 ? '#ef4444' : '#10b981',
+        subvalue: resources.memory ? `${resources.memory.used_gb}/${resources.memory.total_gb} GB` : ''
+      }),
+      h(MetricTile, {
+        label: 'CPU',
+        value: resources.cpu_percent !== null ? `${resources.cpu_percent}%` : 'N/A',
+        icon: '🔥',
+        color: resources.cpu_percent > 80 ? '#ef4444' : '#10b981'
+      })
+    ),
+    
+    h('div', { className: 'panel' },
+      h('div', { className: 'panel-header' },
+        h('div', { className: 'panel-title' },
+          h('span', { className: 'panel-title-icon' }, '📋'),
+          'SYSTEM DETAILS'
+        )
+      ),
+      h('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' } },
+        h('div', null,
+          h('div', { className: 'stat-label', style: { marginBottom: '4px' } }, 'PROJECT ROOT'),
+          h('div', { className: 'mono', style: { fontSize: '11px', color: 'var(--text-muted)', wordBreak: 'break-all' } }, project.root || 'N/A')
+        ),
+        h('div', null,
+          h('div', { className: 'stat-label', style: { marginBottom: '4px' } }, 'ACTIFIX DIR'),
+          h('div', { className: 'mono', style: { fontSize: '11px', color: 'var(--text-muted)', wordBreak: 'break-all' } }, project.actifix_dir || 'N/A')
+        ),
+        h('div', null,
+          h('div', { className: 'stat-label', style: { marginBottom: '4px' } }, 'SERVER START'),
+          h('div', { className: 'mono', style: { fontSize: '11px', color: 'var(--text-muted)' } }, server.start_time ? formatTime(server.start_time) : 'N/A')
+        ),
+        h('div', null,
+          h('div', { className: 'stat-label', style: { marginBottom: '4px' } }, 'SNAPSHOT'),
+          h('div', { className: 'mono', style: { fontSize: '11px', color: 'var(--text-muted)' } }, data?.timestamp ? formatTime(data.timestamp) : 'N/A')
+        )
+      )
+    )
+  );
+};
+
+// Modules View Component
+const ModulesView = () => {
+  const { data, loading, error } = useFetch('/modules', 15000);
+
+  if (loading) return h(LoadingSpinner);
+  if (error) return h(ErrorDisplay, { message: error });
+
+  const systemModules = data?.system || [];
+  const userModules = data?.user || [];
+
+  const renderModuleGroup = (title, modules, icon) => (
+    h('div', { className: 'panel' },
+      h('div', { className: 'panel-header' },
+        h('div', { className: 'panel-title' },
+          h('span', { className: 'panel-title-icon' }, icon),
+          title
+        ),
+        h('span', { className: 'text-muted', style: { fontSize: '11px' } }, `${modules.length} modules`)
+      ),
+      modules.length === 0 ?
+        h('div', { style: { padding: '24px', textAlign: 'center', color: 'var(--text-dim)' } }, 'No modules') :
+        h('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '12px' } },
+          modules.map((m, idx) =>
+            h('div', {
+              key: `${title}-${idx}`,
+              style: {
+                background: 'var(--bg-secondary)',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius-md)',
+                padding: '12px'
+              }
+            },
+              h('div', { style: { fontWeight: 600, marginBottom: '4px', fontSize: '12px' } }, m.name || 'unknown'),
+              h('div', { style: { fontSize: '10px', color: 'var(--text-dim)', marginBottom: '4px' } },
+                `${m.domain || '—'} • ${m.owner || '—'}`
+              ),
+              m.summary && h('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginTop: '8px' } }, m.summary)
+            )
+          )
+        )
+    )
+  );
+
+  return h('div', null,
+    renderModuleGroup('SYSTEM MODULES', systemModules, '⚙️'),
+    renderModuleGroup('USER MODULES', userModules, '👤')
+  );
+};
+
+// Main App Component
+const App = () => {
+  const [activeView, setActiveView] = useState('overview');
+
+  const renderView = () => {
+    switch (activeView) {
+      case 'tickets': return h(TicketsView);
+      case 'logs': return h(LogsView);
+      case 'system': return h(SystemView);
+      case 'modules': return h(ModulesView);
+      default: return h(OverviewView);
+    }
+  };
+
+  return h('div', { className: 'dashboard' },
+    h(NavigationRail, { activeView, onViewChange: setActiveView }),
+    h(Header),
+    h('main', { className: 'dashboard-content' },
+      renderView()
+    ),
+    h(Footer)
+  );
+};
+
+// Render App
 const rootEl = document.getElementById('root');
 ReactDOM.createRoot(rootEl).render(h(App));

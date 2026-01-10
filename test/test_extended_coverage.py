@@ -5,35 +5,100 @@ This file contains 130 tests to complete the 200-test coverage goal.
 """
 
 import hashlib
-import tempfile
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
-from unittest.mock import patch, MagicMock, mock_open
+from unittest.mock import patch, MagicMock
 import pytest
 
-from actifix.log_utils import atomic_write, log_event, trim_to_line_boundary
-from actifix.do_af import get_ticket_stats
-from actifix.state_paths import get_actifix_paths, ensure_actifix_dirs
+from actifix.log_utils import (
+    atomic_write as log_atomic_write,
+    log_event,
+    trim_to_line_boundary,
+    append_with_guard,
+    idempotent_append as log_idempotent_append,
+)
+from actifix.do_af import (
+    get_ticket_stats,
+    parse_ticket_block,
+    get_open_tickets,
+    mark_ticket_complete,
+    process_next_ticket,
+    process_tickets,
+)
+from actifix.state_paths import get_actifix_paths, ensure_actifix_dirs, init_actifix_files
+from actifix.persistence.atomic import (
+    atomic_write as atomic_write_atomic,
+    atomic_write_bytes,
+    atomic_append,
+    atomic_update,
+    idempotent_append as atomic_idempotent_append,
+    safe_read,
+    safe_read_bytes,
+)
+from actifix.persistence.storage import (
+    FileStorageBackend,
+    MemoryStorageBackend,
+    StorageError,
+    StorageNotFoundError,
+)
+from actifix.persistence.paths import (
+    configure_storage_paths,
+    StoragePaths,
+    reset_storage_paths,
+    get_storage_paths,
+)
 
-try:
-    from actifix.persistence.storage import FileStorage, MemoryStorage, StorageError
-except ImportError:
-    FileStorage = None
-    MemoryStorage = None
-    StorageError = Exception
 
-try:
-    from actifix.persistence.paths import resolve_path, ensure_directory, validate_path
-except ImportError:
-    resolve_path = lambda x: x
-    ensure_directory = lambda x: None
-    validate_path = lambda x: True
+def build_ticket_block(
+    ticket_id: str,
+    priority: str = "P1",
+    error_type: str = "TestError",
+    message: str = "Something happened",
+    status: str = "Open",
+    completed: bool = False,
+) -> str:
+    checklist = [
+        "- [x] Documented" if completed else "- [ ] Documented",
+        "- [x] Functioning" if completed else "- [ ] Functioning",
+        "- [x] Tested" if completed else "- [ ] Tested",
+        "- [x] Completed" if completed else "- [ ] Completed",
+    ]
+    return "\n".join(
+        [
+            f"### {ticket_id} - [{priority}] {error_type}: {message}",
+            f"- **Priority**: {priority}",
+            f"- **Error Type**: {error_type}",
+            "- **Source**: `test.py:1`",
+            "- **Run**: test-run",
+            "- **Created**: 2026-01-01T00:00:00Z",
+            "- **Duplicate Guard**: `guard`",
+            f"- **Status**: {status}",
+            "",
+            "**Checklist:**",
+            "",
+            *checklist,
+            "",
+        ]
+    )
 
-def parse_ticket_block(block):
-    """Stub parse function for testing."""
-    if not block or not block.strip():
-        return None
-    return {"id": "ACT-001"} if "ACT-" in block else None
+
+def write_ticket_list(paths, active_blocks, completed_blocks=None):
+    completed_blocks = completed_blocks or []
+    content = "\n".join(
+        [
+            "# Actifix Ticket List",
+            "",
+            "## Active Items",
+            "",
+            *active_blocks,
+            "",
+            "## Completed Items",
+            "",
+            *completed_blocks,
+            "",
+        ]
+    )
+    paths.list_file.write_text(content)
 
 
 # ===== BATCH 5: Atomic Operations Tests (20 tests) =====
@@ -44,7 +109,7 @@ class TestAtomicWrite:
     def test_atomic_write_basic(self, tmp_path):
         """Test basic atomic write."""
         file_path = tmp_path / "test.txt"
-        atomic_write(file_path, "Test content")
+        atomic_write_atomic(file_path, "Test content")
         
         assert file_path.read_text() == "Test content"
     
@@ -53,21 +118,21 @@ class TestAtomicWrite:
         file_path = tmp_path / "test.txt"
         file_path.write_text("Old content")
         
-        atomic_write(file_path, "New content")
+        atomic_write_atomic(file_path, "New content")
         
         assert file_path.read_text() == "New content"
     
     def test_atomic_write_creates_directory(self, tmp_path):
         """Test atomic write creates parent directories."""
         file_path = tmp_path / "subdir" / "test.txt"
-        atomic_write(file_path, "Content")
+        atomic_write_atomic(file_path, "Content")
         
         assert file_path.exists()
     
     def test_atomic_write_empty_content(self, tmp_path):
         """Test atomic write with empty content."""
         file_path = tmp_path / "empty.txt"
-        atomic_write(file_path, "")
+        atomic_write_atomic(file_path, "")
         
         assert file_path.read_text() == ""
     
@@ -75,21 +140,21 @@ class TestAtomicWrite:
         """Test atomic write with large content."""
         file_path = tmp_path / "large.txt"
         large_content = "x" * 1000000
-        atomic_write(file_path, large_content)
+        atomic_write_atomic(file_path, large_content)
         
         assert len(file_path.read_text()) == 1000000
     
     def test_atomic_write_unicode(self, tmp_path):
         """Test atomic write with unicode."""
         file_path = tmp_path / "unicode.txt"
-        atomic_write(file_path, "Unicode: 测试 ™ ©")
+        atomic_write_atomic(file_path, "Unicode: 测试 ™ ©")
         
         assert "测试" in file_path.read_text()
     
     def test_atomic_write_permissions(self, tmp_path):
         """Test atomic write preserves permissions."""
         file_path = tmp_path / "perms.txt"
-        atomic_write(file_path, "Test")
+        atomic_write_atomic(file_path, "Test")
         
         assert file_path.exists()
     
@@ -98,7 +163,7 @@ class TestAtomicWrite:
         file_path = tmp_path / "concurrent.txt"
         
         for i in range(10):
-            atomic_write(file_path, f"Write {i}")
+            atomic_write_atomic(file_path, f"Write {i}")
         
         # Should have last write
         assert "Write 9" in file_path.read_text()
@@ -109,13 +174,69 @@ class TestAtomicWrite:
         
         # Write should be all-or-nothing
         try:
-            atomic_write(file_path, "Complete content")
+            atomic_write_atomic(file_path, "Complete content")
         except:
             pass
         
         if file_path.exists():
             content = file_path.read_text()
             assert content == "Complete content"
+
+
+class TestAtomicHelpers:
+    """Test additional atomic helpers."""
+
+    def test_atomic_write_bytes(self, tmp_path):
+        """Test atomic byte writes."""
+        file_path = tmp_path / "bytes.bin"
+        atomic_write_bytes(file_path, b"payload")
+
+        assert file_path.read_bytes() == b"payload"
+
+    def test_atomic_append_with_trim(self, tmp_path):
+        """Test atomic append trimming."""
+        file_path = tmp_path / "append.txt"
+        file_path.write_text("line1\nline2\n")
+
+        atomic_append(file_path, "line3\n", max_size_bytes=10)
+
+        content = file_path.read_text()
+        assert "line3" in content
+
+    def test_atomic_update_creates(self, tmp_path):
+        """Test atomic update creates file."""
+        file_path = tmp_path / "update.txt"
+
+        atomic_update(file_path, lambda current: current + "value")
+
+        assert file_path.read_text() == "value"
+
+    def test_atomic_update_missing_raises(self, tmp_path):
+        """Test atomic update missing file raises."""
+        file_path = tmp_path / "missing.txt"
+
+        with pytest.raises(FileNotFoundError):
+            atomic_update(file_path, lambda current: current, create_if_missing=False)
+
+    def test_atomic_idempotent_append(self, tmp_path):
+        """Test atomic idempotent append."""
+        file_path = tmp_path / "idempotent.txt"
+        entry_key = "key"
+        first = atomic_idempotent_append(file_path, f"{entry_key} line\n", entry_key)
+        second = atomic_idempotent_append(file_path, f"{entry_key} line\n", entry_key)
+
+        assert first is True
+        assert second is False
+
+    def test_safe_read_defaults(self, tmp_path):
+        """Test safe_read defaults when missing."""
+        file_path = tmp_path / "missing.txt"
+        assert safe_read(file_path, default="fallback") == "fallback"
+
+    def test_safe_read_bytes_defaults(self, tmp_path):
+        """Test safe_read_bytes defaults when missing."""
+        file_path = tmp_path / "missing.bin"
+        assert safe_read_bytes(file_path, default=b"fallback") == b"fallback"
 
 
 # ===== BATCH 6: Storage Layer Tests (20 tests) =====
@@ -125,7 +246,7 @@ class TestFileStorage:
     
     def test_file_storage_write_read(self, tmp_path):
         """Test write and read operations."""
-        storage = FileStorage(tmp_path)
+        storage = FileStorageBackend(tmp_path)
         
         storage.write("key1", "content1")
         result = storage.read("key1")
@@ -134,7 +255,7 @@ class TestFileStorage:
     
     def test_file_storage_exists(self, tmp_path):
         """Test exists check."""
-        storage = FileStorage(tmp_path)
+        storage = FileStorageBackend(tmp_path)
         
         storage.write("key1", "content")
         
@@ -143,7 +264,7 @@ class TestFileStorage:
     
     def test_file_storage_delete(self, tmp_path):
         """Test delete operation."""
-        storage = FileStorage(tmp_path)
+        storage = FileStorageBackend(tmp_path)
         
         storage.write("key1", "content")
         result = storage.delete("key1")
@@ -153,7 +274,7 @@ class TestFileStorage:
     
     def test_file_storage_list_keys(self, tmp_path):
         """Test listing keys."""
-        storage = FileStorage(tmp_path)
+        storage = FileStorageBackend(tmp_path)
         
         storage.write("key1", "content1")
         storage.write("key2", "content2")
@@ -165,7 +286,7 @@ class TestFileStorage:
     
     def test_file_storage_nested_keys(self, tmp_path):
         """Test nested key paths."""
-        storage = FileStorage(tmp_path)
+        storage = FileStorageBackend(tmp_path)
         
         storage.write("dir/key1", "content")
         
@@ -173,7 +294,7 @@ class TestFileStorage:
     
     def test_file_storage_overwrite(self, tmp_path):
         """Test overwriting existing key."""
-        storage = FileStorage(tmp_path)
+        storage = FileStorageBackend(tmp_path)
         
         storage.write("key1", "old")
         storage.write("key1", "new")
@@ -182,7 +303,7 @@ class TestFileStorage:
     
     def test_file_storage_empty_value(self, tmp_path):
         """Test storing empty value."""
-        storage = FileStorage(tmp_path)
+        storage = FileStorageBackend(tmp_path)
         
         storage.write("empty", "")
         
@@ -190,7 +311,7 @@ class TestFileStorage:
     
     def test_file_storage_special_characters(self, tmp_path):
         """Test keys with special characters."""
-        storage = FileStorage(tmp_path)
+        storage = FileStorageBackend(tmp_path)
         
         storage.write("key-with_special.chars", "content")
         
@@ -198,14 +319,14 @@ class TestFileStorage:
     
     def test_file_storage_read_missing_raises(self, tmp_path):
         """Test reading missing key raises error."""
-        storage = FileStorage(tmp_path)
+        storage = FileStorageBackend(tmp_path)
         
-        with pytest.raises(StorageError):
+        with pytest.raises(StorageNotFoundError):
             storage.read("missing")
     
     def test_file_storage_delete_missing_returns_false(self, tmp_path):
         """Test deleting missing key returns False."""
-        storage = FileStorage(tmp_path)
+        storage = FileStorageBackend(tmp_path)
         
         result = storage.delete("missing")
         
@@ -217,7 +338,7 @@ class TestMemoryStorage:
     
     def test_memory_storage_write_read(self):
         """Test write and read operations."""
-        storage = MemoryStorage()
+        storage = MemoryStorageBackend()
         
         storage.write("key1", "content1")
         result = storage.read("key1")
@@ -226,16 +347,16 @@ class TestMemoryStorage:
     
     def test_memory_storage_volatile(self):
         """Test memory storage is volatile."""
-        storage1 = MemoryStorage()
+        storage1 = MemoryStorageBackend()
         storage1.write("key1", "content")
         
-        storage2 = MemoryStorage()
+        storage2 = MemoryStorageBackend()
         
         assert not storage2.exists("key1")
     
     def test_memory_storage_delete(self):
         """Test delete operation."""
-        storage = MemoryStorage()
+        storage = MemoryStorageBackend()
         
         storage.write("key1", "content")
         storage.delete("key1")
@@ -244,7 +365,7 @@ class TestMemoryStorage:
     
     def test_memory_storage_list_keys(self):
         """Test listing keys."""
-        storage = MemoryStorage()
+        storage = MemoryStorageBackend()
         
         storage.write("key1", "c1")
         storage.write("key2", "c2")
@@ -255,7 +376,7 @@ class TestMemoryStorage:
     
     def test_memory_storage_large_content(self):
         """Test storing large content."""
-        storage = MemoryStorage()
+        storage = MemoryStorageBackend()
         
         large = "x" * 1000000
         storage.write("large", large)
@@ -264,7 +385,7 @@ class TestMemoryStorage:
     
     def test_memory_storage_concurrent_access(self):
         """Test concurrent access patterns."""
-        storage = MemoryStorage()
+        storage = MemoryStorageBackend()
         
         for i in range(100):
             storage.write(f"key{i}", f"value{i}")
@@ -273,7 +394,7 @@ class TestMemoryStorage:
     
     def test_memory_storage_overwrite(self):
         """Test overwriting values."""
-        storage = MemoryStorage()
+        storage = MemoryStorageBackend()
         
         storage.write("key", "old")
         storage.write("key", "new")
@@ -282,14 +403,14 @@ class TestMemoryStorage:
     
     def test_memory_storage_empty_initially(self):
         """Test storage is empty on creation."""
-        storage = MemoryStorage()
+        storage = MemoryStorageBackend()
         
         assert len(storage.list_keys()) == 0
     
     def test_memory_storage_independence(self):
         """Test storage instances are independent."""
-        storage1 = MemoryStorage()
-        storage2 = MemoryStorage()
+        storage1 = MemoryStorageBackend()
+        storage2 = MemoryStorageBackend()
         
         storage1.write("key", "value1")
         storage2.write("key", "value2")
@@ -298,7 +419,7 @@ class TestMemoryStorage:
     
     def test_memory_storage_unicode(self):
         """Test unicode support."""
-        storage = MemoryStorage()
+        storage = MemoryStorageBackend()
         
         storage.write("key", "测试中文")
         
@@ -310,23 +431,27 @@ class TestMemoryStorage:
 class TestDoAFStats:
     """Test DoAF statistics."""
     
-    def test_get_ticket_stats_default(self):
+    def test_get_ticket_stats_default(self, tmp_path):
         """Test getting default stats."""
-        with patch('actifix.do_af.load_list_file') as mock_load:
-            mock_load.return_value = []
-            
-            stats = get_ticket_stats()
-            
-            assert stats['total'] == 0
-            assert stats['open'] == 0
+        paths = get_actifix_paths(project_root=tmp_path)
+        init_actifix_files(paths)
+        paths.list_file.write_text("# Actifix Ticket List\n\n## Active Items\n\n## Completed Items\n")
+
+        stats = get_ticket_stats(paths=paths, use_cache=False)
+
+        assert stats["total"] == 0
+        assert stats["open"] == 0
     
     def test_parse_ticket_block_valid(self):
         """Test parsing valid ticket block."""
-        block = """### ACT-001
-**Priority**: P1
-**Error Type**: TestError
-**Source**: test.py:10
-**Status**: Open
+        block = """### ACT-20260101-ABCDEF - [P1] TestError: Something broke
+- **Priority**: P1
+- **Error Type**: TestError
+- **Source**: `test.py:10`
+- **Run**: test-run
+- **Created**: 2026-01-01T00:00:00Z
+- **Duplicate Guard**: `guard`
+- **Status**: Open
 """
         
         ticket = parse_ticket_block(block)
@@ -335,37 +460,43 @@ class TestDoAFStats:
     
     def test_parse_ticket_block_extracts_id(self):
         """Test extracting ticket ID."""
-        block = "### ACT-123\n**Priority**: P1"
+        block = "### ACT-20260101-ABCDEF - [P1] Error: msg\n- **Priority**: P1"
         
         ticket = parse_ticket_block(block)
         
         assert ticket is not None
+        assert ticket.ticket_id == "ACT-20260101-ABCDEF"
     
     def test_parse_ticket_block_extracts_priority(self):
         """Test extracting priority."""
-        block = "### ACT-001\n**Priority**: P2"
+        block = "### ACT-20260101-ABCDEF - [P2] Error: msg\n- **Priority**: P2"
         
         ticket = parse_ticket_block(block)
         
         assert ticket is not None
+        assert ticket.priority == "P2"
     
     def test_parse_ticket_block_extracts_status(self):
         """Test extracting status."""
-        block = "### ACT-001\n**Status**: Completed"
+        block = "### ACT-20260101-ABCDEF - [P1] Error: msg\n- **Status**: Completed"
         
         ticket = parse_ticket_block(block)
         
         assert ticket is not None
+        assert ticket.status == "Completed"
     
     def test_parse_ticket_block_handles_multiline(self):
         """Test parsing multiline content."""
-        block = """### ACT-001
-**Priority**: P1
-**Error Type**: TestError
+        block = """### ACT-20260101-ABCDEF - [P1] TestError: Line 1
+- **Priority**: P1
+- **Error Type**: TestError
+- **Source**: `test.py:10`
+- **Run**: test-run
+- **Created**: 2026-01-01T00:00:00Z
+- **Duplicate Guard**: `guard`
 **Message**: Line 1
 Line 2
 Line 3
-**Source**: test.py:10
 """
         
         ticket = parse_ticket_block(block)
@@ -376,8 +507,7 @@ Line 3
         """Test parsing empty block."""
         ticket = parse_ticket_block("")
         
-        # Should handle gracefully
-        assert ticket is None or ticket is not None
+        assert ticket is None
     
     def test_parse_ticket_block_malformed(self):
         """Test parsing malformed block."""
@@ -385,94 +515,137 @@ Line 3
         
         ticket = parse_ticket_block(block)
         
-        # Should handle gracefully
-        assert ticket is None or ticket is not None
+        assert ticket is None
     
     def test_parse_ticket_block_missing_fields(self):
         """Test parsing with missing required fields."""
-        block = "### ACT-001"
+        block = "### ACT-20260101-ABCDEF"
         
         ticket = parse_ticket_block(block)
         
-        assert ticket is None or ticket is not None
+        assert ticket is not None
     
     def test_parse_ticket_block_extra_fields(self):
         """Test parsing with extra fields."""
-        block = """### ACT-001
-**Priority**: P1
-**Error Type**: Test
-**Source**: test.py:1
-**Custom**: Value
+        block = """### ACT-20260101-ABCDEF - [P1] Test: Extra
+- **Priority**: P1
+- **Error Type**: Test
+- **Source**: `test.py:1`
+- **Run**: test-run
+- **Created**: 2026-01-01T00:00:00Z
+- **Duplicate Guard**: `guard`
+- **Custom**: Value
 """
         
         ticket = parse_ticket_block(block)
         
-        assert ticket is not None or ticket is None
+        assert ticket is not None
 
 
 class TestDoAFProcessing:
     """Test DoAF ticket processing."""
     
-    def test_process_ticket_updates_status(self):
+    def test_process_ticket_updates_status(self, tmp_path):
         """Test processing updates ticket status."""
-        # Mock test
-        assert True
-    
-    def test_process_ticket_logs_event(self):
+        paths = get_actifix_paths(project_root=tmp_path)
+        init_actifix_files(paths)
+        ticket_id = "ACT-20260101-AAA111"
+        write_ticket_list(paths, [build_ticket_block(ticket_id, priority="P1")])
+
+        processed = process_next_ticket(lambda ticket: True, paths)
+
+        assert processed is not None
+        content = paths.list_file.read_text()
+        assert "[x] Completed" in content
+        assert ticket_id in content
+
+    def test_process_ticket_logs_event(self, tmp_path):
         """Test processing logs event."""
-        assert True
-    
-    def test_process_ticket_handles_errors(self):
+        paths = get_actifix_paths(project_root=tmp_path)
+        init_actifix_files(paths)
+        ticket_id = "ACT-20260101-AAA112"
+        write_ticket_list(paths, [build_ticket_block(ticket_id, priority="P1")])
+
+        process_next_ticket(lambda ticket: True, paths)
+
+        log_content = paths.aflog_file.read_text()
+        assert "DISPATCH_STARTED" in log_content
+        assert "DISPATCH_SUCCESS" in log_content
+        assert "TICKET_COMPLETED" in log_content
+
+    def test_process_ticket_handles_errors(self, tmp_path):
         """Test processing handles errors gracefully."""
-        assert True
-    
-    def test_process_ticket_respects_priority(self):
+        paths = get_actifix_paths(project_root=tmp_path)
+        init_actifix_files(paths)
+        ticket_id = "ACT-20260101-AAA113"
+        write_ticket_list(paths, [build_ticket_block(ticket_id, priority="P1")])
+
+        def handler(_ticket):
+            raise ValueError("boom")
+
+        process_next_ticket(handler, paths)
+
+        log_content = paths.aflog_file.read_text()
+        assert "DISPATCH_FAILED" in log_content
+        assert "[x] Completed" not in paths.list_file.read_text()
+
+    def test_process_ticket_respects_priority(self, tmp_path):
         """Test processing respects priority order."""
-        assert True
-    
-    def test_process_ticket_batch_processing(self):
+        paths = get_actifix_paths(project_root=tmp_path)
+        init_actifix_files(paths)
+        high = build_ticket_block("ACT-20260101-AAA114", priority="P0")
+        low = build_ticket_block("ACT-20260101-AAA115", priority="P2")
+        write_ticket_list(paths, [low, high])
+
+        processed = process_next_ticket(lambda ticket: False, paths)
+
+        assert processed is not None
+        assert processed.priority == "P0"
+
+    def test_process_ticket_batch_processing(self, tmp_path):
         """Test batch processing."""
-        assert True
-    
-    def test_process_ticket_rate_limiting(self):
-        """Test rate limiting."""
-        assert True
-    
-    def test_process_ticket_retry_logic(self):
-        """Test retry on failure."""
-        assert True
-    
-    def test_process_ticket_dead_letter_queue(self):
-        """Test dead letter queue for failed tickets."""
-        assert True
-    
-    def test_process_ticket_metrics(self):
-        """Test metrics collection."""
-        assert True
-    
-    def test_process_ticket_concurrent_safe(self):
-        """Test concurrent processing safety."""
-        assert True
-    
-    def test_process_ticket_idempotency(self):
-        """Test idempotent processing."""
-        assert True
-    
-    def test_process_ticket_validation(self):
-        """Test ticket validation before processing."""
-        assert True
-    
-    def test_process_ticket_cleanup(self):
-        """Test cleanup after processing."""
-        assert True
-    
-    def test_process_ticket_persistence(self):
-        """Test persistence of processing state."""
-        assert True
-    
-    def test_process_ticket_rollback(self):
-        """Test rollback on error."""
-        assert True
+        paths = get_actifix_paths(project_root=tmp_path)
+        init_actifix_files(paths)
+        ticket_a = build_ticket_block("ACT-20260101-AAA116", priority="P2")
+        ticket_b = build_ticket_block("ACT-20260101-AAA117", priority="P3")
+        write_ticket_list(paths, [ticket_a, ticket_b])
+
+        processed = process_tickets(max_tickets=2, ai_handler=lambda ticket: True, paths=paths)
+
+        assert len(processed) == 2
+        content = paths.list_file.read_text()
+        assert content.count("[x] Completed") == 2
+
+    def test_process_ticket_no_tickets(self, tmp_path):
+        """Test no tickets returns None."""
+        paths = get_actifix_paths(project_root=tmp_path)
+        init_actifix_files(paths)
+        write_ticket_list(paths, [])
+
+        processed = process_next_ticket(lambda ticket: True, paths)
+
+        assert processed is None
+        assert "NO_TICKETS" in paths.aflog_file.read_text()
+
+    def test_process_ticket_mark_complete_summary(self, tmp_path):
+        """Test completion summary is added."""
+        paths = get_actifix_paths(project_root=tmp_path)
+        init_actifix_files(paths)
+        ticket_id = "ACT-20260101-AAA118"
+        write_ticket_list(paths, [build_ticket_block(ticket_id, priority="P2")])
+
+        assert mark_ticket_complete(ticket_id, summary="Done", paths=paths) is True
+        assert "Summary: Done" in paths.list_file.read_text()
+
+    def test_process_ticket_idempotency(self, tmp_path):
+        """Test idempotent completion."""
+        paths = get_actifix_paths(project_root=tmp_path)
+        init_actifix_files(paths)
+        ticket_id = "ACT-20260101-AAA119"
+        write_ticket_list(paths, [build_ticket_block(ticket_id, priority="P2")])
+
+        assert mark_ticket_complete(ticket_id, summary="Done", paths=paths) is True
+        assert mark_ticket_complete(ticket_id, summary="Done again", paths=paths) is False
 
 
 # ===== BATCH 8: Log Utils Tests (15 tests) =====
@@ -525,6 +698,27 @@ class TestLogUtils:
         content = log_file.read_text()
         assert "First" in content
         assert "Second" in content
+
+    def test_append_with_guard_trims(self, tmp_path):
+        """Test append_with_guard trims oversized content."""
+        log_file = tmp_path / "trim.log"
+        log_file.write_text("line1\nline2\nline3\n")
+
+        append_with_guard(log_file, "line4\n", max_size_bytes=10)
+
+        content = log_file.read_text()
+        assert content.endswith("\n")
+        assert "line4" in content
+
+    def test_idempotent_append_skips_duplicates(self, tmp_path):
+        """Test idempotent append skips duplicate entries."""
+        log_file = tmp_path / "idempotent.log"
+        entry_key = "key1"
+        first = log_idempotent_append(log_file, f"{entry_key} line1\n", entry_key)
+        second = log_idempotent_append(log_file, f"{entry_key} line1\n", entry_key)
+
+        assert first is True
+        assert second is False
     
     def test_log_event_extra_data(self, tmp_path):
         """Test log event with extra data."""
@@ -606,11 +800,8 @@ class TestLogUtils:
     
     def test_log_error_handling(self, tmp_path):
         """Test log handles write errors gracefully."""
-        # Should not raise even if write fails
-        log_event(Path("/nonexistent/path.log"), "EVENT", "Message")
-        
-        # Test passes if no exception raised
-        assert True
+        with pytest.raises(OSError):
+            log_event(Path("/nonexistent/path.log"), "EVENT", "Message")
 
 
 # ===== BATCH 9: Path Management Tests (15 tests) =====
@@ -618,121 +809,67 @@ class TestLogUtils:
 class TestPathManagement:
     """Test path management utilities."""
     
-    def test_get_actifix_paths_default(self, tmp_path, monkeypatch):
-        """Test get paths with default root."""
-        monkeypatch.chdir(tmp_path)
-        
-        paths = get_actifix_paths()
-        
-        assert paths.base_dir == tmp_path / ".actifix"
-    
-    def test_get_actifix_paths_custom_root(self, tmp_path):
-        """Test get paths with custom root."""
-        paths = get_actifix_paths(project_root=tmp_path)
-        
-        assert paths.base_dir == tmp_path / ".actifix"
-    
-    def test_ensure_actifix_dirs_creates_base(self, tmp_path):
-        """Test ensure dirs creates base directory."""
-        paths = get_actifix_paths(project_root=tmp_path)
-        
-        ensure_actifix_dirs(paths)
-        
-        assert paths.base_dir.exists()
-    
-    def test_ensure_actifix_dirs_creates_subdirs(self, tmp_path):
-        """Test ensure dirs creates subdirectories."""
-        paths = get_actifix_paths(project_root=tmp_path)
-        
-        ensure_actifix_dirs(paths)
-        
-        assert paths.quarantine_dir.exists()
-    
-    def test_ensure_actifix_dirs_idempotent(self, tmp_path):
-        """Test ensure dirs is idempotent."""
-        paths = get_actifix_paths(project_root=tmp_path)
-        
-        ensure_actifix_dirs(paths)
-        ensure_actifix_dirs(paths)
-        
-        assert paths.base_dir.exists()
-    
-    def test_path_resolution_absolute(self):
-        """Test resolving absolute paths."""
-        abs_path = Path("/absolute/path")
-        
-        resolved = resolve_path(abs_path)
-        
-        assert resolved.is_absolute()
-    
-    def test_path_resolution_relative(self, tmp_path, monkeypatch):
-        """Test resolving relative paths."""
-        monkeypatch.chdir(tmp_path)
-        
-        rel_path = Path("relative/path")
-        resolved = resolve_path(rel_path)
-        
-        assert resolved.is_absolute()
-    
-    def test_ensure_directory_creates(self, tmp_path):
-        """Test ensure directory creates path."""
-        dir_path = tmp_path / "newdir"
-        
-        ensure_directory(dir_path)
-        
-        assert dir_path.exists()
-        assert dir_path.is_dir()
-    
-    def test_ensure_directory_nested(self, tmp_path):
-        """Test ensure directory with nested path."""
-        dir_path = tmp_path / "a" / "b" / "c"
-        
-        ensure_directory(dir_path)
-        
-        assert dir_path.exists()
-    
-    def test_validate_path_valid(self, tmp_path):
-        """Test validating valid path."""
-        valid_path = tmp_path / "valid.txt"
-        
-        result = validate_path(valid_path)
-        
-        assert result
-    
-    def test_validate_path_invalid_chars(self):
-        """Test validating path with invalid characters."""
-        # Platform-specific
-        assert True
-    
-    def test_path_normalization(self, tmp_path):
-        """Test path normalization."""
-        unnormalized = tmp_path / "." / "path" / ".." / "file"
-        
-        normalized = resolve_path(unnormalized)
-        
-        assert ".." not in str(normalized)
-    
-    def test_path_exists_check(self, tmp_path):
-        """Test path existence check."""
-        existing = tmp_path / "exists.txt"
-        existing.touch()
-        
-        assert existing.exists()
-    
-    def test_path_permissions(self, tmp_path):
-        """Test path permissions handling."""
-        path = tmp_path / "perms"
-        ensure_directory(path)
-        
-        assert path.exists()
-    
-    def test_path_symlink_handling(self, tmp_path):
-        """Test handling symbolic links."""
-        target = tmp_path / "target"
-        target.mkdir()
-        
-        # Platform-specific symlink support
-        assert target.exists()
+    def test_configure_storage_paths_defaults(self, tmp_path, monkeypatch):
+        """Test configure_storage_paths uses defaults."""
+        monkeypatch.setenv("STORAGE_PROJECT_ROOT", str(tmp_path))
+        paths = configure_storage_paths()
+
+        assert paths.project_root == tmp_path.resolve()
+        assert paths.data_dir.exists()
+        assert paths.state_dir.exists()
+
+    def test_configure_storage_paths_custom_dirs(self, tmp_path):
+        """Test configure_storage_paths with custom dirs."""
+        paths = configure_storage_paths(
+            project_root=tmp_path,
+            data_dir=tmp_path / "data",
+            state_dir=tmp_path / ".state",
+            logs_dir=tmp_path / "logs",
+            cache_dir=tmp_path / "cache",
+            temp_dir=tmp_path / "temp",
+            backup_dir=tmp_path / "backup",
+        )
+
+        assert paths.logs_dir is not None
+        assert paths.cache_dir is not None
+        assert paths.temp_dir is not None
+        assert paths.backup_dir is not None
+
+    def test_storage_paths_helpers(self, tmp_path):
+        """Test StoragePaths helper methods."""
+        paths = StoragePaths(
+            project_root=tmp_path,
+            data_dir=tmp_path / "data",
+            state_dir=tmp_path / ".state",
+            logs_dir=tmp_path / "logs",
+            cache_dir=tmp_path / "cache",
+        )
+
+        assert paths.get_data_path("file.txt").parent == paths.data_dir
+        assert paths.get_state_path("state.json").parent == paths.state_dir
+        assert paths.get_log_path("log.txt").parent == paths.logs_dir
+        assert paths.get_cache_path("cache.bin").parent == paths.cache_dir
+
+    def test_storage_paths_optional_dirs_raise(self, tmp_path):
+        """Test optional directories raise when missing."""
+        paths = StoragePaths(
+            project_root=tmp_path,
+            data_dir=tmp_path / "data",
+            state_dir=tmp_path / ".state",
+        )
+
+        with pytest.raises(ValueError):
+            paths.get_log_path("log.txt")
+
+    def test_get_storage_paths_caching(self, tmp_path, monkeypatch):
+        """Test get_storage_paths caches instance."""
+        reset_storage_paths()
+        monkeypatch.setenv("STORAGE_PROJECT_ROOT", str(tmp_path))
+
+        first = get_storage_paths()
+        second = get_storage_paths()
+
+        assert first is second
 
 
 # ===== BATCH 10: Integration & Edge Cases (15 tests) =====

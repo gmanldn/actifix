@@ -6,6 +6,7 @@ Provides endpoints for health, stats, tickets, logs, and system information.
 
 import os
 import platform
+import subprocess
 import sys
 import time
 from datetime import datetime, timezone
@@ -21,6 +22,7 @@ except ImportError:
     Flask = None
     CORS = None
 
+from . import __version__
 from .health import get_health, check_sla_breaches
 from .do_af import get_open_tickets, get_ticket_stats, get_completed_tickets
 from .state_paths import get_actifix_paths
@@ -79,6 +81,43 @@ def _load_modules(project_root: Path) -> Dict[str, List[Dict[str, str]]]:
     return {"system": system, "user": user}
 
 
+def _run_git_command(cmd: list[str], project_root: Path) -> Optional[str]:
+    """Run git command and return stripped stdout or None on failure."""
+    try:
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            cwd=project_root,
+            check=True,
+        )
+        return result.stdout.strip()
+    except Exception:
+        return None
+
+
+def _gather_version_info(project_root: Path) -> Dict[str, Optional[str]]:
+    """Gather version metadata and git status for the dashboard."""
+    info_root = Path(project_root).resolve()
+    status_output = _run_git_command(["git", "status", "--porcelain"], info_root)
+    git_checked = status_output is not None
+    clean = git_checked and status_output == ""
+    branch = _run_git_command(["git", "rev-parse", "--abbrev-ref", "HEAD"], info_root) if git_checked else None
+    commit = _run_git_command(["git", "rev-parse", "HEAD"], info_root) if git_checked else None
+    tag = _run_git_command(["git", "describe", "--tags", "--abbrev=0"], info_root) if git_checked else None
+
+    return {
+        "version": __version__,
+        "git_checked": git_checked,
+        "clean": clean,
+        "dirty": git_checked and not clean,
+        "branch": branch,
+        "commit": commit,
+        "tag": tag,
+        "status": status_output,
+    }
+
+
 def create_app(project_root: Optional[Path] = None) -> "Flask":
     """
     Create and configure the Flask API application.
@@ -126,6 +165,13 @@ def create_app(project_root: Optional[Path] = None) -> "Flask":
             'details': health.details,
         })
     
+    @app.route('/api/version', methods=['GET'])
+    def api_version():
+        """Return version metadata and git status for the dashboard."""
+        root = Path(app.config['PROJECT_ROOT'])
+        info = _gather_version_info(root)
+        return jsonify(info)
+
     @app.route('/api/stats', methods=['GET'])
     def api_stats():
         """Get ticket statistics."""
