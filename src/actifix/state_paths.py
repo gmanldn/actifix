@@ -1,143 +1,81 @@
-"""
-Actifix State Paths - Configuration for file locations.
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 
-Provides centralized path management for all Actifix artifacts.
+"""
+State paths management for Actifix.
+
+Manages state directories and file paths for the Actifix system,
+ensuring consistent storage locations across different environments.
+
+Version: 2.0.0 (Generic)
 """
 
 import os
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
 
 
-@dataclass
-class ActifixPaths:
-    """Configuration for Actifix file paths."""
-    
-    # Base directory for Actifix files
-    base_dir: Path
-    
-    # Core artifact files
-    list_file: Path      # ACTIFIX-LIST.md - ticket database
-    rollup_file: Path    # ACTIFIX.md - error rollup
-    log_file: Path       # ACTIFIX-LOG.md - audit log
-    aflog_file: Path     # AFLog.txt - machine-readable log
-    
-    # Directories
-    backup_dir: Path     # Backup storage
-    quarantine_dir: Path # Quarantined malformed tickets
-    
-    # Lock files
-    list_lock: Path      # Cross-process lock for list operations
-    
-    @property
-    def all_artifacts(self) -> list[Path]:
-        """Return list of all artifact files."""
-        return [
-            self.list_file,
-            self.rollup_file,
-            self.log_file,
-            self.aflog_file,
-        ]
-
-
-def get_actifix_paths(
-    base_dir: Optional[Path] = None,
-    project_root: Optional[Path] = None,
-) -> ActifixPaths:
+def get_actifix_state_dir() -> Path:
     """
-    Get configured Actifix paths.
+    Get the Actifix state directory for temporary files and queues.
     
-    Args:
-        base_dir: Override base directory for Actifix files.
-                  Defaults to 'actifix/' in project root.
-        project_root: Project root directory. 
-                      Defaults to current working directory.
+    Uses environment variable ACTIFIX_STATE_DIR if set,
+    otherwise uses a .actifix directory in the project root.
     
     Returns:
-        ActifixPaths with all paths configured.
-    
-    Environment Variables:
-        ACTIFIX_BASE_DIR: Override base directory
-        ACTIFIX_PROJECT_ROOT: Override project root
+        Path to the state directory
     """
-    # Determine project root
-    if project_root is None:
-        project_root = Path(os.environ.get(
-            "ACTIFIX_PROJECT_ROOT",
-            os.getcwd()
-        ))
+    # Check for environment override
+    env_state_dir = os.getenv("ACTIFIX_STATE_DIR")
+    if env_state_dir:
+        state_dir = Path(env_state_dir)
+    else:
+        # Default to .actifix in project root
+        project_root = Path.cwd()
+        state_dir = project_root / ".actifix"
     
-    # Determine base directory
-    if base_dir is None:
-        env_base = os.environ.get("ACTIFIX_BASE_DIR")
-        if env_base:
-            base_dir = Path(env_base)
-        else:
-            base_dir = project_root / "actifix"
+    # Ensure directory exists
+    state_dir.mkdir(parents=True, exist_ok=True)
     
-    # Ensure base_dir is absolute
-    if not base_dir.is_absolute():
-        base_dir = project_root / base_dir
-    
-    return ActifixPaths(
-        base_dir=base_dir,
-        list_file=base_dir / "ACTIFIX-LIST.md",
-        rollup_file=base_dir / "ACTIFIX.md",
-        log_file=base_dir / "ACTIFIX-LOG.md",
-        aflog_file=base_dir / "AFLog.txt",
-        backup_dir=base_dir / "backups",
-        quarantine_dir=base_dir / "quarantine",
-        list_lock=base_dir / ".actifix_list.lock",
-    )
+    return state_dir
 
 
-def ensure_actifix_dirs(paths: ActifixPaths) -> None:
+def get_actifix_data_dir() -> Path:
     """
-    Ensure all required Actifix directories exist.
+    Get the main Actifix data directory.
     
-    Args:
-        paths: ActifixPaths configuration.
+    This is where ACTIFIX.md, ACTIFIX-LIST.md, etc. are stored.
+    
+    Returns:
+        Path to the data directory
     """
-    paths.base_dir.mkdir(parents=True, exist_ok=True)
-    paths.backup_dir.mkdir(parents=True, exist_ok=True)
-    paths.quarantine_dir.mkdir(parents=True, exist_ok=True)
+    # Check for environment override
+    env_data_dir = os.getenv("ACTIFIX_DATA_DIR")
+    if env_data_dir:
+        return Path(env_data_dir)
+    
+    # Default to actifix/ in project root
+    project_root = Path.cwd()
+    return project_root / "actifix"
 
 
-def init_actifix_files(paths: ActifixPaths) -> None:
+def get_project_root() -> Path:
     """
-    Initialize Actifix artifact files if they don't exist.
+    Get the project root directory.
     
-    Args:
-        paths: ActifixPaths configuration.
+    Returns:
+        Path to the project root
     """
-    ensure_actifix_dirs(paths)
+    return Path.cwd()
+
+
+def get_logs_dir() -> Path:
+    """
+    Get the logs directory.
     
-    # Initialize ACTIFIX-LIST.md
-    if not paths.list_file.exists():
-        paths.list_file.write_text(
-            "# Actifix Ticket List\n"
-            "Tickets generated from recent errors. Update checkboxes as work progresses.\n\n"
-            "## Active Items\n\n"
-            "## Completed Items\n"
-        )
-    
-    # Initialize ACTIFIX.md
-    if not paths.rollup_file.exists():
-        paths.rollup_file.write_text(
-            "# Actifix Error Rollup\n"
-            "Tracks the last 20 errors from recent runs. "
-            "This file is regenerated by RaiseAF.\n\n"
-            "## Recent Errors (last 20)\n"
-        )
-    
-    # Initialize ACTIFIX-LOG.md
-    if not paths.log_file.exists():
-        paths.log_file.write_text(
-            "# Actifix Log\n"
-            "Audit trail of all Actifix operations.\n\n"
-        )
-    
-    # Initialize AFLog.txt
-    if not paths.aflog_file.exists():
-        paths.aflog_file.write_text("")
+    Returns:
+        Path to the logs directory
+    """
+    project_root = get_project_root()
+    logs_dir = project_root / "logs"
+    logs_dir.mkdir(parents=True, exist_ok=True)
+    return logs_dir

@@ -1,0 +1,3 @@
+Actifix Detailed Lifecycle Log
+Entries are appended by DoAF.py after each ticket is processed.
+

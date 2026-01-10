@@ -1,387 +1,151 @@
-"""
-Actifix Bootstrap - Single canonical entrypoint and environment normalization.
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 
-Provides the single entry point that must be used to start the system.
-Establishes correct runtime environment, validates configuration, and
-performs pre-run safety checks.
+"""
+Bootstrap system for Actifix self-development.
+
+This module sets up error capture so that actifix can track its own
+development issues and improvements from the very beginning.
+
+Version: 2.0.0 (Generic)
 """
 
-import hashlib
 import os
 import sys
-import signal
-import atexit
-from datetime import datetime, timezone
+import traceback
 from pathlib import Path
-from typing import Optional, Callable, Any
-from dataclasses import dataclass, field
 
-from .state_paths import get_actifix_paths, init_actifix_files, ActifixPaths
-from .log_utils import atomic_write, log_event
+from .raise_af import record_error, ACTIFIX_CAPTURE_ENV_VAR
 
 
-# Global state for the bootstrapped environment
-_bootstrap_state: Optional["BootstrapState"] = None
+def enable_actifix_capture():
+    """Enable actifix error capture for development."""
+    os.environ[ACTIFIX_CAPTURE_ENV_VAR] = "1"
 
 
-@dataclass
-class BootstrapState:
-    """State of the bootstrapped Actifix environment."""
-    
-    # Core identifiers
-    run_id: str
-    correlation_id: str
-    started_at: datetime
-    
-    # Paths
-    paths: ActifixPaths
-    project_root: Path
-    
-    # Status
-    initialized: bool = False
-    shutdown_requested: bool = False
-    
-    # Cleanup handlers
-    cleanup_handlers: list = field(default_factory=list)
-    
-    # Process tracking
-    pid: int = 0
-    lock_file: Optional[Path] = None
+def disable_actifix_capture():
+    """Disable actifix error capture."""
+    if ACTIFIX_CAPTURE_ENV_VAR in os.environ:
+        del os.environ[ACTIFIX_CAPTURE_ENV_VAR]
 
 
-def generate_run_id() -> str:
-    """Generate unique run identifier."""
-    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-    random_suffix = hashlib.sha256(os.urandom(8)).hexdigest()[:6]
-    return f"run_{timestamp}_{random_suffix}"
-
-
-def generate_correlation_id() -> str:
-    """Generate correlation ID for tracing across components."""
-    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
-    random_suffix = hashlib.sha256(os.urandom(8)).hexdigest()[:8]
-    return f"corr_{timestamp}_{random_suffix}"
-
-
-def _validate_environment() -> list[str]:
+def capture_exception(exc_type, exc_value, exc_traceback):
     """
-    Validate the runtime environment.
+    Capture exceptions in actifix development.
     
-    Returns list of validation errors (empty if valid).
+    This can be set as the global exception handler during development
+    so that actifix automatically tracks its own bugs.
     """
-    errors = []
-    
-    # Check Python version
-    if sys.version_info < (3, 10):
-        errors.append(f"Python 3.10+ required, got {sys.version}")
-    
-    # Check required directories are writable
-    cwd = Path.cwd()
-    if not os.access(cwd, os.W_OK):
-        errors.append(f"Current directory not writable: {cwd}")
-    
-    return errors
-
-
-def _normalize_import_paths(project_root: Path) -> None:
-    """Ensure project root is in Python path."""
-    root_str = str(project_root)
-    if root_str not in sys.path:
-        sys.path.insert(0, root_str)
-    
-    # Also add src if it exists
-    src_path = project_root / "src"
-    if src_path.exists() and str(src_path) not in sys.path:
-        sys.path.insert(0, str(src_path))
-
-
-def _cleanup_stale_locks(paths: ActifixPaths) -> None:
-    """Remove stale lock files from previous runs."""
-    lock_file = paths.list_lock
-    
-    if lock_file.exists():
-        try:
-            # Check if lock is stale (file content has PID)
-            content = lock_file.read_text().strip()
-            if content.isdigit():
-                pid = int(content)
-                # Check if process is still running
-                try:
-                    os.kill(pid, 0)
-                    # Process exists - lock is active
-                except OSError:
-                    # Process doesn't exist - stale lock
-                    lock_file.unlink()
-        except Exception:
-            # Error reading lock, remove it
-            try:
-                lock_file.unlink()
-            except OSError:
-                pass
-
-
-def _acquire_lock(paths: ActifixPaths) -> Path:
-    """Acquire process lock file."""
-    lock_file = paths.list_lock
-    lock_file.write_text(str(os.getpid()))
-    return lock_file
-
-
-def _release_lock(lock_file: Optional[Path]) -> None:
-    """Release process lock file."""
-    if lock_file and lock_file.exists():
-        try:
-            lock_file.unlink()
-        except OSError:
-            pass
-
-
-def _signal_handler(signum: int, frame: Any) -> None:
-    """Handle shutdown signals gracefully."""
-    global _bootstrap_state
-    if _bootstrap_state:
-        _bootstrap_state.shutdown_requested = True
-        shutdown()
-
-
-def _atexit_handler() -> None:
-    """Handle process exit cleanup."""
-    shutdown()
-
-
-def bootstrap(
-    project_root: Optional[Path] = None,
-    run_name: Optional[str] = None,
-    fail_fast: bool = True,
-) -> BootstrapState:
-    """
-    Bootstrap the Actifix system.
-    
-    This is the SINGLE CANONICAL ENTRYPOINT for the system.
-    Must be called before any other Actifix operations.
-    
-    Args:
-        project_root: Project root directory. Defaults to cwd.
-        run_name: Optional name for this run.
-        fail_fast: If True, raise on validation errors.
-    
-    Returns:
-        BootstrapState with initialized environment.
-    
-    Raises:
-        RuntimeError: If environment validation fails and fail_fast=True.
-        RuntimeError: If already bootstrapped.
-    """
-    global _bootstrap_state
-    
-    if _bootstrap_state is not None:
-        if _bootstrap_state.initialized:
-            raise RuntimeError(
-                "Actifix already bootstrapped. "
-                "Call shutdown() before re-bootstrapping."
-            )
-    
-    # Determine project root
-    if project_root is None:
-        project_root = Path.cwd()
-    project_root = project_root.resolve()
-    
-    # Validate environment
-    errors = _validate_environment()
-    if errors and fail_fast:
-        raise RuntimeError(
-            f"Environment validation failed:\n" +
-            "\n".join(f"  - {e}" for e in errors)
-        )
-    
-    # Normalize import paths
-    _normalize_import_paths(project_root)
-    
-    # Get Actifix paths
-    paths = get_actifix_paths(project_root=project_root)
-    
-    # Initialize files
-    init_actifix_files(paths)
-    
-    # Cleanup stale locks
-    _cleanup_stale_locks(paths)
-    
-    # Generate identifiers
-    run_id = run_name or generate_run_id()
-    correlation_id = generate_correlation_id()
-    
-    # Create state
-    _bootstrap_state = BootstrapState(
-        run_id=run_id,
-        correlation_id=correlation_id,
-        started_at=datetime.now(timezone.utc),
-        paths=paths,
-        project_root=project_root,
-        pid=os.getpid(),
-    )
-    
-    # Acquire lock
-    _bootstrap_state.lock_file = _acquire_lock(paths)
-    
-    # Register signal handlers
-    signal.signal(signal.SIGTERM, _signal_handler)
-    signal.signal(signal.SIGINT, _signal_handler)
-    
-    # Register atexit handler
-    atexit.register(_atexit_handler)
-    
-    # Mark as initialized
-    _bootstrap_state.initialized = True
-    
-    # Log bootstrap event
-    log_event(
-        paths.aflog_file,
-        "BOOTSTRAP",
-        f"Actifix bootstrapped: {run_id}",
-        extra={
-            "correlation_id": correlation_id,
-            "project_root": str(project_root),
-            "pid": os.getpid(),
-        }
-    )
-    
-    return _bootstrap_state
-
-
-def get_state() -> Optional[BootstrapState]:
-    """Get current bootstrap state, or None if not bootstrapped."""
-    return _bootstrap_state
-
-
-def require_bootstrap() -> BootstrapState:
-    """
-    Get bootstrap state, raising if not bootstrapped.
-    
-    Use this at the start of functions that require bootstrapping.
-    
-    Raises:
-        RuntimeError: If not bootstrapped.
-    """
-    if _bootstrap_state is None or not _bootstrap_state.initialized:
-        raise RuntimeError(
-            "Actifix not bootstrapped. "
-            "Call actifix.bootstrap() first."
-        )
-    return _bootstrap_state
-
-
-def get_correlation_id() -> str:
-    """Get current correlation ID for tracing."""
-    state = get_state()
-    if state:
-        return state.correlation_id
-    return "no-correlation"
-
-
-def get_run_id() -> str:
-    """Get current run ID."""
-    state = get_state()
-    if state:
-        return state.run_id
-    return "no-run"
-
-
-def register_cleanup(handler: Callable[[], None]) -> None:
-    """
-    Register a cleanup handler to be called on shutdown.
-    
-    Args:
-        handler: Callable with no arguments.
-    """
-    state = get_state()
-    if state:
-        state.cleanup_handlers.append(handler)
-
-
-def shutdown() -> None:
-    """
-    Shutdown the Actifix system cleanly.
-    
-    Runs all registered cleanup handlers and releases resources.
-    """
-    global _bootstrap_state
-    
-    if _bootstrap_state is None:
+    # Don't capture if it's a KeyboardInterrupt or SystemExit
+    if issubclass(exc_type, (KeyboardInterrupt, SystemExit)):
         return
     
-    if not _bootstrap_state.initialized:
-        return
-    
-    # Run cleanup handlers in reverse order
-    for handler in reversed(_bootstrap_state.cleanup_handlers):
-        try:
-            handler()
-        except Exception:
-            pass  # Don't fail shutdown on handler errors
-    
-    # Log shutdown
     try:
-        log_event(
-            _bootstrap_state.paths.aflog_file,
-            "SHUTDOWN",
-            f"Actifix shutdown: {_bootstrap_state.run_id}",
-            extra={
-                "correlation_id": _bootstrap_state.correlation_id,
-                "duration_seconds": (
-                    datetime.now(timezone.utc) - 
-                    _bootstrap_state.started_at
-                ).total_seconds(),
-            }
+        # Extract source information from traceback
+        tb_list = traceback.extract_tb(exc_traceback)
+        if tb_list:
+            last_frame = tb_list[-1]
+            source = f"{last_frame.filename}:{last_frame.lineno}"
+        else:
+            source = "unknown"
+        
+        # Record the error
+        record_error(
+            message=str(exc_value),
+            source=source,
+            run_label="actifix-development",
+            error_type=exc_type.__name__,
+            stack_trace="".join(traceback.format_exception(exc_type, exc_value, exc_traceback)),
+            capture_context=True
         )
-    except Exception:
-        pass
+        
+        print(f"[Actifix] Captured development error: {exc_type.__name__}: {exc_value}")
+        
+    except Exception as e:
+        # Don't let error capture cause more errors
+        print(f"[Actifix] Failed to capture error: {e}")
+
+
+def install_exception_handler():
+    """Install global exception handler for actifix development."""
+    original_handler = sys.excepthook
     
-    # Release lock
-    _release_lock(_bootstrap_state.lock_file)
+    def actifix_excepthook(exc_type, exc_value, exc_traceback):
+        # Capture with actifix first
+        capture_exception(exc_type, exc_value, exc_traceback)
+        
+        # Then call the original handler
+        original_handler(exc_type, exc_value, exc_traceback)
     
-    # Clear state
-    _bootstrap_state.initialized = False
-    _bootstrap_state = None
-    
-    # Unregister atexit handler
-    try:
-        atexit.unregister(_atexit_handler)
-    except Exception:
-        pass
+    sys.excepthook = actifix_excepthook
+    return original_handler
 
 
-def is_shutdown_requested() -> bool:
-    """Check if shutdown has been requested via signal."""
-    state = get_state()
-    return state.shutdown_requested if state else False
+def uninstall_exception_handler(original_handler):
+    """Restore the original exception handler."""
+    sys.excepthook = original_handler
 
 
-class ActifixContext:
+def bootstrap_actifix_development():
     """
-    Context manager for Actifix bootstrap.
+    Bootstrap actifix for self-development.
     
-    Usage:
-        with ActifixContext() as ctx:
-            # Do work with ctx.paths, ctx.run_id, etc.
-            pass
+    Call this at the start of actifix development to enable
+    automatic error tracking during the development process.
     """
+    print("[Actifix] Bootstrapping self-development mode...")
     
-    def __init__(
-        self,
-        project_root: Optional[Path] = None,
-        run_name: Optional[str] = None,
-    ):
-        self.project_root = project_root
-        self.run_name = run_name
-        self.state: Optional[BootstrapState] = None
+    # Enable error capture
+    enable_actifix_capture()
     
-    def __enter__(self) -> BootstrapState:
-        self.state = bootstrap(
-            project_root=self.project_root,
-            run_name=self.run_name,
-        )
-        return self.state
+    # Install exception handler
+    original_handler = install_exception_handler()
     
-    def __exit__(self, exc_type, exc_val, exc_tb) -> bool:
-        shutdown()
-        return False  # Don't suppress exceptions
+    # Create initial directories
+    from .state_paths import get_actifix_data_dir, get_actifix_state_dir
+    
+    data_dir = get_actifix_data_dir()
+    state_dir = get_actifix_state_dir()
+    
+    data_dir.mkdir(parents=True, exist_ok=True)
+    state_dir.mkdir(parents=True, exist_ok=True)
+    
+    print(f"[Actifix] Data directory: {data_dir}")
+    print(f"[Actifix] State directory: {state_dir}")
+    print("[Actifix] Self-development mode active - actifix will track its own development issues!")
+    
+    return original_handler
+
+
+def create_initial_ticket():
+    """Create an initial ticket for actifix development."""
+    record_error(
+        message="Actifix framework initialization - beginning self-development",
+        source="bootstrap.py:create_initial_ticket",
+        run_label="actifix-bootstrap",
+        error_type="FrameworkInitialization",
+        stack_trace="",
+        capture_context=True
+    )
+
+
+def track_development_progress(milestone: str, details: str = ""):
+    """Track development milestones as actifix tickets."""
+    record_error(
+        message=f"Development milestone: {milestone}. {details}",
+        source="bootstrap.py:track_development_progress", 
+        run_label="actifix-development",
+        error_type="DevelopmentMilestone",
+        stack_trace="",
+        capture_context=False
+    )
+
+
+if __name__ == "__main__":
+    # Bootstrap actifix for self-development
+    bootstrap_actifix_development()
+    create_initial_ticket()
+    
+    print("\n[Actifix] Self-development mode is now active!")
+    print("From now on, actifix will capture its own development errors and improvements.")
+    print("Check the actifix/ directory for automatically generated tickets.")

@@ -1,112 +1,101 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
 """
-Actifix - Automated Error Tracking and Remediation System
+Actifix - Generic Error Tracking and Management Framework
 
-A generic, project-agnostic system for:
-- Recording errors and creating tickets (RaiseAF)
-- Dispatching tickets to AI for automated fixes (DoAF)
-- Tracking ticket lifecycle (Pending → In-Progress → Completed)
-- Health monitoring and SLA tracking
-- Bootstrap and configuration management
-- Testing framework with plan verification
-- Quarantine system for corrupted data
+A sophisticated error tracking system with AI integration, context capture,
+and self-improvement capabilities. Originally inspired by the pokertool actifix system.
 
-Usage:
-    from actifix import bootstrap, record_error, process_tickets, get_health
-    
-    # Bootstrap the system (required)
-    bootstrap()
-    
-    # Record an error
-    record_error(
-        error_type="RuntimeError",
-        message="Something went wrong",
-        source="my_module.py:42",
-        priority="P2"
-    )
-    
-    # Process pending tickets
-    process_tickets(max_tickets=5)
-    
-    # Check system health
-    health = get_health()
+Version: 2.0.0 (Generic)
 """
 
-__version__ = "1.0.0"
-__author__ = "Actifix Team"
+from .raise_af import (
+    record_error,
+    ActifixEntry,
+    TicketPriority,
+    generate_entry_id,
+    generate_duplicate_guard,
+    ensure_scaffold,
+    ACTIFIX_CAPTURE_ENV_VAR
+)
 
-# Core functionality
-from .raise_af import record_error, record_exception, ActifixEntry, PRIORITY_P0, PRIORITY_P1, PRIORITY_P2, PRIORITY_P3
-from .do_af import process_tickets, process_next_ticket, get_open_tickets, mark_ticket_complete, TicketInfo
-from .health import get_health, run_health_check, ActifixHealthCheck, check_sla_breaches
+from .bootstrap import (
+    bootstrap_actifix_development,
+    enable_actifix_capture,
+    disable_actifix_capture,
+    install_exception_handler,
+    uninstall_exception_handler,
+    create_initial_ticket,
+    track_development_progress
+)
 
-# Bootstrap and configuration
-from .bootstrap import bootstrap, shutdown, get_state, require_bootstrap, ActifixContext, get_correlation_id, get_run_id
-from .config import load_config, get_config, ActifixConfig
+from .state_paths import (
+    get_actifix_state_dir,
+    get_actifix_data_dir,
+    get_project_root,
+    get_logs_dir
+)
 
-# Paths and utilities
-from .state_paths import get_actifix_paths, init_actifix_files, ActifixPaths
+__version__ = "2.0.0"
+__author__ = "Actifix Framework"
+__description__ = "Generic Error Tracking and Management Framework with AI Integration"
 
-# Testing framework
-from .testing import TestRunner, run_tests, assert_equals, assert_true, assert_false, assert_raises, assert_contains
-
-# Quarantine system
-from .quarantine import quarantine_content, quarantine_file, list_quarantine, repair_list_file, QuarantineEntry
-
+# Main API
 __all__ = [
-    # Error recording
+    # Core error recording
     "record_error",
-    "record_exception",
     "ActifixEntry",
-    "PRIORITY_P0",
-    "PRIORITY_P1",
-    "PRIORITY_P2",
-    "PRIORITY_P3",
+    "TicketPriority",
     
-    # Ticket dispatch
-    "process_tickets",
-    "process_next_ticket",
-    "get_open_tickets",
-    "mark_ticket_complete",
-    "TicketInfo",
+    # Bootstrap and development
+    "bootstrap_actifix_development",
+    "enable_actifix_capture",
+    "disable_actifix_capture",
+    "create_initial_ticket",
+    "track_development_progress",
     
-    # Health
-    "get_health",
-    "run_health_check",
-    "ActifixHealthCheck",
-    "check_sla_breaches",
+    # State management
+    "get_actifix_state_dir",
+    "get_actifix_data_dir",
+    "get_project_root",
     
-    # Bootstrap
-    "bootstrap",
-    "shutdown",
-    "get_state",
-    "require_bootstrap",
-    "ActifixContext",
-    "get_correlation_id",
-    "get_run_id",
+    # Utilities
+    "generate_entry_id",
+    "generate_duplicate_guard",
+    "ensure_scaffold",
     
-    # Config
-    "load_config",
-    "get_config",
-    "ActifixConfig",
-    
-    # Paths
-    "get_actifix_paths",
-    "init_actifix_files",
-    "ActifixPaths",
-    
-    # Testing
-    "TestRunner",
-    "run_tests",
-    "assert_equals",
-    "assert_true",
-    "assert_false",
-    "assert_raises",
-    "assert_contains",
-    
-    # Quarantine
-    "quarantine_content",
-    "quarantine_file",
-    "list_quarantine",
-    "repair_list_file",
-    "QuarantineEntry",
+    # Constants
+    "ACTIFIX_CAPTURE_ENV_VAR"
 ]
+
+
+def quick_start():
+    """
+    Quick start guide for actifix.
+    
+    This function provides a simple way to get started with actifix
+    for new users.
+    """
+    print("=== Actifix Quick Start ===")
+    print()
+    print("1. Enable error capture:")
+    print("   import actifix")
+    print("   actifix.enable_actifix_capture()")
+    print()
+    print("2. Record an error:")
+    print("   try:")
+    print("       # Your code here")
+    print("       pass")
+    print("   except Exception as e:")
+    print("       actifix.record_error(")
+    print("           message=str(e),")
+    print("           source='your_module.py',")
+    print("           run_label='your-application',")
+    print("           error_type=type(e).__name__")
+    print("       )")
+    print()
+    print("3. Bootstrap self-development mode:")
+    print("   actifix.bootstrap_actifix_development()")
+    print()
+    print("Check the 'actifix/' directory for generated tickets!")
