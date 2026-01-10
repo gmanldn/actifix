@@ -1,138 +1,270 @@
 {
-  "edges": [
-    {
-      "from": "bootstrap.main",
-      "reason": "load configuration",
-      "to": "runtime.config"
-    },
-    {
-      "from": "bootstrap.main",
-      "reason": "initialize logging",
-      "to": "infra.logging"
-    },
-    {
-      "from": "bootstrap.main",
-      "reason": "start health monitoring",
-      "to": "infra.health"
-    },
-    {
-      "from": "runtime.config",
-      "reason": "configuration logging",
-      "to": "infra.logging"
-    },
-    {
-      "from": "runtime.state",
-      "reason": "state operation logging",
-      "to": "infra.logging"
-    },
-    {
-      "from": "infra.health",
-      "reason": "health status logging",
-      "to": "infra.logging"
-    },
-    {
-      "from": "core.raise_af",
-      "reason": "error capture logging",
-      "to": "infra.logging"
-    },
-    {
-      "from": "core.raise_af",
-      "reason": "isolate error state",
-      "to": "core.quarantine"
-    },
-    {
-      "from": "core.do_af",
-      "reason": "remediation logging",
-      "to": "infra.logging"
-    },
-    {
-      "from": "core.do_af",
-      "reason": "process error tickets",
-      "to": "core.raise_af"
-    },
-    {
-      "from": "core.quarantine",
-      "reason": "quarantine logging",
-      "to": "infra.logging"
-    },
-    {
-      "from": "core.quarantine",
-      "reason": "manage quarantine state",
-      "to": "runtime.state"
-    },
-    {
-      "from": "tooling.testing",
-      "reason": "test system bootstrap",
-      "to": "bootstrap.main"
-    },
-    {
-      "from": "tooling.testing",
-      "reason": "test execution logging",
-      "to": "infra.logging"
-    }
-  ],
+  "schema_version": "arch-depgraph.v1",
   "meta": {
-    "freshness_days": 7,
-    "generated_at": "2025-01-10T06:45:00.000000+00:00",
-    "generator": "manual",
-    "generator_version": "1.0.0",
+    "generated_at": "2026-01-10T10:07:22.875851+00:00",
+    "generator": "update_architecture_docs.py",
+    "generator_version": "2.0.0",
     "source_commit": "current_development"
   },
   "nodes": [
     {
-      "domain": "runtime",
       "id": "bootstrap.main",
-      "label": "main",
-      "owner": "runtime"
+      "domain": "runtime",
+      "owner": "runtime",
+      "label": "main"
     },
     {
-      "domain": "runtime",
       "id": "runtime.config",
-      "label": "config",
-      "owner": "runtime"
-    },
-    {
       "domain": "runtime",
+      "owner": "runtime",
+      "label": "config"
+    },
+    {
       "id": "runtime.state",
-      "label": "state",
-      "owner": "runtime"
+      "domain": "runtime",
+      "owner": "runtime",
+      "label": "state"
     },
     {
-      "domain": "infra",
       "id": "infra.logging",
-      "label": "logging",
-      "owner": "infra"
-    },
-    {
       "domain": "infra",
+      "owner": "infra",
+      "label": "logging"
+    },
+    {
       "id": "infra.health",
-      "label": "health",
-      "owner": "infra"
+      "domain": "infra",
+      "owner": "infra",
+      "label": "health"
     },
     {
-      "domain": "core",
+      "id": "infra.persistence.atomic",
+      "domain": "infra",
+      "owner": "persistence",
+      "label": "atomic"
+    },
+    {
+      "id": "infra.persistence.storage",
+      "domain": "infra",
+      "owner": "persistence",
+      "label": "storage"
+    },
+    {
+      "id": "infra.persistence.queue",
+      "domain": "infra",
+      "owner": "persistence",
+      "label": "queue"
+    },
+    {
+      "id": "infra.persistence.manager",
+      "domain": "infra",
+      "owner": "persistence",
+      "label": "manager"
+    },
+    {
+      "id": "infra.persistence.health",
+      "domain": "infra",
+      "owner": "persistence",
+      "label": "health"
+    },
+    {
+      "id": "infra.persistence.paths",
+      "domain": "infra",
+      "owner": "persistence",
+      "label": "paths"
+    },
+    {
       "id": "core.raise_af",
-      "label": "raise_af",
-      "owner": "core"
+      "domain": "core",
+      "owner": "core",
+      "label": "raise_af"
     },
     {
-      "domain": "core",
       "id": "core.do_af",
-      "label": "do_af",
-      "owner": "core"
-    },
-    {
       "domain": "core",
-      "id": "core.quarantine",
-      "label": "quarantine",
-      "owner": "core"
+      "owner": "core",
+      "label": "do_af"
     },
     {
+      "id": "core.quarantine",
+      "domain": "core",
+      "owner": "core",
+      "label": "quarantine"
+    },
+    {
+      "id": "tooling.testing.system",
       "domain": "tooling",
+      "owner": "testing",
+      "label": "system"
+    },
+    {
+      "id": "tooling.testing.reporting",
+      "domain": "tooling",
+      "owner": "testing",
+      "label": "reporting"
+    },
+    {
       "id": "tooling.testing",
-      "label": "testing",
-      "owner": "tooling"
+      "domain": "tooling",
+      "owner": "tooling",
+      "label": "testing"
     }
   ],
-  "schema_version": "arch-depgraph.v1"
+  "edges": [
+    {
+      "from": "bootstrap.main",
+      "to": "runtime.config",
+      "reason": "bootstrap.main depends on runtime.config"
+    },
+    {
+      "from": "bootstrap.main",
+      "to": "infra.logging",
+      "reason": "bootstrap.main depends on infra.logging"
+    },
+    {
+      "from": "bootstrap.main",
+      "to": "infra.health",
+      "reason": "bootstrap.main depends on infra.health"
+    },
+    {
+      "from": "runtime.config",
+      "to": "infra.logging",
+      "reason": "runtime.config depends on infra.logging"
+    },
+    {
+      "from": "runtime.state",
+      "to": "infra.logging",
+      "reason": "runtime.state depends on infra.logging"
+    },
+    {
+      "from": "infra.health",
+      "to": "infra.logging",
+      "reason": "infra.health depends on infra.logging"
+    },
+    {
+      "from": "infra.persistence.atomic",
+      "to": "infra.logging",
+      "reason": "infra.persistence.atomic depends on infra.logging"
+    },
+    {
+      "from": "infra.persistence.storage",
+      "to": "infra.logging",
+      "reason": "infra.persistence.storage depends on infra.logging"
+    },
+    {
+      "from": "infra.persistence.storage",
+      "to": "infra.persistence.atomic",
+      "reason": "infra.persistence.storage depends on infra.persistence.atomic"
+    },
+    {
+      "from": "infra.persistence.queue",
+      "to": "infra.logging",
+      "reason": "infra.persistence.queue depends on infra.logging"
+    },
+    {
+      "from": "infra.persistence.queue",
+      "to": "infra.persistence.storage",
+      "reason": "infra.persistence.queue depends on infra.persistence.storage"
+    },
+    {
+      "from": "infra.persistence.manager",
+      "to": "infra.logging",
+      "reason": "infra.persistence.manager depends on infra.logging"
+    },
+    {
+      "from": "infra.persistence.manager",
+      "to": "infra.persistence.storage",
+      "reason": "infra.persistence.manager depends on infra.persistence.storage"
+    },
+    {
+      "from": "infra.persistence.manager",
+      "to": "infra.persistence.queue",
+      "reason": "infra.persistence.manager depends on infra.persistence.queue"
+    },
+    {
+      "from": "infra.persistence.health",
+      "to": "infra.logging",
+      "reason": "infra.persistence.health depends on infra.logging"
+    },
+    {
+      "from": "infra.persistence.health",
+      "to": "infra.persistence.storage",
+      "reason": "infra.persistence.health depends on infra.persistence.storage"
+    },
+    {
+      "from": "infra.persistence.paths",
+      "to": "infra.logging",
+      "reason": "infra.persistence.paths depends on infra.logging"
+    },
+    {
+      "from": "core.raise_af",
+      "to": "infra.logging",
+      "reason": "core.raise_af depends on infra.logging"
+    },
+    {
+      "from": "core.raise_af",
+      "to": "core.quarantine",
+      "reason": "core.raise_af depends on core.quarantine"
+    },
+    {
+      "from": "core.do_af",
+      "to": "infra.logging",
+      "reason": "core.do_af depends on infra.logging"
+    },
+    {
+      "from": "core.do_af",
+      "to": "core.raise_af",
+      "reason": "core.do_af depends on core.raise_af"
+    },
+    {
+      "from": "core.quarantine",
+      "to": "infra.logging",
+      "reason": "core.quarantine depends on infra.logging"
+    },
+    {
+      "from": "core.quarantine",
+      "to": "runtime.state",
+      "reason": "core.quarantine depends on runtime.state"
+    },
+    {
+      "from": "tooling.testing.system",
+      "to": "infra.logging",
+      "reason": "tooling.testing.system depends on infra.logging"
+    },
+    {
+      "from": "tooling.testing.system",
+      "to": "runtime.state",
+      "reason": "tooling.testing.system depends on runtime.state"
+    },
+    {
+      "from": "tooling.testing.reporting",
+      "to": "infra.logging",
+      "reason": "tooling.testing.reporting depends on infra.logging"
+    },
+    {
+      "from": "tooling.testing.reporting",
+      "to": "tooling.testing.system",
+      "reason": "tooling.testing.reporting depends on tooling.testing.system"
+    },
+    {
+      "from": "tooling.testing",
+      "to": "bootstrap.main",
+      "reason": "tooling.testing depends on bootstrap.main"
+    },
+    {
+      "from": "tooling.testing",
+      "to": "infra.logging",
+      "reason": "tooling.testing depends on infra.logging"
+    },
+    {
+      "from": "tooling.testing",
+      "to": "tooling.testing.system",
+      "reason": "tooling.testing depends on tooling.testing.system"
+    },
+    {
+      "from": "tooling.testing",
+      "to": "tooling.testing.reporting",
+      "reason": "tooling.testing depends on tooling.testing.reporting"
+    }
+  ]
 }

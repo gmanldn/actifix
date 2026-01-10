@@ -1,233 +1,282 @@
-{
-  "contracts": [
-    {
-      "applies_to": [
-        "bootstrap.main",
-        "runtime.config", 
-        "core.raise_af",
-        "core.do_af",
-        "infra.health",
-        "tooling.testing"
-      ],
-      "enforced_by": [
-        "infra.logging"
-      ],
-      "id": "contract.logging",
-      "summary": "All modules must log via centralized logging system with correlation IDs"
-    },
-    {
-      "applies_to": [
-        "core.raise_af",
-        "core.do_af"
-      ],
-      "enforced_by": [
-        "core.quarantine"
-      ],
-      "id": "contract.error_isolation",
-      "summary": "Error handling must isolate failures and prevent system-wide corruption"
-    },
-    {
-      "applies_to": [
-        "bootstrap.main",
-        "runtime.config",
-        "runtime.state",
-        "core.raise_af",
-        "core.do_af"
-      ],
-      "enforced_by": [
-        "tooling.testing",
-        "infra.health"
-      ],
-      "id": "contract.quality_gates",
-      "summary": "All components must pass quality gates and maintain architecture compliance"
-    }
-  ],
-  "domains": [
-    {
-      "id": "runtime",
-      "summary": "Bootstrap, configuration, state management, lifecycle"
-    },
-    {
-      "id": "infra", 
-      "summary": "Logging, health monitoring, observability"
-    },
-    {
-      "id": "core",
-      "summary": "Error handling, ticket management, automated remediation"
-    },
-    {
-      "id": "tooling",
-      "summary": "Testing, quality assurance, architecture validation"
-    }
-  ],
-  "meta": {
-    "freshness_days": 7,
-    "generated_at": "2025-01-10T06:44:00.000000+00:00",
-    "generator": "manual",
-    "generator_version": "1.0.0",
-    "notes": [
-      "Single source of truth for actifix architecture contexts",
-      "Keep aligned with quality gates and architecture compliance"
-    ],
-    "source_commit": "current_development"
-  },
-  "modules": [
-    {
-      "contracts": [
-        "ensures environment setup",
-        "launches core services in correct order"
-      ],
-      "depends_on": [
-        "runtime.config",
-        "infra.logging", 
-        "infra.health"
-      ],
-      "domain": "runtime",
-      "entrypoints": [
-        "src/actifix/main.py",
-        "src/actifix/bootstrap.py"
-      ],
-      "id": "bootstrap.main",
-      "owner": "runtime",
-      "summary": "Main entrypoint orchestrating system initialization and process management"
-    },
-    {
-      "contracts": [
-        "centralize configuration",
-        "validate environment state",
-        "fail fast on invalid config"
-      ],
-      "depends_on": [
-        "infra.logging"
-      ],
-      "domain": "runtime",
-      "entrypoints": [
-        "src/actifix/config.py"
-      ],
-      "id": "runtime.config",
-      "owner": "runtime", 
-      "summary": "Configuration management and environment normalization"
-    },
-    {
-      "contracts": [
-        "atomic state operations",
-        "recoverable state management"
-      ],
-      "depends_on": [
-        "infra.logging"
-      ],
-      "domain": "runtime",
-      "entrypoints": [
-        "src/actifix/state_paths.py"
-      ],
-      "id": "runtime.state",
-      "owner": "runtime",
-      "summary": "State management and persistence paths"
-    },
-    {
-      "contracts": [
-        "single logging sink",
-        "structured error logging",
-        "correlation IDs"
-      ],
-      "depends_on": [],
-      "domain": "infra",
-      "entrypoints": [
-        "src/actifix/log_utils.py"
-      ],
-      "id": "infra.logging",
-      "owner": "infra",
-      "summary": "Centralized logging system with correlation tracking"
-    },
-    {
-      "contracts": [
-        "detect degraded states",
-        "surface system health",
-        "continuous monitoring"
-      ],
-      "depends_on": [
-        "infra.logging"
-      ],
-      "domain": "infra",
-      "entrypoints": [
-        "src/actifix/health.py"
-      ],
-      "id": "infra.health",
-      "owner": "infra",
-      "summary": "Health monitoring and system status tracking"
-    },
-    {
-      "contracts": [
-        "capture all errors",
-        "create structured tickets", 
-        "prevent duplication"
-      ],
-      "depends_on": [
-        "infra.logging",
-        "core.quarantine"
-      ],
-      "domain": "core",
-      "entrypoints": [
-        "src/actifix/raise_af.py"
-      ],
-      "id": "core.raise_af",
-      "owner": "core",
-      "summary": "Error capture and ticket creation system"
-    },
-    {
-      "contracts": [
-        "process tickets systematically",
-        "integrate with AI systems",
-        "validate fixes"
-      ],
-      "depends_on": [
-        "infra.logging",
-        "core.raise_af"
-      ],
-      "domain": "core",
-      "entrypoints": [
-        "src/actifix/do_af.py"
-      ],
-      "id": "core.do_af",
-      "owner": "core",
-      "summary": "Ticket processing and automated remediation"
-    },
-    {
-      "contracts": [
-        "isolate corrupted state",
-        "prevent system-wide failures"
-      ],
-      "depends_on": [
-        "infra.logging",
-        "runtime.state"
-      ],
-      "domain": "core",
-      "entrypoints": [
-        "src/actifix/quarantine.py"
-      ],
-      "id": "core.quarantine",
-      "owner": "core",
-      "summary": "Error isolation and safe failure handling"
-    },
-    {
-      "contracts": [
-        "enforce quality gates",
-        "maintain test coverage", 
-        "validate architecture"
-      ],
-      "depends_on": [
-        "bootstrap.main",
-        "infra.logging"
-      ],
-      "domain": "tooling",
-      "entrypoints": [
-        "src/actifix/testing.py",
-        "test/test_actifix.py"
-      ],
-      "id": "tooling.testing",
-      "owner": "tooling",
-      "summary": "Quality assurance and testing framework"
-    }
-  ],
-  "schema_version": "arch-map.v1"
-}
+schema_version: arch-map.v1
+meta:
+  generated_at: '2026-01-10T10:07:22.863527+00:00'
+  generator: update_architecture_docs.py
+  generator_version: 2.0.0
+  source_commit: current_development
+  freshness_days: 7
+  notes:
+  - Single source of truth for actifix architecture contexts
+  - Keep aligned with quality gates and architecture compliance
+  - Auto-generated - includes persistence and testing subsystems
+domains:
+- id: runtime
+  summary: Bootstrap, configuration, state management, lifecycle
+- id: infra
+  summary: Logging, health monitoring, persistence, observability
+- id: core
+  summary: Error handling, ticket management, automated remediation
+- id: tooling
+  summary: Testing, quality assurance, architecture validation
+modules:
+- id: bootstrap.main
+  domain: runtime
+  owner: runtime
+  summary: Main entrypoint orchestrating system initialization and process management
+  entrypoints:
+  - src/actifix/main.py
+  - src/actifix/bootstrap.py
+  contracts:
+  - ensures environment setup
+  - launches core services in correct order
+  depends_on:
+  - runtime.config
+  - infra.logging
+  - infra.health
+- id: runtime.config
+  domain: runtime
+  owner: runtime
+  summary: Configuration management and environment normalization
+  entrypoints:
+  - src/actifix/config.py
+  contracts:
+  - centralize configuration
+  - validate environment state
+  - fail fast on invalid config
+  depends_on:
+  - infra.logging
+- id: runtime.state
+  domain: runtime
+  owner: runtime
+  summary: State management and persistence paths
+  entrypoints:
+  - src/actifix/state_paths.py
+  contracts:
+  - atomic state operations
+  - recoverable state management
+  depends_on:
+  - infra.logging
+- id: infra.logging
+  domain: infra
+  owner: infra
+  summary: Centralized logging system with correlation tracking
+  entrypoints:
+  - src/actifix/log_utils.py
+  contracts:
+  - single logging sink
+  - structured error logging
+  - correlation IDs
+  depends_on: []
+- id: infra.health
+  domain: infra
+  owner: infra
+  summary: Health monitoring and system status tracking
+  entrypoints:
+  - src/actifix/health.py
+  contracts:
+  - detect degraded states
+  - surface system health
+  - continuous monitoring
+  depends_on:
+  - infra.logging
+- id: infra.persistence.atomic
+  domain: infra
+  owner: persistence
+  summary: Atomic file operations for durability and safety
+  entrypoints:
+  - src/actifix/persistence/atomic.py
+  contracts:
+  - atomic writes
+  - append with size limits
+  - idempotent operations
+  depends_on:
+  - infra.logging
+- id: infra.persistence.storage
+  domain: infra
+  owner: persistence
+  summary: Storage backend abstraction (file, memory, JSON)
+  entrypoints:
+  - src/actifix/persistence/storage.py
+  contracts:
+  - pluggable storage backends
+  - consistent interface
+  - error handling
+  depends_on:
+  - infra.logging
+  - infra.persistence.atomic
+- id: infra.persistence.queue
+  domain: infra
+  owner: persistence
+  summary: Persistence queue for asynchronous operations
+  entrypoints:
+  - src/actifix/persistence/queue.py
+  contracts:
+  - durable operation queue
+  - replay capability
+  - entry pruning
+  depends_on:
+  - infra.logging
+  - infra.persistence.storage
+- id: infra.persistence.manager
+  domain: infra
+  owner: persistence
+  summary: High-level persistence management with transactions
+  entrypoints:
+  - src/actifix/persistence/manager.py
+  contracts:
+  - transactional operations
+  - document management
+  - queue integration
+  depends_on:
+  - infra.logging
+  - infra.persistence.storage
+  - infra.persistence.queue
+- id: infra.persistence.health
+  domain: infra
+  owner: persistence
+  summary: Storage health checks and corruption detection
+  entrypoints:
+  - src/actifix/persistence/health.py
+  contracts:
+  - storage validation
+  - integrity verification
+  - corruption detection
+  depends_on:
+  - infra.logging
+  - infra.persistence.storage
+- id: infra.persistence.paths
+  domain: infra
+  owner: persistence
+  summary: Storage path configuration and management
+  entrypoints:
+  - src/actifix/persistence/paths.py
+  contracts:
+  - centralized path configuration
+  - directory helpers
+  depends_on:
+  - infra.logging
+- id: core.raise_af
+  domain: core
+  owner: core
+  summary: Error capture and ticket creation system
+  entrypoints:
+  - src/actifix/raise_af.py
+  contracts:
+  - capture all errors
+  - create structured tickets
+  - prevent duplication
+  depends_on:
+  - infra.logging
+  - core.quarantine
+- id: core.do_af
+  domain: core
+  owner: core
+  summary: Ticket processing and automated remediation
+  entrypoints:
+  - src/actifix/do_af.py
+  contracts:
+  - process tickets systematically
+  - integrate with AI systems
+  - validate fixes
+  depends_on:
+  - infra.logging
+  - core.raise_af
+- id: core.quarantine
+  domain: core
+  owner: core
+  summary: Error isolation and safe failure handling
+  entrypoints:
+  - src/actifix/quarantine.py
+  contracts:
+  - isolate corrupted state
+  - prevent system-wide failures
+  depends_on:
+  - infra.logging
+  - runtime.state
+- id: tooling.testing.system
+  domain: tooling
+  owner: testing
+  summary: System-level test framework and test builder
+  entrypoints:
+  - src/actifix/testing/system.py
+  contracts:
+  - build system tests
+  - validate dependencies
+  - enforce architecture
+  depends_on:
+  - infra.logging
+  - runtime.state
+- id: tooling.testing.reporting
+  domain: tooling
+  owner: testing
+  summary: Test cycle reporting and progress tracking
+  entrypoints:
+  - src/actifix/testing/reporting.py
+  contracts:
+  - test inventory
+  - numbered progress
+  - cycle logs
+  depends_on:
+  - infra.logging
+  - tooling.testing.system
+- id: tooling.testing
+  domain: tooling
+  owner: tooling
+  summary: Quality assurance and testing framework
+  entrypoints:
+  - src/actifix/testing/__init__.py
+  - test.py
+  contracts:
+  - enforce quality gates
+  - maintain test coverage
+  - validate architecture
+  depends_on:
+  - bootstrap.main
+  - infra.logging
+  - tooling.testing.system
+  - tooling.testing.reporting
+contracts:
+- id: contract.logging
+  summary: All modules must log via centralized logging system with correlation IDs
+  applies_to:
+  - bootstrap.main
+  - runtime.config
+  - core.raise_af
+  - core.do_af
+  - infra.health
+  - infra.persistence.atomic
+  - infra.persistence.storage
+  - infra.persistence.queue
+  - infra.persistence.manager
+  - tooling.testing
+  enforced_by:
+  - infra.logging
+- id: contract.error_isolation
+  summary: Error handling must isolate failures and prevent system-wide corruption
+  applies_to:
+  - core.raise_af
+  - core.do_af
+  enforced_by:
+  - core.quarantine
+- id: contract.quality_gates
+  summary: All components must pass quality gates and maintain architecture compliance
+  applies_to:
+  - bootstrap.main
+  - runtime.config
+  - runtime.state
+  - core.raise_af
+  - core.do_af
+  - infra.persistence.manager
+  enforced_by:
+  - tooling.testing
+  - infra.health
+- id: contract.durability
+  summary: All persistence operations must be atomic and recoverable
+  applies_to:
+  - infra.persistence.atomic
+  - infra.persistence.storage
+  - infra.persistence.queue
+  - infra.persistence.manager
+  enforced_by:
+  - infra.persistence.atomic
+  - infra.persistence.health
