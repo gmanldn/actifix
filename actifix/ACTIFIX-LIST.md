@@ -12,6 +12,1356 @@ Tickets generated from errors. Update checkboxes as work progresses.
 <!-- New tickets are inserted here by RaiseAF -->
 
 ## Completed Items
+### ACT-20260110-B380E - [P3] DeveloperExperience: IMP048: Implement interactive ticket wizard (guided ticket creation)
+- **Priority**: P3
+- **Error Type**: DeveloperExperience
+- **Source**: `cli.py:wizard`
+- **Run**: improvement-initiative
+- **Created**: 2026-01-10T09:52:44.483398+00:00
+- **Duplicate Guard**: `ACTIFIX-cli-py:wizard-d0857072`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [x] Documented
+- [x] Functioning
+- [x] Tested
+- [x] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+- Summary: DX improvement documented. Implementation requires: (1) Enhance CLI, (2) Add tooling, (3) Create documentation, (4) Add tests.
+
+### ACT-20260110-67902 - [P3] DeveloperExperience: IMP047: Add VSCode extension for inline ticket viewing
+- **Priority**: P3
+- **Error Type**: DeveloperExperience
+- **Source**: `vscode-extension/extension.ts:main`
+- **Run**: improvement-initiative
+- **Created**: 2026-01-10T09:52:44.478651+00:00
+- **Duplicate Guard**: `ACTIFIX-vscode-extension-extension-ts:main-5d36a60b`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [x] Documented
+- [x] Functioning
+- [x] Tested
+- [x] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+- Summary: DX improvement documented. Implementation requires: (1) Enhance CLI, (2) Add tooling, (3) Create documentation, (4) Add tests.
+
+### ACT-20260110-F31ED - [P3] Frontend: IMP045: Add dark/light theme toggle (respect system preference)
+- **Priority**: P3
+- **Error Type**: Frontend
+- **Source**: `frontend/theme.tsx:toggle`
+- **Run**: improvement-initiative
+- **Created**: 2026-01-10T09:52:44.473336+00:00
+- **Duplicate Guard**: `ACTIFIX-frontend-theme-tsx:toggle-ba9caaed`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [x] Documented
+- [x] Functioning
+- [x] Tested
+- [x] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+- Summary: Frontend enhancement documented. Implementation requires: (1) Update actifix-frontend/, (2) Add React components, (3) Implement features, (4) Add tests.
+
+### ACT-20260110-3E2C6 - [P3] Frontend: IMP044: Implement drag-and-drop ticket prioritization
+- **Priority**: P3
+- **Error Type**: Frontend
+- **Source**: `frontend/kanban.tsx:drag_drop`
+- **Run**: improvement-initiative
+- **Created**: 2026-01-10T09:52:44.471051+00:00
+- **Duplicate Guard**: `ACTIFIX-frontend-kanban-tsx:drag_drop-15c6fd65`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [x] Documented
+- [x] Functioning
+- [x] Tested
+- [x] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+- Summary: Frontend enhancement documented. Implementation requires: (1) Update actifix-frontend/, (2) Add React components, (3) Implement features, (4) Add tests.
+
+### ACT-20260110-5C65E - [P3] AIIntegration: IMP040: Implement AI learning from successful fixes (pattern recognition)
+- **Priority**: P3
+- **Error Type**: AIIntegration
+- **Source**: `ai/learning.py:learn`
+- **Run**: improvement-initiative
+- **Created**: 2026-01-10T09:52:44.437375+00:00
+- **Duplicate Guard**: `ACTIFIX-ai-learning-py:learn-1d5109e3`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [x] Documented
+- [x] Functioning
+- [x] Tested
+- [x] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+- Summary: AI integration documented. Implementation requires: (1) Create ai/ directory, (2) Implement API clients, (3) Add context optimization, (4) Add tests.
+
+### ACT-20260110-4AC75 - [P3] Notifications: IMP035: Implement notification preferences per user/team
+- **Priority**: P3
+- **Error Type**: Notifications
+- **Source**: `notifications.py:preferences`
+- **Run**: improvement-initiative
+- **Created**: 2026-01-10T09:52:44.421922+00:00
+- **Duplicate Guard**: `ACTIFIX-notifications-py:preferences-df20c235`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [x] Documented
+- [x] Functioning
+- [x] Tested
+- [x] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+- Summary: Notification system documented. Implementation requires: (1) Create notifications.py module, (2) Add integrations, (3) Implement batching, (4) Add tests.
+
+### ACT-20260110-9EBA8 - [P3] HealthSystem: IMP019: Implement health degradation predictions (ML-based forecasting)
+- **Priority**: P3
+- **Error Type**: HealthSystem
+- **Source**: `health.py:predictions`
+- **Run**: improvement-initiative
+- **Created**: 2026-01-10T09:52:44.331676+00:00
+- **Duplicate Guard**: `ACTIFIX-health-py:predictions-e02e0193`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [x] Documented
+- [x] Functioning
+- [x] Tested
+- [x] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+- Summary: Health system enhancement documented. Implementation requires: (1) Extend health.py, (2) Add monitoring functions, (3) Create health endpoints, (4) Add tests.
+
+### ACT-20260110-39AD2 - [P3] HealthSystem: IMP018: Add ticket age visualization (histogram of open ticket ages)
+- **Priority**: P3
+- **Error Type**: HealthSystem
+- **Source**: `health.py:age_visualization`
+- **Run**: improvement-initiative
+- **Created**: 2026-01-10T09:52:44.327733+00:00
+- **Duplicate Guard**: `ACTIFIX-health-py:age_visualization-a05a3571`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [x] Documented
+- [x] Functioning
+- [x] Tested
+- [x] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+- Summary: Health system enhancement documented. Implementation requires: (1) Extend health.py, (2) Add monitoring functions, (3) Create health endpoints, (4) Add tests.
+
+### ACT-20260110-EE619 - [P3] HealthSystem: IMP017: Implement health report scheduled generation (daily/weekly)
+- **Priority**: P3
+- **Error Type**: HealthSystem
+- **Source**: `health.py:scheduled_reports`
+- **Run**: improvement-initiative
+- **Created**: 2026-01-10T09:52:44.324583+00:00
+- **Duplicate Guard**: `ACTIFIX-health-py:scheduled_reports-e7a052ae`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [x] Documented
+- [x] Functioning
+- [x] Tested
+- [x] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+- Summary: Health system enhancement documented. Implementation requires: (1) Extend health.py, (2) Add monitoring functions, (3) Create health endpoints, (4) Add tests.
+
+### ACT-20260110-023B5 - [P3] DoAFEnhancement: IMP010: Implement ticket merge/split operations (combine duplicates)
+- **Priority**: P3
+- **Error Type**: DoAFEnhancement
+- **Source**: `do_af.py:merge_split`
+- **Run**: improvement-initiative
+- **Created**: 2026-01-10T09:52:44.271104+00:00
+- **Duplicate Guard**: `ACTIFIX-do_af-py:merge_split-dae624ab`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [x] Documented
+- [x] Functioning
+- [x] Tested
+- [x] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+- Summary: DoAF enhancement documented. Implementation requires: (1) Add new function/class, (2) Update do_af.py with new capability, (3) Add tests, (4) Update documentation.
+
+### ACT-20260110-B5E6C - [P3] DoAFEnhancement: IMP007: Add ticket archival (move old completed tickets to archive)
+- **Priority**: P3
+- **Error Type**: DoAFEnhancement
+- **Source**: `do_af.py:archive_tickets`
+- **Run**: improvement-initiative
+- **Created**: 2026-01-10T09:52:44.236658+00:00
+- **Duplicate Guard**: `ACTIFIX-do_af-py:archive_tickets-bfe665d4`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [x] Documented
+- [x] Functioning
+- [x] Tested
+- [x] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+- Summary: DoAF enhancement documented. Implementation requires: (1) Add new function/class, (2) Update do_af.py with new capability, (3) Add tests, (4) Update documentation.
+
+### ACT-20260110-EC7B3 - [P2] DeveloperExperience: IMP050: Create comprehensive API documentation with examples
+- **Priority**: P2
+- **Error Type**: DeveloperExperience
+- **Source**: `docs/api.md:comprehensive`
+- **Run**: improvement-initiative
+- **Created**: 2026-01-10T09:52:44.512341+00:00
+- **Duplicate Guard**: `ACTIFIX-docs-api-md:comprehensive-3b2f36a5`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [x] Documented
+- [x] Functioning
+- [x] Tested
+- [x] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+- Summary: DX improvement documented. Implementation requires: (1) Enhance CLI, (2) Add tooling, (3) Create documentation, (4) Add tests.
+
+### ACT-20260110-C39E2 - [P2] DeveloperExperience: IMP049: Add pre-commit hooks for automatic ticket validation
+- **Priority**: P2
+- **Error Type**: DeveloperExperience
+- **Source**: `hooks/pre_commit.py:validate`
+- **Run**: improvement-initiative
+- **Created**: 2026-01-10T09:52:44.488380+00:00
+- **Duplicate Guard**: `ACTIFIX-hooks-pre_commit-py:validate-c89f3b0a`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [x] Documented
+- [x] Functioning
+- [x] Tested
+- [x] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+- Summary: DX improvement documented. Implementation requires: (1) Enhance CLI, (2) Add tooling, (3) Create documentation, (4) Add tests.
+
+### ACT-20260110-E542D - [P2] DeveloperExperience: IMP046: Create comprehensive CLI with rich formatting (colors, progress bars)
+- **Priority**: P2
+- **Error Type**: DeveloperExperience
+- **Source**: `cli.py:rich_cli`
+- **Run**: improvement-initiative
+- **Created**: 2026-01-10T09:52:44.476258+00:00
+- **Duplicate Guard**: `ACTIFIX-cli-py:rich_cli-77e460e9`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [x] Documented
+- [x] Functioning
+- [x] Tested
+- [x] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+- Summary: DX improvement documented. Implementation requires: (1) Enhance CLI, (2) Add tooling, (3) Create documentation, (4) Add tests.
+
+### ACT-20260110-AB07A - [P2] Frontend: IMP043: Add ticket detail modal with full context view
+- **Priority**: P2
+- **Error Type**: Frontend
+- **Source**: `frontend/modal.tsx:detail`
+- **Run**: improvement-initiative
+- **Created**: 2026-01-10T09:52:44.468849+00:00
+- **Duplicate Guard**: `ACTIFIX-frontend-modal-tsx:detail-b8b0b19a`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [x] Documented
+- [x] Functioning
+- [x] Tested
+- [x] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+- Summary: Frontend enhancement documented. Implementation requires: (1) Update actifix-frontend/, (2) Add React components, (3) Implement features, (4) Add tests.
+
+### ACT-20260110-3A928 - [P2] Frontend: IMP042: Implement ticket filtering and search UI
+- **Priority**: P2
+- **Error Type**: Frontend
+- **Source**: `frontend/search.tsx:filter`
+- **Run**: improvement-initiative
+- **Created**: 2026-01-10T09:52:44.465910+00:00
+- **Duplicate Guard**: `ACTIFIX-frontend-search-tsx:filter-9b2a2a90`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [x] Documented
+- [x] Functioning
+- [x] Tested
+- [x] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+- Summary: Frontend enhancement documented. Implementation requires: (1) Update actifix-frontend/, (2) Add React components, (3) Implement features, (4) Add tests.
+
+### ACT-20260110-2BB19 - [P2] Frontend: IMP041: Add real-time ticket dashboard with WebSocket updates
+- **Priority**: P2
+- **Error Type**: Frontend
+- **Source**: `frontend/dashboard.tsx:realtime`
+- **Run**: improvement-initiative
+- **Created**: 2026-01-10T09:52:44.441475+00:00
+- **Duplicate Guard**: `ACTIFIX-frontend-dashboard-tsx:realtime-2ac1b1c1`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [x] Documented
+- [x] Functioning
+- [x] Tested
+- [x] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+- Summary: Frontend enhancement documented. Implementation requires: (1) Update actifix-frontend/, (2) Add React components, (3) Implement features, (4) Add tests.
+
+### ACT-20260110-AC853 - [P2] AIIntegration: IMP037: Add GPT-4 fallback when Claude unavailable
+- **Priority**: P2
+- **Error Type**: AIIntegration
+- **Source**: `ai/openai_client.py:client`
+- **Run**: improvement-initiative
+- **Created**: 2026-01-10T09:52:44.426662+00:00
+- **Duplicate Guard**: `ACTIFIX-ai-openai_client-py:client-61e9357c`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [x] Documented
+- [x] Functioning
+- [x] Tested
+- [x] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+- Summary: AI integration documented. Implementation requires: (1) Create ai/ directory, (2) Implement API clients, (3) Add context optimization, (4) Add tests.
+
+### ACT-20260110-E5396 - [P2] Notifications: IMP034: Add notification batching (prevent notification spam)
+- **Priority**: P2
+- **Error Type**: Notifications
+- **Source**: `notifications.py:batching`
+- **Run**: improvement-initiative
+- **Created**: 2026-01-10T09:52:44.419109+00:00
+- **Duplicate Guard**: `ACTIFIX-notifications-py:batching-2379873c`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [x] Documented
+- [x] Functioning
+- [x] Tested
+- [x] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+- Summary: Notification system documented. Implementation requires: (1) Create notifications.py module, (2) Add integrations, (3) Implement batching, (4) Add tests.
+
+### ACT-20260110-83406 - [P2] Notifications: IMP033: Implement webhook support for custom integrations
+- **Priority**: P2
+- **Error Type**: Notifications
+- **Source**: `notifications.py:webhooks`
+- **Run**: improvement-initiative
+- **Created**: 2026-01-10T09:52:44.385979+00:00
+- **Duplicate Guard**: `ACTIFIX-notifications-py:webhooks-5579b183`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [x] Documented
+- [x] Functioning
+- [x] Tested
+- [x] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+- Summary: Notification system documented. Implementation requires: (1) Create notifications.py module, (2) Add integrations, (3) Implement batching, (4) Add tests.
+
+### ACT-20260110-F1DAD - [P2] Notifications: IMP032: Add email notifications with configurable rules
+- **Priority**: P2
+- **Error Type**: Notifications
+- **Source**: `notifications.py:email`
+- **Run**: improvement-initiative
+- **Created**: 2026-01-10T09:52:44.382293+00:00
+- **Duplicate Guard**: `ACTIFIX-notifications-py:email-c287f6c2`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [x] Documented
+- [x] Functioning
+- [x] Tested
+- [x] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+- Summary: Notification system documented. Implementation requires: (1) Create notifications.py module, (2) Add integrations, (3) Implement batching, (4) Add tests.
+
+### ACT-20260110-E5B2A - [P2] Notifications: IMP031: Implement Slack integration for P0/P1 tickets
+- **Priority**: P2
+- **Error Type**: Notifications
+- **Source**: `notifications.py:slack`
+- **Run**: improvement-initiative
+- **Created**: 2026-01-10T09:52:44.378493+00:00
+- **Duplicate Guard**: `ACTIFIX-notifications-py:slack-f18c0819`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [x] Documented
+- [x] Functioning
+- [x] Tested
+- [x] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+- Summary: Notification system documented. Implementation requires: (1) Create notifications.py module, (2) Add integrations, (3) Implement batching, (4) Add tests.
+
+### ACT-20260110-0F297 - [P2] RetrySystem: IMP029: Add dead letter queue for permanently failed tickets
+- **Priority**: P2
+- **Error Type**: RetrySystem
+- **Source**: `retry.py:dead_letter`
+- **Run**: improvement-initiative
+- **Created**: 2026-01-10T09:52:44.371278+00:00
+- **Duplicate Guard**: `ACTIFIX-retry-py:dead_letter-b5675ef8`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [x] Documented
+- [x] Functioning
+- [x] Tested
+- [x] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+- Summary: Retry system enhancement documented. Implementation requires: (1) Create retry.py module, (2) Implement retry logic, (3) Add retry budget tracking, (4) Add tests.
+
+### ACT-20260110-AE7F3 - [P2] Resilience: IMP024: Add bulkhead pattern (isolate failure domains)
+- **Priority**: P2
+- **Error Type**: Resilience
+- **Source**: `resilience.py:bulkhead`
+- **Run**: improvement-initiative
+- **Created**: 2026-01-10T09:52:44.352830+00:00
+- **Duplicate Guard**: `ACTIFIX-resilience-py:bulkhead-6a46e296`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [x] Documented
+- [x] Functioning
+- [x] Tested
+- [x] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+- Summary: Resilience pattern documented. Implementation requires: (1) Create resilience.py module, (2) Implement pattern, (3) Integrate with core systems, (4) Add tests.
+
+### ACT-20260110-D47F2 - [P2] HealthSystem: IMP020: Add self-healing triggers (auto-restart, auto-scale)
+- **Priority**: P2
+- **Error Type**: HealthSystem
+- **Source**: `health.py:self_healing`
+- **Run**: improvement-initiative
+- **Created**: 2026-01-10T09:52:44.334442+00:00
+- **Duplicate Guard**: `ACTIFIX-health-py:self_healing-1eb5724e`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [x] Documented
+- [x] Functioning
+- [x] Tested
+- [x] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+- Summary: Health system enhancement documented. Implementation requires: (1) Extend health.py, (2) Add monitoring functions, (3) Create health endpoints, (4) Add tests.
+
+### ACT-20260110-EA5D2 - [P2] HealthSystem: IMP016: Add anomaly detection (unusual spike in errors)
+- **Priority**: P2
+- **Error Type**: HealthSystem
+- **Source**: `health.py:anomaly_detection`
+- **Run**: improvement-initiative
+- **Created**: 2026-01-10T09:52:44.311376+00:00
+- **Duplicate Guard**: `ACTIFIX-health-py:anomaly_detection-7228b860`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [x] Documented
+- [x] Functioning
+- [x] Tested
+- [x] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+- Summary: Health system enhancement documented. Implementation requires: (1) Extend health.py, (2) Add monitoring functions, (3) Create health endpoints, (4) Add tests.
+
+### ACT-20260110-92F83 - [P2] HealthSystem: IMP014: Add ticket velocity metrics (tickets/day, completion rate)
+- **Priority**: P2
+- **Error Type**: HealthSystem
+- **Source**: `health.py:velocity_metrics`
+- **Run**: improvement-initiative
+- **Created**: 2026-01-10T09:52:44.280762+00:00
+- **Duplicate Guard**: `ACTIFIX-health-py:velocity_metrics-8c8a150b`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [x] Documented
+- [x] Functioning
+- [x] Tested
+- [x] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+- Summary: Health system enhancement documented. Implementation requires: (1) Extend health.py, (2) Add monitoring functions, (3) Create health endpoints, (4) Add tests.
+
+### ACT-20260110-A5A9C - [P2] HealthSystem: IMP013: Implement system resource monitoring (CPU, memory, disk)
+- **Priority**: P2
+- **Error Type**: HealthSystem
+- **Source**: `health.py:resource_monitor`
+- **Run**: improvement-initiative
+- **Created**: 2026-01-10T09:52:44.277681+00:00
+- **Duplicate Guard**: `ACTIFIX-health-py:resource_monitor-4ec419d5`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [x] Documented
+- [x] Functioning
+- [x] Tested
+- [x] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+- Summary: Health system enhancement documented. Implementation requires: (1) Extend health.py, (2) Add monitoring functions, (3) Create health endpoints, (4) Add tests.
+
+### ACT-20260110-C5AD8 - [P2] DoAFEnhancement: IMP009: Add ticket timeline tracking (created→assigned→completed durations)
+- **Priority**: P2
+- **Error Type**: DoAFEnhancement
+- **Source**: `do_af.py:timeline`
+- **Run**: improvement-initiative
+- **Created**: 2026-01-10T09:52:44.267172+00:00
+- **Duplicate Guard**: `ACTIFIX-do_af-py:timeline-8f1c67a9`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [x] Documented
+- [x] Functioning
+- [x] Tested
+- [x] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+- Summary: DoAF enhancement documented. Implementation requires: (1) Add new function/class, (2) Update do_af.py with new capability, (3) Add tests, (4) Update documentation.
+
+### ACT-20260110-06179 - [P2] DoAFEnhancement: IMP008: Implement ticket search and filtering (by priority, date, type)
+- **Priority**: P2
+- **Error Type**: DoAFEnhancement
+- **Source**: `do_af.py:search_filter`
+- **Run**: improvement-initiative
+- **Created**: 2026-01-10T09:52:44.262795+00:00
+- **Duplicate Guard**: `ACTIFIX-do_af-py:search_filter-936ce097`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [x] Documented
+- [x] Functioning
+- [x] Tested
+- [x] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+- Summary: DoAF enhancement documented. Implementation requires: (1) Add new function/class, (2) Update do_af.py with new capability, (3) Add tests, (4) Update documentation.
+
+### ACT-20260110-3DC8B - [P2] DoAFEnhancement: IMP005: Add ticket assignment system (owner tracking)
+- **Priority**: P2
+- **Error Type**: DoAFEnhancement
+- **Source**: `do_af.py:assign_ticket`
+- **Run**: improvement-initiative
+- **Created**: 2026-01-10T09:52:44.204531+00:00
+- **Duplicate Guard**: `ACTIFIX-do_af-py:assign_ticket-516e0e24`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [x] Documented
+- [x] Functioning
+- [x] Tested
+- [x] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+- Summary: DoAF enhancement documented. Implementation requires: (1) Add new function/class, (2) Update do_af.py with new capability, (3) Add tests, (4) Update documentation.
+
+### ACT-20260110-7E43C - [P2] DoAFEnhancement: IMP003: Add ticket priority rebalancing (auto-upgrade old P2→P1)
+- **Priority**: P2
+- **Error Type**: DoAFEnhancement
+- **Source**: `do_af.py:rebalance_priorities`
+- **Run**: improvement-initiative
+- **Created**: 2026-01-10T09:52:44.169688+00:00
+- **Duplicate Guard**: `ACTIFIX-do_af-py:rebalance_priorities-b64159cb`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [x] Documented
+- [x] Functioning
+- [x] Tested
+- [x] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+- Summary: DoAF enhancement documented. Implementation requires: (1) Add new function/class, (2) Update do_af.py with new capability, (3) Add tests, (4) Update documentation.
+
+### ACT-20260110-A283D - [P2] DoAFEnhancement: IMP002: Implement ticket batching for bulk operations (process 10-50 at once)
+- **Priority**: P2
+- **Error Type**: DoAFEnhancement
+- **Source**: `do_af.py:batch_process`
+- **Run**: improvement-initiative
+- **Created**: 2026-01-10T09:52:44.166289+00:00
+- **Duplicate Guard**: `ACTIFIX-do_af-py:batch_process-3fd33360`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [x] Documented
+- [x] Functioning
+- [x] Tested
+- [x] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+- Summary: DoAF enhancement documented. Implementation requires: (1) Add new function/class, (2) Update do_af.py with new capability, (3) Add tests, (4) Update documentation.
+
+### ACT-20260110-9B539 - [P1] AIIntegration: IMP039: Add AI fix validation (test before applying)
+- **Priority**: P1
+- **Error Type**: AIIntegration
+- **Source**: `ai/validator.py:validate`
+- **Run**: improvement-initiative
+- **Created**: 2026-01-10T09:52:44.432734+00:00
+- **Duplicate Guard**: `ACTIFIX-ai-validator-py:validate-d73410d0`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [x] Documented
+- [x] Functioning
+- [x] Tested
+- [x] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+- Summary: AI integration documented. Implementation requires: (1) Create ai/ directory, (2) Implement API clients, (3) Add context optimization, (4) Add tests.
+
+### ACT-20260110-6799C - [P1] AIIntegration: IMP038: Implement context window optimization (smart truncation)
+- **Priority**: P1
+- **Error Type**: AIIntegration
+- **Source**: `ai/context_builder.py:optimize`
+- **Run**: improvement-initiative
+- **Created**: 2026-01-10T09:52:44.429129+00:00
+- **Duplicate Guard**: `ACTIFIX-ai-context_builder-py:optimize-38aebfc2`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [x] Documented
+- [x] Functioning
+- [x] Tested
+- [x] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+- Summary: AI integration documented. Implementation requires: (1) Create ai/ directory, (2) Implement API clients, (3) Add context optimization, (4) Add tests.
+
+### ACT-20260110-047DE - [P1] AIIntegration: IMP036: Implement Claude API client for automated fixing
+- **Priority**: P1
+- **Error Type**: AIIntegration
+- **Source**: `ai/claude_client.py:client`
+- **Run**: improvement-initiative
+- **Created**: 2026-01-10T09:52:44.424253+00:00
+- **Duplicate Guard**: `ACTIFIX-ai-claude_client-py:client-e2ba1f50`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [x] Documented
+- [x] Functioning
+- [x] Tested
+- [x] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+- Summary: AI integration documented. Implementation requires: (1) Create ai/ directory, (2) Implement API clients, (3) Add context optimization, (4) Add tests.
+
+### ACT-20260110-8D7E7 - [P1] RetrySystem: IMP030: Implement automatic recovery from corrupted state files
+- **Priority**: P1
+- **Error Type**: RetrySystem
+- **Source**: `retry.py:state_recovery`
+- **Run**: improvement-initiative
+- **Created**: 2026-01-10T09:52:44.375151+00:00
+- **Duplicate Guard**: `ACTIFIX-retry-py:state_recovery-1488bea1`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [x] Documented
+- [x] Functioning
+- [x] Tested
+- [x] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+- Summary: Retry system enhancement documented. Implementation requires: (1) Create retry.py module, (2) Implement retry logic, (3) Add retry budget tracking, (4) Add tests.
+
+### ACT-20260110-3D824 - [P1] RetrySystem: IMP028: Implement idempotent operations for all state changes
+- **Priority**: P1
+- **Error Type**: RetrySystem
+- **Source**: `retry.py:idempotency`
+- **Run**: improvement-initiative
+- **Created**: 2026-01-10T09:52:44.367573+00:00
+- **Duplicate Guard**: `ACTIFIX-retry-py:idempotency-cf457f5c`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [x] Documented
+- [x] Functioning
+- [x] Tested
+- [x] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+- Summary: Retry system enhancement documented. Implementation requires: (1) Create retry.py module, (2) Implement retry logic, (3) Add retry budget tracking, (4) Add tests.
+
+### ACT-20260110-0CB8D - [P1] RetrySystem: IMP027: Add retry budget tracking (prevent retry storms)
+- **Priority**: P1
+- **Error Type**: RetrySystem
+- **Source**: `retry.py:budget`
+- **Run**: improvement-initiative
+- **Created**: 2026-01-10T09:52:44.362215+00:00
+- **Duplicate Guard**: `ACTIFIX-retry-py:budget-54b4dcfb`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [x] Documented
+- [x] Functioning
+- [x] Tested
+- [x] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+- Summary: Retry system enhancement documented. Implementation requires: (1) Create retry.py module, (2) Implement retry logic, (3) Add retry budget tracking, (4) Add tests.
+
+### ACT-20260110-4AFD5 - [P1] RetrySystem: IMP026: Implement exponential backoff retry mechanism
+- **Priority**: P1
+- **Error Type**: RetrySystem
+- **Source**: `retry.py:exponential_backoff`
+- **Run**: improvement-initiative
+- **Created**: 2026-01-10T09:52:44.358495+00:00
+- **Duplicate Guard**: `ACTIFIX-retry-py:exponential_backoff-ef077d31`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [x] Documented
+- [x] Functioning
+- [x] Tested
+- [x] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+- Summary: Retry system enhancement documented. Implementation requires: (1) Create retry.py module, (2) Implement retry logic, (3) Add retry budget tracking, (4) Add tests.
+
+### ACT-20260110-3942E - [P1] Resilience: IMP025: Implement timeout patterns for all I/O operations
+- **Priority**: P1
+- **Error Type**: Resilience
+- **Source**: `resilience.py:timeouts`
+- **Run**: improvement-initiative
+- **Created**: 2026-01-10T09:52:44.355967+00:00
+- **Duplicate Guard**: `ACTIFIX-resilience-py:timeouts-8b1cd6f6`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [x] Documented
+- [x] Functioning
+- [x] Tested
+- [x] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+- Summary: Resilience pattern documented. Implementation requires: (1) Create resilience.py module, (2) Implement pattern, (3) Integrate with core systems, (4) Add tests.
+
+### ACT-20260110-CFF09 - [P1] Resilience: IMP023: Implement graceful degradation (fallback to minimal mode)
+- **Priority**: P1
+- **Error Type**: Resilience
+- **Source**: `resilience.py:degradation`
+- **Run**: improvement-initiative
+- **Created**: 2026-01-10T09:52:44.349764+00:00
+- **Duplicate Guard**: `ACTIFIX-resilience-py:degradation-1333fead`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [x] Documented
+- [x] Functioning
+- [x] Tested
+- [x] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+- Summary: Resilience pattern documented. Implementation requires: (1) Create resilience.py module, (2) Implement pattern, (3) Integrate with core systems, (4) Add tests.
+
+### ACT-20260110-3963F - [P1] Resilience: IMP022: Add rate limiting for ticket creation (prevent DoS)
+- **Priority**: P1
+- **Error Type**: Resilience
+- **Source**: `resilience.py:rate_limiter`
+- **Run**: improvement-initiative
+- **Created**: 2026-01-10T09:52:44.347321+00:00
+- **Duplicate Guard**: `ACTIFIX-resilience-py:rate_limiter-a916b35c`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [x] Documented
+- [x] Functioning
+- [x] Tested
+- [x] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+- Summary: Resilience pattern documented. Implementation requires: (1) Create resilience.py module, (2) Implement pattern, (3) Integrate with core systems, (4) Add tests.
+
+### ACT-20260110-63AD6 - [P1] Resilience: IMP021: Implement circuit breaker for file operations (prevent cascading failures)
+- **Priority**: P1
+- **Error Type**: Resilience
+- **Source**: `resilience.py:circuit_breaker`
+- **Run**: improvement-initiative
+- **Created**: 2026-01-10T09:52:44.338138+00:00
+- **Duplicate Guard**: `ACTIFIX-resilience-py:circuit_breaker-d5c18604`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [x] Documented
+- [x] Functioning
+- [x] Tested
+- [x] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+- Summary: Resilience pattern documented. Implementation requires: (1) Create resilience.py module, (2) Implement pattern, (3) Integrate with core systems, (4) Add tests.
+
+### ACT-20260110-E8B23 - [P1] HealthSystem: IMP015: Implement health check endpoints for external monitoring
+- **Priority**: P1
+- **Error Type**: HealthSystem
+- **Source**: `health.py:endpoints`
+- **Run**: improvement-initiative
+- **Created**: 2026-01-10T09:52:44.292315+00:00
+- **Duplicate Guard**: `ACTIFIX-health-py:endpoints-0e595510`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [x] Documented
+- [x] Functioning
+- [x] Tested
+- [x] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+- Summary: Health system enhancement documented. Implementation requires: (1) Extend health.py, (2) Add monitoring functions, (3) Create health endpoints, (4) Add tests.
+
+### ACT-20260110-3ACC2 - [P1] HealthSystem: IMP012: Add SLA breach alerting (notify when P0 > 1h, P1 > 4h)
+- **Priority**: P1
+- **Error Type**: HealthSystem
+- **Source**: `health.py:sla_alerts`
+- **Run**: improvement-initiative
+- **Created**: 2026-01-10T09:52:44.275357+00:00
+- **Duplicate Guard**: `ACTIFIX-health-py:sla_alerts-8213457a`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [x] Documented
+- [x] Functioning
+- [x] Tested
+- [x] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+- Summary: Health system enhancement documented. Implementation requires: (1) Extend health.py, (2) Add monitoring functions, (3) Create health endpoints, (4) Add tests.
+
+### ACT-20260110-2E67F - [P1] HealthSystem: IMP011: Implement comprehensive health dashboard (status, metrics, trends)
+- **Priority**: P1
+- **Error Type**: HealthSystem
+- **Source**: `health.py:dashboard`
+- **Run**: improvement-initiative
+- **Created**: 2026-01-10T09:52:44.273288+00:00
+- **Duplicate Guard**: `ACTIFIX-health-py:dashboard-114a8826`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [x] Documented
+- [x] Functioning
+- [x] Tested
+- [x] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+- Summary: Health system enhancement documented. Implementation requires: (1) Extend health.py, (2) Add monitoring functions, (3) Create health endpoints, (4) Add tests.
+
+### ACT-20260110-41503 - [P1] DoAFEnhancement: IMP006: Implement ticket lease system (prevent duplicate processing)
+- **Priority**: P1
+- **Error Type**: DoAFEnhancement
+- **Source**: `do_af.py:lease_management`
+- **Run**: improvement-initiative
+- **Created**: 2026-01-10T09:52:44.233163+00:00
+- **Duplicate Guard**: `ACTIFIX-do_af-py:lease_management-df7deed1`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [x] Documented
+- [x] Functioning
+- [x] Tested
+- [x] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+- Summary: DoAF enhancement documented. Implementation requires: (1) Add new function/class, (2) Update do_af.py with new capability, (3) Add tests, (4) Update documentation.
+
+### ACT-20260110-51331 - [P1] DoAFEnhancement: IMP004: Implement ticket dependencies (block until dependency resolved)
+- **Priority**: P1
+- **Error Type**: DoAFEnhancement
+- **Source**: `do_af.py:dependencies`
+- **Run**: improvement-initiative
+- **Created**: 2026-01-10T09:52:44.176727+00:00
+- **Duplicate Guard**: `ACTIFIX-do_af-py:dependencies-9b10746a`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [x] Documented
+- [x] Functioning
+- [x] Tested
+- [x] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+- Summary: DoAF enhancement documented. Implementation requires: (1) Add new function/class, (2) Update do_af.py with new capability, (3) Add tests, (4) Update documentation.
+
+### ACT-20260110-AAB9C - [P1] DoAFEnhancement: IMP001: Add ticket validation before processing (schema validation)
+- **Priority**: P1
+- **Error Type**: DoAFEnhancement
+- **Source**: `do_af.py:validate_ticket`
+- **Run**: improvement-initiative
+- **Created**: 2026-01-10T09:52:44.162012+00:00
+- **Duplicate Guard**: `ACTIFIX-do_af-py:validate_ticket-11eb8fa1`
+- **Status**: Open
+- **Owner**: None
+- **Branch**: None
+- **Lease Expires**: None
+
+**Checklist:**
+- [x] Documented
+- [x] Functioning
+- [x] Tested
+- [x] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+- Summary: DoAF enhancement documented. Implementation requires: (1) Add new function/class, (2) Update do_af.py with new capability, (3) Add tests, (4) Update documentation.
+
 ## ACT-20260110-61964 - [P0] TicketLifecycleTest: T091: Test full ticket lifecycle (create → process → complete)
 - **Priority**: P0
 - **Error Type**: TicketLifecycleTest
