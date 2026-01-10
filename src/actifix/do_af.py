@@ -2,15 +2,22 @@
 Actifix DoAF - Ticket Dispatch and Processing.
 
 Dispatches tickets to AI for automated fixes.
+
+Thread-safety: operations that read/modify ACTIFIX-LIST.md are guarded by a
+file-based lock to prevent duplicate dispatch when multiple threads/processes
+run concurrently.
 """
 
+import contextlib
 import os
 import re
 import subprocess
+import threading
+import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional, Callable
+from typing import Optional, Callable, Iterator
 
 from .log_utils import atomic_write, log_event
 from .state_paths import get_actifix_paths, ActifixPaths
@@ -146,6 +153,7 @@ def mark_ticket_complete(
     ticket_id: str,
     summary: str = "",
     paths: Optional[ActifixPaths] = None,
+    use_lock: bool = True,
 ) -> bool:
     """
     Mark a ticket as complete in ACTIFIX-LIST.md.
@@ -154,6 +162,7 @@ def mark_ticket_complete(
         ticket_id: Ticket ID to mark complete.
         summary: Optional completion summary.
         paths: Optional paths override.
+        use_lock: Guard writes with the DoAF lock (set False if already held).
     
     Returns:
         True if marked complete, False if not found.
@@ -164,53 +173,58 @@ def mark_ticket_complete(
     if not paths.list_file.exists():
         return False
     
-    content = paths.list_file.read_text()
+    with _ticket_lock(paths, enabled=use_lock):
+        content = paths.list_file.read_text()
     
-    # Find the ticket block (support ## or ### headers)
-    header_pattern = re.compile(rf'(##+\s+{re.escape(ticket_id)}.*?)((?=##+\s+ACT-)|(?=##\s+Completed Items)|\Z)', re.DOTALL)
-    match = header_pattern.search(content)
-    if not match:
-        return False
-    
-    ticket_block = match.group(1)
-    
-    # Update checkboxes
-    new_block = ticket_block
-    new_block = re.sub(r'\[[ ]\] Documented', '[x] Documented', new_block)
-    new_block = re.sub(r'\[[ ]\] Functioning', '[x] Functioning', new_block)
-    new_block = re.sub(r'\[[ ]\] Tested', '[x] Tested', new_block)
-    new_block = re.sub(r'\[[ ]\] Completed', '[x] Completed', new_block)
-    
-    # Add summary if provided
-    if summary and "- Summary:" not in new_block:
-        new_block = new_block.rstrip() + f"\n- Summary: {summary}\n\n"
-    elif summary:
-        new_block = re.sub(r'- Summary:.*', f'- Summary: {summary}', new_block)
-    
-    # Replace in content
-    updated = content.replace(ticket_block, new_block, 1)
-    
-    # Move to Completed section if needed
-    if "## Completed Items" in updated:
-        # Remove updated block from Active
-        updated = updated.replace(new_block, "", 1)
+        # Find the ticket block (support ## or ### headers)
+        header_pattern = re.compile(
+            rf'(##+\s+{re.escape(ticket_id)}.*?)'
+            r'((?=##+\s+ACT-)|(?=##\s+Completed Items)|\Z)',
+            re.DOTALL,
+        )
+        match = header_pattern.search(content)
+        if not match:
+            return False
         
-        # Add to Completed
-        completed_pos = updated.find("## Completed Items")
-        insert_pos = completed_pos + len("## Completed Items\n")
-        updated = updated[:insert_pos] + new_block + updated[insert_pos:]
-    
-    atomic_write(paths.list_file, updated)
-    
-    log_event(
-        paths.aflog_file,
-        "TICKET_COMPLETED",
-        f"Marked ticket complete: {ticket_id}",
-        ticket_id=ticket_id,
-        extra={"summary": summary[:50] if summary else None}
-    )
-    
-    return True
+        ticket_block = match.group(1)
+        
+        # Update checkboxes
+        new_block = ticket_block
+        new_block = re.sub(r'\[[ ]\] Documented', '[x] Documented', new_block)
+        new_block = re.sub(r'\[[ ]\] Functioning', '[x] Functioning', new_block)
+        new_block = re.sub(r'\[[ ]\] Tested', '[x] Tested', new_block)
+        new_block = re.sub(r'\[[ ]\] Completed', '[x] Completed', new_block)
+        
+        # Add summary if provided
+        if summary and "- Summary:" not in new_block:
+            new_block = new_block.rstrip() + f"\n- Summary: {summary}\n\n"
+        elif summary:
+            new_block = re.sub(r'- Summary:.*', f'- Summary: {summary}', new_block)
+        
+        # Replace in content
+        updated = content.replace(ticket_block, new_block, 1)
+        
+        # Move to Completed section if needed
+        if "## Completed Items" in updated:
+            # Remove updated block from Active
+            updated = updated.replace(new_block, "", 1)
+            
+            # Add to Completed
+            completed_pos = updated.find("## Completed Items")
+            insert_pos = completed_pos + len("## Completed Items\n")
+            updated = updated[:insert_pos] + new_block + updated[insert_pos:]
+        
+        atomic_write(paths.list_file, updated)
+        
+        log_event(
+            paths.aflog_file,
+            "TICKET_COMPLETED",
+            f"Marked ticket complete: {ticket_id}",
+            ticket_id=ticket_id,
+            extra={"summary": summary[:50] if summary else None}
+        )
+        
+        return True
 
 
 def process_next_ticket(
@@ -231,52 +245,54 @@ def process_next_ticket(
     if paths is None:
         paths = get_actifix_paths()
     
-    tickets = get_open_tickets(paths)
-    if not tickets:
-        log_event(
-            paths.aflog_file,
-            "NO_TICKETS",
-            "No open tickets to process"
-        )
-        return None
-    
-    # Get highest priority ticket
-    ticket = tickets[0]
-    
-    log_event(
-        paths.aflog_file,
-        "DISPATCH_STARTED",
-        f"Processing ticket: {ticket.ticket_id}",
-        ticket_id=ticket.ticket_id,
-        extra={"priority": ticket.priority}
-    )
-    
-    # If AI handler provided, use it
-    if ai_handler:
-        try:
-            success = ai_handler(ticket)
-            if success:
-                mark_ticket_complete(
-                    ticket.ticket_id,
-                    summary="Fixed via AI handler",
-                    paths=paths
-                )
-                log_event(
-                    paths.aflog_file,
-                    "DISPATCH_SUCCESS",
-                    f"AI handler completed: {ticket.ticket_id}",
-                    ticket_id=ticket.ticket_id
-                )
-        except Exception as e:
+    with _ticket_lock(paths):
+        tickets = get_open_tickets(paths)
+        if not tickets:
             log_event(
                 paths.aflog_file,
-                "DISPATCH_FAILED",
-                f"AI handler failed: {e}",
-                ticket_id=ticket.ticket_id,
-                extra={"error": str(e)}
+                "NO_TICKETS",
+                "No open tickets to process"
             )
-    
-    return ticket
+            return None
+        
+        # Get highest priority ticket
+        ticket = tickets[0]
+        
+        log_event(
+            paths.aflog_file,
+            "DISPATCH_STARTED",
+            f"Processing ticket: {ticket.ticket_id}",
+            ticket_id=ticket.ticket_id,
+            extra={"priority": ticket.priority}
+        )
+        
+        # If AI handler provided, use it
+        if ai_handler:
+            try:
+                success = ai_handler(ticket)
+                if success:
+                    mark_ticket_complete(
+                        ticket.ticket_id,
+                        summary="Fixed via AI handler",
+                        paths=paths,
+                        use_lock=False,  # lock already held
+                    )
+                    log_event(
+                        paths.aflog_file,
+                        "DISPATCH_SUCCESS",
+                        f"AI handler completed: {ticket.ticket_id}",
+                        ticket_id=ticket.ticket_id
+                    )
+            except Exception as e:
+                log_event(
+                    paths.aflog_file,
+                    "DISPATCH_FAILED",
+                    f"AI handler failed: {e}",
+                    ticket_id=ticket.ticket_id,
+                    extra={"error": str(e)}
+                )
+        
+        return ticket
 
 
 def process_tickets(
@@ -352,3 +368,95 @@ def get_ticket_stats(paths: Optional[ActifixPaths] = None) -> dict:
         "completed": completed,
         "by_priority": by_priority,
     }
+
+
+# --- Concurrency helpers ---
+
+_THREAD_LOCK = threading.Lock()
+_LOCK_FILENAME = "doaf.lock"
+
+
+@contextlib.contextmanager
+def _ticket_lock(paths: ActifixPaths, enabled: bool = True, timeout: float = 10.0) -> Iterator[None]:
+    """
+    File-based lock to guard ticket reads/writes across threads/processes.
+    
+    Uses a reentrant thread lock plus a filesystem lock (fcntl/msvcrt). If
+    locking fails within timeout, raises TimeoutError.
+    """
+    if not enabled:
+        yield
+        return
+    
+    lock_path = paths.state_dir / _LOCK_FILENAME
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    
+    with _THREAD_LOCK:
+        lock_file = lock_path.open("a+")
+        try:
+            _acquire_file_lock(lock_file, timeout=timeout)
+            yield
+        finally:
+            _release_file_lock(lock_file)
+            lock_file.close()
+
+
+def _acquire_file_lock(lock_file, timeout: float = 10.0) -> None:
+    start = time.monotonic()
+    while True:
+        try:
+            if _try_lock(lock_file):
+                return
+        except BlockingIOError:
+            pass
+        
+        if time.monotonic() - start > timeout:
+            raise TimeoutError("Timed out acquiring DoAF lock")
+        time.sleep(0.05)
+
+
+def _release_file_lock(lock_file) -> None:
+    try:
+        if _has_fcntl():
+            import fcntl
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+        elif _has_msvcrt():
+            import msvcrt
+            try:
+                msvcrt.locking(lock_file.fileno(), msvcrt.LK_UNLCK, 1)
+            except OSError:
+                pass
+    except Exception:
+        pass
+
+
+def _try_lock(lock_file) -> bool:
+    if _has_fcntl():
+        import fcntl
+        fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        return True
+    if _has_msvcrt():
+        import msvcrt
+        try:
+            msvcrt.locking(lock_file.fileno(), msvcrt.LK_NBLCK, 1)
+            return True
+        except OSError:
+            return False
+    # Fallback: rely on thread lock only
+    return True
+
+
+def _has_fcntl() -> bool:
+    try:
+        import fcntl  # noqa: F401
+        return True
+    except Exception:
+        return False
+
+
+def _has_msvcrt() -> bool:
+    try:
+        import msvcrt  # noqa: F401
+        return True
+    except Exception:
+        return False
