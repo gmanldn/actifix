@@ -1,0 +1,10 @@
+2026-01-10 16:26:51,161 - INFO - === ACTIFIX Universal Setup ===
+2026-01-10 16:26:51,161 - INFO - === Running Self-Tests ===
+2026-01-10 16:26:51,161 - INFO - Prerequisites test ✓
+2026-01-10 16:26:51,176 - INFO - Python imports test ✓
+2026-01-10 16:26:51,177 - INFO - Workspace structure test ✓
+2026-01-10 16:26:51,177 - DEBUG - Running command: /Library/Frameworks/Python.framework/Versions/3.14/bin/python3 -m actifix.main --help
+2026-01-10 16:26:51,215 - DEBUG - Command error: /Library/Frameworks/Python.framework/Versions/3.14/bin/python3: No module named actifix.main
+
+2026-01-10 16:26:51,215 - ERROR - Test failed: Command test failed
+2026-01-10 16:26:51,215 - INFO - Self-tests completed: 3 passed, 1 failed

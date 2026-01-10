@@ -1,6 +1,139 @@
 # Actifix Quickstart
 
-Rapid guide to install Actifix, bootstrap error capture, and view the web interface on macOS, Linux, and Windows (via WSL).
+> **The Self-Improving Error Management Framework** 🚀
+
+## What is ACTIFIX?
+
+ACTIFIX is a sophisticated error tracking and management framework that can **track and improve itself**. Unlike traditional error logging systems, ACTIFIX is designed from the ground up for AI-assisted development, comprehensive context capture, and production-grade reliability.
+
+### 🎯 What ACTIFIX Does
+
+**Core Purpose**: Captures errors with rich context and enables AI-assisted debugging through intelligent ticket generation.
+
+**Key Capabilities**:
+- **📊 Comprehensive Error Capture** - Records errors with stack traces, file snippets, and system state
+- **🤖 AI-Ready Integration** - Generates detailed remediation notes for Claude, GPT, and other AI assistants  
+- **🔄 Self-Improvement Mode** - Can track its own development bugs and create improvement tickets
+- **🎯 Auto-Priority Classification** - Automatically assigns P0 (Critical) to P4 (Trivial) priorities
+- **🛡️ Production-Grade Reliability** - Includes fallback queues, atomic writes, and health monitoring
+- **🚫 Smart Deduplication** - Prevents redundant tickets using normalized duplicate guards
+- **🔒 Secret Redaction** - Automatically scrubs API keys, passwords, and PII from captures
+
+### 💡 Why Choose ACTIFIX?
+
+**For Development Teams:**
+- Replace scattered error logs with organized, prioritized tickets
+- Get AI-ready error descriptions for faster debugging
+- Track development progress and regression prevention
+
+**For Production Systems:**
+- Capture critical errors with enough context for immediate action
+- Automatically classify severity for proper escalation
+- Maintain audit trails for compliance and post-mortems
+
+**For AI-Assisted Development:**
+- Generate comprehensive context for AI debugging sessions
+- Enable AI assistants to suggest specific fixes with full error context
+- Create self-improving systems that track their own enhancement tickets
+
+### 🔄 The Self-Improvement Advantage
+
+What makes ACTIFIX unique is its ability to **improve itself**:
+
+```python
+# ACTIFIX tracking its own development
+import actifix
+actifix.bootstrap_actifix_development()
+
+# Now when ACTIFIX encounters a bug in its own code,
+# it automatically creates a ticket to fix itself!
+```
+
+This creates a continuous improvement loop where the framework gets better over time by tracking and fixing its own issues.
+
+### 🛠️ Real-World Use Cases
+
+**1. Production Error Monitoring**
+```python
+# In your production application
+import actifix
+actifix.enable_actifix_capture()
+
+# Automatically capture API failures
+try:
+    response = api_client.fetch_user_data(user_id)
+except APIException as e:
+    actifix.record_error(
+        message=f"API failure: {e}",
+        source=f"{__file__}:{sys._getframe().f_lineno}",
+        run_label="production-api",
+        error_type="APIException",
+        priority=actifix.TicketPriority.P1  # High priority for production
+    )
+```
+
+**2. Development Bug Tracking**
+```python
+# During development - ACTIFIX tracks its own issues!
+import actifix
+actifix.bootstrap_actifix_development()
+
+# Any bugs in your development code get automatically captured
+def experimental_feature():
+    # If this crashes, ACTIFIX creates a ticket automatically
+    return risky_new_algorithm()
+```
+
+**3. AI-Assisted Debugging**
+```python
+# Generate rich context for AI assistants
+try:
+    complex_data_processing()
+except Exception as e:
+    ticket = actifix.record_error(
+        message=str(e),
+        source="data_processor.py:157",
+        run_label="ml-pipeline",
+        capture_context=True  # Includes file snippets and system state
+    )
+    
+    # The ticket now contains everything an AI needs to suggest a fix!
+    print(f"Ticket {ticket.entry_id} ready for AI analysis")
+```
+
+**4. Team Collaboration**
+```python
+# Track progress and share context with your team
+actifix.track_development_progress(
+    "Database migration completed",
+    "Successfully migrated 1M+ user records to new schema. "
+    "Performance improved by 40%. Ready for production deployment."
+)
+```
+
+### 📊 What You Get
+
+After setup, ACTIFIX generates organized files in the `actifix/` directory:
+
+- **`ACTIFIX-LIST.md`** - Detailed ticket list with checkboxes for tracking progress
+- **`ACTIFIX.md`** - Quick rollup of last 20 errors for rapid overview  
+- **`ACTIFIX-LOG.md`** - Chronological log of completed tickets
+- **`AFLog.txt`** - Detailed audit trail for troubleshooting
+
+Each ticket includes:
+- 🆔 Unique ID (e.g., `ACT-20261001-ABC123`)
+- 🎯 Auto-assigned priority (P0-P4) 
+- 📍 Precise source location
+- 🕐 Creation timestamp
+- 🔍 Stack trace preview
+- 🤖 AI remediation notes
+- ✅ Progress checklist (Documented → Functioning → Tested → Completed)
+
+---
+
+## Quick Setup Guide
+
+Rapid guide to install ACTIFIX, bootstrap error capture, and view the web interface on macOS, Linux, and Windows (via WSL).
 
 ## Prerequisites
 - Python 3.10+ with `pip` and `venv`
