@@ -40,7 +40,7 @@ This file catalogs the architectural modules of the Actifix system. It provides 
 **Domain:** runtime  
 **Owner:** runtime  
 **Summary:** Public API surface and package exports  
-**Entrypoints:** src/actifix/__init__.py  
+**Entrypoints:** src/actifix/__init__.py, src/actifix/api.py  
 **Contracts:** expose stable API; centralize package exports  
 **Depends on:** core.raise_af, bootstrap.main, runtime.state, infra.health  
 
@@ -249,7 +249,7 @@ def update_map_yaml():
                 "domain": "runtime",
                 "owner": "runtime",
                 "summary": "Public API surface and package exports",
-                "entrypoints": ["src/actifix/__init__.py"],
+                "entrypoints": ["src/actifix/__init__.py", "src/actifix/api.py"],
                 "contracts": ["expose stable API", "centralize package exports"],
                 "depends_on": ["core.raise_af", "bootstrap.main", "runtime.state", "infra.health"]
             },

@@ -1,6 +1,6 @@
 schema_version: arch-map.v1
 meta:
-  generated_at: '2026-01-10T16:09:32.656387+00:00'
+  generated_at: '2026-01-10T20:35:39.679770+00:00'
   generator: update_architecture_docs.py
   generator_version: 2.0.0
   source_commit: current_development

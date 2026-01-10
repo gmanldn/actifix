@@ -200,7 +200,7 @@ class TestModulesMatchCodebase:
     def test_critical_modules_documented(self, map_data, actual_modules):
         """Critical modules must be documented in MAP.yaml."""
         documented_modules = {m["id"] for m in map_data["modules"]}
-        
+       
         # Core modules that MUST be documented
         critical = {
             "bootstrap.main",
@@ -213,9 +213,25 @@ class TestModulesMatchCodebase:
             "core.quarantine",
             "tooling.testing",
         }
-        
+       
         missing = critical - documented_modules
         assert not missing, f"Critical modules not documented: {missing}"
+
+    def test_all_python_files_documented(self, map_data):
+        """Every Python file in src/actifix must appear in MAP.yaml entrypoints."""
+        documented_entrypoints = set()
+        for module in map_data["modules"]:
+            documented_entrypoints.update(module["entrypoints"])
+
+        actual_files = set()
+        for path in SRC_DIR.rglob("*.py"):
+            if "__pycache__" in path.parts:
+                continue
+            relative = path.relative_to(ROOT).as_posix()
+            actual_files.add(relative)
+
+        missing = actual_files - documented_entrypoints
+        assert not missing, f"Undocumented entrypoints: {sorted(missing)}"
 
     def test_all_python_files_documented(self, map_data):
         """Every Python file in src/actifix must appear in MAP.yaml entrypoints."""
@@ -252,9 +268,17 @@ class TestDependencyGraphConsistency:
         """Every module in MAP.yaml should have a node in DEPGRAPH.json."""
         module_ids = {m["id"] for m in map_data["modules"]}
         node_ids = {n["id"] for n in depgraph_data["nodes"]}
-        
+
         missing = module_ids - node_ids
         assert not missing, f"Modules missing from DEPGRAPH.json: {missing}"
+
+    def test_all_nodes_documented_in_map(self, map_data, depgraph_data):
+        """Every DEPGRAPH node should map to a module in MAP.yaml."""
+        module_ids = {m["id"] for m in map_data["modules"]}
+        node_ids = {n["id"] for n in depgraph_data["nodes"]}
+
+        extra = node_ids - module_ids
+        assert not extra, f"DEPGRAPH nodes missing from MAP.yaml: {extra}"
 
     def test_edges_reference_valid_nodes(self, depgraph_data):
         """All edges must reference valid nodes."""
@@ -291,8 +315,7 @@ class TestDependencyGraphConsistency:
                 )
         
         # Allow some flexibility - warn but don't fail
-        if mismatches:
-            print(f"\nDependency mismatches (review needed): {mismatches}")
+        assert not mismatches, f"Dependency mismatches: {mismatches}"
 
 
 class TestContractValidation:
