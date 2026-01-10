@@ -345,3 +345,44 @@ class TestSystemEndpointDetails:
             timestamp = data['timestamp']
             # This should not raise
             datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+    
+    def test_cpu_and_memory_always_available(self, temp_project):
+        """Test that CPU and memory are never N/A - should always have numeric values."""
+        if not FLASK_AVAILABLE:
+            pytest.skip("Flask not available")
+        
+        from actifix.api import create_app
+        app = create_app(temp_project)
+        app.config['TESTING'] = True
+        with app.test_client() as client:
+            response = client.get('/api/system')
+            data = json.loads(response.data)
+            
+            resources = data['resources']
+            
+            # CPU should always be a number, never None or "N/A"
+            cpu = resources.get('cpu_percent')
+            assert cpu is not None, "CPU percent should never be None"
+            assert isinstance(cpu, (int, float)), f"CPU should be numeric, got {type(cpu)}"
+            assert cpu >= 0, "CPU percent should be >= 0"
+            assert cpu <= 100, "CPU percent should be <= 100"
+            
+            # Memory should always be available
+            memory = resources.get('memory')
+            assert memory is not None, "Memory info should never be None"
+            assert isinstance(memory, dict), "Memory should be a dict"
+            assert 'percent' in memory, "Memory should have percent field"
+            assert 'used_gb' in memory, "Memory should have used_gb field"
+            assert 'total_gb' in memory, "Memory should have total_gb field"
+            
+            # Memory values should be numeric
+            assert isinstance(memory['percent'], (int, float)), "Memory percent should be numeric"
+            assert isinstance(memory['used_gb'], (int, float)), "Memory used_gb should be numeric"
+            assert isinstance(memory['total_gb'], (int, float)), "Memory total_gb should be numeric"
+            
+            # Memory values should be reasonable
+            assert memory['percent'] >= 0, "Memory percent should be >= 0"
+            assert memory['percent'] <= 100, "Memory percent should be <= 100"
+            assert memory['used_gb'] >= 0, "Memory used_gb should be >= 0"
+            assert memory['total_gb'] > 0, "Memory total_gb should be > 0"
+            assert memory['used_gb'] <= memory['total_gb'], "Used memory should not exceed total"

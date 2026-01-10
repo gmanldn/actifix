@@ -119,6 +119,7 @@ def test_api_system_with_psutil(tmp_path, monkeypatch):
 
 
 def test_api_system_without_psutil(tmp_path, monkeypatch):
+    """Test that system endpoint falls back to defaults when psutil is missing."""
     original_import = builtins.__import__
 
     def fake_import(name, *args, **kwargs):
@@ -132,9 +133,14 @@ def test_api_system_without_psutil(tmp_path, monkeypatch):
     app.config["TESTING"] = True
     with app.test_client() as client:
         response = client.get("/api/system")
+        assert response.status_code == 200
         data = response.get_json()
-        assert data["resources"]["memory"] is None
-        assert data["resources"]["cpu_percent"] is None
+        resources = data["resources"]
+        assert resources["cpu_percent"] == 0.0
+        memory = resources["memory"]
+        assert memory["percent"] == 0.0
+        assert memory["used_gb"] == 0.0
+        assert memory["total_gb"] == 0.0
 
 
 def test_api_version_endpoint(tmp_path):

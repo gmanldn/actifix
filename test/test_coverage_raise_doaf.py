@@ -10,6 +10,7 @@ import runpy
 import sys
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -170,6 +171,7 @@ def test_ticket_lock_behaviors(tmp_path, monkeypatch):
     with do_af._ticket_lock(paths, enabled=False):
         assert True
 
+    original_try_lock = do_af._try_lock
     monkeypatch.setattr(do_af, "_try_lock", lambda _lock: False)
     monkeypatch.setattr(do_af.time, "sleep", lambda _x: None)
 
@@ -187,6 +189,7 @@ def test_ticket_lock_behaviors(tmp_path, monkeypatch):
     lock_file = (paths.state_dir / "dummy.lock").open("w")
     monkeypatch.setattr(do_af, "_has_fcntl", lambda: False)
     monkeypatch.setattr(do_af, "_has_msvcrt", lambda: False)
+    monkeypatch.setattr(do_af, "_try_lock", original_try_lock)
     assert do_af._try_lock(lock_file) is True
     lock_file.close()
 
@@ -196,19 +199,19 @@ def test_doaf_cli_commands(tmp_path, capsys):
     init_actifix_files(paths)
     do_af._global_manager = None
 
-    args = do_af._build_cli_parser().parse_args(["stats", "--project-root", str(tmp_path)])
+    args = do_af._build_cli_parser().parse_args(["--project-root", str(tmp_path), "stats"])
     resolved = do_af._resolve_paths_from_args(args)
     assert resolved.list_file.exists()
 
-    assert do_af.main(["stats", "--project-root", str(tmp_path)]) == 0
+    assert do_af.main(["--project-root", str(tmp_path), "stats"]) == 0
     out = capsys.readouterr().out
     assert "Total Tickets" in out
 
-    assert do_af.main(["list", "--project-root", str(tmp_path)]) == 0
+    assert do_af.main(["--project-root", str(tmp_path), "list"]) == 0
     out = capsys.readouterr().out
     assert "No open tickets" in out
 
-    assert do_af.main(["process", "--project-root", str(tmp_path)]) == 0
+    assert do_af.main(["--project-root", str(tmp_path), "process"]) == 0
     out = capsys.readouterr().out
     assert "No open tickets to process" in out
 
@@ -218,12 +221,12 @@ def test_doaf_cli_commands(tmp_path, capsys):
     ]
     _write_list(paths, active, [])
 
-    assert do_af.main(["list", "--project-root", str(tmp_path), "--limit", "1"]) == 0
+    assert do_af.main(["--project-root", str(tmp_path), "list", "--limit", "1"]) == 0
     out = capsys.readouterr().out
     assert "more not shown" in out
 
     with pytest.raises(SystemExit):
-        do_af.main(["process", "--project-root", str(tmp_path), "--max-tickets", "0"])
+        do_af.main(["--project-root", str(tmp_path), "process", "--max-tickets", "0"])
 
 
 def test_raise_af_capture_disabled(monkeypatch):
@@ -236,44 +239,16 @@ def test_raise_af_capture_disabled(monkeypatch):
 
 
 def test_raise_af_capture_disabled_logging_error(monkeypatch):
-    def boom(*_args, **_kwargs):
-        raise RuntimeError("logger failed")
+    class FaultyLogger:
+        def debug(self, _msg: str) -> None:
+            raise RuntimeError("logger failed")
 
-    monkeypatch.setattr(raise_af, "_capture_disabled_log_count", 0)
-    monkeypatch.setattr(builtins, "__import__", builtins.__import__)
-    monkeypatch.setattr(raise_af, "ACTIFIX_CAPTURE_ENV_VAR", "ACTIFIX_CAPTURE_ENABLED")
-    monkeypatch.setattr(raise_af, "logging", None, raising=False)
-    monkeypatch.setattr(raise_af, "_capture_disabled_log_count", 0)
-
-    monkeypatch.setattr(sys.modules[raise_af.__name__], "logging", None, raising=False)
-    monkeypatch.setitem(sys.modules, "logging", None)
-    monkeypatch.setattr(raise_af, "logging", None, raising=False)
-    monkeypatch.setattr(raise_af, "_capture_disabled_log_count", 0)
-
-    monkeypatch.setattr(raise_af, "logging", None, raising=False)
-    monkeypatch.setattr(raise_af, "_capture_disabled_log_count", 0)
-
-    monkeypatch.setattr(raise_af, "logging", None, raising=False)
-    monkeypatch.setattr(raise_af, "_capture_disabled_log_count", 0)
-
-    monkeypatch.setattr(raise_af, "logging", None, raising=False)
-    monkeypatch.setattr(raise_af, "_capture_disabled_log_count", 0)
-
-    monkeypatch.setattr(raise_af, "logging", None, raising=False)
-    monkeypatch.setattr(raise_af, "_capture_disabled_log_count", 0)
-
-    monkeypatch.setitem(sys.modules, "logging", __import__("logging"))
-    monkeypatch.setattr(sys.modules["logging"], "getLogger", lambda _name: SimpleLogger(boom))
+    fake_logging = SimpleNamespace(getLogger=lambda _name: FaultyLogger())
+    monkeypatch.setitem(sys.modules, "logging", fake_logging)
+    raise_af._capture_disabled_log_count = 0
 
     raise_af._log_capture_disabled("source", "error")
-
-
-class SimpleLogger:
-    def __init__(self, callback):
-        self._callback = callback
-
-    def debug(self, _msg: str) -> None:
-        self._callback()
+    assert raise_af._capture_disabled_log_count == 1
 
 
 def test_raise_af_correlation_id(monkeypatch):
@@ -432,19 +407,23 @@ def test_raise_af_replay_queue_paths(tmp_path, monkeypatch):
     list_file = base_dir / "ACTIFIX-LIST.md"
     list_file.write_text("# List")
 
-    legacy_file = base_dir / raise_af.LEGACY_FALLBACK_QUEUE
-    legacy_file.write_text(
+    sample_entry = (
         "[{\"message\": \"msg\", \"source\": \"src\", \"run_label\": \"run\", "
         "\"entry_id\": \"ACT-TEST\", \"created_at\": \"2024-01-01T00:00:00+00:00\", "
         "\"priority\": \"P2\", \"error_type\": \"error\", \"stack_trace\": \"\", "
         "\"duplicate_guard\": \"guard\"}]"
     )
 
+    queue_file = raise_af._get_fallback_queue_file(base_dir)
+    queue_file.unlink(missing_ok=True)
+    legacy_file = base_dir / raise_af.LEGACY_FALLBACK_QUEUE
+    legacy_file.write_text(sample_entry)
+
     assert raise_af.replay_fallback_queue(base_dir) == 1
     assert not legacy_file.exists()
+    assert not queue_file.exists()
 
-    queue_file = raise_af._get_fallback_queue_file(base_dir)
-    queue_file.write_text(legacy_file.read_text() if legacy_file.exists() else "[]")
+    queue_file.write_text(sample_entry)
 
     def boom(*_args, **_kwargs):
         raise RuntimeError("append failed")
@@ -465,6 +444,7 @@ def test_raise_af_record_error_duplicate_and_priority(tmp_path, monkeypatch):
     paths = get_actifix_paths(project_root=tmp_path)
     init_actifix_files(paths)
     monkeypatch.setenv("ACTIFIX_CAPTURE_ENABLED", "1")
+    monkeypatch.setattr(raise_af, "generate_duplicate_guard", lambda *_args, **_kwargs: "ACTIFIX-src-1234")
 
     paths.list_file.write_text(
         "\n".join(

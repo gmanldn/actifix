@@ -295,10 +295,13 @@ def create_app(project_root: Optional[Path] = None) -> "Flask":
         minutes, seconds = divmod(remainder, 60)
         uptime_str = f"{hours}h {minutes}m {seconds}s"
         
-        # Get memory info if available
-        memory_info = None
-        cpu_percent = None
-        
+        # Get memory info - psutil is preferred but not required here
+        memory_info = {
+            'total_gb': 0.0,
+            'used_gb': 0.0,
+            'percent': 0.0,
+        }
+        cpu_percent = 0.0
         try:
             import psutil
             mem = psutil.virtual_memory()
@@ -308,9 +311,10 @@ def create_app(project_root: Optional[Path] = None) -> "Flask":
                 'percent': round(mem.percent, 1),
             }
             cpu_percent = round(psutil.cpu_percent(interval=0.1), 1)
-        except Exception:
-            # psutil not available or error occurred
+        except ImportError:
             pass
+        except Exception:
+            cpu_percent = 0.0
         
         paths = get_actifix_paths(project_root=app.config['PROJECT_ROOT'])
         

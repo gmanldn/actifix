@@ -127,6 +127,63 @@ def build_system_tests(
         health = run_health_check(paths=paths, print_report=False)
         assert_true(health.status in {"OK", "WARNING", "ERROR", "SLA_BREACH"})
     
+    def test_api_smoke_test() -> None:
+        """Smoke test: API server creation and basic endpoints."""
+        try:
+            from ..api import create_app, FLASK_AVAILABLE
+        except ImportError:
+            return  # Skip if Flask not available
+        
+        if not FLASK_AVAILABLE:
+            return  # Skip if Flask not available
+        
+        app = create_app(paths.project_root)
+        assert_true(app is not None, "API app should be created")
+        
+        with app.test_client() as client:
+            # Test ping endpoint
+            response = client.get('/api/ping')
+            assert_equals(response.status_code, 200, "Ping endpoint should return 200")
+    
+    def test_api_cpu_memory_never_null() -> None:
+        """Smoke test: CPU and memory must always be available (never None/N/A)."""
+        try:
+            from ..api import create_app, FLASK_AVAILABLE
+            import json
+        except ImportError:
+            return  # Skip if Flask not available
+        
+        if not FLASK_AVAILABLE:
+            return  # Skip if Flask not available
+        
+        app = create_app(paths.project_root)
+        
+        with app.test_client() as client:
+            response = client.get('/api/system')
+            assert_equals(response.status_code, 200, "System endpoint should return 200")
+            
+            data = json.loads(response.data)
+            resources = data.get('resources', {})
+            
+            # CPU must be a number, never None
+            cpu = resources.get('cpu_percent')
+            assert_true(cpu is not None, "CPU percent must never be None")
+            assert_true(isinstance(cpu, (int, float)), f"CPU must be numeric, got {type(cpu)}")
+            assert_true(0 <= cpu <= 100, f"CPU percent must be 0-100, got {cpu}")
+            
+            # Memory must be available
+            memory = resources.get('memory')
+            assert_true(memory is not None, "Memory info must never be None")
+            assert_true(isinstance(memory, dict), "Memory must be a dict")
+            assert_true('percent' in memory, "Memory must have percent field")
+            assert_true('used_gb' in memory, "Memory must have used_gb field")
+            assert_true('total_gb' in memory, "Memory must have total_gb field")
+            
+            # Validate memory values
+            assert_true(isinstance(memory['percent'], (int, float)), "Memory percent must be numeric")
+            assert_true(0 <= memory['percent'] <= 100, f"Memory percent must be 0-100, got {memory['percent']}")
+            assert_true(memory['total_gb'] > 0, f"Total memory must be > 0, got {memory['total_gb']}")
+    
     register("python_version", test_python_version, "Python version check", ["system", "dependencies"])
     register("paths_bootstrap", test_paths_and_files, "Path and artifact bootstrap", ["system", "bootstrap"])
     register("config_validation", test_config_validation, "Configuration validation", ["config"])
@@ -135,5 +192,7 @@ def build_system_tests(
     register("storage_health", test_storage_health_and_corruption, "Storage health and corruption detection", ["persistence", "health"])
     register("integrity_hashing", test_integrity_hashing, "Integrity hashing verification", ["persistence"])
     register("health_check", test_health_check_runs, "Actifix health execution", ["health"])
+    register("api_smoke", test_api_smoke_test, "API server smoke test", ["system", "api"])
+    register("api_resources", test_api_cpu_memory_never_null, "API CPU/memory availability", ["system", "api"])
     
     return tests
