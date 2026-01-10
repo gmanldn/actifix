@@ -3,5 +3,13 @@
 __pycache__/
 .pytest_cache/
 .actifix/test_logs/
+.actifix/
+actifix/ACTIFIX-LIST.md
+actifix/ACTIFIX.md
+actifix/ACTIFIX-LOG.md
+actifix/AFLog.txt
+actifix/backups/
+actifix/quarantine/
+logs/
 src/actifix/**/__pycache__/
 test/**/__pycache__/
