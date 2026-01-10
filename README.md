@@ -67,6 +67,7 @@ cat actifix/ACTIFIX.md
 
 ## 📖 Documentation
 
+- **[Quickstart](QUICKSTART.md)** - Fast setup and first ticket
 - **[Framework Overview](docs/FRAMEWORK_OVERVIEW.md)** - Comprehensive guide
 - **[Installation Guide](docs/INSTALLATION.md)** - Setup instructions
 - **[Development Guide](docs/DEVELOPMENT.md)** - Contributing guidelines
