@@ -1,0 +1,15 @@
+<svg width="320" height="200" viewBox="0 0 320 200" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">Stylized pangolin</title>
+  <desc id="desc">A simple gold pangolin icon on a dark background.</desc>
+  <rect width="320" height="200" fill="#0C0C0C"/>
+  <g transform="translate(32 32)" fill="#d4af37">
+    <path d="M40 96c-2-22 14-52 40-64 27-13 64-3 80 14 12 13 16 28 12 48-6 28-34 40-74 36-34-4-58-21-58-34z" opacity=".92"/>
+    <path d="M110 44c-4-10 4-20 12-22 10-4 26-2 36 6 8 6 10 16 10 24 0 7-6 12-14 10-14-3-24-8-44-18z" opacity=".8"/>
+    <path d="M74 122c6-14 30-22 52-18 20 4 30 10 30 16 0 8-18 16-44 16-22 0-42-8-38-14z" opacity=".9"/>
+    <circle cx="186" cy="74" r="6" fill="#0C0C0C"/>
+    <path d="M188 70c6-2 10-8 14-10 8-4 18 0 26 6 8 6 12 16 8 26-4 14-24 22-46 20l-4-12c12 0 22-6 24-12 2-6-4-14-12-16-4 0-6 0-10 4l-10-6z" opacity=".92"/>
+    <path d="M104 52c-6-2-12 0-18 4-10 8-16 20-12 34l14-2c-2-8 2-16 10-20 6-4 12-4 16-4l-10-12z" opacity=".7"/>
+    <path d="M60 108c-10-4-16-14-18-20-4-12 6-30 20-38 12-6 24-4 32 0l-10 12c-6-2-12 0-16 4-6 6-8 14-6 20 2 6 10 14 22 14l-14 8z" opacity=".75"/>
+    <path d="M196 132c8 10 6 26-4 36-10 8-30 10-46 4-10-4-18-12-16-18 2-8 20-12 34-10 12 2 22-4 32-12z" opacity=".7"/>
+  </g>
+</svg>

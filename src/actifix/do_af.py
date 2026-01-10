@@ -48,7 +48,7 @@ def parse_ticket_block(block: str) -> Optional[TicketInfo]:
         TicketInfo if parsed successfully, None otherwise.
     """
     # Extract ticket ID from header
-    header_match = re.search(r'### (ACT-\d{8}-[A-F0-9]+)', block)
+    header_match = re.search(r'##+ (ACT-\d{8}-[A-F0-9]+)', block)
     if not header_match:
         return None
     
@@ -125,12 +125,12 @@ def get_open_tickets(paths: Optional[ActifixPaths] = None) -> list[TicketInfo]:
     else:
         active_section = content[active_start:active_end]
     
-    # Split into ticket blocks
-    blocks = re.split(r'(?=### ACT-)', active_section)
+    # Split into ticket blocks (support ## or ### headers)
+    blocks = re.split(r'(?=##+ ACT-)', active_section)
     
     tickets = []
     for block in blocks:
-        if block.strip() and block.startswith('### ACT-'):
+        if block.strip() and block.lstrip().startswith('## ACT-'):
             ticket = parse_ticket_block(block)
             if ticket and not ticket.completed:
                 tickets.append(ticket)
@@ -166,29 +166,13 @@ def mark_ticket_complete(
     
     content = paths.list_file.read_text()
     
-    if ticket_id not in content:
+    # Find the ticket block (support ## or ### headers)
+    header_pattern = re.compile(rf'(##+\s+{re.escape(ticket_id)}.*?)((?=##+\s+ACT-)|(?=##\s+Completed Items)|\Z)', re.DOTALL)
+    match = header_pattern.search(content)
+    if not match:
         return False
     
-    # Update checklist items
-    updated = content
-    
-    # Find the ticket block
-    ticket_start = content.find(f"### {ticket_id}")
-    if ticket_start == -1:
-        return False
-    
-    # Find next ticket or section
-    next_ticket = content.find("### ACT-", ticket_start + 1)
-    next_section = content.find("## ", ticket_start + 1)
-    
-    if next_ticket == -1:
-        ticket_end = next_section if next_section != -1 else len(content)
-    elif next_section == -1:
-        ticket_end = next_ticket
-    else:
-        ticket_end = min(next_ticket, next_section)
-    
-    ticket_block = content[ticket_start:ticket_end]
+    ticket_block = match.group(1)
     
     # Update checkboxes
     new_block = ticket_block
@@ -204,12 +188,12 @@ def mark_ticket_complete(
         new_block = re.sub(r'- Summary:.*', f'- Summary: {summary}', new_block)
     
     # Replace in content
-    updated = content[:ticket_start] + new_block + content[ticket_end:]
+    updated = content.replace(ticket_block, new_block, 1)
     
     # Move to Completed section if needed
     if "## Completed Items" in updated:
-        # Remove from Active
-        updated = updated.replace(new_block, "")
+        # Remove updated block from Active
+        updated = updated.replace(new_block, "", 1)
         
         # Add to Completed
         completed_pos = updated.find("## Completed Items")
@@ -349,7 +333,7 @@ def get_ticket_stats(paths: Optional[ActifixPaths] = None) -> dict:
     content = paths.list_file.read_text()
     
     # Count all tickets
-    all_tickets = re.findall(r'### (ACT-\d{8}-[A-F0-9]+)', content)
+    all_tickets = re.findall(r'##+ (ACT-\d{8}-[A-F0-9]+)', content)
     
     # Count completed
     completed = content.count('[x] Completed')
