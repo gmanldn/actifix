@@ -8,19 +8,25 @@ file-based lock to prevent duplicate dispatch when multiple threads/processes
 run concurrently.
 """
 
+# Allow running as a standalone script (python src/actifix/do_af.py)
+if __name__ == "__main__" and __package__ is None:  # pragma: no cover - path setup
+    import sys
+    from pathlib import Path as _Path
+
+    sys.path.insert(0, str(_Path(__file__).resolve().parent.parent))
+    __package__ = "actifix"
+
+import argparse
 import contextlib
-import os
 import re
-import subprocess
 import threading
 import time
 from dataclasses import dataclass
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional, Callable, Iterator
 
 from .log_utils import atomic_write, log_event
-from .state_paths import get_actifix_paths, ActifixPaths
+from .state_paths import ActifixPaths, get_actifix_paths, init_actifix_files
 
 
 @dataclass
@@ -370,6 +376,142 @@ def get_ticket_stats(paths: Optional[ActifixPaths] = None) -> dict:
     }
 
 
+# --- CLI helpers ---
+
+def _resolve_paths_from_args(args: argparse.Namespace) -> ActifixPaths:
+    """Resolve Actifix paths based on CLI arguments."""
+    return init_actifix_files(
+        get_actifix_paths(
+            project_root=args.project_root,
+            base_dir=args.base_dir,
+            state_dir=args.state_dir,
+            logs_dir=args.logs_dir,
+        )
+    )
+
+
+def _build_cli_parser() -> argparse.ArgumentParser:
+    """Construct the CLI parser for direct do_af execution."""
+    parser = argparse.ArgumentParser(
+        description="Actifix DoAF - Ticket dispatch and processing CLI",
+    )
+    parser.add_argument(
+        "--project-root",
+        type=Path,
+        default=None,
+        help="Project root directory (default: current working directory)",
+    )
+    parser.add_argument(
+        "--base-dir",
+        type=Path,
+        default=None,
+        help="Actifix data directory (default: <project_root>/actifix)",
+    )
+    parser.add_argument(
+        "--state-dir",
+        type=Path,
+        default=None,
+        help="Actifix state directory (default: <project_root>/.actifix)",
+    )
+    parser.add_argument(
+        "--logs-dir",
+        type=Path,
+        default=None,
+        help="Actifix logs directory (default: <project_root>/logs)",
+    )
+
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    stats_parser = subparsers.add_parser("stats", help="Show ticket statistics")
+    stats_parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Suppress verbose headers in stats output",
+    )
+
+    list_parser = subparsers.add_parser("list", help="List open tickets")
+    list_parser.add_argument(
+        "--limit",
+        type=int,
+        default=10,
+        help="Maximum number of tickets to display (default: 10)",
+    )
+
+    process_parser = subparsers.add_parser("process", help="Dispatch open tickets")
+    process_parser.add_argument(
+        "--max-tickets",
+        type=int,
+        default=5,
+        help="Maximum number of tickets to dispatch (default: 5)",
+    )
+
+    return parser
+
+
+def _print_ticket(ticket: TicketInfo) -> None:
+    """Pretty-print a ticket summary for CLI output."""
+    print(f"- {ticket.ticket_id} [{ticket.priority}] {ticket.error_type}: {ticket.message}")
+    print(f"  Source: {ticket.source} | Run: {ticket.run_name} | Created: {ticket.created}")
+
+
+def main(argv: Optional[list[str]] = None) -> int:
+    """
+    CLI entrypoint for do_af.py.
+    
+    Supports basic commands:
+    - stats: show ticket statistics
+    - list: list open tickets
+    - process: dispatch open tickets (AI handler optional)
+    """
+    parser = _build_cli_parser()
+    args = parser.parse_args(argv)
+
+    if getattr(args, "max_tickets", 1) < 1:
+        parser.error("--max-tickets must be at least 1")
+
+    paths = _resolve_paths_from_args(args)
+
+    if args.command == "stats":
+        stats = get_ticket_stats(paths)
+        if not args.quiet:
+            print("=== Actifix DoAF Stats ===")
+        print(f"Total Tickets: {stats.get('total', 0)}")
+        print(f"Open: {stats.get('open', 0)}")
+        print(f"Completed: {stats.get('completed', 0)}")
+        print("By Priority:")
+        for priority, count in stats.get("by_priority", {}).items():
+            print(f"  {priority}: {count}")
+        print(f"Data Directory: {paths.base_dir}")
+        return 0
+
+    if args.command == "list":
+        tickets = get_open_tickets(paths)
+        if not tickets:
+            print("No open tickets.")
+            return 0
+
+        limit = max(args.limit, 1)
+        print(f"Open tickets ({len(tickets)} total, showing {min(limit, len(tickets))}):")
+        for ticket in tickets[:limit]:
+            _print_ticket(ticket)
+        if len(tickets) > limit:
+            print(f"... {len(tickets) - limit} more not shown")
+        return 0
+
+    if args.command == "process":
+        tickets = process_tickets(max_tickets=args.max_tickets, paths=paths)
+        if not tickets:
+            print("No open tickets to process.")
+            return 0
+
+        print(f"Dispatched {len(tickets)} ticket(s):")
+        for ticket in tickets:
+            _print_ticket(ticket)
+        return 0
+
+    return 1
+
+
 # --- Concurrency helpers ---
 
 _THREAD_LOCK = threading.Lock()
@@ -460,3 +602,7 @@ def _has_msvcrt() -> bool:
         return True
     except Exception:
         return False
+
+
+if __name__ == "__main__":  # pragma: no cover - CLI entry
+    raise SystemExit(main())
