@@ -1,0 +1,138 @@
+{
+  "edges": [
+    {
+      "from": "bootstrap.main",
+      "reason": "load configuration",
+      "to": "runtime.config"
+    },
+    {
+      "from": "bootstrap.main",
+      "reason": "initialize logging",
+      "to": "infra.logging"
+    },
+    {
+      "from": "bootstrap.main",
+      "reason": "start health monitoring",
+      "to": "infra.health"
+    },
+    {
+      "from": "runtime.config",
+      "reason": "configuration logging",
+      "to": "infra.logging"
+    },
+    {
+      "from": "runtime.state",
+      "reason": "state operation logging",
+      "to": "infra.logging"
+    },
+    {
+      "from": "infra.health",
+      "reason": "health status logging",
+      "to": "infra.logging"
+    },
+    {
+      "from": "core.raise_af",
+      "reason": "error capture logging",
+      "to": "infra.logging"
+    },
+    {
+      "from": "core.raise_af",
+      "reason": "isolate error state",
+      "to": "core.quarantine"
+    },
+    {
+      "from": "core.do_af",
+      "reason": "remediation logging",
+      "to": "infra.logging"
+    },
+    {
+      "from": "core.do_af",
+      "reason": "process error tickets",
+      "to": "core.raise_af"
+    },
+    {
+      "from": "core.quarantine",
+      "reason": "quarantine logging",
+      "to": "infra.logging"
+    },
+    {
+      "from": "core.quarantine",
+      "reason": "manage quarantine state",
+      "to": "runtime.state"
+    },
+    {
+      "from": "tooling.testing",
+      "reason": "test system bootstrap",
+      "to": "bootstrap.main"
+    },
+    {
+      "from": "tooling.testing",
+      "reason": "test execution logging",
+      "to": "infra.logging"
+    }
+  ],
+  "meta": {
+    "freshness_days": 7,
+    "generated_at": "2025-01-10T06:45:00.000000+00:00",
+    "generator": "manual",
+    "generator_version": "1.0.0",
+    "source_commit": "current_development"
+  },
+  "nodes": [
+    {
+      "domain": "runtime",
+      "id": "bootstrap.main",
+      "label": "main",
+      "owner": "runtime"
+    },
+    {
+      "domain": "runtime",
+      "id": "runtime.config",
+      "label": "config",
+      "owner": "runtime"
+    },
+    {
+      "domain": "runtime",
+      "id": "runtime.state",
+      "label": "state",
+      "owner": "runtime"
+    },
+    {
+      "domain": "infra",
+      "id": "infra.logging",
+      "label": "logging",
+      "owner": "infra"
+    },
+    {
+      "domain": "infra",
+      "id": "infra.health",
+      "label": "health",
+      "owner": "infra"
+    },
+    {
+      "domain": "core",
+      "id": "core.raise_af",
+      "label": "raise_af",
+      "owner": "core"
+    },
+    {
+      "domain": "core",
+      "id": "core.do_af",
+      "label": "do_af",
+      "owner": "core"
+    },
+    {
+      "domain": "core",
+      "id": "core.quarantine",
+      "label": "quarantine",
+      "owner": "core"
+    },
+    {
+      "domain": "tooling",
+      "id": "tooling.testing",
+      "label": "testing",
+      "owner": "tooling"
+    }
+  ],
+  "schema_version": "arch-depgraph.v1"
+}
