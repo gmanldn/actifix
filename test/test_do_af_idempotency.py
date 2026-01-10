@@ -152,6 +152,54 @@ def test_idempotency_guard_logs_skip_event(temp_actifix_paths):
     assert "Skipped already-completed ticket" in aflog_content
 
 
+def test_idempotency_guard_ignores_remediation_notes(temp_actifix_paths):
+    """Ensure remediation notes mentioning [x] Completed don't trip the guard."""
+    paths = temp_actifix_paths
+    
+    list_content = """# Actifix Ticket List
+
+## Active Items
+
+### ACT-20260101-NOTES999 - [P2] Ticket With Notes
+
+- **Priority**: P2
+- **Error Type**: TestError
+- **Source**: `notes.py:10`
+- **Run**: test-run
+- **Created**: 2026-01-10T12:00:00Z
+- **Duplicate Guard**: `TEST-notes-py:10-zzzz9999`
+
+**Checklist:**
+
+- [x] Documented
+- [ ] Functioning
+- [ ] Tested
+- [ ] Completed
+
+<details>
+<summary>AI Remediation Notes</summary>
+
+Error Message: mention [x] Completed here but should not trigger guard.
+</details>
+
+## Completed Items
+
+"""
+    
+    paths.list_file.write_text(list_content)
+    paths.aflog_file.write_text("")
+    
+    # Should complete successfully despite notes containing "[x] Completed"
+    result = mark_ticket_complete(
+        "ACT-20260101-NOTES999",
+        summary="Completed even with notes string",
+        paths=paths
+    )
+    assert result is True
+    content = paths.list_file.read_text()
+    assert "[x] Completed" in content
+
+
 def test_normal_completion_still_works(temp_actifix_paths):
     """Test that normal ticket completion still works correctly."""
     paths = temp_actifix_paths

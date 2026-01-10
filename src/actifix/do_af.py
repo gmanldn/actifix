@@ -197,8 +197,14 @@ def mark_ticket_complete(
         
         ticket_block = match.group(1)
         
-        # Idempotency guard: check if already completed
-        if '[x] Completed' in ticket_block:
+        # Idempotency guard: check checklist (avoid false positives in remediation notes)
+        checklist_match = re.search(
+            r"\*\*Checklist:\*\*(.*?)(?:<details>|$)",
+            ticket_block,
+            re.DOTALL,
+        )
+        checklist_section = checklist_match.group(1) if checklist_match else ticket_block
+        if re.search(r'^\s*-\s*\[x\]\s*Completed', checklist_section, re.MULTILINE):
             log_event(
                 paths.aflog_file,
                 "TICKET_ALREADY_COMPLETED",

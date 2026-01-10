@@ -11,42 +11,6 @@ Tickets generated from errors. Update checkboxes as work progresses.
 
 <!-- New tickets are inserted here by RaiseAF -->
 
-### ACT-20251221-D8BDD3 - [P3] Enhancement: ACTIFIX-ROBUST-007: Add DoAF Idempotency Guard. Prevent double-completing tickets if DoAF runs twice
-
-- **Priority**: P3
-- **Error Type**: Enhancement
-- **Source**: `Actifix/DoAF.py:300`
-- **Run**: actifix-robustness-review
-- **Created**: 2025-12-21T00:35:15.815585+00:00
-- **Duplicate Guard**: `ACTIFIX-Actifix-DoAF-py:300-cb00c196`
-
-**Checklist:**
-
-- [x] Documented
-- [ ] Functioning
-- [ ] Tested
-- [ ] Completed
-
-<details>
-<summary>Stack Trace Preview</summary>
-
-```
-NoneType: None
-```
-</details>
-
-<details>
-<summary>AI Remediation Notes</summary>
-
-Error Type: Enhancement
-Error Message: ACTIFIX-ROBUST-007: Add DoAF Idempotency Guard. Prevent double-completing tickets if DoAF runs twice on same ticket. Check ticket already has [x] Completed. Skip if already completed. Log skip event to AFLog.
-Source Location: Actifix/DoAF.py:300
-Priority: P3
-
-R
-...
-</details>
-
 ### ACT-20251221-C8D7E0 - [P0] Enhancement: MULTIUSER-LOCK-001: Implement Ticket Lease System with Exclusive Ownership. Create a ticket lease sy
 
 - **Priority**: P0
@@ -5692,6 +5656,43 @@ NoneType: None
 </details>
 
 ## Completed Items
+### ACT-20251221-D8BDD3 - [P3] Enhancement: ACTIFIX-ROBUST-007: Add DoAF Idempotency Guard. Prevent double-completing tickets if DoAF runs twice
+
+- **Priority**: P3
+- **Error Type**: Enhancement
+- **Source**: `Actifix/DoAF.py:300`
+- **Run**: actifix-robustness-review
+- **Created**: 2025-12-21T00:35:15.815585+00:00
+- **Duplicate Guard**: `ACTIFIX-Actifix-DoAF-py:300-cb00c196`
+
+**Checklist:**
+
+- [x] Documented
+- [x] Functioning
+- [x] Tested
+- [x] Completed
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+<details>
+<summary>AI Remediation Notes</summary>
+
+Error Type: Enhancement
+Error Message: ACTIFIX-ROBUST-007: Add DoAF Idempotency Guard. Prevent double-completing tickets if DoAF runs twice on same ticket. Check ticket already has [x] Completed. Skip if already completed. Log skip event to AFLog.
+Source Location: Actifix/DoAF.py:300
+Priority: P3
+
+R
+...
+</details>
+- Summary: Idempotency guard implemented with checklist-only check and tests
+
 ### ACT-20251220-61FD39 - [P3] Enhancement: Log when ACTIFIX_CAPTURE_ENABLED disables ticket intake
 
 - **Priority**: P3

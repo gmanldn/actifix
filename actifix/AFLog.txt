@@ -710,3 +710,14 @@ Entries are appended by DoAF.py after each ticket is processed.
 2026-01-10T12:38:23.591569+00:00 | TEST_EXECUTION_STARTED | - | Executing 8 tests | {'plan': 'actifix-system'}
 2026-01-10T12:38:23.601637+00:00 | TEST_EXECUTION_COMPLETED | - | Tests completed: 8/8 passed | {'plan': 'actifix-system', 'passed': 8, 'failed': 0, 'errors': 0, 'duration': 0.010042, 'success': True}
 2026-01-10T12:38:25.583725+00:00 | TEST_CYCLE_COMPLETED | - | Test cycle actifix-system completed | {'run_id': '20260110T123823Z', 'passed': 8, 'failed': 0, 'errors': 0}
+2026-01-10T14:33:47.683358+00:00 | TICKET_ALREADY_COMPLETED | ACT-20251221-D8BDD3 | Skipped already-completed ticket: ACT-20251221-D8BDD3 | {'reason': 'idempotency_guard'}
+2026-01-10T14:34:06.755769+00:00 | TICKET_ALREADY_COMPLETED | ACT-20251221-D8BDD3 | Skipped already-completed ticket: ACT-20251221-D8BDD3 | {'reason': 'idempotency_guard'}
+2026-01-10T14:35:22.086265+00:00 | TICKET_COMPLETED | ACT-20251221-D8BDD3 | Marked ticket complete: ACT-20251221-D8BDD3 | {'summary': 'Idempotency guard implemented with checklist-only '}
+2026-01-10T14:35:38.611003+00:00 | TEST_PLAN_DECLARED | - | Test plan declared: actifix-system | {'total_tests': 8, 'correlation_id': 'actifix-test-cycle'}
+2026-01-10T14:35:38.612102+00:00 | TEST_EXECUTION_STARTED | - | Executing 8 tests | {'plan': 'actifix-system'}
+2026-01-10T14:35:38.618889+00:00 | TEST_EXECUTION_COMPLETED | - | Tests completed: 8/8 passed | {'plan': 'actifix-system', 'passed': 8, 'failed': 0, 'errors': 0, 'duration': 0.006775, 'success': True}
+2026-01-10T14:35:39.825241+00:00 | TEST_CYCLE_COMPLETED | - | Test cycle actifix-system completed | {'run_id': '20260110T143538Z', 'passed': 8, 'failed': 0, 'errors': 0}
+2026-01-10T14:35:43.400895+00:00 | TEST_PLAN_DECLARED | - | Test plan declared: actifix-system | {'total_tests': 8, 'correlation_id': 'actifix-test-cycle'}
+2026-01-10T14:35:43.402285+00:00 | TEST_EXECUTION_STARTED | - | Executing 8 tests | {'plan': 'actifix-system'}
+2026-01-10T14:35:43.409653+00:00 | TEST_EXECUTION_COMPLETED | - | Tests completed: 8/8 passed | {'plan': 'actifix-system', 'passed': 8, 'failed': 0, 'errors': 0, 'duration': 0.007362, 'success': True}
+2026-01-10T14:35:44.809540+00:00 | TEST_CYCLE_COMPLETED | - | Test cycle actifix-system completed | {'run_id': '20260110T143543Z', 'passed': 8, 'failed': 0, 'errors': 0}
