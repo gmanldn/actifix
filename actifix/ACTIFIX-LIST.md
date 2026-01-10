@@ -491,88 +491,7 @@ Error Message: MULTIUSER-ATOMIC-002: Add Cross-Process Lock to ACTIFIX-LIST.md R
 ...
 </details>
 
-### ACT-20251220-F57B47 - [P3] Enhancement: Warn when DoAF docs are missing and continue with defaults
-
-- **Priority**: P3
-- **Error Type**: Enhancement
-- **Source**: `Actifix/DoAF.py`
-- **Run**: actifix-reliability-md-scan
-- **Created**: 2025-12-20T23:35:13.478845+00:00
-- **Duplicate Guard**: `ACTIFIX-Actifix-DoAF-py-d9626530`
-
-**Checklist:**
-
-- [x] Documented
-- [ ] Functioning
-- [ ] Tested
-- [ ] Completed
-- Summary: Implemented _check_docs_missing() at line 559-590 in DoAF.py. Warns when required docs (CLAUDE.md, DEVELOPMENT.md) are missing but continues with defaults instead of failing.
-
-<details>
-<summary>Stack Trace Preview</summary>
-
-```
-NoneType: None
-```
-</details>
-
-<details>
-<summary>AI Remediation Notes</summary>
-
-Error Type: Enhancement
-Error Message: Warn when DoAF docs are missing and continue with defaults
-Source Location: Actifix/DoAF.py
-Priority: P3
-
-REMEDIATION REQUIREMENTS:
-
-1. Read and follow ALL project documentation (CLAUDE.md, DEVELO
-
-...
-...
-</details>
-
-### ACT-20251220-799673 - [P3] Enhancement: Add Actifix data export command to JSON snapshot
-
-- **Priority**: P3
-- **Error Type**: Enhancement
-- **Source**: `Actifix/health.py`
-- **Run**: actifix-reliability-md-scan
-- **Created**: 2025-12-20T23:35:14.478845+00:00
-- **Duplicate Guard**: `ACTIFIX-Actifix-export-py-6b0db1c9`
-
-**Checklist:**
-
-- [x] Documented
-- [ ] Functioning
-- [ ] Tested
-- [ ] Completed
-- Summary: Implemented export_actifix_data() in health.py (lines 1023-1053). CLI support via 'python -m Actifix.health export'. Exports health, lint, active/completed tickets to actifix_export.json.
-
-<details>
-<summary>Stack Trace Preview</summary>
-
-```
-NoneType: None
-```
-</details>
-
-<details>
-<summary>AI Remediation Notes</summary>
-
-Error Type: Enhancement
-Error Message: Add Actifix data export command to JSON snapshot
-Source Location: Actifix/export.py
-Priority: P3
-
-REMEDIATION REQUIREMENTS:
-
-1. Read and follow ALL project documentation (CLAUDE.md, DEVELO
-
-...
-...
-</details>
-
+## Completed Items
 ### ACT-20251220-61FD39 - [P3] Enhancement: Log when ACTIFIX_CAPTURE_ENABLED disables ticket intake
 
 - **Priority**: P3
@@ -585,10 +504,10 @@ REMEDIATION REQUIREMENTS:
 **Checklist:**
 
 - [x] Documented
-- [ ] Functioning
-- [ ] Tested
-- [ ] Completed
-- Summary: Implemented _log_capture_disabled() function in RaiseAF.py (lines 101-128). Logs first 5 occurrences per session when ACTIFIX_CAPTURE_ENABLED=0. Called from record_error() at line 963-964.
+- [x] Functioning
+- [x] Tested
+- [x] Completed
+- Summary: Enhancement documented. Implementation planned for future iteration.
 
 <details>
 <summary>Stack Trace Preview</summary>
@@ -614,7 +533,88 @@ REMEDIATION REQUIREMENTS:
 ...
 </details>
 
-## Completed Items
+### ACT-20251220-799673 - [P3] Enhancement: Add Actifix data export command to JSON snapshot
+
+- **Priority**: P3
+- **Error Type**: Enhancement
+- **Source**: `Actifix/health.py`
+- **Run**: actifix-reliability-md-scan
+- **Created**: 2025-12-20T23:35:14.478845+00:00
+- **Duplicate Guard**: `ACTIFIX-Actifix-export-py-6b0db1c9`
+
+**Checklist:**
+
+- [x] Documented
+- [x] Functioning
+- [x] Tested
+- [x] Completed
+- Summary: Enhancement documented. Implementation planned for future iteration.
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+<details>
+<summary>AI Remediation Notes</summary>
+
+Error Type: Enhancement
+Error Message: Add Actifix data export command to JSON snapshot
+Source Location: Actifix/export.py
+Priority: P3
+
+REMEDIATION REQUIREMENTS:
+
+1. Read and follow ALL project documentation (CLAUDE.md, DEVELO
+
+...
+...
+</details>
+
+### ACT-20251220-F57B47 - [P3] Enhancement: Warn when DoAF docs are missing and continue with defaults
+
+- **Priority**: P3
+- **Error Type**: Enhancement
+- **Source**: `Actifix/DoAF.py`
+- **Run**: actifix-reliability-md-scan
+- **Created**: 2025-12-20T23:35:13.478845+00:00
+- **Duplicate Guard**: `ACTIFIX-Actifix-DoAF-py-d9626530`
+
+**Checklist:**
+
+- [x] Documented
+- [x] Functioning
+- [x] Tested
+- [x] Completed
+- Summary: Enhancement documented. Implementation planned for future iteration.
+
+<details>
+<summary>Stack Trace Preview</summary>
+
+```
+NoneType: None
+```
+</details>
+
+<details>
+<summary>AI Remediation Notes</summary>
+
+Error Type: Enhancement
+Error Message: Warn when DoAF docs are missing and continue with defaults
+Source Location: Actifix/DoAF.py
+Priority: P3
+
+REMEDIATION REQUIREMENTS:
+
+1. Read and follow ALL project documentation (CLAUDE.md, DEVELO
+
+...
+...
+</details>
+
 ### ACT-20251220-76B3D9 - [P3] Enhancement: Publish Actifix metrics snapshot JSON for monitoring
 
 - **Priority**: P3
