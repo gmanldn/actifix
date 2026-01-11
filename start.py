@@ -63,11 +63,13 @@ def ensure_scaffold() -> None:
         sys.path.insert(0, str(SRC_DIR))
 
     # Defer imports until path is set
-    from actifix.state_paths import init_actifix_files
-    from actifix.raise_af import ACTIFIX_CAPTURE_ENV_VAR
+    from actifix.state_paths import get_actifix_paths, init_actifix_files
+    from actifix.raise_af import ACTIFIX_CAPTURE_ENV_VAR, enforce_raise_af_only
 
     os.environ.setdefault(ACTIFIX_CAPTURE_ENV_VAR, "1")
-    init_actifix_files()
+    paths = get_actifix_paths()
+    enforce_raise_af_only(paths)
+    init_actifix_files(paths)
 
 
 def is_port_in_use(port: int) -> bool:
