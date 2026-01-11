@@ -30,7 +30,7 @@ import sys
 import traceback
 import uuid
 from dataclasses import dataclass, field, asdict
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from enum import Enum
 from pathlib import Path
 from typing import List, Optional, Dict, Any
@@ -87,6 +87,15 @@ class ActifixEntry:
         }
 
 
+@dataclass
+class DuplicateAssessment:
+    """Assessment describing whether a duplicate guard should be skipped."""
+    is_duplicate: bool
+    reason: str
+    last_seen: Optional[datetime] = None
+    status: str = "unknown"
+
+
 # Get project root and actifix directories
 PROJECT_ROOT = Path.cwd()
 ACTIFIX_DIR = PROJECT_ROOT / "actifix"
@@ -100,6 +109,7 @@ SYSTEM_STATE_MAX_CHARS = int(os.getenv("ACTIFIX_SYSTEM_STATE_MAX_CHARS", "1500")
 ACTIFIX_CAPTURE_ENV_VAR = "ACTIFIX_CAPTURE_ENABLED"
 ACTIFIX_CHANGE_ORIGIN_ENV = "ACTIFIX_CHANGE_ORIGIN"
 ACTIFIX_ENFORCE_RAISE_AF_ENV = "ACTIFIX_ENFORCE_RAISE_AF"
+DUPLICATE_REOPEN_WINDOW = timedelta(hours=24)
 
 # Fallback queue for when ACTIFIX-LIST.md is unwritable
 FALLBACK_QUEUE_FILE = get_actifix_state_dir() / "actifix_fallback_queue.json"
@@ -190,17 +200,48 @@ def generate_ticket_id() -> str:
     return generate_entry_id()
 
 
-def generate_duplicate_guard(source: str, message: str, error_type: str = "unknown") -> str:
-    """Generate a unique duplicate guard for deduplication."""
-    # Normalize message for deduplication
-    normalized = re.sub(r'\d+', 'N', message)
+def _normalize_for_guard(text: str) -> str:
+    """Normalize free text for guard generation and comparisons."""
+    if not text:
+        return ""
+
+    normalized = re.sub(r'\d+', 'N', text)
     normalized = re.sub(r'/[^\s]+/', '/PATH/', normalized)
-    normalized = normalized.lower().strip()[:200]
+    return normalized.lower().strip()[:200]
 
-    guard_input = f"{error_type}:{source}:{normalized}"
+
+def _stack_signature_for_guard(stack_trace: Optional[str]) -> str:
+    """
+    Produce a lightweight signature from the first meaningful stack line.
+    Focus on the error content rather than call-site noise.
+    """
+    if not stack_trace:
+        return ""
+
+    for line in stack_trace.splitlines():
+        cleaned = line.strip()
+        if not cleaned or cleaned.lower().startswith("traceback"):
+            continue
+        return _normalize_for_guard(cleaned)
+    return ""
+
+
+def generate_duplicate_guard(
+    source: str,
+    message: str,
+    error_type: str = "unknown",
+    stack_trace: Optional[str] = None,
+) -> str:
+    """Generate a message-focused duplicate guard for deduplication."""
+    normalized_message = _normalize_for_guard(message)
+    normalized_error = _normalize_for_guard(error_type or "unknown")
+    stack_signature = _stack_signature_for_guard(stack_trace)
+
+    guard_input = f"{normalized_error}:{normalized_message}:{stack_signature}"
     hash_suffix = hashlib.sha256(guard_input.encode()).hexdigest()[:8]
+    message_slug = (normalized_message.replace(" ", "-") or "message")[:40]
 
-    return f"ACTIFIX-{source.replace('/', '-').replace('.', '-')[:40]}-{hash_suffix}"
+    return f"ACTIFIX-{message_slug}-{hash_suffix}"
 
 
 def redact_secrets_from_text(text: str) -> str:
@@ -480,6 +521,121 @@ def get_completed_guards(base_dir: Path) -> set:
     return guards
 
 
+_TICKET_BLOCK_PATTERN = re.compile(r"(### .*?)(?=### |\Z)", re.DOTALL)
+
+
+def _parse_ticket_blocks_for_guard(
+    content: str,
+    section_label: str,
+    duplicate_guard: str,
+) -> List[tuple[Optional[datetime], str, str]]:
+    """Extract ticket records that match the given guard."""
+    records: List[tuple[Optional[datetime], str, str]] = []
+
+    for match in _TICKET_BLOCK_PATTERN.finditer(content):
+        block = match.group(1)
+        if duplicate_guard not in block:
+            continue
+
+        created_at = None
+        created_match = re.search(r"- \*\*Created\*\*:\s*([^\n]+)", block)
+        if created_match:
+            try:
+                created_at = datetime.fromisoformat(created_match.group(1).strip())
+            except ValueError:
+                created_at = None
+
+        status_match = re.search(r"- \*\*Status\*\*:\s*([^\n]+)", block)
+        status = status_match.group(1).strip() if status_match else (
+            "Completed" if section_label == "completed" else "Open"
+        )
+
+        records.append((created_at, status, block))
+
+    return records
+
+
+def assess_duplicate_guard(
+    duplicate_guard: str,
+    base_dir: Path,
+    reopen_window: timedelta = DUPLICATE_REOPEN_WINDOW,
+) -> DuplicateAssessment:
+    """
+    Decide if a duplicate guard represents a repeat or a new occurrence.
+
+    Rules:
+    - If an open ticket exists for the guard, treat as duplicate
+    - If only completed tickets exist but the most recent is older than the
+      reopen window, treat as a new occurrence
+    - Otherwise, treat as a repeat
+    """
+    actifix_list = base_dir / "ACTIFIX-LIST.md"
+    if not actifix_list.exists():
+        return DuplicateAssessment(
+            is_duplicate=False,
+            reason="ticket list missing; treating as new",
+            status="missing",
+        )
+
+    content = actifix_list.read_text(encoding="utf-8")
+    sections = content.split("## Completed Items", 1)
+    active_section = sections[0] if sections else content
+    completed_section = sections[1] if len(sections) > 1 else ""
+
+    records = _parse_ticket_blocks_for_guard(active_section, "active", duplicate_guard)
+    records += _parse_ticket_blocks_for_guard(completed_section, "completed", duplicate_guard)
+
+    if not records:
+        if duplicate_guard in content:
+            return DuplicateAssessment(
+                is_duplicate=True,
+                reason="guard present in legacy list format",
+                status="unknown",
+            )
+        return DuplicateAssessment(
+            is_duplicate=False,
+            reason="no matching guard in ticket list",
+            status="none",
+        )
+
+    # Pick the most recent occurrence
+    latest_record = max(
+        records,
+        key=lambda record: record[0] or datetime.min.replace(tzinfo=timezone.utc),
+    )
+    last_seen, status, _block = latest_record
+    status_lower = status.lower()
+
+    if status_lower in {"open", "in progress", "in_progress", "assigned"}:
+        return DuplicateAssessment(
+            is_duplicate=True,
+            reason="ticket already open for this signature",
+            last_seen=last_seen,
+            status=status,
+        )
+
+    if last_seen and (datetime.now(timezone.utc) - last_seen) > reopen_window:
+        return DuplicateAssessment(
+            is_duplicate=False,
+            reason="completed but stale; treating as new occurrence",
+            last_seen=last_seen,
+            status=status,
+        )
+
+    if last_seen:
+        age_hours = (datetime.now(timezone.utc) - last_seen).total_seconds() / 3600
+        reason = f"repeat seen {age_hours:.1f}h ago"
+    else:
+        reason = "repeat of previously recorded issue"
+
+    return DuplicateAssessment(
+        is_duplicate=True,
+        reason=reason,
+        last_seen=last_seen,
+        status=status,
+    )
+
+
 def ensure_scaffold(base_dir: Path) -> None:
     """Create Actifix directory and baseline files if missing."""
     base_dir.mkdir(parents=True, exist_ok=True)
@@ -664,7 +820,7 @@ def _append_ticket_impl(entry: ActifixEntry, base_dir: Path) -> None:
 
     # Build detailed ticket block
     block = [
-        f"### {entry.entry_id} - [{entry.priority.value}] {entry.error_type}: {entry.message[:100]}",
+        f"### {entry.entry_id} - [{entry.priority.value}] {entry.error_type} @ {entry.created_at.isoformat()}: {entry.message[:100]}",
         f"- **Priority**: {entry.priority.value}",
         f"- **Error Type**: {entry.error_type}",
         f"- **Source**: `{entry.source}`",
@@ -817,19 +973,21 @@ def record_error(
 
     ensure_scaffold(base_dir_path)
 
+    # Capture stack trace early so duplicate guards can incorporate error context
+    resolved_stack_trace = stack_trace if stack_trace is not None else capture_stack_trace()
+
     # Generate duplicate guard early for checking
-    duplicate_guard = generate_duplicate_guard(clean_source, clean_message, clean_error_type)
+    duplicate_guard = generate_duplicate_guard(
+        clean_source,
+        clean_message,
+        clean_error_type,
+        resolved_stack_trace,
+    )
 
     # LOOP PREVENTION: Check if this error already has a ticket
     if not skip_duplicate_check:
-        if check_duplicate_guard(duplicate_guard, base_dir_path):
-            # Duplicate detected - don't create another ticket
-            return None
-
-        # Also check completed guards to prevent recreating fixed issues
-        completed_guards = get_completed_guards(base_dir_path)
-        if duplicate_guard in completed_guards:
-            # This error was already fixed - don't recreate
+        assessment = assess_duplicate_guard(duplicate_guard, base_dir_path)
+        if assessment.is_duplicate:
             return None
 
     # Auto-classify priority if not provided
@@ -841,10 +999,6 @@ def record_error(
     
     if priority is None:
         priority = classify_priority(clean_error_type, clean_message, clean_source)
-
-    # Capture stack trace if not provided
-    if stack_trace is None:
-        stack_trace = capture_stack_trace()
 
     # Capture context
     file_context = {}
@@ -864,7 +1018,7 @@ def record_error(
         created_at=datetime.now(timezone.utc),
         priority=priority,
         error_type=clean_error_type,
-        stack_trace=stack_trace,
+        stack_trace=resolved_stack_trace,
         file_context=file_context,
         system_state=system_state,
         duplicate_guard=duplicate_guard,

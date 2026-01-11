@@ -10,6 +10,7 @@ All Changes Must Start via Raise_AF
 4. **No plan docs**: Never create `*_PLAN.md`, `ROADMAP.md`, `DESIGN.md` files
 5. **All errors via raise_af**: Use `actifix.raise_af.record_error()` for all error capture
 6. **Raise_AF gate**: Set `ACTIFIX_CHANGE_ORIGIN=raise_af` before running Actifix or making changes (enforced)
+7. **Architecture graph first**: Always open `docs/architecture/MAP.yaml` and `docs/architecture/DEPGRAPH.json` before starting work so you understand the canonical module/edge graph, and ensure every change is reflected there before committing.
 
 ```bash
 # Commit convention
