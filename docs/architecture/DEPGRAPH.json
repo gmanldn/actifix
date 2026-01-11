@@ -126,6 +126,12 @@
       "domain": "tooling",
       "owner": "tooling",
       "label": "testing"
+    },
+    {
+      "id": "tooling.simple_ticket_attack",
+      "domain": "tooling",
+      "owner": "tooling",
+      "label": "simple_ticket_attack"
     }
   ],
   "edges": [
@@ -333,6 +339,16 @@
       "from": "tooling.testing",
       "to": "tooling.testing.reporting",
       "reason": "tooling.testing depends on tooling.testing.reporting"
+    },
+    {
+      "from": "tooling.simple_ticket_attack",
+      "to": "core.raise_af",
+      "reason": "tooling.simple_ticket_attack depends on core.raise_af"
+    },
+    {
+      "from": "tooling.simple_ticket_attack",
+      "to": "runtime.state",
+      "reason": "tooling.simple_ticket_attack depends on runtime.state"
     }
   ]
 }

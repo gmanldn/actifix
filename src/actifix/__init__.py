@@ -40,7 +40,7 @@ from .state_paths import (
 )
 from .health import get_health, run_health_check, format_health_report
 
-__version__ = "2.6.18"
+__version__ = "2.6.21"
 __author__ = "Actifix Framework"
 __description__ = "Generic Error Tracking and Management Framework with AI Integration"
 
