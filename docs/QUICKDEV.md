@@ -114,3 +114,21 @@ def enqueue_alert(paths, payload):
 - Tests cover happy paths, error paths, and persistence/queue interactions where relevant.
 
 Use this guide to keep modules elegant, observable, and fast to ship while remaining fully governed by the Actifix platform.
+
+## Simple Ticket Attack
+
+Use the simple ticket attack helper when you need a controlled backlog of simple issues to drive automation or DoAF experiments. The helper iterates through `record_error(...)` with 200 lightweight descriptions so every ticket goes through the Actifix method (duplicate guards, AI notes, and atomic writes).
+
+```bash
+ACTIFIX_CHANGE_ORIGIN=raise_af ACTIFIX_CAPTURE_ENABLED=1 python -m actifix.simple_ticket_attack
+```
+
+Options:
+- `--count`: total tickets to create (default 200)
+- `--start-index`: begin numbering at a different offset
+- `--priority`: set P0–P3 for the entire batch
+- `--run-label`: override the run label recorded in the tickets
+- `--capture-context`: include file/system context in each ticket
+- `--dry-run`: preview the messages without writing files
+
+Run this whenever you want to "attack" a backlog of simple tickets while keeping the canonical Actifix workflow in charge (no manual edits to `ACTIFIX-LIST.md`).

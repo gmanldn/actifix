@@ -276,6 +276,19 @@ modules:
   - infra.logging
   - tooling.testing.system
   - tooling.testing.reporting
+- id: tooling.simple_ticket_attack
+  domain: tooling
+  owner: tooling
+  summary: Batch creation of lightweight tickets through the Actifix pipeline
+  entrypoints:
+  - src/actifix/simple_ticket_attack.py
+  contracts:
+  - generate sequences of simple tickets with record_error
+  - keep ACTIFIX-LIST.md untouched by manual edits
+  - reuse the core ticketing flow for experiments
+  depends_on:
+  - core.raise_af
+  - runtime.state
 contracts:
 - id: contract.logging
   summary: All modules must log via centralized logging system with correlation IDs
