@@ -1,7 +1,6 @@
-# Coding Agent Instructions (AGENTS/CLAUDE/GPT)
+# Coding Agent Instructions
 
 This file provides essential context and rules for all coding agents working with the Actifix codebase.
-It is synchronized across `AGENTS.md`, `CLAUDE.md`, and `GPT.md`.
 
 ---
 
@@ -73,9 +72,9 @@ python test.py --coverage         # Must maintain 95%+ coverage
 3. **Commit with a descriptive message** following conventions
 4. **Push immediately** - no local-only commits
 
-## 5. Agent Instruction Files Must Stay in Sync
+## 5. Instruction File Stewardship
 
-**CRITICAL: `AGENTS.md`, `CLAUDE.md`, and `GPT.md` must always have identical content.**
+**CRITICAL: `AGENTS.md` is the canonical instruction file and must be kept accurate.**
 
 ---
 
@@ -1404,4 +1403,4 @@ mark_ticket_complete("AF-20260110-abc123", "Fixed by adding null check")
 
 **END OF AGENTS.md**
 
-*This document must be kept in sync with CLAUDE.md and GPT.md*
+*This document must be kept up to date.*
