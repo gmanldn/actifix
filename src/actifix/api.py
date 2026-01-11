@@ -32,6 +32,7 @@ from .do_af import (
 )
 from .raise_af import enforce_raise_af_only
 from .state_paths import get_actifix_paths
+from .config import get_config, set_config, load_config
 
 # Server start time for uptime calculation
 SERVER_START_TIME = time.time()
@@ -470,6 +471,67 @@ def create_app(project_root: Optional[Path] = None) -> "Flask":
             'status': 'ok',
             'timestamp': datetime.now(timezone.utc).isoformat(),
         })
+    
+    @app.route('/api/settings', methods=['GET'])
+    def api_get_settings():
+        """Get current AI settings (API key is masked for security)."""
+        config = get_config()
+        
+        # Mask API key for security - only show first 4 and last 4 chars
+        api_key = config.ai_api_key
+        if api_key and len(api_key) > 8:
+            masked_key = api_key[:4] + '*' * (len(api_key) - 8) + api_key[-4:]
+        elif api_key:
+            masked_key = '*' * len(api_key)
+        else:
+            masked_key = ''
+        
+        return jsonify({
+            'ai_provider': config.ai_provider,
+            'ai_api_key': masked_key,
+            'ai_model': config.ai_model,
+            'ai_enabled': config.ai_enabled,
+        })
+    
+    @app.route('/api/settings', methods=['POST'])
+    def api_update_settings():
+        """Update AI settings."""
+        try:
+            data = request.get_json()
+            
+            if not data:
+                return jsonify({'error': 'No data provided'}), 400
+            
+            # Get current config
+            config = get_config()
+            
+            # Update AI settings
+            if 'ai_provider' in data:
+                config.ai_provider = data['ai_provider']
+            if 'ai_api_key' in data:
+                config.ai_api_key = data['ai_api_key']
+            if 'ai_model' in data:
+                config.ai_model = data['ai_model']
+            if 'ai_enabled' in data:
+                config.ai_enabled = bool(data['ai_enabled'])
+            
+            # Set the updated config
+            set_config(config)
+            
+            # Also update environment variables so they persist for the session
+            os.environ['ACTIFIX_AI_PROVIDER'] = config.ai_provider
+            os.environ['ACTIFIX_AI_API_KEY'] = config.ai_api_key
+            os.environ['ACTIFIX_AI_MODEL'] = config.ai_model
+            os.environ['ACTIFIX_AI_ENABLED'] = '1' if config.ai_enabled else '0'
+            
+            return jsonify({
+                'success': True,
+                'message': 'Settings updated successfully',
+            })
+        except Exception as e:
+            return jsonify({
+                'error': str(e)
+            }), 500
     
     return app
 

@@ -115,6 +115,7 @@ const NavigationRail = ({ activeView, onViewChange, logAlert }) => {
     { id: 'logs', icon: '📜', label: 'Logs' },
     { id: 'system', icon: '⚙️', label: 'System' },
     { id: 'modules', icon: '🧩', label: 'Modules' },
+    { id: 'settings', icon: '🔧', label: 'Settings' },
   ];
 
   return h('nav', { className: 'nav-rail' },
@@ -582,6 +583,201 @@ const SystemView = () => {
   );
 };
 
+// Settings View Component
+const SettingsView = () => {
+  const [aiProvider, setAiProvider] = useState('openai');
+  const [aiApiKey, setAiApiKey] = useState('');
+  const [aiModel, setAiModel] = useState('');
+  const [aiEnabled, setAiEnabled] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState('');
+
+  // Load current settings
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const response = await fetch(`${API_BASE}/settings`);
+        if (response.ok) {
+          const data = await response.json();
+          setAiProvider(data.ai_provider || 'openai');
+          setAiApiKey(data.ai_api_key || '');
+          setAiModel(data.ai_model || '');
+          setAiEnabled(data.ai_enabled || false);
+        }
+      } catch (err) {
+        console.error('Failed to load settings:', err);
+      }
+    };
+    loadSettings();
+  }, []);
+
+  const handleSave = async () => {
+    setSaving(true);
+    setMessage('');
+
+    try {
+      const response = await fetch(`${API_BASE}/settings`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ai_provider: aiProvider,
+          ai_api_key: aiApiKey,
+          ai_model: aiModel,
+          ai_enabled: aiEnabled,
+        }),
+      });
+
+      if (response.ok) {
+        setMessage('Settings saved successfully!');
+        setTimeout(() => setMessage(''), 3000);
+      } else {
+        const data = await response.json();
+        setMessage(`Error: ${data.error || 'Failed to save settings'}`);
+      }
+    } catch (err) {
+      setMessage(`Error: ${err.message}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const providers = [
+    { value: 'openai', label: 'OpenAI' },
+    { value: 'anthropic', label: 'Anthropic (Claude)' },
+    { value: 'google', label: 'Google (Gemini)' },
+    { value: 'openrouter', label: 'OpenRouter' },
+    { value: 'ollama', label: 'Ollama (Local)' },
+  ];
+
+  return h('div', { className: 'panel' },
+    h('div', { className: 'panel-header' },
+      h('div', { className: 'panel-title' },
+        h('span', { className: 'panel-title-icon' }, '🔧'),
+        'AI SETTINGS'
+      )
+    ),
+    h('div', { style: { padding: '24px' } },
+      h('div', { style: { maxWidth: '600px', margin: '0 auto' } },
+        // AI Provider
+        h('div', { style: { marginBottom: '24px' } },
+          h('label', { style: { display: 'block', marginBottom: '8px', fontWeight: 600, fontSize: '13px' } }, 'AI Provider'),
+          h('select', {
+            value: aiProvider,
+            onChange: (e) => setAiProvider(e.target.value),
+            style: {
+              width: '100%',
+              padding: '10px',
+              borderRadius: 'var(--radius-md)',
+              border: '1px solid var(--border)',
+              background: 'var(--bg-secondary)',
+              color: 'var(--text-primary)',
+              fontSize: '13px',
+            }
+          },
+            providers.map(p => h('option', { key: p.value, value: p.value }, p.label))
+          )
+        ),
+
+        // API Key
+        h('div', { style: { marginBottom: '24px' } },
+          h('label', { style: { display: 'block', marginBottom: '8px', fontWeight: 600, fontSize: '13px' } }, 'API Key'),
+          h('input', {
+            type: 'password',
+            value: aiApiKey,
+            onChange: (e) => setAiApiKey(e.target.value),
+            placeholder: 'Enter your API key',
+            style: {
+              width: '100%',
+              padding: '10px',
+              borderRadius: 'var(--radius-md)',
+              border: '1px solid var(--border)',
+              background: 'var(--bg-secondary)',
+              color: 'var(--text-primary)',
+              fontSize: '13px',
+            }
+          })
+        ),
+
+        // AI Model
+        h('div', { style: { marginBottom: '24px' } },
+          h('label', { style: { display: 'block', marginBottom: '8px', fontWeight: 600, fontSize: '13px' } }, 'Model Name (Optional)'),
+          h('input', {
+            type: 'text',
+            value: aiModel,
+            onChange: (e) => setAiModel(e.target.value),
+            placeholder: 'e.g., gpt-4, claude-3-sonnet, gemini-pro',
+            style: {
+              width: '100%',
+              padding: '10px',
+              borderRadius: 'var(--radius-md)',
+              border: '1px solid var(--border)',
+              background: 'var(--bg-secondary)',
+              color: 'var(--text-primary)',
+              fontSize: '13px',
+            }
+          })
+        ),
+
+        // Enable AI
+        h('div', { style: { marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '12px' } },
+          h('input', {
+            type: 'checkbox',
+            checked: aiEnabled,
+            onChange: (e) => setAiEnabled(e.target.checked),
+            id: 'ai-enabled',
+            style: { width: '18px', height: '18px', cursor: 'pointer' }
+          }),
+          h('label', { htmlFor: 'ai-enabled', style: { fontWeight: 600, fontSize: '13px', cursor: 'pointer' } }, 'Enable AI Integration')
+        ),
+
+        // Save Button
+        h('div', { style: { marginTop: '32px', display: 'flex', gap: '12px', alignItems: 'center' } },
+          h('button', {
+            className: 'btn btn-primary',
+            onClick: handleSave,
+            disabled: saving,
+            style: {
+              padding: '10px 24px',
+              fontSize: '13px',
+              fontWeight: 600,
+            }
+          }, saving ? 'Saving...' : 'Save Settings'),
+          message && h('span', {
+            style: {
+              fontSize: '12px',
+              color: message.includes('Error') ? '#ef4444' : '#10b981',
+            }
+          }, message)
+        ),
+
+        // Info
+        h('div', {
+          style: {
+            marginTop: '32px',
+            padding: '16px',
+            background: 'var(--bg-secondary)',
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--radius-md)',
+            fontSize: '12px',
+            color: 'var(--text-muted)',
+          }
+        },
+          h('div', { style: { marginBottom: '8px', fontWeight: 600 } }, '💡 Note:'),
+          h('div', null, 'Settings are stored in memory and will reset when the server restarts. For persistent configuration, set environment variables:'),
+          h('ul', { style: { marginTop: '8px', paddingLeft: '20px' } },
+            h('li', null, 'ACTIFIX_AI_PROVIDER'),
+            h('li', null, 'ACTIFIX_AI_API_KEY'),
+            h('li', null, 'ACTIFIX_AI_MODEL'),
+            h('li', null, 'ACTIFIX_AI_ENABLED')
+          )
+        )
+      )
+    )
+  );
+};
+
 // Modules View Component
 const ModulesView = () => {
   const { data, loading, error } = useFetch('/modules', 15000);
@@ -695,6 +891,7 @@ const App = () => {
       case 'logs': return h(LogsView);
       case 'system': return h(SystemView);
       case 'modules': return h(ModulesView);
+      case 'settings': return h(SettingsView);
       default: return h(OverviewView);
     }
   };

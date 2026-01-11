@@ -47,6 +47,12 @@ class ActifixConfig:
     # Health checks
     health_check_interval_seconds: float = 60.0
     stale_lock_timeout_seconds: float = 300.0
+    
+    # AI Integration
+    ai_provider: str = "openai"  # openai, anthropic, google, openrouter, ollama
+    ai_api_key: str = ""
+    ai_model: str = ""  # e.g., gpt-4, claude-3-sonnet, gemini-pro
+    ai_enabled: bool = False
 
 
 def _parse_bool(value: str) -> bool:
@@ -163,6 +169,11 @@ def load_config(
         stale_lock_timeout_seconds=_parse_float(
             os.environ.get("ACTIFIX_STALE_LOCK_TIMEOUT", ""), 300.0
         ),
+        
+        ai_provider=os.environ.get("ACTIFIX_AI_PROVIDER", "openai"),
+        ai_api_key=os.environ.get("ACTIFIX_AI_API_KEY", ""),
+        ai_model=os.environ.get("ACTIFIX_AI_MODEL", ""),
+        ai_enabled=_parse_bool(os.environ.get("ACTIFIX_AI_ENABLED", "0")),
     )
     
     # Validate configuration
