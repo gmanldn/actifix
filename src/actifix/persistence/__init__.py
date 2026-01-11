@@ -75,6 +75,24 @@ from .health import (
     detect_corruption,
 )
 
+from .database import (
+    DatabasePool,
+    DatabaseConfig,
+    DatabaseError,
+    DatabaseConnectionError,
+    DatabaseSchemaError,
+    get_database_pool,
+    reset_database_pool,
+)
+
+from .ticket_repo import (
+    TicketRepository,
+    TicketFilter,
+    TicketLock,
+    get_ticket_repository,
+    reset_ticket_repository,
+)
+
 __version__ = "1.0.0"
 
 __all__ = [
@@ -111,4 +129,20 @@ __all__ = [
     "HealthStatus",
     "check_storage_health",
     "detect_corruption",
+    
+    # Database
+    "DatabasePool",
+    "DatabaseConfig",
+    "DatabaseError",
+    "DatabaseConnectionError",
+    "DatabaseSchemaError",
+    "get_database_pool",
+    "reset_database_pool",
+    
+    # Ticket Repository
+    "TicketRepository",
+    "TicketFilter",
+    "TicketLock",
+    "get_ticket_repository",
+    "reset_ticket_repository",
 ]
