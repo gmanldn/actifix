@@ -16,7 +16,7 @@ import traceback
 from pathlib import Path
 from typing import Optional
 
-from .raise_af import record_error, ACTIFIX_CAPTURE_ENV_VAR
+from .raise_af import record_error, ACTIFIX_CAPTURE_ENV_VAR, enforce_raise_af_only
 from .state_paths import get_actifix_paths, init_actifix_files, ActifixPaths
 
 
@@ -129,6 +129,7 @@ def bootstrap(project_root: Optional[Path] = None) -> ActifixPaths:
     Returns:
         Initialized ActifixPaths.
     """
+    enforce_raise_af_only(get_actifix_paths(project_root=project_root))
     paths = get_actifix_paths(project_root=project_root)
     init_actifix_files(paths)
     return paths

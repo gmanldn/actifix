@@ -35,7 +35,12 @@ from enum import Enum
 from pathlib import Path
 from typing import List, Optional, Dict, Any
 
-from .state_paths import get_actifix_state_dir, get_actifix_paths, ActifixPaths
+from .state_paths import (
+    get_actifix_state_dir,
+    get_actifix_paths,
+    get_raise_af_sentinel,
+    ActifixPaths,
+)
 
 
 class TicketPriority(str, Enum):
@@ -93,6 +98,8 @@ SYSTEM_STATE_MAX_CHARS = int(os.getenv("ACTIFIX_SYSTEM_STATE_MAX_CHARS", "1500")
 
 # Environment variable to enable/disable capture
 ACTIFIX_CAPTURE_ENV_VAR = "ACTIFIX_CAPTURE_ENABLED"
+ACTIFIX_CHANGE_ORIGIN_ENV = "ACTIFIX_CHANGE_ORIGIN"
+ACTIFIX_ENFORCE_RAISE_AF_ENV = "ACTIFIX_ENFORCE_RAISE_AF"
 
 # Fallback queue for when ACTIFIX-LIST.md is unwritable
 FALLBACK_QUEUE_FILE = get_actifix_state_dir() / "actifix_fallback_queue.json"
@@ -143,6 +150,33 @@ def _get_current_correlation_id() -> Optional[str]:
         return None
     except Exception:
         return None
+
+
+def enforce_raise_af_only(
+    paths: Optional[ActifixPaths] = None,
+    change_origin: Optional[str] = None,
+) -> None:
+    """
+    Enforce Raise_AF-only change policy.
+
+    Requires ACTIFIX_CHANGE_ORIGIN=raise_af (unless enforcement explicitly
+    disabled via ACTIFIX_ENFORCE_RAISE_AF=0). Sentinel file in state dir
+    enables enforcement by default for this repo.
+    """
+    active_paths = paths or get_actifix_paths()
+    sentinel = get_raise_af_sentinel(active_paths)
+
+    enforce_flag = os.getenv(ACTIFIX_ENFORCE_RAISE_AF_ENV, "1").strip().lower()
+    enforcement_enabled = enforce_flag not in {"0", "false", "no", "off"} or sentinel.exists()
+
+    if not enforcement_enabled:
+        return
+
+    origin = (change_origin or os.getenv(ACTIFIX_CHANGE_ORIGIN_ENV, "")).strip().lower()
+    if origin != "raise_af":
+        raise PermissionError(
+            "Raise_AF policy enforced: set ACTIFIX_CHANGE_ORIGIN=raise_af and begin changes via actifix.raise_af.record_error()."
+        )
 
 
 def generate_entry_id() -> str:
@@ -760,6 +794,9 @@ def record_error(
     if active_paths is None:
         active_paths = get_actifix_paths(base_dir=base_dir) if base_dir else get_actifix_paths()
     base_dir_path = active_paths.base_dir
+
+    # Enforce Raise_AF-only policy before proceeding
+    enforce_raise_af_only(active_paths)
     
     # Clean inputs
     clean_message = message.strip()

@@ -17,6 +17,9 @@ from pathlib import Path
 from typing import Optional, List
 
 
+RAISE_AF_SENTINEL_FILENAME = "RAISE_AF_ONLY"
+
+
 @dataclass
 class ActifixPaths:
     """Resolved Actifix path configuration."""
@@ -139,6 +142,14 @@ def init_actifix_files(paths: Optional[ActifixPaths] = None) -> ActifixPaths:
     
     if not paths.aflog_file.exists():
         paths.aflog_file.write_text("", encoding="utf-8")
+
+    # Write sentinel to enforce Raise_AF-only change policy
+    sentinel = paths.state_dir / RAISE_AF_SENTINEL_FILENAME
+    if not sentinel.exists():
+        sentinel.write_text(
+            "Raise_AF gate active. Set ACTIFIX_CHANGE_ORIGIN=raise_af before executing changes.\n",
+            encoding="utf-8",
+        )
     
     return paths
 
@@ -187,3 +198,10 @@ def get_logs_dir() -> Path:
     paths = get_actifix_paths()
     ensure_actifix_dirs(paths)
     return paths.logs_dir
+
+
+def get_raise_af_sentinel(paths: Optional[ActifixPaths] = None) -> Path:
+    """Return the Raise_AF sentinel path used for enforcement."""
+    if paths is None:
+        paths = get_actifix_paths()
+    return paths.state_dir / RAISE_AF_SENTINEL_FILENAME

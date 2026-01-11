@@ -93,11 +93,13 @@ See `src/actifix/` for implementation details: `raise_af.py` (capture engine), `
 
 ## Raise_AF Ticketing Requirement
 
-All work must begin by logging the condition through `actifix.raise_af.record_error(...)` so a ticket appears in `actifix/ACTIFIX-LIST.md` with the proper priority and context. This ensures the RaiseAF ticketing workflow remains the single source of truth for every change and keeps the AI/automation pipeline honest.
+All work must begin by logging the condition through `actifix.raise_af.record_error(...)` so a ticket appears in `actifix/ACTIFIX-LIST.md` with the proper priority and context. This ensures the RaiseAF ticketing workflow remains the single source of truth for every change and keeps the AI/automation pipeline honest. Enforcement is active: set `ACTIFIX_CHANGE_ORIGIN=raise_af` (default enforced) or operations will fail fast.
 
 ## Configuration (Environment Variables)
 
 - `ACTIFIX_CAPTURE_ENABLED`: Enable/disable capture (`1`, `true`, `yes`, `on`, `debug`).  
+- `ACTIFIX_CHANGE_ORIGIN`: Must be `raise_af` when enforcement is on (default).  
+- `ACTIFIX_ENFORCE_RAISE_AF`: Set to `0` only for emergency bypass (default `1`).  
 - `ACTIFIX_DATA_DIR`: Data directory for tickets (default `./actifix`).  
 - `ACTIFIX_STATE_DIR`: State directory (default `./.actifix`).  
 - `ACTIFIX_FILE_CONTEXT_MAX_CHARS`: File context length (default `2000`).  
@@ -128,7 +130,6 @@ actifix/
 - **Developer safety net**: Keep capture on in local/dev; Actifix auto-opens tickets for regressions and flaky behaviors while you work.  
 - **AI-assisted debugging**: Feed the ticket Markdown (with remediation notes) to your copilot for suggested fixes.  
 - **Self-hosted improvement**: Run `bootstrap_actifix_development()` inside this repo; Actifix will ticket its own issues while you add features.
-- **High-value ticket generator**: Run `python scripts/generate_high_value_tickets.py --count 10 --priority P0` to flood `actifix/ACTIFIX-LIST.md` with critical/demo tickets for validation or AI pilot exercises.
 
 ## Roadmap Snapshot
 

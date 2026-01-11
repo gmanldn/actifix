@@ -27,6 +27,7 @@ from pathlib import Path
 from typing import Optional, Callable, Iterator
 
 from .log_utils import atomic_write, log_event
+from .raise_af import enforce_raise_af_only
 from .state_paths import ActifixPaths, get_actifix_paths, init_actifix_files
 
 
@@ -382,6 +383,9 @@ def mark_ticket_complete(
     if paths is None:
         paths = get_actifix_paths()
     
+    # Enforce Raise_AF-only policy before modifying tickets
+    enforce_raise_af_only(paths)
+    
     if not paths.list_file.exists():
         return False
     
@@ -476,6 +480,9 @@ def fix_highest_priority_ticket(
     """
     if paths is None:
         paths = get_actifix_paths()
+    
+    # Enforce Raise_AF-only policy before modifying tickets
+    enforce_raise_af_only(paths)
 
     init_actifix_files(paths)
 
@@ -592,6 +599,9 @@ def process_next_ticket(
     """
     if paths is None:
         paths = get_actifix_paths()
+    
+    # Enforce Raise_AF-only policy before processing tickets
+    enforce_raise_af_only(paths)
     
     with _ticket_lock(paths):
         tickets = get_open_tickets(paths)
@@ -876,6 +886,10 @@ def main(argv: Optional[list[str]] = None) -> int:
         parser.error("--max-tickets must be at least 1")
 
     paths = _resolve_paths_from_args(args)
+    
+    # Enforce Raise_AF-only policy for any command that might modify state
+    if args.command == "process":
+        enforce_raise_af_only(paths)
 
     if args.command == "stats":
         stats = get_ticket_stats(paths)

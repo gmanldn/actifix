@@ -22,7 +22,7 @@ import yaml
 ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 
-ARCH_DIR = ROOT / "Arch"
+ARCH_DIR = ROOT / "docs" / "architecture"
 SRC_DIR = ROOT / "src" / "actifix"
 
 # Note: We validate module existence via filesystem checks, not imports

@@ -30,6 +30,7 @@ from .do_af import (
     get_completed_tickets,
     fix_highest_priority_ticket,
 )
+from .raise_af import enforce_raise_af_only
 from .state_paths import get_actifix_paths
 
 # Server start time for uptime calculation
@@ -155,20 +156,64 @@ def _parse_log_line(line: str) -> Optional[dict]:
     if not stripped:
         return None
 
-    parts = [part.strip() for part in stripped.split(" | ")]
-    timestamp = parts[0] if len(parts) >= 1 else ""
-    event_type = parts[1] if len(parts) >= 2 else "LOG"
-    ticket_id = parts[2] if len(parts) >= 3 else "-"
-    message = parts[3] if len(parts) >= 4 else stripped
-    extra = parts[4] if len(parts) >= 5 else None
-    level = _map_event_type_to_level(event_type, message)
+    # AFLog structured format: "timestamp | EVENT | ticket | message | extra"
+    if " | " in stripped:
+        parts = [part.strip() for part in stripped.split(" | ")]
+        timestamp = parts[0] if len(parts) >= 1 else ""
+        event_type = parts[1] if len(parts) >= 2 else "LOG"
+        ticket_id = parts[2] if len(parts) >= 3 else "-"
+        message = parts[3] if len(parts) >= 4 else stripped
+        extra = parts[4] if len(parts) >= 5 else None
+        level = _map_event_type_to_level(event_type, message)
 
+        return {
+            "timestamp": timestamp,
+            "event": event_type,
+            "ticket": ticket_id,
+            "text": message,
+            "extra": extra,
+            "level": level,
+        }
+
+    # Simple text formats such as "LEVEL: message" or icon-prefixed lines
+    icon_levels = {
+        "✓": "SUCCESS",
+        "✗": "ERROR",
+        "⚠": "WARNING",
+    }
+    for icon, level in icon_levels.items():
+        if stripped.startswith(icon):
+            message = stripped[len(icon):].strip() or stripped
+            return {
+                "timestamp": "",
+                "event": "LOG",
+                "ticket": "-",
+                "text": message,
+                "extra": None,
+                "level": level,
+            }
+
+    prefix, sep, remainder = stripped.partition(":")
+    if sep:
+        event_type = prefix.strip() or "LOG"
+        message = remainder.strip() or stripped
+        level = _map_event_type_to_level(event_type, message)
+        return {
+            "timestamp": "",
+            "event": event_type,
+            "ticket": "-",
+            "text": message,
+            "extra": None,
+            "level": level,
+        }
+
+    level = _map_event_type_to_level("LOG", stripped)
     return {
-        "timestamp": timestamp,
-        "event": event_type,
-        "ticket": ticket_id,
-        "text": message,
-        "extra": extra,
+        "timestamp": "",
+        "event": "LOG",
+        "ticket": "-",
+        "text": stripped,
+        "extra": None,
         "level": level,
     }
 
@@ -282,6 +327,11 @@ def create_app(project_root: Optional[Path] = None) -> "Flask":
     def api_fix_ticket():
         """Fix the highest priority open ticket with detailed logging."""
         paths = get_actifix_paths(project_root=app.config['PROJECT_ROOT'])
+        
+        # Enforce Raise_AF-only policy before modifying tickets
+        # (Defense in depth - also enforced in fix_highest_priority_ticket)
+        enforce_raise_af_only(paths)
+        
         result = fix_highest_priority_ticket(paths)
         return jsonify({
             'processed': result.get('processed', False),
@@ -301,17 +351,22 @@ def create_app(project_root: Optional[Path] = None) -> "Flask":
         lines = request.args.get('lines', 100, type=int)
         
         log_files = {
-            'audit': paths.aflog_file,  # AFLog.txt
-            'errors': paths.rollup_file,  # ACTIFIX.md
-            'list': paths.list_file,  # ACTIFIX-LIST.md
+            # Prefer ACTIFIX-LOG.md for audit if it exists; fallback to AFLog.txt
+            'audit': [paths.log_file, paths.aflog_file],
+            'errors': [paths.rollup_file],  # ACTIFIX.md
+            'list': [paths.list_file],  # ACTIFIX-LIST.md
         }
         
         # Also check for setup.log
         setup_log = app.config['PROJECT_ROOT'] / 'logs' / 'setup.log'
         if setup_log.exists():
-            log_files['setup'] = setup_log
+            log_files['setup'] = [setup_log]
         
-        log_file = log_files.get(log_type)
+        candidates = log_files.get(log_type, [])
+        if not isinstance(candidates, list):
+            candidates = [candidates]
+        
+        log_file = next((p for p in candidates if p and p.exists()), candidates[0] if candidates else None)
         
         if not log_file or not log_file.exists():
             return jsonify({
