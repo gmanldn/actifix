@@ -614,14 +614,16 @@ def fix_highest_priority_ticket(
 def process_next_ticket(
     ai_handler: Optional[Callable[[TicketInfo], bool]] = None,
     paths: Optional[ActifixPaths] = None,
+    use_ai: bool = True,
 ) -> Optional[TicketInfo]:
     """
-    Process the next open ticket.
+    Process the next open ticket using AI or custom handler.
     
     Args:
         ai_handler: Optional custom AI handler function.
                    Takes TicketInfo, returns True if fixed.
         paths: Optional paths override.
+        use_ai: Whether to use built-in AI system (default: True).
     
     Returns:
         Processed TicketInfo if any, None otherwise.
@@ -653,28 +655,102 @@ def process_next_ticket(
             extra={"priority": ticket.priority}
         )
         
-        # If AI handler provided, use it
+        # Try AI system first if enabled
+        if use_ai and not ai_handler:
+            try:
+                from .ai_client import get_ai_client
+                
+                ai_client = get_ai_client()
+                
+                # Convert TicketInfo to dict for AI client
+                ticket_dict = {
+                    'id': ticket.ticket_id,
+                    'priority': ticket.priority,
+                    'error_type': ticket.error_type,
+                    'message': ticket.message,
+                    'source': ticket.source,
+                    'stack_trace': getattr(ticket, 'stack_trace', ''),
+                    'created': ticket.created,
+                }
+                
+                log_event(
+                    paths.aflog_file,
+                    "AI_PROCESSING",
+                    f"Requesting AI fix for ticket: {ticket.ticket_id}",
+                    ticket_id=ticket.ticket_id
+                )
+                
+                ai_response = ai_client.generate_fix(ticket_dict)
+                
+                if ai_response.success:
+                    # AI provided a fix
+                    summary = f"Fixed via {ai_response.provider.value} ({ai_response.model})"
+                    if ai_response.cost_usd:
+                        summary += f" - Cost: ${ai_response.cost_usd:.4f}"
+                    
+                    mark_ticket_complete(
+                        ticket.ticket_id,
+                        summary=summary,
+                        paths=paths,
+                        use_lock=False,  # lock already held
+                    )
+                    
+                    log_event(
+                        paths.aflog_file,
+                        "AI_DISPATCH_SUCCESS",
+                        f"AI successfully fixed ticket: {ticket.ticket_id}",
+                        ticket_id=ticket.ticket_id,
+                        extra={
+                            "provider": ai_response.provider.value,
+                            "model": ai_response.model,
+                            "tokens": ai_response.tokens_used,
+                            "cost": ai_response.cost_usd,
+                            "fix_preview": ai_response.content[:100] + "..." if len(ai_response.content) > 100 else ai_response.content
+                        }
+                    )
+                    
+                    return ticket
+                else:
+                    # AI failed, log but continue to custom handler if provided
+                    log_event(
+                        paths.aflog_file,
+                        "AI_DISPATCH_FAILED",
+                        f"AI failed to fix ticket: {ai_response.error}",
+                        ticket_id=ticket.ticket_id,
+                        extra={"error": ai_response.error}
+                    )
+                    
+            except Exception as e:
+                log_event(
+                    paths.aflog_file,
+                    "AI_SYSTEM_ERROR",
+                    f"AI system error: {e}",
+                    ticket_id=ticket.ticket_id,
+                    extra={"error": str(e)}
+                )
+        
+        # If AI handler provided, use it as fallback or primary
         if ai_handler:
             try:
                 success = ai_handler(ticket)
                 if success:
                     mark_ticket_complete(
                         ticket.ticket_id,
-                        summary="Fixed via AI handler",
+                        summary="Fixed via custom AI handler",
                         paths=paths,
                         use_lock=False,  # lock already held
                     )
                     log_event(
                         paths.aflog_file,
-                        "DISPATCH_SUCCESS",
-                        f"AI handler completed: {ticket.ticket_id}",
+                        "CUSTOM_DISPATCH_SUCCESS",
+                        f"Custom AI handler completed: {ticket.ticket_id}",
                         ticket_id=ticket.ticket_id
                     )
             except Exception as e:
                 log_event(
                     paths.aflog_file,
-                    "DISPATCH_FAILED",
-                    f"AI handler failed: {e}",
+                    "CUSTOM_DISPATCH_FAILED",
+                    f"Custom AI handler failed: {e}",
                     ticket_id=ticket.ticket_id,
                     extra={"error": str(e)}
                 )

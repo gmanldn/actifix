@@ -140,6 +140,12 @@
       "label": "simple_ticket_attack"
     },
     {
+      "id": "core.ai_client",
+      "domain": "core",
+      "owner": "core",
+      "label": "ai_client"
+    },
+    {
       "id": "infra.persistence.paths",
       "domain": "infra",
       "owner": "persistence",
@@ -424,6 +430,26 @@
       "from": "tooling.simple_ticket_attack",
       "to": "runtime.state",
       "reason": "tooling.simple_ticket_attack depends on runtime.state"
+    },
+    {
+      "from": "core.ai_client",
+      "to": "runtime.config",
+      "reason": "core.ai_client depends on runtime.config"
+    },
+    {
+      "from": "core.ai_client",
+      "to": "infra.logging",
+      "reason": "core.ai_client depends on infra.logging"
+    },
+    {
+      "from": "core.ai_client",
+      "to": "runtime.state",
+      "reason": "core.ai_client depends on runtime.state"
+    },
+    {
+      "from": "core.do_af",
+      "to": "core.ai_client",
+      "reason": "core.do_af depends on core.ai_client"
     }
   ]
 }

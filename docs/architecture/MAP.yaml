@@ -248,6 +248,7 @@ modules:
   depends_on:
   - infra.logging
   - core.raise_af
+  - core.ai_client
 - id: core.quarantine
   domain: core
   owner: core
@@ -328,6 +329,25 @@ modules:
   depends_on:
   - core.raise_af
   - infra.persistence.ticket_repo
+  - runtime.state
+
+- id: core.ai_client
+  domain: core
+  owner: core
+  summary: Multi-provider AI integration with automatic fallback chain
+  entrypoints:
+  - src/actifix/ai_client.py
+  contracts:
+  - Claude Code local auth detection
+  - Claude API integration
+  - OpenAI GPT-4 Turbo integration
+  - Ollama local model support
+  - Free alternative user prompts
+  - Automatic provider fallback
+  - Cost tracking and logging
+  depends_on:
+  - runtime.config
+  - infra.logging
   - runtime.state
 contracts:
 - id: contract.logging
