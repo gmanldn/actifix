@@ -11,6 +11,7 @@ Version: 1.0.0
 """
 
 import contextlib
+import os
 import json
 import sqlite3
 import threading
@@ -277,9 +278,10 @@ def get_database_pool(db_path: Optional[Path] = None) -> DatabasePool:
     global _global_pool
     
     if db_path is None:
-        # Use project root / data directory for database
+        # Use env override or project root / data directory for database
         from pathlib import Path as _Path
-        db_path = _Path.cwd() / "data" / "actifix.db"
+        env_db_path = os.environ.get("ACTIFIX_DB_PATH")
+        db_path = Path(env_db_path).expanduser() if env_db_path else (_Path.cwd() / "data" / "actifix.db")
     
     with _pool_lock:
         if _global_pool is None or _global_pool.config.db_path != db_path:

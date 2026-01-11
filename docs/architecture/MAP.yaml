@@ -349,6 +349,19 @@ modules:
   - runtime.config
   - infra.logging
   - runtime.state
+- id: core.error_taxonomy
+  domain: core
+  owner: core
+  summary: Enhanced error classification and taxonomy system
+  entrypoints:
+  - src/actifix/error_taxonomy.py
+  contracts:
+  - sophisticated error pattern matching
+  - priority classification based on error characteristics
+  - remediation hints generation
+  - extensible pattern system
+  depends_on:
+  - core.raise_af
 contracts:
 - id: contract.logging
   summary: All modules must log via centralized logging system with correlation IDs

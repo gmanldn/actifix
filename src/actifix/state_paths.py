@@ -5,8 +5,8 @@
 State paths management for Actifix.
 
 Provides a single, deterministic source of truth for all Actifix file and
-directory locations. Mirrors the Pokertool-style layout by ensuring the ticket
-list, rollup, audit log, and test logs are always created together.
+directory locations. Ensures rollups, audit logs, and test logs are created
+alongside database-backed ticket storage.
 
 Version: 2.1.0 (Generic)
 """
@@ -42,7 +42,6 @@ class ActifixPaths:
     def all_artifacts(self) -> List[Path]:
         """Return all core artifacts that must exist for health checks."""
         return [
-            self.list_file,
             self.rollup_file,
             self.log_file,
             self.aflog_file,
@@ -119,16 +118,6 @@ def init_actifix_files(paths: Optional[ActifixPaths] = None) -> ActifixPaths:
         paths = get_actifix_paths()
     
     ensure_actifix_dirs(paths)
-    
-    if not paths.list_file.exists():
-        paths.list_file.write_text(
-            "# ACTIFIX Ticket List\n\n"
-            "## Active Items\n\n"
-            "_No active items_\n\n"
-            "## Completed Items\n\n"
-            "_No completed items_\n",
-            encoding="utf-8",
-        )
     
     if not paths.rollup_file.exists():
         paths.rollup_file.write_text(

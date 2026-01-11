@@ -206,7 +206,6 @@ def get_health(paths: Optional[ActifixPaths] = None) -> ActifixHealthCheck:
             "breaches": breaches,
             "paths": {
                 "base_dir": str(paths.base_dir),
-                "list_file": str(paths.list_file),
             }
         },
         warnings=warnings,

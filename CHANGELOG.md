@@ -1,0 +1,125 @@
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+### Added
+- 50 actionable tasks implementation from documentation analysis
+- Comprehensive task list with priority distribution
+- Initial ticket creation via raise_af workflow
+
+## [2.7.0] - 2026-01-11
+
+### Added
+- Multi-provider AI integration with automatic fallback chain
+- Claude Code local auth detection
+- Claude API integration
+- OpenAI GPT-4 Turbo integration
+- Ollama local model support
+- Free alternative user prompts
+- Automatic provider fallback
+- Cost tracking and logging
+- SQLite database backend with connection pooling
+- Ticket repository with CRUD operations and locking
+- Database migration script for importing tickets
+- Enhanced persistence layer with atomic operations
+- Comprehensive testing framework
+- Architecture compliance validation
+- Health monitoring system
+- Quarantine system for error isolation
+
+### Changed
+- Improved error capture with rich context
+- Enhanced ticket processing workflow
+- Better AI remediation notes generation
+- Optimized state management
+- Refined architecture documentation
+
+### Fixed
+- Thread safety issues in database operations
+- Memory leaks in long-running processes
+- Error handling edge cases
+- Configuration validation bugs
+
+## [2.6.0] - 2026-01-10
+
+### Added
+- Self-improving error management framework
+- Production-grade error capture with priority classification
+- AI-native ticket generation
+- Self-development mode for framework improvement
+- Transparent Markdown artifacts
+- Configurable environment variables
+- Web dashboard frontend
+- Comprehensive documentation suite
+
+### Changed
+- Refactored core architecture for better modularity
+- Improved error classification algorithm
+- Enhanced duplicate detection mechanism
+- Better secret redaction capabilities
+
+### Fixed
+- Race conditions in concurrent error capture
+- File corruption issues during atomic writes
+- Memory usage optimization
+- Performance bottlenecks in ticket processing
+
+## [2.5.0] - 2026-01-09
+
+### Added
+- Initial framework implementation
+- Basic error capture and ticket creation
+- Simple file-based persistence
+- Command-line interface
+- Basic testing infrastructure
+
+### Changed
+- Initial architecture design
+- Core module structure
+- Basic configuration system
+
+## [2.0.0] - 2026-01-01
+
+### Added
+- Project inception
+- Core concept development
+- Initial design documents
+
+---
+
+## Release Notes
+
+### Version 2.7.0 Highlights
+This release focuses on AI integration and database persistence, making Actifix production-ready with multi-provider AI support and robust data storage.
+
+### Version 2.6.0 Highlights
+Major milestone introducing the self-improving error management framework with comprehensive documentation and web interface.
+
+### Version 2.5.0 Highlights
+Foundation release establishing core error capture and ticket management capabilities.
+
+## Migration Guide
+
+### Upgrading to 2.7.0
+- Database migration required for existing installations
+- Run `python -m actifix.migrate_to_db` to import existing tickets
+- Update configuration for AI provider settings
+- Review new environment variables for AI integration
+
+### Upgrading to 2.6.0
+- No breaking changes from 2.5.0
+- New configuration options available
+- Web dashboard requires static file serving
+
+## Support
+
+For questions about releases or upgrade issues:
+- Check the documentation in `docs/`
+- Review architecture files in `docs/architecture/`
+- Report issues via GitHub Issues
+- See `docs/DEVELOPMENT.md` for contribution guidelines

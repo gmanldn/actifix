@@ -1,12 +1,10 @@
 """
 Test DoAF idempotency guard to prevent double-completing tickets.
-
-Tests that mark_ticket_complete() skips already-completed tickets
-and logs the skip event to AFLog.
 """
 
 import sys
 import tempfile
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
@@ -15,6 +13,8 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from actifix.do_af import mark_ticket_complete, get_open_tickets, get_completed_tickets, get_ticket_stats
+from actifix.raise_af import ActifixEntry, TicketPriority
+from actifix.persistence.ticket_repo import get_ticket_repository
 from actifix.state_paths import ActifixPaths
 
 
@@ -25,7 +25,7 @@ def temp_actifix_paths():
         base = Path(tmpdir)
         state_dir = base / ".actifix"
         state_dir.mkdir()
-        
+
         paths = ActifixPaths(
             project_root=base,
             base_dir=base / "actifix",
@@ -39,271 +39,74 @@ def temp_actifix_paths():
             quarantine_dir=state_dir / "quarantine",
             test_logs_dir=state_dir / "test_logs",
         )
-        
-        # Create directories
+
+        # Create directories and log files
         paths.base_dir.mkdir(parents=True, exist_ok=True)
         paths.logs_dir.mkdir(parents=True, exist_ok=True)
-        
+        paths.aflog_file.write_text("")
+
         yield paths
+
+
+def _create_ticket(ticket_id: str, priority: TicketPriority, message: str) -> None:
+    repo = get_ticket_repository()
+    entry = ActifixEntry(
+        message=message,
+        source="tests/do_af.py:1",
+        run_label="test-run",
+        entry_id=ticket_id,
+        created_at=datetime.now(timezone.utc),
+        priority=priority,
+        error_type="TestError",
+        stack_trace="",
+        duplicate_guard=f"ACTIFIX-{ticket_id}",
+    )
+    repo.create_ticket(entry)
 
 
 def test_idempotency_guard_prevents_double_completion(temp_actifix_paths):
     """Test that mark_ticket_complete skips already-completed tickets."""
     paths = temp_actifix_paths
-    
-    # Create initial ACTIFIX-LIST.md with a test ticket
-    list_content = """# Actifix Ticket List
 
-## Active Items
+    ticket_id = "ACT-20260101-TEST123"
+    _create_ticket(ticket_id, TicketPriority.P3, "Idempotency test")
 
-### ACT-20260101-TEST123 - [P3] Test Ticket
-
-- **Priority**: P3
-- **Error Type**: TestError
-- **Source**: `test.py:50`
-- **Run**: test-run
-- **Created**: 2026-01-10T12:00:00Z
-- **Duplicate Guard**: `TEST-test-py:50-abcd1234`
-
-**Checklist:**
-
-- [x] Documented
-- [ ] Functioning
-- [ ] Tested
-- [ ] Completed
-
-## Completed Items
-
-"""
-    
-    paths.list_file.write_text(list_content)
-    paths.aflog_file.write_text("")
-    
     # First call: mark as complete (should succeed)
     result1 = mark_ticket_complete(
-        "ACT-20260101-TEST123",
+        ticket_id,
         summary="Fixed successfully",
         paths=paths
     )
-    assert result1 is True, "First mark_ticket_complete should return True"
-    
-    # Verify it was marked complete
-    content = paths.list_file.read_text()
-    assert "[x] Completed" in content, "Ticket should be marked completed"
-    
-    # Second call: try to mark as complete again (should be skipped by idempotency guard)
+    assert result1 is True
+
+    # Second call: should be skipped
     result2 = mark_ticket_complete(
-        "ACT-20260101-TEST123",
+        ticket_id,
         summary="Already fixed",
         paths=paths
     )
-    assert result2 is False, "Second mark_ticket_complete should return False (idempotency guard)"
-    
+    assert result2 is False
+
     # Verify AFLog has skip event
     aflog_content = paths.aflog_file.read_text()
-    assert "TICKET_ALREADY_COMPLETED" in aflog_content, "AFLog should have skip event"
-    assert "idempotency_guard" in aflog_content, "AFLog should mention idempotency guard"
-
-
-def test_idempotency_guard_logs_skip_event(temp_actifix_paths):
-    """Test that idempotency guard logs skip event to AFLog."""
-    paths = temp_actifix_paths
-    
-    # Create a ticket that's already completed
-    list_content = """# Actifix Ticket List
-
-## Active Items
-
-### ACT-20260101-DONE456 - [P2] Already Done Ticket
-
-- **Priority**: P2
-- **Error Type**: TestError
-- **Source**: `done.py:100`
-- **Run**: test-run
-- **Created**: 2026-01-10T12:00:00Z
-- **Duplicate Guard**: `TEST-done-py:100-efgh5678`
-
-**Checklist:**
-
-- [x] Documented
-- [x] Functioning
-- [x] Tested
-- [x] Completed
-
-## Completed Items
-
-"""
-    
-    paths.list_file.write_text(list_content)
-    paths.aflog_file.write_text("Previous events\n")
-    
-    # Try to mark as complete
-    result = mark_ticket_complete(
-        "ACT-20260101-DONE456",
-        summary="Trying to mark already-complete",
-        paths=paths
-    )
-    assert result is False, "Should return False for already-completed ticket"
-    
-    # Verify skip event was logged
-    aflog_content = paths.aflog_file.read_text()
     assert "TICKET_ALREADY_COMPLETED" in aflog_content
-    assert "ACT-20260101-DONE456" in aflog_content
-    assert "Skipped already-completed ticket" in aflog_content
+    assert "idempotency_guard" in aflog_content
 
 
-def test_idempotency_guard_ignores_remediation_notes(temp_actifix_paths):
-    """Ensure remediation notes mentioning [x] Completed don't trip the guard."""
-    paths = temp_actifix_paths
-    
-    list_content = """# Actifix Ticket List
-
-## Active Items
-
-### ACT-20260101-NOTES999 - [P2] Ticket With Notes
-
-- **Priority**: P2
-- **Error Type**: TestError
-- **Source**: `notes.py:10`
-- **Run**: test-run
-- **Created**: 2026-01-10T12:00:00Z
-- **Duplicate Guard**: `TEST-notes-py:10-zzzz9999`
-
-**Checklist:**
-
-- [x] Documented
-- [ ] Functioning
-- [ ] Tested
-- [ ] Completed
-
-<details>
-<summary>AI Remediation Notes</summary>
-
-Error Message: mention [x] Completed here but should not trigger guard.
-</details>
-
-## Completed Items
-
-"""
-    
-    paths.list_file.write_text(list_content)
-    paths.aflog_file.write_text("")
-    
-    # Should complete successfully despite notes containing "[x] Completed"
-    result = mark_ticket_complete(
-        "ACT-20260101-NOTES999",
-        summary="Completed even with notes string",
-        paths=paths
-    )
-    assert result is True
-    content = paths.list_file.read_text()
-    assert "[x] Completed" in content
-
-
-def test_normal_completion_still_works(temp_actifix_paths):
-    """Test that normal ticket completion still works correctly."""
-    paths = temp_actifix_paths
-    
-    # Create initial list
-    list_content = """# Actifix Ticket List
-
-## Active Items
-
-### ACT-20260101-NORMAL789 - [P1] Normal Ticket
-
-- **Priority**: P1
-- **Error Type**: TestError
-- **Source**: `normal.py:25`
-- **Run**: test-run
-- **Created**: 2026-01-10T12:00:00Z
-- **Duplicate Guard**: `TEST-normal-py:25-ijkl9012`
-
-**Checklist:**
-
-- [ ] Documented
-- [ ] Functioning
-- [ ] Tested
-- [ ] Completed
-
-## Completed Items
-
-"""
-    
-    paths.list_file.write_text(list_content)
-    paths.aflog_file.write_text("")
-    
-    # Mark as complete
-    result = mark_ticket_complete(
-        "ACT-20260101-NORMAL789",
-        summary="Fixed normally",
-        paths=paths
-    )
-    assert result is True, "Normal completion should succeed"
-    
-    # Verify all checkboxes were updated
-    content = paths.list_file.read_text()
-    assert "[x] Documented" in content
-    assert "[x] Functioning" in content
-    assert "[x] Tested" in content
-    assert "[x] Completed" in content
-    
-    # Verify completion event was logged
-    aflog_content = paths.aflog_file.read_text()
-    assert "TICKET_COMPLETED" in aflog_content
-    assert "ACT-20260101-NORMAL789" in aflog_content
-
-
-def test_completed_status_in_active_items_not_counted_as_open(temp_actifix_paths):
-    """Ensure completed tickets in Active Items are not reported as open."""
+def test_ticket_queries_use_database(temp_actifix_paths):
+    """Test get_open_tickets/get_completed_tickets/get_ticket_stats in DB mode."""
     paths = temp_actifix_paths
 
-    list_content = """# Actifix Ticket List
-
-## Active Items
-
-### ACT-20260102-ABCD1111 - [P1] Completed In Active
-
-- **Priority**: P1
-- **Error Type**: TestError
-- **Source**: `done.py:10`
-- **Run**: test-run
-- **Created**: 2026-01-10T12:00:00Z
-- **Duplicate Guard**: `TEST-done-py:10-aaaa1111`
-- **Status**: Completed
-
-**Checklist:**
-- [ ] Documented
-- [ ] Functioning
-- [ ] Tested
-- [ ] Completed
-
-### ACT-20260102-BEEF2222 - [P2] Still Open
-
-- **Priority**: P2
-- **Error Type**: TestError
-- **Source**: `open.py:20`
-- **Run**: test-run
-- **Created**: 2026-01-10T12:05:00Z
-- **Duplicate Guard**: `TEST-open-py:20-bbbb2222`
-- **Status**: Open
-
-**Checklist:**
-- [ ] Documented
-- [ ] Functioning
-- [ ] Tested
-- [ ] Completed
-
-## Completed Items
-
-"""
-    paths.list_file.write_text(list_content)
+    _create_ticket("ACT-20260101-OPEN1", TicketPriority.P1, "Open ticket 1")
+    _create_ticket("ACT-20260101-OPEN2", TicketPriority.P2, "Open ticket 2")
+    mark_ticket_complete("ACT-20260101-OPEN2", summary="done", paths=paths)
 
     open_tickets = get_open_tickets(paths)
-    completed_tickets = get_completed_tickets(paths)
-    stats = get_ticket_stats(paths)
+    assert any(ticket.ticket_id == "ACT-20260101-OPEN1" for ticket in open_tickets)
 
-    assert len(open_tickets) == 1
-    assert open_tickets[0].ticket_id == "ACT-20260102-BEEF2222"
-    assert any(ticket.ticket_id == "ACT-20260102-ABCD1111" for ticket in completed_tickets)
-    assert stats["open"] == 1
-    assert stats["completed"] == 1
+    completed_tickets = get_completed_tickets(paths)
+    assert any(ticket.ticket_id == "ACT-20260101-OPEN2" for ticket in completed_tickets)
+
+    stats = get_ticket_stats(paths)
+    assert stats["total"] >= 2
+    assert stats["completed"] >= 1

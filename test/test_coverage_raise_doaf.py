@@ -306,25 +306,21 @@ def test_raise_af_file_context_and_system_state(tmp_path, monkeypatch):
 
 
 def test_raise_af_duplicate_guards(tmp_path):
-    base_dir = tmp_path / "actifix"
-    base_dir.mkdir()
-    list_file = base_dir / "ACTIFIX-LIST.md"
-    list_file.write_text(
-        "\n".join(
-            [
-                "# Actifix Ticket List",
-                "## Active Items",
-                "_None_",
-                "## Completed Items",
-                "- **Duplicate Guard**: `ACTIFIX-test-1234`",
-            ]
-        )
-    )
-    assert raise_af.check_duplicate_guard("ACTIFIX-test-1234", base_dir) is True
-    assert raise_af.get_completed_guards(base_dir) == {"ACTIFIX-test-1234"}
+    from actifix.persistence.ticket_repo import get_ticket_repository
 
-    list_file.write_text("# Actifix Ticket List\n## Active Items\n")
-    assert raise_af.get_completed_guards(base_dir) == set()
+    repo = get_ticket_repository()
+    entry = ActifixEntry(
+        message="dup guard test",
+        source="src",
+        run_label="run",
+        entry_id="ACT-TEST",
+        created_at=datetime.now(timezone.utc),
+        priority=TicketPriority.P2,
+        error_type="error",
+        duplicate_guard="ACTIFIX-test-1234",
+    )
+    repo.create_ticket(entry)
+    assert repo.check_duplicate_guard("ACTIFIX-test-1234") is not None
 
 
 def test_raise_af_recent_entries_and_fallback_queue(tmp_path, monkeypatch):
@@ -378,34 +374,9 @@ def test_raise_af_persist_queue_legacy_cleanup(tmp_path, monkeypatch):
     assert legacy.exists()
 
 
-def test_raise_af_append_ticket_impl_variants(tmp_path):
-    base_dir = tmp_path / "actifix"
-    base_dir.mkdir()
-    list_file = base_dir / "ACTIFIX-LIST.md"
-    list_file.write_text("Header only")
-
-    entry = ActifixEntry(
-        message="msg",
-        source="src",
-        run_label="run",
-        entry_id="ACT-TEST",
-        created_at=datetime.now(timezone.utc),
-        priority=TicketPriority.P2,
-        error_type="error",
-        stack_trace="trace" * 5,
-        ai_remediation_notes="notes",
-        correlation_id="cid-1",
-    )
-    raise_af._append_ticket_impl(entry, base_dir)
-    content = list_file.read_text()
-    assert "Correlation ID" in content
-
-
 def test_raise_af_replay_queue_paths(tmp_path, monkeypatch):
     base_dir = tmp_path / "actifix"
     base_dir.mkdir()
-    list_file = base_dir / "ACTIFIX-LIST.md"
-    list_file.write_text("# List")
 
     sample_entry = (
         "[{\"message\": \"msg\", \"source\": \"src\", \"run_label\": \"run\", "
@@ -425,13 +396,22 @@ def test_raise_af_replay_queue_paths(tmp_path, monkeypatch):
 
     queue_file.write_text(sample_entry)
 
-    def boom(*_args, **_kwargs):
-        raise RuntimeError("append failed")
+    from actifix.persistence import ticket_repo
+    original_repo = ticket_repo.get_ticket_repository
 
-    monkeypatch.setattr(raise_af, "_append_ticket_impl", boom)
+    class BoomRepo:
+        def create_ticket(self, *_args, **_kwargs):
+            raise RuntimeError("append failed")
+
+        def check_duplicate_guard(self, *_args, **_kwargs):
+            return None
+
+    monkeypatch.setattr(ticket_repo, "get_ticket_repository", lambda: BoomRepo())
     replayed = raise_af.replay_fallback_queue(base_dir)
     assert replayed == 0
     assert queue_file.exists()
+
+    monkeypatch.setattr(ticket_repo, "get_ticket_repository", original_repo)
 
     def bad_load(*_args, **_kwargs):
         raise RuntimeError("load failed")

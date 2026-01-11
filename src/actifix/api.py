@@ -355,7 +355,6 @@ def create_app(project_root: Optional[Path] = None) -> "Flask":
             # Prefer ACTIFIX-LOG.md for audit if it exists; fallback to AFLog.txt
             'audit': [paths.log_file, paths.aflog_file],
             'errors': [paths.rollup_file],  # ACTIFIX.md
-            'list': [paths.list_file],  # ACTIFIX-LIST.md
         }
         
         # Also check for setup.log

@@ -296,6 +296,9 @@ class TicketRepository:
             'documented': 1,
             'functioning': 1,
             'tested': 1,
+            'locked_by': None,
+            'locked_at': None,
+            'lease_expires': None,
         }
         
         if summary:

@@ -88,7 +88,6 @@ class TestCmdInit:
         
         assert result == 0
         actifix_dir = tmp_path / "actifix"
-        assert (actifix_dir / "ACTIFIX-LIST.md").exists()
         assert (actifix_dir / "ACTIFIX.md").exists()
         assert (actifix_dir / "AFLog.txt").exists()
 
@@ -309,7 +308,7 @@ class TestCmdQuarantine:
             entries = [
                 MagicMock(
                     entry_id="quarantine_001",
-                    original_source="ACTIFIX-LIST.md",
+                    original_source="database",
                     reason="Malformed ticket",
                     quarantined_at=datetime.now(timezone.utc),
                 ),
@@ -326,25 +325,8 @@ class TestCmdQuarantine:
             assert result == 0
             captured = capsys.readouterr()
             assert "quarantine_001" in captured.out
-            assert "ACTIFIX-LIST.md" in captured.out
+            assert "database" in captured.out
             assert "Malformed ticket" in captured.out
-    
-    def test_cmd_quarantine_repair(self, tmp_path, capsys):
-        """Test quarantine repair action."""
-        with patch('actifix.main.repair_list_file') as mock_repair:
-            mock_repair.return_value = (10, 2)
-            
-            args = argparse.Namespace(
-                project_root=str(tmp_path),
-                quarantine_action="repair",
-            )
-            
-            result = cmd_quarantine(args)
-            
-            assert result == 0
-            captured = capsys.readouterr()
-            assert "valid tickets: 10" in captured.out.lower()
-            assert "quarantined: 2" in captured.out.lower()
 
 
 class TestCmdTest:

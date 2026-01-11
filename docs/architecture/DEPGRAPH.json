@@ -168,6 +168,12 @@
       "domain": "core",
       "owner": "core",
       "label": "raise_af"
+    },
+    {
+      "id": "core.error_taxonomy",
+      "domain": "core",
+      "owner": "core",
+      "label": "error_taxonomy"
     }
   ],
   "edges": [
@@ -450,6 +456,11 @@
       "from": "core.do_af",
       "to": "core.ai_client",
       "reason": "core.do_af depends on core.ai_client"
+    },
+    {
+      "from": "core.error_taxonomy",
+      "to": "core.raise_af",
+      "reason": "core.error_taxonomy depends on core.raise_af"
     }
   ]
 }

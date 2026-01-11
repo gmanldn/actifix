@@ -87,15 +87,6 @@ class ActifixEntry:
         }
 
 
-@dataclass
-class DuplicateAssessment:
-    """Assessment describing whether a duplicate guard should be skipped."""
-    is_duplicate: bool
-    reason: str
-    last_seen: Optional[datetime] = None
-    status: str = "unknown"
-
-
 # Get project root and actifix directories
 PROJECT_ROOT = Path.cwd()
 ACTIFIX_DIR = PROJECT_ROOT / "actifix"
@@ -111,7 +102,7 @@ ACTIFIX_CHANGE_ORIGIN_ENV = "ACTIFIX_CHANGE_ORIGIN"
 ACTIFIX_ENFORCE_RAISE_AF_ENV = "ACTIFIX_ENFORCE_RAISE_AF"
 DUPLICATE_REOPEN_WINDOW = timedelta(hours=24)
 
-# Fallback queue for when ACTIFIX-LIST.md is unwritable
+# Fallback queue for when database writes are unavailable
 FALLBACK_QUEUE_FILE = get_actifix_state_dir() / "actifix_fallback_queue.json"
 LEGACY_FALLBACK_QUEUE = ".actifix_fallback_queue.json"
 
@@ -481,159 +472,6 @@ def generate_ai_remediation_notes(entry: 'ActifixEntry') -> str:
     return full_notes
 
 
-def check_duplicate_guard(duplicate_guard: str, base_dir: Path) -> bool:
-    """
-    Check if a ticket with the same duplicate guard already exists.
-    Returns True if duplicate exists, False otherwise.
-    """
-    actifix_list = base_dir / "ACTIFIX-LIST.md"
-    if not actifix_list.exists():
-        return False
-
-    content = actifix_list.read_text(encoding="utf-8")
-    return duplicate_guard in content
-
-
-def get_completed_guards(base_dir: Path) -> set:
-    """Get all duplicate guards from the Completed Items section."""
-    actifix_list = base_dir / "ACTIFIX-LIST.md"
-    if not actifix_list.exists():
-        return set()
-
-    content = actifix_list.read_text(encoding="utf-8")
-
-    # Find completed section
-    completed_start = content.find("## Completed Items")
-    if completed_start == -1:
-        return set()
-
-    completed_section = content[completed_start:]
-
-    # Extract all duplicate guards from completed section
-    guards = set()
-    for line in completed_section.splitlines():
-        if "Duplicate Guard" in line and "`" in line:
-            # Extract guard from: - **Duplicate Guard**: `ACTIFIX-xxx`
-            match = re.search(r'`(ACTIFIX-[^`]+)`', line)
-            if match:
-                guards.add(match.group(1))
-
-    return guards
-
-
-_TICKET_BLOCK_PATTERN = re.compile(r"(### .*?)(?=### |\Z)", re.DOTALL)
-
-
-def _parse_ticket_blocks_for_guard(
-    content: str,
-    section_label: str,
-    duplicate_guard: str,
-) -> List[tuple[Optional[datetime], str, str]]:
-    """Extract ticket records that match the given guard."""
-    records: List[tuple[Optional[datetime], str, str]] = []
-
-    for match in _TICKET_BLOCK_PATTERN.finditer(content):
-        block = match.group(1)
-        if duplicate_guard not in block:
-            continue
-
-        created_at = None
-        created_match = re.search(r"- \*\*Created\*\*:\s*([^\n]+)", block)
-        if created_match:
-            try:
-                created_at = datetime.fromisoformat(created_match.group(1).strip())
-            except ValueError:
-                created_at = None
-
-        status_match = re.search(r"- \*\*Status\*\*:\s*([^\n]+)", block)
-        status = status_match.group(1).strip() if status_match else (
-            "Completed" if section_label == "completed" else "Open"
-        )
-
-        records.append((created_at, status, block))
-
-    return records
-
-
-def assess_duplicate_guard(
-    duplicate_guard: str,
-    base_dir: Path,
-    reopen_window: timedelta = DUPLICATE_REOPEN_WINDOW,
-) -> DuplicateAssessment:
-    """
-    Decide if a duplicate guard represents a repeat or a new occurrence.
-
-    Rules:
-    - If an open ticket exists for the guard, treat as duplicate
-    - If only completed tickets exist but the most recent is older than the
-      reopen window, treat as a new occurrence
-    - Otherwise, treat as a repeat
-    """
-    actifix_list = base_dir / "ACTIFIX-LIST.md"
-    if not actifix_list.exists():
-        return DuplicateAssessment(
-            is_duplicate=False,
-            reason="ticket list missing; treating as new",
-            status="missing",
-        )
-
-    content = actifix_list.read_text(encoding="utf-8")
-    sections = content.split("## Completed Items", 1)
-    active_section = sections[0] if sections else content
-    completed_section = sections[1] if len(sections) > 1 else ""
-
-    records = _parse_ticket_blocks_for_guard(active_section, "active", duplicate_guard)
-    records += _parse_ticket_blocks_for_guard(completed_section, "completed", duplicate_guard)
-
-    if not records:
-        if duplicate_guard in content:
-            return DuplicateAssessment(
-                is_duplicate=True,
-                reason="guard present in legacy list format",
-                status="unknown",
-            )
-        return DuplicateAssessment(
-            is_duplicate=False,
-            reason="no matching guard in ticket list",
-            status="none",
-        )
-
-    # Pick the most recent occurrence
-    latest_record = max(
-        records,
-        key=lambda record: record[0] or datetime.min.replace(tzinfo=timezone.utc),
-    )
-    last_seen, status, _block = latest_record
-    status_lower = status.lower()
-
-    if status_lower in {"open", "in progress", "in_progress", "assigned"}:
-        return DuplicateAssessment(
-            is_duplicate=True,
-            reason="ticket already open for this signature",
-            last_seen=last_seen,
-            status=status,
-        )
-
-    if last_seen and (datetime.now(timezone.utc) - last_seen) > reopen_window:
-        return DuplicateAssessment(
-            is_duplicate=False,
-            reason="completed but stale; treating as new occurrence",
-            last_seen=last_seen,
-            status=status,
-        )
-
-    if last_seen:
-        age_hours = (datetime.now(timezone.utc) - last_seen).total_seconds() / 3600
-        reason = f"repeat seen {age_hours:.1f}h ago"
-    else:
-        reason = "repeat of previously recorded issue"
-
-    return DuplicateAssessment(
-        is_duplicate=True,
-        reason=reason,
-        last_seen=last_seen,
-        status=status,
-    )
 
 
 def ensure_scaffold(base_dir: Path) -> None:
@@ -647,18 +485,6 @@ def ensure_scaffold(base_dir: Path) -> None:
             "Tracks the last 20 errors from recent runs. This file is regenerated by RaiseAF.py.\n\n"
             "## Recent Errors (last 20)\n"
             "_No entries yet. Use RaiseAF.py to record errors._\n",
-            encoding="utf-8",
-        )
-
-    actifix_list = base_dir / "ACTIFIX-LIST.md"
-    if not actifix_list.exists():
-        actifix_list.write_text(
-            "# Actifix Ticket List\n"
-            "Tickets generated from recent errors. Update checkboxes as work progresses.\n\n"
-            "## Active Items\n"
-            "_None_\n\n"
-            "## Completed Items\n"
-            "_None_\n",
             encoding="utf-8",
         )
 
@@ -752,7 +578,7 @@ def _persist_queue(queue: list, target: Path, legacy: Path) -> None:
 
 
 def _queue_to_fallback(entry: ActifixEntry, base_dir: Path) -> bool:
-    """Queue entry to fallback file when ACTIFIX-LIST.md is unwritable."""
+    """Queue entry to fallback file when database writes fail."""
     queue_file = _get_fallback_queue_file(base_dir)
     legacy_file = base_dir / LEGACY_FALLBACK_QUEUE
     try:
@@ -768,8 +594,44 @@ def _queue_to_fallback(entry: ActifixEntry, base_dir: Path) -> bool:
         return False
 
 
+def _entry_from_dict(entry_dict: Dict[str, Any]) -> ActifixEntry:
+    """Rebuild an ActifixEntry from serialized fallback data."""
+    created_at = entry_dict.get("created_at")
+    if isinstance(created_at, str):
+        try:
+            created_at = datetime.fromisoformat(created_at)
+        except ValueError:
+            created_at = datetime.now(timezone.utc)
+    elif not isinstance(created_at, datetime):
+        created_at = datetime.now(timezone.utc)
+
+    priority = entry_dict.get("priority", "P2")
+    if isinstance(priority, str):
+        try:
+            priority = TicketPriority(priority)
+        except Exception:
+            priority = TicketPriority.P2
+
+    return ActifixEntry(
+        message=entry_dict.get("message", ""),
+        source=entry_dict.get("source", ""),
+        run_label=entry_dict.get("run_label", ""),
+        entry_id=entry_dict.get("entry_id", ""),
+        created_at=created_at,
+        priority=priority,
+        error_type=entry_dict.get("error_type", "unknown"),
+        stack_trace=entry_dict.get("stack_trace", ""),
+        file_context=entry_dict.get("file_context", {}) or {},
+        system_state=entry_dict.get("system_state", {}) or {},
+        ai_remediation_notes=entry_dict.get("ai_remediation_notes", ""),
+        duplicate_guard=entry_dict.get("duplicate_guard", ""),
+        format_version=entry_dict.get("format_version", "1.0"),
+        correlation_id=entry_dict.get("correlation_id"),
+    )
+
+
 def replay_fallback_queue(base_dir: Path = ACTIFIX_DIR) -> int:
-    """Replay entries from fallback queue to ACTIFIX-LIST.md."""
+    """Replay entries from fallback queue to the database."""
     queue_file = _get_fallback_queue_file(base_dir)
     legacy_file = base_dir / LEGACY_FALLBACK_QUEUE
 
@@ -780,23 +642,17 @@ def replay_fallback_queue(base_dir: Path = ACTIFIX_DIR) -> int:
 
         replayed = 0
         failed = []
+        from .persistence.ticket_repo import get_ticket_repository
+        repo = get_ticket_repository()
 
         for entry_dict in queue:
             try:
-                # Reconstruct entry
-                entry = ActifixEntry(
-                    message=entry_dict.get("message", ""),
-                    source=entry_dict.get("source", ""),
-                    run_label=entry_dict.get("run_label", ""),
-                    entry_id=entry_dict.get("entry_id", ""),
-                    created_at=datetime.fromisoformat(entry_dict.get("created_at", datetime.now(timezone.utc).isoformat())),
-                    priority=TicketPriority(entry_dict.get("priority", "P2")),
-                    error_type=entry_dict.get("error_type", "unknown"),
-                    stack_trace=entry_dict.get("stack_trace", ""),
-                    duplicate_guard=entry_dict.get("duplicate_guard", ""),
-                )
-                _append_ticket_impl(entry, base_dir)
-                replayed += 1
+                entry = _entry_from_dict(entry_dict)
+                created = repo.create_ticket(entry)
+                if created or repo.check_duplicate_guard(entry.duplicate_guard):
+                    replayed += 1
+                else:
+                    failed.append(entry_dict)
             except Exception:
                 failed.append(entry_dict)
 
@@ -811,106 +667,6 @@ def replay_fallback_queue(base_dir: Path = ACTIFIX_DIR) -> int:
         return replayed
     except Exception:
         return 0
-
-
-def _append_ticket_impl(entry: ActifixEntry, base_dir: Path) -> None:
-    """Internal implementation of ticket append."""
-    path = base_dir / "ACTIFIX-LIST.md"
-    content = path.read_text(encoding="utf-8")
-
-    # Build detailed ticket block
-    block = [
-        f"### {entry.entry_id} - [{entry.priority.value}] {entry.error_type} @ {entry.created_at.isoformat()}: {entry.message[:100]}",
-        f"- **Priority**: {entry.priority.value}",
-        f"- **Error Type**: {entry.error_type}",
-        f"- **Source**: `{entry.source}`",
-        f"- **Run**: {entry.run_label}",
-        f"- **Created**: {entry.created_at.isoformat()}",
-        f"- **Duplicate Guard**: `{entry.duplicate_guard}`",
-    ]
-
-    # Add correlation ID if present
-    if entry.correlation_id:
-        block.append(f"- **Correlation ID**: `{entry.correlation_id}`")
-
-    # Add status and tracking fields
-    block.extend([
-        f"- **Status**: Open",
-        f"- **Owner**: None",
-        f"- **Branch**: None",
-        f"- **Lease Expires**: None",
-        "",
-        "**Checklist:**",
-        "- [ ] Documented",
-        "- [ ] Functioning",
-        "- [ ] Tested",
-        "- [ ] Completed",
-        "",
-    ])
-
-    # Add stack trace summary if available
-    if entry.stack_trace and len(entry.stack_trace) > 10:
-        trace_preview = entry.stack_trace[-500:].strip()
-        block.extend([
-            "<details>",
-            "<summary>Stack Trace Preview</summary>",
-            "",
-            "```",
-            trace_preview,
-            "```",
-            "</details>",
-            "",
-        ])
-
-    # Add AI notes preview
-    if entry.ai_remediation_notes:
-        notes_preview = entry.ai_remediation_notes[:300].strip()
-        block.extend([
-            "<details>",
-            "<summary>AI Remediation Notes</summary>",
-            "",
-            notes_preview,
-            "...",
-            "</details>",
-            "",
-        ])
-
-    block_text = "\n".join(block)
-
-    if "## Active Items" not in content:
-        content = (
-            "# Actifix Ticket List\n"
-            "Tickets generated from recent errors. Update checkboxes as work progresses.\n\n"
-            "## Active Items\n\n"
-            "## Completed Items\n"
-            "_None_\n"
-        )
-
-    # Remove placeholder if present
-    content = content.replace("## Active Items\n_None_", "## Active Items\n")
-
-    insertion_point = content.find("## Completed Items")
-    if insertion_point == -1:
-        content = f"{content.rstrip()}\n\n{block_text}\n"
-    else:
-        before = content[:insertion_point].rstrip()
-        after = content[insertion_point:]
-        content = f"{before}\n\n{block_text}\n{after.lstrip()}"
-
-    path.write_text(content, encoding="utf-8")
-
-
-def _append_ticket(entry: ActifixEntry, base_dir: Path) -> bool:
-    """Append ticket to ACTIFIX-LIST.md with fallback queue support."""
-    try:
-        _append_ticket_impl(entry, base_dir)
-        # Try to replay any queued entries
-        replay_fallback_queue(base_dir)
-        return True
-    except (PermissionError, OSError, IOError):
-        # ACTIFIX-LIST.md is unwritable, use fallback queue
-        _queue_to_fallback(entry, base_dir)
-        return False
 
 
 def record_error(
@@ -986,7 +742,6 @@ def record_error(
 
     # LOOP PREVENTION: Check if this error already has a ticket
     if not skip_duplicate_check:
-        # Try database first, fall back to file-based check
         try:
             from .persistence.ticket_repo import get_ticket_repository
             repo = get_ticket_repository()
@@ -994,10 +749,7 @@ def record_error(
             if existing and existing['status'] in ('Open', 'In Progress'):
                 return None
         except Exception:
-            # Fallback to file-based check
-            assessment = assess_duplicate_guard(duplicate_guard, base_dir_path)
-            if assessment.is_duplicate:
-                return None
+            pass
 
     # Auto-classify priority if not provided
     if isinstance(priority, str):
@@ -1038,14 +790,16 @@ def record_error(
     if not skip_ai_notes:
         entry.ai_remediation_notes = generate_ai_remediation_notes(entry)
 
-    # Try database first, fall back to file-based storage
+    # Try database first, fall back to queue
     try:
         from .persistence.ticket_repo import get_ticket_repository
         repo = get_ticket_repository()
-        repo.create_ticket(entry)
+        created = repo.create_ticket(entry)
+        if not created:
+            return None
+        replay_fallback_queue(base_dir_path)
     except Exception:
-        # Fallback to file-based storage
-        _append_ticket(entry, base_dir_path)
+        _queue_to_fallback(entry, base_dir_path)
     
     _append_recent(entry, base_dir_path)
 

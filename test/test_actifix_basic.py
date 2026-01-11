@@ -81,12 +81,14 @@ class TestActifixBasic:
         
         # Check files were created
         assert (temp_actifix_dir / "ACTIFIX.md").exists()
-        assert (temp_actifix_dir / "ACTIFIX-LIST.md").exists()
-        
-        # Check content
-        list_content = (temp_actifix_dir / "ACTIFIX-LIST.md").read_text()
-        assert entry.entry_id in list_content
-        assert "Test error for actifix development" in list_content
+        assert not (temp_actifix_dir / "ACTIFIX-LIST.md").exists()
+
+        # Check database content
+        from actifix.persistence.ticket_repo import get_ticket_repository
+        repo = get_ticket_repository()
+        stored = repo.get_ticket(entry.entry_id)
+        assert stored is not None
+        assert stored["message"] == "Test error for actifix development"
         
         rollup_content = (temp_actifix_dir / "ACTIFIX.md").read_text()
         assert entry.entry_id in rollup_content
@@ -191,7 +193,6 @@ class TestActifixBasic:
         
         required_files = [
             "ACTIFIX.md",
-            "ACTIFIX-LIST.md", 
             "ACTIFIX-LOG.md",
             "AFLog.txt"
         ]
@@ -199,44 +200,31 @@ class TestActifixBasic:
         for filename in required_files:
             assert (temp_actifix_dir / filename).exists(), f"Missing: {filename}"
     
-    def test_fallback_queue_when_file_unwritable(self, temp_actifix_dir, monkeypatch):
-        """Test fallback queue when ACTIFIX-LIST.md is unwritable."""
-        from actifix.raise_af import _append_ticket, ActifixEntry, TicketPriority
-        from datetime import datetime, timezone
+    def test_fallback_queue_when_db_unavailable(self, temp_actifix_dir, monkeypatch):
+        """Test fallback queue when database writes fail."""
+        from actifix.raise_af import record_error
+        from actifix.persistence import ticket_repo
         
         state_dir = temp_actifix_dir / ".actifix_state"
         monkeypatch.setenv("ACTIFIX_STATE_DIR", str(state_dir))
 
-        # Create a test entry
-        entry = ActifixEntry(
+        def _raise_db():
+            raise RuntimeError("db down")
+
+        monkeypatch.setattr(ticket_repo, "get_ticket_repository", _raise_db)
+
+        actifix.enable_actifix_capture()
+        entry = record_error(
             message="Test fallback error",
             source="fallback_test.py",
-            run_label="fallback-run", 
-            entry_id="ACT-20261001-TEST01",
-            created_at=datetime.now(timezone.utc),
-            priority=TicketPriority.P2,
+            run_label="fallback-run",
             error_type="TestError",
-            duplicate_guard="ACTIFIX-test-fallback-001"
+            capture_context=False,
         )
-        
-        # Create the directory but make it read-only to simulate write failure
-        actifix.ensure_scaffold(temp_actifix_dir)
-        
-        # Make the list file read-only to force fallback
-        list_file = temp_actifix_dir / "ACTIFIX-LIST.md"
-        list_file.chmod(0o444)  # Read-only
-        
-        try:
-            # This should use fallback queue
-            result = _append_ticket(entry, temp_actifix_dir)
-            
-            # Check fallback queue was created
-            queue_file = state_dir / "actifix_fallback_queue.json"
-            assert queue_file.exists(), f"Missing fallback queue at {queue_file}"
-            
-        finally:
-            # Restore write permissions for cleanup
-            list_file.chmod(0o644)
+        assert entry is not None
+
+        queue_file = state_dir / "actifix_fallback_queue.json"
+        assert queue_file.exists(), f"Missing fallback queue at {queue_file}"
 
 
 class TestActifixSelfDevelopment:
@@ -253,9 +241,10 @@ class TestActifixSelfDevelopment:
         )
         
         # Check that milestone was recorded
-        list_content = (temp_actifix_dir / "ACTIFIX-LIST.md").read_text()
-        assert "Development milestone" in list_content
-        assert "Core error capture implemented" in list_content
+        from actifix.persistence.ticket_repo import get_ticket_repository
+        repo = get_ticket_repository()
+        tickets = repo.get_tickets()
+        assert any("Development milestone" in ticket["message"] for ticket in tickets)
     
     def test_exception_handler_captures_errors(self, temp_actifix_dir, monkeypatch, capsys):
         """Test that the exception handler captures development errors."""
@@ -281,9 +270,10 @@ class TestActifixSelfDevelopment:
             assert "Captured development error" in captured.out
             
             # Check files were created
-            assert (temp_actifix_dir / "ACTIFIX-LIST.md").exists()
-            list_content = (temp_actifix_dir / "ACTIFIX-LIST.md").read_text()
-            assert "Test exception for development tracking" in list_content
+            from actifix.persistence.ticket_repo import get_ticket_repository
+            repo = get_ticket_repository()
+            tickets = repo.get_tickets()
+            assert any("Test exception for development tracking" in ticket["message"] for ticket in tickets)
             
         finally:
             # Restore original handler

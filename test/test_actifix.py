@@ -16,7 +16,6 @@ class TestActifixPaths:
         
         paths = get_actifix_paths()
         assert paths.base_dir.name == "actifix"
-        assert paths.list_file.name == "ACTIFIX-LIST.md"
         assert paths.rollup_file.name == "ACTIFIX.md"
     
     def test_get_actifix_paths_custom(self):
@@ -26,7 +25,6 @@ class TestActifixPaths:
             base = Path(tmpdir) / "custom"
             paths = get_actifix_paths(base_dir=base)
             assert paths.base_dir == base
-            assert paths.list_file == base / "ACTIFIX-LIST.md"
 
 
 class TestLogUtils:

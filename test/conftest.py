@@ -12,3 +12,17 @@ def enforce_raise_af_origin(monkeypatch):
     """
     monkeypatch.setenv("ACTIFIX_CHANGE_ORIGIN", "raise_af")
     yield
+
+
+@pytest.fixture(autouse=True)
+def isolate_actifix_db(monkeypatch, tmp_path):
+    """Use a fresh SQLite database per test to avoid cross-test leakage."""
+    db_path = tmp_path / "actifix.db"
+    monkeypatch.setenv("ACTIFIX_DB_PATH", str(db_path))
+    from actifix.persistence.database import reset_database_pool
+    from actifix.persistence.ticket_repo import reset_ticket_repository
+    reset_database_pool()
+    reset_ticket_repository()
+    yield
+    reset_database_pool()
+    reset_ticket_repository()

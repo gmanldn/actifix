@@ -21,7 +21,7 @@ def test_readme_documents_raise_af_ticket_flow():
     readme = Path("README.md").read_text()
     assert "Raise_AF Ticketing Requirement" in readme
     assert "actifix.raise_af.record_error" in readme
-    assert "actifix/ACTIFIX-LIST.md" in readme
+    assert "actifix.db" in readme or "SQLite" in readme
 
 
 def test_enforce_raise_af_blocks_missing_origin(monkeypatch, tmp_path):

@@ -14,7 +14,7 @@ from .config import load_config
 from .health import run_health_check
 from .raise_af import record_error, enforce_raise_af_only
 from .do_af import process_tickets, get_ticket_stats
-from .quarantine import list_quarantine, get_quarantine_count, repair_list_file
+from .quarantine import list_quarantine, get_quarantine_count
 from .testing import TestRunner
 
 
@@ -29,7 +29,6 @@ def cmd_init(args: argparse.Namespace) -> int:
     init_actifix_files(paths)
     
     print(f"✓ Created {paths.base_dir}")
-    print(f"✓ Created {paths.list_file.name}")
     print(f"✓ Created {paths.rollup_file.name}")
     print(f"✓ Created {paths.log_file.name}")
     print(f"\nActifix initialized successfully!")
@@ -108,12 +107,6 @@ def cmd_quarantine(args: argparse.Namespace) -> int:
                     print(f"  Date: {entry.quarantined_at.isoformat()}")
             else:
                 print("No quarantined items")
-        
-        elif args.quarantine_action == "repair":
-            valid, quarantined = repair_list_file()
-            print(f"✓ Repaired list file:")
-            print(f"  Valid tickets: {valid}")
-            print(f"  Quarantined: {quarantined}")
         
         return 0
 
@@ -203,7 +196,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     quarantine_parser = subparsers.add_parser("quarantine", help="Manage quarantine")
     quarantine_parser.add_argument(
         "quarantine_action",
-        choices=["list", "repair"],
+        choices=["list"],
         help="Quarantine action",
     )
     
