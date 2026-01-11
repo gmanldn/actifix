@@ -12,7 +12,7 @@ from typing import Optional
 from .bootstrap import bootstrap, shutdown, ActifixContext
 from .config import load_config
 from .health import run_health_check
-from .raise_af import record_error
+from .raise_af import record_error, enforce_raise_af_only
 from .do_af import process_tickets, get_ticket_stats
 from .quarantine import list_quarantine, get_quarantine_count, repair_list_file
 from .testing import TestRunner
@@ -24,7 +24,7 @@ def cmd_init(args: argparse.Namespace) -> int:
     
     project_root = Path(args.project_root or Path.cwd())
     paths = get_actifix_paths(project_root=project_root)
-    
+    enforce_raise_af_only(paths)
     print(f"Initializing Actifix in {project_root}...")
     init_actifix_files(paths)
     
