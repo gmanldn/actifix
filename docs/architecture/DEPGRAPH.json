@@ -124,14 +124,44 @@
     {
       "id": "tooling.testing",
       "domain": "tooling",
-      "owner": "tooling",
+      "owner": "testing",
       "label": "testing"
+    },
+    {
+      "id": "tooling.migrate_to_db",
+      "domain": "tooling",
+      "owner": "tooling",
+      "label": "migrate_to_db"
     },
     {
       "id": "tooling.simple_ticket_attack",
       "domain": "tooling",
       "owner": "tooling",
       "label": "simple_ticket_attack"
+    },
+    {
+      "id": "infra.persistence.paths",
+      "domain": "infra",
+      "owner": "persistence",
+      "label": "paths"
+    },
+    {
+      "id": "infra.persistence.database",
+      "domain": "infra",
+      "owner": "persistence",
+      "label": "database"
+    },
+    {
+      "id": "infra.persistence.ticket_repo",
+      "domain": "infra",
+      "owner": "persistence",
+      "label": "ticket_repo"
+    },
+    {
+      "id": "core.raise_af",
+      "domain": "core",
+      "owner": "core",
+      "label": "raise_af"
     }
   ],
   "edges": [
@@ -339,6 +369,51 @@
       "from": "tooling.testing",
       "to": "tooling.testing.reporting",
       "reason": "tooling.testing depends on tooling.testing.reporting"
+    },
+    {
+      "from": "infra.persistence.paths",
+      "to": "infra.logging",
+      "reason": "infra.persistence.paths depends on infra.logging"
+    },
+    {
+      "from": "infra.persistence.database",
+      "to": "infra.logging",
+      "reason": "infra.persistence.database depends on infra.logging"
+    },
+    {
+      "from": "infra.persistence.ticket_repo",
+      "to": "infra.logging",
+      "reason": "infra.persistence.ticket_repo depends on infra.logging"
+    },
+    {
+      "from": "infra.persistence.ticket_repo",
+      "to": "infra.persistence.database",
+      "reason": "infra.persistence.ticket_repo depends on infra.persistence.database"
+    },
+    {
+      "from": "infra.persistence.ticket_repo",
+      "to": "core.raise_af",
+      "reason": "infra.persistence.ticket_repo depends on core.raise_af"
+    },
+    {
+      "from": "core.raise_af",
+      "to": "infra.logging",
+      "reason": "core.raise_af depends on infra.logging"
+    },
+    {
+      "from": "tooling.migrate_to_db",
+      "to": "core.raise_af",
+      "reason": "tooling.migrate_to_db depends on core.raise_af"
+    },
+    {
+      "from": "tooling.migrate_to_db",
+      "to": "infra.persistence.ticket_repo",
+      "reason": "tooling.migrate_to_db depends on infra.persistence.ticket_repo"
+    },
+    {
+      "from": "tooling.migrate_to_db",
+      "to": "runtime.state",
+      "reason": "tooling.migrate_to_db depends on runtime.state"
     },
     {
       "from": "tooling.simple_ticket_attack",

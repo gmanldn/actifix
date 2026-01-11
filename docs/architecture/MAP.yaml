@@ -196,6 +196,32 @@ modules:
   - directory helpers
   depends_on:
   - infra.logging
+- id: infra.persistence.database
+  domain: infra
+  owner: persistence
+  summary: SQLite database backend with connection pooling and schema management
+  entrypoints:
+  - src/actifix/persistence/database.py
+  contracts:
+  - thread-safe connection pooling
+  - automatic schema migrations
+  - WAL mode for concurrency
+  depends_on:
+  - infra.logging
+- id: infra.persistence.ticket_repo
+  domain: infra
+  owner: persistence
+  summary: Ticket repository with CRUD operations and locking
+  entrypoints:
+  - src/actifix/persistence/ticket_repo.py
+  contracts:
+  - database CRUD for tickets
+  - lease-based locking
+  - duplicate prevention
+  depends_on:
+  - infra.logging
+  - infra.persistence.database
+  - core.raise_af
 - id: core.raise_af
   domain: core
   owner: core
@@ -288,6 +314,20 @@ modules:
   - reuse the core ticketing flow for experiments
   depends_on:
   - core.raise_af
+  - runtime.state
+- id: tooling.migrate_to_db
+  domain: tooling
+  owner: tooling
+  summary: Migration script to import tickets from ACTIFIX-LIST.md to database
+  entrypoints:
+  - src/actifix/migrate_to_db.py
+  contracts:
+  - parse markdown ticket format
+  - import to SQLite database
+  - preserve all ticket data
+  depends_on:
+  - core.raise_af
+  - infra.persistence.ticket_repo
   - runtime.state
 contracts:
 - id: contract.logging

@@ -309,7 +309,7 @@ def parse_ticket_block(block: str) -> Optional[TicketInfo]:
 
 def get_open_tickets(paths: Optional[ActifixPaths] = None, use_cache: bool = True) -> list[TicketInfo]:
     """
-    Get all open (incomplete) tickets from ACTIFIX-LIST.md.
+    Get all open (incomplete) tickets from database or ACTIFIX-LIST.md fallback.
     
     Args:
         paths: Optional paths override.
@@ -318,6 +318,35 @@ def get_open_tickets(paths: Optional[ActifixPaths] = None, use_cache: bool = Tru
     Returns:
         List of open TicketInfo, sorted by priority (P0 first).
     """
+    # Try database first
+    try:
+        from .persistence.ticket_repo import get_ticket_repository, TicketFilter
+        repo = get_ticket_repository()
+        db_tickets = repo.get_tickets(TicketFilter(status="Open"))
+        
+        # Convert to TicketInfo format
+        tickets = []
+        for ticket in db_tickets:
+            tickets.append(TicketInfo(
+                ticket_id=ticket['id'],
+                priority=ticket['priority'],
+                error_type=ticket['error_type'],
+                message=ticket['message'],
+                source=ticket['source'],
+                run_name=ticket['run_label'] or '',
+                created=ticket['created_at'].isoformat() if ticket['created_at'] else '',
+                duplicate_guard=ticket['duplicate_guard'] or '',
+                full_block='',  # Not needed from DB
+                status=ticket['status'],
+                documented=ticket['documented'],
+                functioning=ticket['functioning'],
+                tested=ticket['tested'],
+                completed=ticket['completed'],
+            ))
+        return tickets
+    except Exception:
+        pass  # Fall back to file-based
+    
     if use_cache:
         manager = get_ticket_manager(paths=paths)
         return manager.get_open_tickets()

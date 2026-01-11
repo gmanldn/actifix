@@ -986,9 +986,18 @@ def record_error(
 
     # LOOP PREVENTION: Check if this error already has a ticket
     if not skip_duplicate_check:
-        assessment = assess_duplicate_guard(duplicate_guard, base_dir_path)
-        if assessment.is_duplicate:
-            return None
+        # Try database first, fall back to file-based check
+        try:
+            from .persistence.ticket_repo import get_ticket_repository
+            repo = get_ticket_repository()
+            existing = repo.check_duplicate_guard(duplicate_guard)
+            if existing and existing['status'] in ('Open', 'In Progress'):
+                return None
+        except Exception:
+            # Fallback to file-based check
+            assessment = assess_duplicate_guard(duplicate_guard, base_dir_path)
+            if assessment.is_duplicate:
+                return None
 
     # Auto-classify priority if not provided
     if isinstance(priority, str):
@@ -1029,7 +1038,15 @@ def record_error(
     if not skip_ai_notes:
         entry.ai_remediation_notes = generate_ai_remediation_notes(entry)
 
-    _append_ticket(entry, base_dir_path)
+    # Try database first, fall back to file-based storage
+    try:
+        from .persistence.ticket_repo import get_ticket_repository
+        repo = get_ticket_repository()
+        repo.create_ticket(entry)
+    except Exception:
+        # Fallback to file-based storage
+        _append_ticket(entry, base_dir_path)
+    
     _append_recent(entry, base_dir_path)
 
     return entry
