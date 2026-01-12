@@ -69,8 +69,9 @@ def api_workspace(tmp_path, monkeypatch):
 
     (base / "logs").mkdir(parents=True, exist_ok=True)
     (base / "Actifix" / "dummy").mkdir(parents=True, exist_ok=True)
-    arch_dir.mkdir(parents=True, exist_ok=True)
-    (arch_dir / "MODULES.md").write_text(
+    docs_arch_dir = base / "docs" / "architecture"
+    docs_arch_dir.mkdir(parents=True, exist_ok=True)
+    (docs_arch_dir / "MODULES.md").write_text(
         "## runtime-utils\n**Domain:** runtime\n**Owner:** runtime\n**Summary:** system helper\n"
         "## tooling-play\n**Domain:** tooling\n**Owner:** tooling\n**Summary:** user helper\n",
         encoding="utf-8",

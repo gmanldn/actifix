@@ -235,13 +235,13 @@ const Header = ({ onFix, isFixing, fixStatus }) => {
     ),
     h('div', { className: 'header-right' },
       h('div', { className: 'header-stats' },
-        h('div', { className: 'stat-card', style: { padding: '4px 12px', minWidth: '60px' } },
-          h('div', { className: 'stat-value', style: { fontSize: '16px' } }, health?.metrics?.open_tickets ?? '—'),
-          h('div', { className: 'stat-label', style: { fontSize: '9px' } }, 'OPEN')
+        h('div', { className: 'stat-card', style: { padding: '6px 14px', minWidth: '70px' } },
+          h('div', { className: 'stat-value', style: { fontSize: '18px', fontWeight: '700' } }, health?.metrics?.open_tickets ?? '—'),
+          h('div', { className: 'stat-label', style: { fontSize: '10px', fontWeight: '600', letterSpacing: '0.05em' } }, 'OPEN')
         ),
-        h('div', { className: 'stat-card', style: { padding: '4px 12px', minWidth: '60px' } },
-          h('div', { className: 'stat-value', style: { fontSize: '16px' } }, health?.metrics?.completed_tickets ?? '—'),
-          h('div', { className: 'stat-label', style: { fontSize: '9px' } }, 'DONE')
+        h('div', { className: 'stat-card', style: { padding: '6px 14px', minWidth: '70px' } },
+          h('div', { className: 'stat-value', style: { fontSize: '18px', fontWeight: '700' } }, health?.metrics?.completed_tickets ?? '—'),
+          h('div', { className: 'stat-label', style: { fontSize: '10px', fontWeight: '600', letterSpacing: '0.05em' } }, 'DONE')
         ),
         h('div', { className: `connection-status ${connected ? 'connected' : 'disconnected'}` },
           h('span', { className: 'connection-dot' }),

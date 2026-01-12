@@ -77,8 +77,8 @@ SYSTEM_OWNERS = {"runtime", "infra", "core", "persistence", "testing", "tooling"
 
 
 def _load_modules(project_root: Path) -> Dict[str, List[Dict[str, str]]]:
-    """Parse Arch/MODULES.md into system/user buckets."""
-    modules_md = project_root / "Arch" / "MODULES.md"
+    """Parse docs/architecture/MODULES.md into system/user buckets."""
+    modules_md = project_root / "docs" / "architecture" / "MODULES.md"
     if not modules_md.exists():
         return {"system": [], "user": []}
 

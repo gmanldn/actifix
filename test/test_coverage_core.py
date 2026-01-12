@@ -59,8 +59,8 @@ def test_actifix_all_exports():
 
 
 def test_api_modules_parsing(tmp_path):
-    modules_dir = tmp_path / "Arch"
-    modules_dir.mkdir()
+    modules_dir = tmp_path / "docs" / "architecture"
+    modules_dir.mkdir(parents=True)
     modules_md = modules_dir / "MODULES.md"
     modules_md.write_text(
         "\n".join(
