@@ -67,7 +67,7 @@ with ActifixContext() as paths:
 ```python
 from actifix.state_paths import get_actifix_paths
 paths = get_actifix_paths()
-# paths.list_file, paths.logs_dir, paths.state_dir, etc.
+# paths.base_dir, paths.logs_dir, paths.state_dir, etc.
 ```
 
 ---
@@ -76,7 +76,7 @@ paths = get_actifix_paths()
 
 | File | Path | Purpose |
 |------|------|---------|
-| Ticket list | `actifix/ACTIFIX-LIST.md` | All open/completed tickets |
+| Ticket database | `data/actifix.db` | Canonical SQLite store for all tickets |
 | Recent errors | `actifix/ACTIFIX.md` | Last 20 errors (rollup) |
 | Audit log | `actifix/AFLog.txt` | Event history |
 | Quarantine | `actifix/quarantine/` | Isolated corrupt data |
@@ -84,23 +84,35 @@ paths = get_actifix_paths()
 
 ---
 
-## Ticket Format (ACTIFIX-LIST.md)
+## Ticket Format (SQLite `tickets` table)
 
-```markdown
-## Active Items
-
-### ACT-20260110-XXXXX - [P1] ErrorType: Message
-- **Priority**: P1
-- **Source**: `file.py:42`
-- **Created**: 2026-01-10T12:00:00Z
-- **Duplicate Guard**: `hash`
-- **Status**: Open
-
-<details><summary>Stack Trace Preview</summary>...</details>
-<details><summary>AI Remediation Notes</summary>...</details>
-
-## Completed Items
-(same format, checkboxes marked [x])
+```sql
+CREATE TABLE tickets (
+    id TEXT PRIMARY KEY,
+    priority TEXT NOT NULL,
+    error_type TEXT NOT NULL,
+    message TEXT NOT NULL,
+    source TEXT NOT NULL,
+    run_label TEXT,
+    created_at TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP,
+    duplicate_guard TEXT UNIQUE,
+    status TEXT DEFAULT 'Open',
+    owner TEXT,
+    locked_by TEXT,
+    lease_expires TIMESTAMP,
+    branch TEXT,
+    stack_trace TEXT,
+    file_context TEXT,
+    system_state TEXT,
+    ai_remediation_notes TEXT,
+    correlation_id TEXT,
+    completion_summary TEXT,
+    documented BOOLEAN DEFAULT 0,
+    functioning BOOLEAN DEFAULT 0,
+    tested BOOLEAN DEFAULT 0,
+    completed BOOLEAN DEFAULT 0
+);
 ```
 
 ---
@@ -125,7 +137,7 @@ Exception → bootstrap (exception handler) → record_error()
   → capture context (stack, files, system state)
   → classify_priority()
   → redact_secrets()
-  → append to ACTIFIX-LIST.md (or fallback queue if fails)
+  → persist to `data/actifix.db` via `TicketRepository`
   → update ACTIFIX.md rollup
   → log to AFLog.txt
 ```

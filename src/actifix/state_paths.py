@@ -28,8 +28,6 @@ class ActifixPaths:
     base_dir: Path
     state_dir: Path
     logs_dir: Path
-    
-    list_file: Path
     rollup_file: Path
     log_file: Path
     aflog_file: Path
@@ -88,7 +86,6 @@ def _build_paths(
         base_dir=resolved_base,
         state_dir=resolved_state,
         logs_dir=resolved_logs,
-        list_file=resolved_base / "ACTIFIX-LIST.md",
         rollup_file=resolved_base / "ACTIFIX.md",
         log_file=resolved_base / "ACTIFIX-LOG.md",
         aflog_file=resolved_base / "AFLog.txt",

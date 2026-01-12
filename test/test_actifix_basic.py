@@ -10,6 +10,7 @@ This test file itself will be tracked by actifix during development!
 import pytest
 import tempfile
 import shutil
+import json
 from pathlib import Path
 import os
 import sys
@@ -32,6 +33,8 @@ def temp_actifix_dir(monkeypatch):
     # Override the default directories
     monkeypatch.setenv("ACTIFIX_DATA_DIR", str(actifix_dir))
     monkeypatch.setenv("ACTIFIX_STATE_DIR", str(temp_dir / ".actifix"))
+    db_path = temp_dir / "data" / "actifix.db"
+    monkeypatch.setenv("ACTIFIX_DB_PATH", str(db_path))
     
     yield actifix_dir
     
@@ -39,6 +42,7 @@ def temp_actifix_dir(monkeypatch):
     monkeypatch.delenv(actifix.ACTIFIX_CAPTURE_ENV_VAR, raising=False)
     monkeypatch.delenv("ACTIFIX_DATA_DIR", raising=False)
     monkeypatch.delenv("ACTIFIX_STATE_DIR", raising=False)
+    monkeypatch.delenv("ACTIFIX_DB_PATH", raising=False)
     
     shutil.rmtree(temp_dir, ignore_errors=True)
 
@@ -79,9 +83,10 @@ class TestActifixBasic:
         assert entry.message == "Test error for actifix development"
         assert entry.priority == actifix.TicketPriority.P2  # Default priority
         
-        # Check files were created
+        # Check files and database were created
+        db_path = temp_actifix_dir.parent / "data" / "actifix.db"
         assert (temp_actifix_dir / "ACTIFIX.md").exists()
-        assert not (temp_actifix_dir / "ACTIFIX-LIST.md").exists()
+        assert db_path.exists(), "Database file should exist for ticket storage"
 
         # Check database content
         from actifix.persistence.ticket_repo import get_ticket_repository
@@ -225,6 +230,9 @@ class TestActifixBasic:
 
         queue_file = state_dir / "actifix_fallback_queue.json"
         assert queue_file.exists(), f"Missing fallback queue at {queue_file}"
+
+        queue_content = json.loads(queue_file.read_text(encoding="utf-8"))
+        assert any(item.get("entry_id") == entry.entry_id for item in queue_content)
 
 
 class TestActifixSelfDevelopment:

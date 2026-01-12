@@ -225,16 +225,17 @@ modules:
 - id: core.raise_af
   domain: core
   owner: core
-  summary: Error capture and ticket creation system
+  summary: Error capture and ticket creation system (persists entries into the SQLite ticket repository)
   entrypoints:
   - src/actifix/raise_af.py
   contracts:
   - capture all errors
-  - create structured tickets
+  - create structured tickets persisted in `data/actifix.db`
   - prevent duplication
   depends_on:
   - infra.logging
   - core.quarantine
+  - infra.persistence.ticket_repo
 - id: core.do_af
   domain: core
   owner: core
@@ -249,6 +250,7 @@ modules:
   - infra.logging
   - core.raise_af
   - core.ai_client
+  - infra.persistence.ticket_repo
 - id: core.quarantine
   domain: core
   owner: core
@@ -311,7 +313,7 @@ modules:
   - src/actifix/simple_ticket_attack.py
   contracts:
   - generate sequences of simple tickets with record_error
-  - keep ACTIFIX-LIST.md untouched by manual edits
+  - keep `data/actifix.db` untouched by manual edits (use the API instead)
   - reuse the core ticketing flow for experiments
   depends_on:
   - core.raise_af
@@ -319,13 +321,13 @@ modules:
 - id: tooling.migrate_to_db
   domain: tooling
   owner: tooling
-  summary: Migration script to import tickets from ACTIFIX-LIST.md to database
+  summary: Legacy migration script to seed the SQLite ticket database from archived Markdown lists
   entrypoints:
   - src/actifix/migrate_to_db.py
   contracts:
-  - parse markdown ticket format
-  - import to SQLite database
-  - preserve all ticket data
+  - ingest historical Markdown exports when an archive is provided
+  - import entries into the canonical SQLite store
+  - preserve all ticket metadata for audit
   depends_on:
   - core.raise_af
   - infra.persistence.ticket_repo

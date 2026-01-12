@@ -14,30 +14,26 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from actifix.do_af import mark_ticket_complete, get_open_tickets, get_completed_tickets, get_ticket_stats
 from actifix.raise_af import ActifixEntry, TicketPriority
-from actifix.persistence.ticket_repo import get_ticket_repository
-from actifix.state_paths import ActifixPaths
+from actifix.persistence.database import reset_database_pool
+from actifix.persistence.ticket_repo import get_ticket_repository, reset_ticket_repository
+from actifix.state_paths import get_actifix_paths
 
 
 @pytest.fixture
-def temp_actifix_paths():
+def temp_actifix_paths(monkeypatch):
     """Create temporary Actifix paths for testing."""
     with tempfile.TemporaryDirectory() as tmpdir:
         base = Path(tmpdir)
         state_dir = base / ".actifix"
         state_dir.mkdir()
+        db_path = base / "data" / "actifix.db"
+        monkeypatch.setenv("ACTIFIX_DB_PATH", str(db_path))
 
-        paths = ActifixPaths(
+        paths = get_actifix_paths(
             project_root=base,
             base_dir=base / "actifix",
             state_dir=state_dir,
             logs_dir=base / "logs",
-            list_file=base / "actifix" / "ACTIFIX-LIST.md",
-            rollup_file=base / "actifix" / "ACTIFIX.md",
-            log_file=base / "actifix" / "ACTIFIX-LOG.md",
-            aflog_file=base / "actifix" / "AFLog.txt",
-            fallback_queue_file=state_dir / "actifix_fallback_queue.json",
-            quarantine_dir=state_dir / "quarantine",
-            test_logs_dir=state_dir / "test_logs",
         )
 
         # Create directories and log files
@@ -46,6 +42,9 @@ def temp_actifix_paths():
         paths.aflog_file.write_text("")
 
         yield paths
+
+        reset_database_pool()
+        reset_ticket_repository()
 
 
 def _create_ticket(ticket_id: str, priority: TicketPriority, message: str) -> None:

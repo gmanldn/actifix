@@ -11,7 +11,7 @@ ACTIFIX is a sophisticated error tracking and management framework that can **tr
 - **AI-native:** Produces consistent, compact tickets ready for Claude, GPT, or any LLM to propose fixes.
 - **Self-development:** Bootstrap once and ACTIFIX will open tickets against its own codebase as you work.
 - **Reliability & safety:** Atomic writes, fallback queues, secret redaction, and health checks to avoid silent failures.
-- **Human-readable artifacts:** Markdown tickets (`ACTIFIX-LIST.md`, `ACTIFIX.md`) plus lifecycle logs (`AFLog.txt`).
+- **Human-readable artifacts:** SQLite ticket database (`data/actifix.db`), Markdown rollup (`ACTIFIX.md`), and lifecycle logs (`AFLog.txt`).
 
 ### 💡 Why Choose ACTIFIX?
 
@@ -107,12 +107,12 @@ actifix.track_development_progress(
 
 ### 📊 What You Get
 
-After setup, ACTIFIX generates organized files in the `actifix/` directory:
+After setup, ACTIFIX emits structured data in these locations:
 
-- **`ACTIFIX-LIST.md`** - Detailed ticket list with checkboxes for tracking progress
-- **`ACTIFIX.md`** - Quick rollup of last 20 errors for rapid overview  
-- **`ACTIFIX-LOG.md`** - Chronological log of completed tickets
-- **`AFLog.txt`** - Detailed audit trail for troubleshooting
+- **`data/actifix.db`** - SQLite `tickets` table (priority, status, metadata, context, AI notes)
+- **`actifix/ACTIFIX.md`** - Quick rollup of the last 20 errors
+- **`actifix/ACTIFIX-LOG.md`** - Chronological log of completed tickets
+- **`actifix/AFLog.txt`** - Detailed audit trail for troubleshooting
 
 Each ticket includes:
 - 🆔 Unique ID (e.g., `ACT-20261001-ABC123`)
@@ -205,7 +205,10 @@ except Exception as exc:
         error_type=type(exc).__name__,
     )
 ```
-Then check `actifix/ACTIFIX-LIST.md` and `actifix/ACTIFIX.md` for the captured ticket.
+Then use `sqlite3 data/actifix.db "SELECT id, priority, status, message FROM tickets ORDER BY created_at DESC LIMIT 5;"` and `cat actifix/ACTIFIX.md` to inspect the capture.
+
+## Task Registry
+`data/actifix.db` is the **single authoritative registry** for Actifix tasks. Always create tickets via `actifix.record_error(...)`, `DoAF`, or the CLI—the database is the only writeable source of truth. Legacy Markdown lists like `ACTIFIX-LIST.md` or `TASK_LIST.md` are retired and should never be edited directly.
 
 ## Useful Commands
 - `python -m actifix.main record P2 "message" "module.py:42"`: manual ticket.
@@ -225,7 +228,7 @@ Open http://localhost:8080 to view the Actifix dashboard. No build step is requi
 ## Directory Layout & Environment
 - Defaults: tickets in `actifix/`, state in `.actifix/`, logs in `logs/`.
 - Override via env vars: `ACTIFIX_DATA_DIR`, `ACTIFIX_STATE_DIR`, `ACTIFIX_LOGS_DIR`, `ACTIFIX_CAPTURE_ENABLED=1`.
-- Generated artifacts: `ACTIFIX-LIST.md` (tickets), `ACTIFIX.md` (rollup), `ACTIFIX-LOG.md` (history), `AFLog.txt` (audit).
+- Generated artifacts: `data/actifix.db` (tickets), `ACTIFIX.md` (rollup), `ACTIFIX-LOG.md` (history), `AFLog.txt` (audit).
 
 ## Next Steps
 - Integrate into your app by calling `actifix.enable_actifix_capture()` early and `actifix.install_exception_handler()` during development to auto-capture uncaught exceptions.

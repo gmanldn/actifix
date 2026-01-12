@@ -114,14 +114,14 @@ Decisions are treated as **state**, not commentary.
 
 ### 5.1 Single Source of Task Truth
 
-All work is tracked through a **single authoritative task registry**.
+All work is tracked through the **canonical `tickets` table in `data/actifix.db`**.
 
 Rules:
 
-- Tasks are created programmatically
-- Manual edits are prohibited
-- Tasks must include acceptance criteria
-- Task completion requires validation, not declaration
+- Tickets are created programmatically via `actifix.raise_af.record_error()` and the DoAF pipeline.
+- Manual Markdown task files (e.g., `TASK_LIST.md`, `ACTIFIX-LIST.md`) are retired; they exist only in archives and never in active storage.
+- Tasks must include acceptance criteria.
+- Task completion requires validation, not declaration.
 
 ### 5.2 Definition of Done
 
