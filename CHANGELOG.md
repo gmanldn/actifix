@@ -106,8 +106,7 @@ Foundation release establishing core error capture and ticket management capabil
 ## Migration Guide
 
 ### Upgrading to 2.7.0
-- Database migration required for existing installations
-- Run `python -m actifix.migrate_to_db` to import existing tickets
+- Tickets are now stored exclusively in `data/actifix.db`; existing Markdown archives are ignored and no manual migration is required because the database is already authoritative
 - Update configuration for AI provider settings
 - Review new environment variables for AI integration
 

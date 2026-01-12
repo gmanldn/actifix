@@ -114,6 +114,8 @@ After setup, ACTIFIX emits structured data in these locations:
 - **`actifix/ACTIFIX-LOG.md`** - Chronological log of completed tickets
 - **`actifix/AFLog.txt`** - Detailed audit trail for troubleshooting
 
+> **Tasking reminder:** `data/actifix.db` is the canonical task registry; `ACTIFIX.md`, `ACTIFIX-LOG.md`, and `AFLog.txt` are read-only snapshots that help you audit capture but must never be edited directly. Legacy Markdown files such as `TASK_LIST.md` or `Actifix-list.md` were retired with the database migration—use `actifix.raise_af`, DoAF, or the API to create, query, and resolve tickets.
+
 Each ticket includes:
 - 🆔 Unique ID (e.g., `ACT-20261001-ABC123`)
 - 🎯 Auto-assigned priority (P0-P4) 
@@ -208,7 +210,7 @@ except Exception as exc:
 Then use `sqlite3 data/actifix.db "SELECT id, priority, status, message FROM tickets ORDER BY created_at DESC LIMIT 5;"` and `cat actifix/ACTIFIX.md` to inspect the capture.
 
 ## Task Registry
-`data/actifix.db` is the **single authoritative registry** for Actifix tasks. Always create tickets via `actifix.record_error(...)`, `DoAF`, or the CLI—the database is the only writeable source of truth. Legacy Markdown lists like `ACTIFIX-LIST.md` or `TASK_LIST.md` are retired and should never be edited directly.
+`data/actifix.db` is the **single authoritative registry** for Actifix tasks. Always create tickets via `actifix.record_error(...)`, `DoAF`, or the CLI—the database is the only writeable source of truth. Legacy Markdown task lists were retired long ago and no longer exist in this workspace.
 
 ## Useful Commands
 - `python -m actifix.main record P2 "message" "module.py:42"`: manual ticket.

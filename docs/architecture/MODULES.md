@@ -130,6 +130,24 @@ This file catalogs the architectural modules of the Actifix system. It provides 
 **Contracts:** centralized path configuration; directory helpers  
 **Depends on:** infra.logging  
 
+## infra.persistence.database
+
+**Domain:** infra  
+**Owner:** persistence  
+**Summary:** SQLite database backend with connection pooling and schema management  
+**Entrypoints:** src/actifix/persistence/database.py  
+**Contracts:** thread-safe connection pooling; automatic schema migrations; WAL mode for concurrency  
+**Depends on:** infra.logging  
+
+## infra.persistence.ticket_repo
+
+**Domain:** infra  
+**Owner:** persistence  
+**Summary:** Ticket repository with CRUD operations, locking, and duplicate prevention  
+**Entrypoints:** src/actifix/persistence/ticket_repo.py  
+**Contracts:** database CRUD for tickets; lease-based locking for DoAF agents; duplicate guard enforcement  
+**Depends on:** infra.logging, infra.persistence.database, core.raise_af  
+
 ## core.raise_af
 
 **Domain:** core  
@@ -148,6 +166,24 @@ This file catalogs the architectural modules of the Actifix system. It provides 
 **Contracts:** process tickets systematically; integrate with AI systems; validate fixes  
 **Depends on:** infra.logging, core.raise_af  
 
+## core.ai_client
+
+**Domain:** core  
+**Owner:** core  
+**Summary:** Multi-provider AI integration with automatic fallback chain  
+**Entrypoints:** src/actifix/ai_client.py  
+**Contracts:** Claude local auth detection; Claude API integration; OpenAI GPT-4 Turbo support; Ollama local model support; free alternative prompts; automatic provider fallback; cost tracking and logging  
+**Depends on:** runtime.config, infra.logging, runtime.state  
+
+## core.error_taxonomy
+
+**Domain:** core  
+**Owner:** core  
+**Summary:** Enhanced error classification and taxonomy system  
+**Entrypoints:** src/actifix/error_taxonomy.py  
+**Contracts:** sophisticated error pattern matching; priority classification; remediation hints generation; extensible pattern system  
+**Depends on:** core.raise_af  
+
 ## core.quarantine
 
 **Domain:** core  
@@ -156,6 +192,15 @@ This file catalogs the architectural modules of the Actifix system. It provides 
 **Entrypoints:** src/actifix/quarantine.py  
 **Contracts:** isolate corrupted state; prevent system-wide failures  
 **Depends on:** infra.logging, runtime.state  
+
+## tooling.simple_ticket_attack
+
+**Domain:** tooling  
+**Owner:** tooling  
+**Summary:** Batch creation of lightweight tickets through the Actifix pipeline  
+**Entrypoints:** src/actifix/simple_ticket_attack.py  
+**Contracts:** generate sequences of simple tickets via `record_error`; keep `data/actifix.db` intact (use API/DoAF for access); reuse core ticketing flow for experimentation  
+**Depends on:** core.raise_af, runtime.state  
 
 ## tooling.testing.system
 

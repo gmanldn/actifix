@@ -76,11 +76,11 @@ paths = get_actifix_paths()
 
 | File | Path | Purpose |
 |------|------|---------|
-| Ticket database | `data/actifix.db` | Canonical SQLite store for all tickets |
-| Recent errors | `actifix/ACTIFIX.md` | Last 20 errors (rollup) |
-| Audit log | `actifix/AFLog.txt` | Event history |
+| **Ticket database** | `data/actifix.db` | **CANONICAL SQLite store for all tickets** |
 | Quarantine | `actifix/quarantine/` | Isolated corrupt data |
 | State | `.actifix/` | Internal state, fallback queue |
+
+**Note**: The database (`data/actifix.db`) is the single source of truth. All ticket data is stored here.
 
 ---
 
@@ -138,8 +138,6 @@ Exception → bootstrap (exception handler) → record_error()
   → classify_priority()
   → redact_secrets()
   → persist to `data/actifix.db` via `TicketRepository`
-  → update ACTIFIX.md rollup
-  → log to AFLog.txt
 ```
 
 ---

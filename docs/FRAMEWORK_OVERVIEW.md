@@ -163,10 +163,10 @@ actifix.track_development_progress(
 
 ### Generated Files
 
-Actifix creates the following files in the `actifix/` directory:
+Actifix creates the following artifacts:
 
+- **data/actifix.db**: SQLite ticket database (priority, status, AI notes, context)
 - **ACTIFIX.md**: Rollup of the last 20 errors (quick overview)
-- **ACTIFIX-LIST.md**: Detailed ticket list with checkboxes and status tracking
 - **ACTIFIX-LOG.md**: Chronological log of completed tickets
 - **AFLog.txt**: Detailed lifecycle log for troubleshooting
 
@@ -190,7 +190,7 @@ Actifix is designed to improve itself! Here's how:
 
 1. **Bootstrap**: Enable self-development mode
 2. **Development**: As you develop, actifix captures errors in its own code
-3. **Review**: Review generated tickets in `actifix/ACTIFIX-LIST.md`
+3. **Review**: Query `data/actifix.db` (or use the DoAF API) to inspect ticket status
 4. **Fix**: Implement fixes for the captured issues
 5. **Track**: Mark tickets as completed when fixed
 6. **Iterate**: Continue developing, actifix keeps tracking!
@@ -266,7 +266,7 @@ Actifix tracks its own development! To contribute:
 
 1. Enable self-development mode
 2. Actifix will create tickets for any issues you encounter
-3. Review tickets in `actifix/ACTIFIX-LIST.md`
+3. Query `data/actifix.db` or the DoAF endpoint to review tickets
 4. Implement fixes
 5. Submit PR with completed tickets
 

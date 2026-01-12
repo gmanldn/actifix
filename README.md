@@ -11,7 +11,7 @@ Actifix is a self-improving error management framework that captures rich contex
 - 📦 **Drop-in usage**: Pure-stdlib Python package—import it, call `enable_actifix_capture()`, and start recording tickets immediately.
 - 🧠 **AI-native**: Generates remediation notes, normalized context, and 200k-token-friendly bundles for Claude, GPT, or any LLM.
 - 🔁 **Self-improvement mode**: Actifix watches its own development, opening tickets against itself as you code.
-- 🗂️ **Transparent artifacts**: Human-readable Markdown ticket lists (`ACTIFIX-LIST.md`, `ACTIFIX.md`) plus detailed lifecycle logs (`AFLog.txt`).
+- 🗂️ **Transparent artifacts**: SQLite ticket database (`data/actifix.db`), error rollups (`ACTIFIX.md`), and lifecycle logs (`AFLog.txt`).
 - 🛠️ **Configurable by environment**: Tune data/state directories, context capture limits, and capture enablement with env vars—no code changes needed.
 
 ## How It Works (Lifecycle)
@@ -76,7 +76,9 @@ actifix.track_development_progress(
 
 ### Inspect Tickets
 ```bash
-cat actifix/ACTIFIX-LIST.md   # full ticket list with status checkboxes
+sqlite3 data/actifix.db "SELECT id, priority, status, message, run_label FROM tickets ORDER BY
+    CASE priority WHEN 'P0' THEN 0 WHEN 'P1' THEN 1 WHEN 'P2' THEN 2 WHEN 'P3' THEN 3 ELSE 4 END,
+    created_at DESC LIMIT 30;"
 cat actifix/ACTIFIX.md        # rollup of the last 20 errors
 tail -n 50 actifix/AFLog.txt  # lifecycle log for debugging capture
 ```
@@ -93,7 +95,7 @@ See `src/actifix/` for implementation details: `raise_af.py` (capture engine), `
 
 ## Raise_AF Ticketing Requirement
 
-All work must begin by logging the condition through `actifix.raise_af.record_error(...)` so a ticket appears in `actifix/ACTIFIX-LIST.md` with the proper priority and context. This ensures the RaiseAF ticketing workflow remains the single source of truth for every change and keeps the AI/automation pipeline honest. Enforcement is active: set `ACTIFIX_CHANGE_ORIGIN=raise_af` (default enforced) or operations will fail fast.
+All work must begin by logging the condition through `actifix.raise_af.record_error(...)` so a structured row lands in `data/actifix.db` with the proper priority and context (the legacy Markdown list is retired). Files such as `TASK_LIST.md` or `Actifix-list.md` no longer exist—the SQLite store and associated APIs are the only writable task registry. This keeps the RaiseAF ticketing workflow as the single source of truth and keeps the AI/automation pipeline honest. Enforcement is active: set `ACTIFIX_CHANGE_ORIGIN=raise_af` (default enforced) or operations will fail fast.
 
 ## Configuration (Environment Variables)
 
@@ -116,9 +118,10 @@ actifix/
 │   └── __init__.py       # Main API surface
 ├── test/                 # Test suite
 │   └── test_actifix_basic.py
+├── data/                 # Runtime storage
+│   └── actifix.db        # SQLite ticket database (canonical source of truth)
 ├── actifix/              # Generated artifacts (created on first run)
 │   ├── ACTIFIX.md        # Error rollup (last 20)
-│   ├── ACTIFIX-LIST.md   # Detailed ticket list with statuses
 │   ├── ACTIFIX-LOG.md    # Completion log
 │   └── AFLog.txt         # Lifecycle log
 └── docs/                 # Documentation

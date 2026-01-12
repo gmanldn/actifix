@@ -131,4 +131,4 @@ Options:
 - `--capture-context`: include file/system context in each ticket
 - `--dry-run`: preview the messages without writing files
 
-Run this whenever you want to "attack" a backlog of simple tickets while keeping the canonical Actifix workflow in charge (no manual edits to `ACTIFIX-LIST.md`).
+Run this whenever you want to "attack" a backlog of simple tickets while keeping the canonical Actifix workflow in charge (avoid direct edits to `data/actifix.db`; use the Actifix API instead).

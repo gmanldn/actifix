@@ -237,16 +237,8 @@ class TestRunner:
             min_coverage_percent=self.min_coverage,
         )
         
-        # Log plan declaration
-        log_event(
-            self.paths.aflog_file,
-            "TEST_PLAN_DECLARED",
-            f"Test plan declared: {self.name}",
-            extra={
-                "total_tests": len(tests),
-                "correlation_id": get_correlation_id(),
-            }
-        )
+        # Log plan declaration (database is canonical, no text files)
+        # log_event removed as database is the canonical storage
         
         return self._plan
     
@@ -276,13 +268,8 @@ class TestRunner:
         failed_tests = []
         error_tests = []
         
-        # Log execution start
-        log_event(
-            self.paths.aflog_file,
-            "TEST_EXECUTION_STARTED",
-            f"Executing {total} tests",
-            extra={"plan": self.name}
-        )
+        # Log execution start (database is canonical, no text files)
+        # log_event removed as database is the canonical storage
         
         for index, test in enumerate(self._plan.tests):
             # Report progress
@@ -382,20 +369,8 @@ class TestRunner:
         self._plan.skipped_count = skipped
         self._plan.error_count = errors
         
-        # Log result
-        log_event(
-            self.paths.aflog_file,
-            "TEST_EXECUTION_COMPLETED",
-            f"Tests completed: {passed}/{total} passed",
-            extra={
-                "plan": self.name,
-                "passed": passed,
-                "failed": failed,
-                "errors": errors,
-                "duration": duration,
-                "success": success,
-            }
-        )
+        # Log result (database is canonical, no text files)
+        # log_event removed as database is the canonical storage
         
         # Verify plan execution
         if not plan_matched:

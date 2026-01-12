@@ -57,8 +57,9 @@ cp -r src/actifix /your/project/
 
 ```
 your-project/
-├── actifix/                    # Actifix data directory
-│   ├── ACTIFIX-LIST.md        # Ticket database
+├── data/                       # Runtime storage
+│   └── actifix.db              # Tickets table (canonical source of truth)
+├── actifix/                    # Generated artifacts
 │   ├── ACTIFIX.md             # Error rollup (last 20)
 │   ├── ACTIFIX-LOG.md         # Audit trail
 │   ├── AFLog.txt              # Machine-readable log
@@ -161,7 +162,7 @@ print(f"Warnings: {health.warnings}")
 ```
 1. Error Detected
        ↓
-2. RaiseAF creates ticket in ACTIFIX-LIST.md
+2. RaiseAF creates tickets in `data/actifix.db` for structured logging
        ↓
 3. Ticket marked as:
    - [ ] Documented

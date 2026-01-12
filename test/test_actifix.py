@@ -2,6 +2,7 @@
 Tests for Actifix package.
 """
 
+import os
 import tempfile
 from pathlib import Path
 
@@ -75,11 +76,13 @@ class TestRaiseAF:
         guard3 = generate_duplicate_guard("test.py:20", "different error")
         assert guard != guard3
     
-    def test_record_error(self):
+    def test_record_error(self, monkeypatch):
         from actifix.raise_af import record_error
         from actifix.state_paths import get_actifix_paths
         
         with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = Path(tmpdir) / "data" / "actifix.db"
+            monkeypatch.setenv("ACTIFIX_DB_PATH", str(db_path))
             paths = get_actifix_paths(base_dir=Path(tmpdir) / "actifix")
             
             entry = record_error(
@@ -93,8 +96,19 @@ class TestRaiseAF:
             assert entry is not None
             assert entry.error_type == "TestError"
             assert entry.priority == "P2"
-            assert paths.list_file.exists()
-            assert "TestError" in paths.list_file.read_text()
+            from actifix.persistence.ticket_repo import get_ticket_repository, reset_ticket_repository
+            from actifix.persistence.database import reset_database_pool
+
+            try:
+                repo = get_ticket_repository()
+                stored = repo.get_ticket(entry.ticket_id)
+                assert stored is not None
+                assert stored["message"] == "Test error message"
+                assert stored["priority"] == "P2"
+                assert os.environ["ACTIFIX_DB_PATH"] == str(db_path)
+            finally:
+                reset_database_pool()
+                reset_ticket_repository()
 
 
 class TestDoAF:

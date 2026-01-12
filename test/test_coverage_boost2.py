@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import sys
+import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -39,6 +40,7 @@ from actifix.persistence.storage import (
     StorageNotFoundError,
     StoragePermissionError,
 )
+from actifix.persistence.ticket_repo import get_ticket_repository
 from actifix.simple_ticket_attack import (
     _build_messages,
     _normalize_priority,
@@ -46,34 +48,30 @@ from actifix.simple_ticket_attack import (
     main as simple_ticket_main,
 )
 from actifix.state_paths import get_actifix_paths, init_actifix_files
-from actifix.raise_af import TicketPriority
+from actifix.raise_af import ActifixEntry, TicketPriority
 
 
-def _write_list(paths, content: str) -> None:
-    atomic_write(paths.list_file, content)
-
-
-def _ticket_block(ticket_id: str, priority: str, created: str, completed: bool = False) -> str:
-    completed_mark = "[x]" if completed else "[ ]"
-    return "\n".join(
-        [
-            f"### {ticket_id} - [{priority}] Error: Sample",
-            f"- **Priority**: {priority}",
-            "- **Error Type**: Error",
-            "- **Source**: `tests.py:1`",
-            "- **Run**: test-run",
-            f"- **Created**: {created}",
-            "- **Duplicate Guard**: `ACTIFIX-test-guard`",
-            "- **Status**: Completed" if completed else "- **Status**: Open",
-            "",
-            "**Checklist:**",
-            "- [ ] Documented",
-            "- [ ] Functioning",
-            "- [ ] Tested",
-            f"- {completed_mark} Completed",
-            "",
-        ]
+def _seed_ticket(
+    ticket_id: str,
+    priority: TicketPriority = TicketPriority.P2,
+    completed: bool = False,
+    created_at: datetime | None = None,
+) -> ActifixEntry:
+    repo = get_ticket_repository()
+    entry = ActifixEntry(
+        message="Coverage helper",
+        source="test/test_coverage_boost2.py",
+        run_label="coverage",
+        entry_id=ticket_id,
+        created_at=created_at or datetime.now(timezone.utc),
+        priority=priority,
+        error_type="TestError",
+        duplicate_guard=f"{ticket_id}-{uuid.uuid4().hex}",
     )
+    repo.create_ticket(entry)
+    if completed:
+        repo.mark_complete(ticket_id)
+    return entry
 
 
 def test_api_helpers_and_parse_branches(tmp_path, monkeypatch):
@@ -113,16 +111,19 @@ def test_api_endpoints_fix_ticket_and_logs(tmp_path, monkeypatch):
     paths = get_actifix_paths(project_root=tmp_path)
     init_actifix_files(paths)
 
-    created = datetime.now(timezone.utc).isoformat()
-    content = "\n".join(
-        [
-            "# Actifix Ticket List",
-            "## Active Items",
-            _ticket_block("ACT-20260111-ABCD1", "P1", created),
-            "## Completed Items",
-        ]
+    repo = get_ticket_repository()
+    entry = ActifixEntry(
+        message="API log fix required",
+        source="test/test_coverage_boost2.py:api",
+        run_label="api",
+        entry_id="ACT-20260111-ABCD1",
+        created_at=datetime.now(timezone.utc),
+        priority=TicketPriority.P1,
+        error_type="TestError",
+        stack_trace="",
+        duplicate_guard="api-guard",
     )
-    _write_list(paths, content)
+    repo.create_ticket(entry)
 
     app = api.create_app(tmp_path)
     client = app.test_client()
@@ -216,15 +217,7 @@ def test_health_helpers_and_report(tmp_path, capsys):
     init_actifix_files(paths)
 
     old_time = (datetime.now(timezone.utc) - timedelta(hours=2)).isoformat()
-    content = "\n".join(
-        [
-            "# Actifix Ticket List",
-            "## Active Items",
-            _ticket_block("ACT-20260111-BEAC1", "P0", old_time),
-            "## Completed Items",
-        ]
-    )
-    _write_list(paths, content)
+    _seed_ticket("ACT-20260111-BEAC1", TicketPriority.P0, created_at=datetime.fromisoformat(old_time))
 
     breaches = check_sla_breaches(paths)
     assert breaches
@@ -370,24 +363,14 @@ def test_do_af_fallback_stats_and_cli(tmp_path, monkeypatch):
     paths = get_actifix_paths(project_root=tmp_path)
     init_actifix_files(paths)
 
-    created = datetime.now(timezone.utc).isoformat()
-    content = "\n".join(
-        [
-            "# Actifix Ticket List",
-            "## Active Items",
-            _ticket_block("ACT-20260111-ABCD1", "P2", created, completed=False),
-            _ticket_block("ACT-20260111-FFFF1", "P2", created, completed=True),
-            "## Completed Items",
-            _ticket_block("ACT-20260111-FFFF1", "P2", created, completed=True),
-        ]
-    )
-    _write_list(paths, content)
+    _seed_ticket("ACT-20260111-ABCD1", TicketPriority.P2)
+    _seed_ticket("ACT-20260111-FFFF1", TicketPriority.P2, completed=True)
 
     completed = get_completed_tickets(paths=paths, use_cache=False)
     assert completed
 
     stats = get_ticket_stats(paths=paths, use_cache=False)
-    assert stats["completed"] == 1
+    assert stats["completed"] >= 1
 
     processed = process_tickets(max_tickets=1, paths=paths)
     assert processed

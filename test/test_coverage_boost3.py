@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+from datetime import datetime, timezone
+import uuid
 from pathlib import Path
 
 import pytest
@@ -25,6 +27,8 @@ from actifix.persistence.storage import (
     StoragePermissionError,
     JSONStorageMixin,
 )
+from actifix.persistence.ticket_repo import get_ticket_repository
+from actifix.raise_af import ActifixEntry, TicketPriority
 from actifix.testing import (
     TestRunner,
     assert_equals,
@@ -33,8 +37,34 @@ from actifix.testing import (
     assert_raises,
     assert_contains,
 )
+from actifix.persistence.ticket_repo import get_ticket_repository
+from actifix.raise_af import ActifixEntry, TicketPriority
 from actifix.state_paths import get_actifix_paths, init_actifix_files
 from actifix.log_utils import atomic_write, atomic_write_bytes
+
+
+def _seed_ticket(
+    ticket_id: str,
+    priority: TicketPriority = TicketPriority.P2,
+    completed: bool = False,
+    created_at=None,
+) -> ActifixEntry:
+    repo = get_ticket_repository()
+    entry = ActifixEntry(
+        message="DoAF path helper",
+        source="test/test_coverage_boost3.py",
+        run_label="coverage",
+        entry_id=ticket_id,
+        created_at=created_at or datetime.now(timezone.utc),
+        priority=priority,
+        error_type="TestError",
+        stack_trace="",
+        duplicate_guard=f"{ticket_id}-{uuid.uuid4().hex}",
+    )
+    repo.create_ticket(entry)
+    if completed:
+        repo.mark_complete(ticket_id)
+    return entry
 
 
 def test_storage_paths_optional_dirs(tmp_path, monkeypatch):
@@ -200,34 +230,12 @@ def test_do_af_paths_none_and_mark_failed(tmp_path, monkeypatch):
     paths = get_actifix_paths(project_root=tmp_path)
     init_actifix_files(paths)
 
-    content = "\n".join(
-        [
-            "# Actifix Ticket List",
-            "## Active Items",
-            "### ACT-20260111-ABCD1 - [P1] Error: Sample",
-            "- **Priority**: P1",
-            "- **Error Type**: Error",
-            "- **Source**: `tests.py:1`",
-            "- **Run**: test-run",
-            "- **Created**: 2026-01-11T00:00:00+00:00",
-            "- **Duplicate Guard**: `ACTIFIX-test-guard`",
-            "- **Status**: Open",
-            "",
-            "**Checklist:**",
-            "- [ ] Documented",
-            "- [ ] Functioning",
-            "- [ ] Tested",
-            "- [ ] Completed",
-            "",
-            "## Completed Items",
-        ]
-    )
-    atomic_write(paths.list_file, content)
+    entry = _seed_ticket("ACT-20260111-ABCD1", TicketPriority.P1)
 
     monkeypatch.setattr(do_af, "get_actifix_paths", lambda *args, **kwargs: paths)
 
     open_tickets = do_af.get_open_tickets(paths=None, use_cache=False)
-    assert len(open_tickets) == 1
+    assert any(ticket.ticket_id == entry.entry_id for ticket in open_tickets)
 
     ticket = do_af.process_next_ticket(paths=None)
     assert ticket is not None

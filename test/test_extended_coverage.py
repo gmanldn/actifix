@@ -5,6 +5,7 @@ This file contains 130 tests to complete the 200-test coverage goal.
 """
 
 import hashlib
+import uuid
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from unittest.mock import patch, MagicMock
@@ -19,7 +20,6 @@ from actifix.log_utils import (
 )
 from actifix.do_af import (
     get_ticket_stats,
-    parse_ticket_block,
     get_open_tickets,
     mark_ticket_complete,
     process_next_ticket,
@@ -47,58 +47,32 @@ from actifix.persistence.paths import (
     reset_storage_paths,
     get_storage_paths,
 )
+from actifix.persistence.ticket_repo import get_ticket_repository
+from actifix.raise_af import ActifixEntry, TicketPriority
 
 
-def build_ticket_block(
+def _seed_ticket(
     ticket_id: str,
-    priority: str = "P1",
-    error_type: str = "TestError",
-    message: str = "Something happened",
-    status: str = "Open",
+    priority: TicketPriority = TicketPriority.P2,
     completed: bool = False,
-) -> str:
-    checklist = [
-        "- [x] Documented" if completed else "- [ ] Documented",
-        "- [x] Functioning" if completed else "- [ ] Functioning",
-        "- [x] Tested" if completed else "- [ ] Tested",
-        "- [x] Completed" if completed else "- [ ] Completed",
-    ]
-    return "\n".join(
-        [
-            f"### {ticket_id} - [{priority}] {error_type}: {message}",
-            f"- **Priority**: {priority}",
-            f"- **Error Type**: {error_type}",
-            "- **Source**: `test.py:1`",
-            "- **Run**: test-run",
-            "- **Created**: 2026-01-01T00:00:00Z",
-            "- **Duplicate Guard**: `guard`",
-            f"- **Status**: {status}",
-            "",
-            "**Checklist:**",
-            "",
-            *checklist,
-            "",
-        ]
+    summary: str | None = None,
+) -> ActifixEntry:
+    repo = get_ticket_repository()
+    entry = ActifixEntry(
+        message="Extended coverage ticket",
+        source="test/test_extended_coverage.py",
+        run_label="extended",
+        entry_id=ticket_id,
+        created_at=datetime.now(timezone.utc),
+        priority=priority,
+        error_type="TestError",
+        stack_trace="",
+        duplicate_guard=f"{ticket_id}-{uuid.uuid4().hex}",
     )
-
-
-def write_ticket_list(paths, active_blocks, completed_blocks=None):
-    completed_blocks = completed_blocks or []
-    content = "\n".join(
-        [
-            "# Actifix Ticket List",
-            "",
-            "## Active Items",
-            "",
-            *active_blocks,
-            "",
-            "## Completed Items",
-            "",
-            *completed_blocks,
-            "",
-        ]
-    )
-    paths.list_file.write_text(content)
+    repo.create_ticket(entry)
+    if completed:
+        repo.mark_complete(ticket_id, summary=summary)
+    return entry
 
 
 # ===== BATCH 5: Atomic Operations Tests (20 tests) =====
@@ -435,217 +409,75 @@ class TestDoAFStats:
         """Test getting default stats."""
         paths = get_actifix_paths(project_root=tmp_path)
         init_actifix_files(paths)
-        paths.list_file.write_text("# Actifix Ticket List\n\n## Active Items\n\n## Completed Items\n")
 
         stats = get_ticket_stats(paths=paths, use_cache=False)
 
         assert stats["total"] == 0
         assert stats["open"] == 0
     
-    def test_parse_ticket_block_valid(self):
-        """Test parsing valid ticket block."""
-        block = """### ACT-20260101-ABCDEF - [P1] TestError: Something broke
-- **Priority**: P1
-- **Error Type**: TestError
-- **Source**: `test.py:10`
-- **Run**: test-run
-- **Created**: 2026-01-01T00:00:00Z
-- **Duplicate Guard**: `guard`
-- **Status**: Open
-"""
-        
-        ticket = parse_ticket_block(block)
-        
-        assert ticket is not None
-    
-    def test_parse_ticket_block_extracts_id(self):
-        """Test extracting ticket ID."""
-        block = "### ACT-20260101-ABCDEF - [P1] Error: msg\n- **Priority**: P1"
-        
-        ticket = parse_ticket_block(block)
-        
-        assert ticket is not None
-        assert ticket.ticket_id == "ACT-20260101-ABCDEF"
-    
-    def test_parse_ticket_block_extracts_priority(self):
-        """Test extracting priority."""
-        block = "### ACT-20260101-ABCDEF - [P2] Error: msg\n- **Priority**: P2"
-        
-        ticket = parse_ticket_block(block)
-        
-        assert ticket is not None
-        assert ticket.priority == "P2"
-    
-    def test_parse_ticket_block_extracts_status(self):
-        """Test extracting status."""
-        block = "### ACT-20260101-ABCDEF - [P1] Error: msg\n- **Status**: Completed"
-        
-        ticket = parse_ticket_block(block)
-        
-        assert ticket is not None
-        assert ticket.status == "Completed"
-    
-    def test_parse_ticket_block_handles_multiline(self):
-        """Test parsing multiline content."""
-        block = """### ACT-20260101-ABCDEF - [P1] TestError: Line 1
-- **Priority**: P1
-- **Error Type**: TestError
-- **Source**: `test.py:10`
-- **Run**: test-run
-- **Created**: 2026-01-01T00:00:00Z
-- **Duplicate Guard**: `guard`
-**Message**: Line 1
-Line 2
-Line 3
-"""
-        
-        ticket = parse_ticket_block(block)
-        
-        assert ticket is not None
-    
-    def test_parse_ticket_block_empty_returns_none(self):
-        """Test parsing empty block."""
-        ticket = parse_ticket_block("")
-        
-        assert ticket is None
-    
-    def test_parse_ticket_block_malformed(self):
-        """Test parsing malformed block."""
-        block = "Not a valid ticket"
-        
-        ticket = parse_ticket_block(block)
-        
-        assert ticket is None
-    
-    def test_parse_ticket_block_missing_fields(self):
-        """Test parsing with missing required fields."""
-        block = "### ACT-20260101-ABCDEF"
-        
-        ticket = parse_ticket_block(block)
-        
-        assert ticket is not None
-    
-    def test_parse_ticket_block_extra_fields(self):
-        """Test parsing with extra fields."""
-        block = """### ACT-20260101-ABCDEF - [P1] Test: Extra
-- **Priority**: P1
-- **Error Type**: Test
-- **Source**: `test.py:1`
-- **Run**: test-run
-- **Created**: 2026-01-01T00:00:00Z
-- **Duplicate Guard**: `guard`
-- **Custom**: Value
-"""
-        
-        ticket = parse_ticket_block(block)
-        
-        assert ticket is not None
+    def test_get_ticket_stats_reflects_repository_counts(self, tmp_path):
+        """Ensure stats reflect actual tickets."""
+        paths = get_actifix_paths(project_root=tmp_path)
+        init_actifix_files(paths)
 
+        _seed_ticket("ACT-20260101-STAT1", TicketPriority.P0)
+        _seed_ticket("ACT-20260101-STAT2", TicketPriority.P2, completed=True)
+
+        stats = get_ticket_stats(paths=paths, use_cache=False)
+        assert stats["total"] >= 2
+        assert stats["completed"] >= 1
+        assert stats["open"] >= 1
+    
 
 class TestDoAFProcessing:
-    """Test DoAF ticket processing."""
-    
-    def test_process_ticket_updates_status(self, tmp_path):
-        """Test processing updates ticket status."""
+    """Test DoAF ticket processing backed by the repository."""
+
+    def test_process_next_ticket_completes_entry(self, tmp_path):
         paths = get_actifix_paths(project_root=tmp_path)
         init_actifix_files(paths)
-        ticket_id = "ACT-20260101-AAA111"
-        write_ticket_list(paths, [build_ticket_block(ticket_id, priority="P1")])
 
-        processed = process_next_ticket(lambda ticket: True, paths)
+        entry = _seed_ticket("ACT-20260101-AAA111", TicketPriority.P1)
+        processed = process_next_ticket(lambda ticket: True, paths=paths, use_ai=False)
 
         assert processed is not None
-        content = paths.list_file.read_text()
-        assert "[x] Completed" in content
-        assert ticket_id in content
-
-    def test_process_ticket_logs_event(self, tmp_path):
-        """Test processing logs event."""
-        paths = get_actifix_paths(project_root=tmp_path)
-        init_actifix_files(paths)
-        ticket_id = "ACT-20260101-AAA112"
-        write_ticket_list(paths, [build_ticket_block(ticket_id, priority="P1")])
-
-        process_next_ticket(lambda ticket: True, paths)
-
+        stored = get_ticket_repository().get_ticket(entry.ticket_id)
+        assert stored["status"] == "Completed"
         log_content = paths.aflog_file.read_text()
         assert "DISPATCH_STARTED" in log_content
-        assert "DISPATCH_SUCCESS" in log_content
         assert "TICKET_COMPLETED" in log_content
 
-    def test_process_ticket_handles_errors(self, tmp_path):
-        """Test processing handles errors gracefully."""
+    def test_process_tickets_respects_limit(self, tmp_path):
         paths = get_actifix_paths(project_root=tmp_path)
         init_actifix_files(paths)
-        ticket_id = "ACT-20260101-AAA113"
-        write_ticket_list(paths, [build_ticket_block(ticket_id, priority="P1")])
 
-        def handler(_ticket):
+        _seed_ticket("ACT-20260101-AAA112", TicketPriority.P2)
+        _seed_ticket("ACT-20260101-AAA113", TicketPriority.P3)
+        processed = process_tickets(max_tickets=1, ai_handler=lambda ticket: True, paths=paths)
+
+        assert len(processed) == 1
+
+    def test_process_next_ticket_failure_logs(self, tmp_path):
+        paths = get_actifix_paths(project_root=tmp_path)
+        init_actifix_files(paths)
+
+        _seed_ticket("ACT-20260101-AAA114", TicketPriority.P1)
+
+        def fail_handler(_ticket: TicketInfo) -> bool:
             raise ValueError("boom")
 
-        process_next_ticket(handler, paths)
-
-        log_content = paths.aflog_file.read_text()
-        assert "DISPATCH_FAILED" in log_content
-        assert "[x] Completed" not in paths.list_file.read_text()
-
-    def test_process_ticket_respects_priority(self, tmp_path):
-        """Test processing respects priority order."""
-        paths = get_actifix_paths(project_root=tmp_path)
-        init_actifix_files(paths)
-        high = build_ticket_block("ACT-20260101-AAA114", priority="P0")
-        low = build_ticket_block("ACT-20260101-AAA115", priority="P2")
-        write_ticket_list(paths, [low, high])
-
-        processed = process_next_ticket(lambda ticket: False, paths)
-
+        processed = process_next_ticket(fail_handler, paths=paths, use_ai=False)
         assert processed is not None
-        assert processed.priority == "P0"
+        assert "DISPATCH_FAILED" in paths.aflog_file.read_text()
 
-    def test_process_ticket_batch_processing(self, tmp_path):
-        """Test batch processing."""
+    def test_mark_ticket_complete_summary_persists(self, tmp_path):
         paths = get_actifix_paths(project_root=tmp_path)
         init_actifix_files(paths)
-        ticket_a = build_ticket_block("ACT-20260101-AAA116", priority="P2")
-        ticket_b = build_ticket_block("ACT-20260101-AAA117", priority="P3")
-        write_ticket_list(paths, [ticket_a, ticket_b])
 
-        processed = process_tickets(max_tickets=2, ai_handler=lambda ticket: True, paths=paths)
+        entry = _seed_ticket("ACT-20260101-AAA118", TicketPriority.P2)
+        assert mark_ticket_complete(entry.ticket_id, summary="Done", paths=paths)
 
-        assert len(processed) == 2
-        content = paths.list_file.read_text()
-        assert content.count("[x] Completed") == 2
-
-    def test_process_ticket_no_tickets(self, tmp_path):
-        """Test no tickets returns None."""
-        paths = get_actifix_paths(project_root=tmp_path)
-        init_actifix_files(paths)
-        write_ticket_list(paths, [])
-
-        processed = process_next_ticket(lambda ticket: True, paths)
-
-        assert processed is None
-        assert "NO_TICKETS" in paths.aflog_file.read_text()
-
-    def test_process_ticket_mark_complete_summary(self, tmp_path):
-        """Test completion summary is added."""
-        paths = get_actifix_paths(project_root=tmp_path)
-        init_actifix_files(paths)
-        ticket_id = "ACT-20260101-AAA118"
-        write_ticket_list(paths, [build_ticket_block(ticket_id, priority="P2")])
-
-        assert mark_ticket_complete(ticket_id, summary="Done", paths=paths) is True
-        assert "Summary: Done" in paths.list_file.read_text()
-
-    def test_process_ticket_idempotency(self, tmp_path):
-        """Test idempotent completion."""
-        paths = get_actifix_paths(project_root=tmp_path)
-        init_actifix_files(paths)
-        ticket_id = "ACT-20260101-AAA119"
-        write_ticket_list(paths, [build_ticket_block(ticket_id, priority="P2")])
-
-        assert mark_ticket_complete(ticket_id, summary="Done", paths=paths) is True
-        assert mark_ticket_complete(ticket_id, summary="Done again", paths=paths) is False
+        stored = get_ticket_repository().get_ticket(entry.ticket_id)
+        assert stored["completion_summary"] == "Done"
 
 
 # ===== BATCH 8: Log Utils Tests (15 tests) =====

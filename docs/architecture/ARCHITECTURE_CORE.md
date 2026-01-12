@@ -119,7 +119,7 @@ All work is tracked through the **canonical `tickets` table in `data/actifix.db`
 Rules:
 
 - Tickets are created programmatically via `actifix.raise_af.record_error()` and the DoAF pipeline.
-- Manual Markdown task files (e.g., `TASK_LIST.md`, `ACTIFIX-LIST.md`) are retired; they exist only in archives and never in active storage.
+- Manual Markdown task files are retired; only the database-backed `tickets` table is actively managed.
 - Tasks must include acceptance criteria.
 - Task completion requires validation, not declaration.
 

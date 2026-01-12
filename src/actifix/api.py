@@ -350,18 +350,22 @@ def create_app(project_root: Optional[Path] = None) -> "Flask":
         paths = get_actifix_paths(project_root=app.config['PROJECT_ROOT'])
         log_type = request.args.get('type', 'audit')
         lines = request.args.get('lines', 100, type=int)
-        
         log_files = {
-            # Prefer ACTIFIX-LOG.md for audit if it exists; fallback to AFLog.txt
-            'audit': [paths.log_file, paths.aflog_file],
-            'errors': [paths.rollup_file],  # ACTIFIX.md
+            'audit': [
+                paths.log_file,
+                paths.aflog_file,
+            ],
+            'errors': [
+                paths.log_file,
+                paths.aflog_file,
+            ],
         }
-        
+
         # Also check for setup.log
         setup_log = app.config['PROJECT_ROOT'] / 'logs' / 'setup.log'
         if setup_log.exists():
             log_files['setup'] = [setup_log]
-        
+
         candidates = log_files.get(log_type, [])
         if not isinstance(candidates, list):
             candidates = [candidates]

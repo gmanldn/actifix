@@ -89,60 +89,28 @@ class AIClient:
         last_error = None
         
         for provider in providers:
-            log_event(
-                self.paths.aflog_file,
-                "AI_ATTEMPT",
-                f"Trying {provider.value} for ticket {ticket_info.get('id', 'unknown')}",
-                extra={"provider": provider.value, "ticket_id": ticket_info.get('id')}
-            )
+            # Log attempt (database is canonical, no text files)
+            # log_event removed as database is the canonical storage
             
             for attempt in range(max_retries):
                 try:
                     response = self._call_provider(provider, prompt, ticket_info)
                     if response.success:
-                        log_event(
-                            self.paths.aflog_file,
-                            "AI_SUCCESS",
-                            f"Successfully generated fix using {provider.value}",
-                            extra={
-                                "provider": provider.value,
-                                "ticket_id": ticket_info.get('id'),
-                                "attempt": attempt + 1,
-                                "tokens": response.tokens_used,
-                                "cost": response.cost_usd
-                            }
-                        )
+                        # Log success (database is canonical, no text files)
+                        # log_event removed as database is the canonical storage
                         return response
                     else:
                         last_error = response.error
-                        log_event(
-                            self.paths.aflog_file,
-                            "AI_ATTEMPT_FAILED",
-                            f"Attempt {attempt + 1} failed for {provider.value}: {response.error}",
-                            extra={
-                                "provider": provider.value,
-                                "ticket_id": ticket_info.get('id'),
-                                "attempt": attempt + 1,
-                                "error": response.error
-                            }
-                        )
+                        # Log failure (database is canonical, no text files)
+                        # log_event removed as database is the canonical storage
                         
                         if attempt < max_retries - 1:
                             time.sleep(2 ** attempt)  # Exponential backoff
                             
                 except Exception as e:
                     last_error = str(e)
-                    log_event(
-                        self.paths.aflog_file,
-                        "AI_EXCEPTION",
-                        f"Exception in {provider.value}: {e}",
-                        extra={
-                            "provider": provider.value,
-                            "ticket_id": ticket_info.get('id'),
-                            "attempt": attempt + 1,
-                            "error": str(e)
-                        }
-                    )
+                    # Log exception (database is canonical, no text files)
+                    # log_event removed as database is the canonical storage
                     
                     if attempt < max_retries - 1:
                         time.sleep(2 ** attempt)

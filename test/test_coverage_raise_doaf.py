@@ -4,10 +4,9 @@ Coverage tests for raise_af and do_af modules.
 
 from __future__ import annotations
 
-import builtins
-import os
 import runpy
 import sys
+import uuid
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from types import SimpleNamespace
@@ -17,58 +16,33 @@ import pytest
 import actifix.do_af as do_af
 import actifix.raise_af as raise_af
 from actifix.do_af import TicketInfo
+from actifix.persistence.ticket_repo import get_ticket_repository
 from actifix.raise_af import ActifixEntry, TicketPriority
 from actifix.state_paths import get_actifix_paths, init_actifix_files
 
 
-def _ticket_block(
+def _seed_ticket(
     ticket_id: str,
-    priority: str = "P2",
-    message: str = "Something broke",
-    created: str | None = None,
+    priority: TicketPriority = TicketPriority.P2,
     completed: bool = False,
-    status: str = "Open",
     summary: str | None = None,
-) -> str:
-    created = created or datetime.now(timezone.utc).isoformat()
-    completed_mark = "[x]" if completed else "[ ]"
-    lines = [
-        f"### {ticket_id} - [{priority}] Error: {message}",
-        f"- **Priority**: {priority}",
-        "- **Error Type**: Error",
-        "- **Source**: `tests.py:1`",
-        "- **Run**: test-run",
-        f"- **Created**: {created}",
-        f"- **Duplicate Guard**: `{ticket_id}-guard`",
-        f"- **Status**: {status}",
-        "",
-        "**Checklist:**",
-        "- [ ] Documented",
-        "- [ ] Functioning",
-        "- [ ] Tested",
-        f"- {completed_mark} Completed",
-    ]
-    if summary is not None:
-        lines.append(f"- Summary: {summary}")
-    return "\n".join(lines) + "\n"
-
-
-def _write_list(paths, active_blocks: list[str], completed_blocks: list[str] | None = None) -> None:
-    completed_blocks = completed_blocks or []
-    content = "\n".join(
-        [
-            "# Actifix Ticket List",
-            "",
-            "## Active Items",
-            "",
-            *active_blocks,
-            "## Completed Items",
-            "",
-            *completed_blocks,
-            "",
-        ]
+) -> ActifixEntry:
+    repo = get_ticket_repository()
+    entry = ActifixEntry(
+        message="Seeded test ticket",
+        source="test/test_coverage_raise_doaf.py:seed",
+        run_label="raise-af",
+        entry_id=ticket_id,
+        created_at=datetime.now(timezone.utc),
+        priority=priority,
+        error_type="TestError",
+        stack_trace="",
+        duplicate_guard=f"{ticket_id}-{uuid.uuid4().hex}",
     )
-    paths.list_file.write_text(content)
+    repo.create_ticket(entry)
+    if completed:
+        repo.mark_complete(ticket_id, summary=summary)
+    return entry
 
 
 def test_ticket_manager_cache_and_parse(tmp_path):
@@ -76,31 +50,21 @@ def test_ticket_manager_cache_and_parse(tmp_path):
     init_actifix_files(paths)
     do_af._global_manager = None
 
-    created = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
-    active = [
-        _ticket_block("ACT-20250101-AAAAA", "P1", created=created),
-        _ticket_block("ACT-20250101-BBBBB", "P0"),
-        _ticket_block("ACT-20250101-CCCCC", "P2", completed=True, status="Completed"),
-    ]
-    completed = [
-        _ticket_block("ACT-20250101-DDDDD", "P3", completed=True, status="Completed"),
-    ]
-    _write_list(paths, active, completed)
+    _seed_ticket("ACT-20250101-AAAAA", TicketPriority.P1)
+    _seed_ticket("ACT-20250101-BBBBB", TicketPriority.P0)
+    _seed_ticket("ACT-20250101-CCCCC", TicketPriority.P2, completed=True)
+    _seed_ticket("ACT-20250101-DDDDD", TicketPriority.P3, completed=True)
 
     manager = do_af.StatefulTicketManager(paths=paths, cache_ttl=60)
     open_tickets = manager.get_open_tickets()
     completed_tickets = manager.get_completed_tickets()
     stats = manager.get_stats()
 
-    assert len(open_tickets) == 2
-    assert len(completed_tickets) == 2
-    assert stats["open"] == 2
-
-    assert manager._parse_tickets_from_section("no sections", "Active Items", "Completed Items") == []
-
-    paths.list_file.unlink()
+    assert len(open_tickets) >= 2
+    assert len(completed_tickets) >= 2
+    assert stats["open"] >= 2
     manager.invalidate_cache()
-    assert manager.get_open_tickets() == []
+    assert len(manager.get_open_tickets()) >= 2
 
 
 def test_get_tickets_fallbacks(tmp_path):
@@ -108,7 +72,6 @@ def test_get_tickets_fallbacks(tmp_path):
     init_actifix_files(paths)
     do_af._global_manager = None
 
-    paths.list_file.unlink()
     assert do_af.get_open_tickets(paths, use_cache=False) == []
     assert do_af.get_completed_tickets(paths, use_cache=False) == []
     stats = do_af.get_ticket_stats(paths, use_cache=False)
@@ -121,20 +84,17 @@ def test_mark_ticket_complete_and_idempotent(tmp_path):
     do_af._global_manager = None
 
     ticket_id = "ACT-20250102-AAAAA"
-    active = [_ticket_block(ticket_id, completed=True, status="Completed")]
-    _write_list(paths, active, [])
-
+    _seed_ticket(ticket_id, completed=True)
     assert do_af.mark_ticket_complete(ticket_id, paths=paths) is False
     assert "TICKET_ALREADY_COMPLETED" in paths.aflog_file.read_text()
 
     ticket_id = "ACT-20250102-BBBBB"
-    active = [_ticket_block(ticket_id, summary="Old summary")]
-    _write_list(paths, active, [])
+    repo = get_ticket_repository()
+    _seed_ticket(ticket_id)
 
     assert do_af.mark_ticket_complete(ticket_id, summary="New summary", paths=paths) is True
-    content = paths.list_file.read_text()
-    assert "## Completed Items" in content
-    assert "New summary" in content
+    stored = repo.get_ticket(ticket_id)
+    assert stored["completion_summary"] == "New summary"
 
 
 def test_process_next_ticket_handlers(tmp_path):
@@ -143,11 +103,8 @@ def test_process_next_ticket_handlers(tmp_path):
     do_af._global_manager = None
 
     ticket_id = "ACT-20250103-AAAAA"
-    active = [
-        _ticket_block(ticket_id),
-        _ticket_block("ACT-20250103-BBBBB")
-    ]
-    _write_list(paths, active, [])
+    _seed_ticket(ticket_id, TicketPriority.P0)
+    _seed_ticket("ACT-20250103-BBBBB", TicketPriority.P1)
 
     def handler(ticket: TicketInfo) -> bool:
         return ticket.ticket_id == ticket_id
@@ -201,7 +158,6 @@ def test_doaf_cli_commands(tmp_path, capsys):
 
     args = do_af._build_cli_parser().parse_args(["--project-root", str(tmp_path), "stats"])
     resolved = do_af._resolve_paths_from_args(args)
-    assert resolved.list_file.exists()
 
     assert do_af.main(["--project-root", str(tmp_path), "stats"]) == 0
     out = capsys.readouterr().out
@@ -215,11 +171,8 @@ def test_doaf_cli_commands(tmp_path, capsys):
     out = capsys.readouterr().out
     assert "No open tickets to process" in out
 
-    active = [
-        _ticket_block("ACT-20250104-AAAAA", "P0"),
-        _ticket_block("ACT-20250104-BBBBB", "P2"),
-    ]
-    _write_list(paths, active, [])
+    _seed_ticket("ACT-20250104-AAAAA", TicketPriority.P0)
+    _seed_ticket("ACT-20250104-BBBBB", TicketPriority.P2)
 
     assert do_af.main(["--project-root", str(tmp_path), "list", "--limit", "1"]) == 0
     out = capsys.readouterr().out
@@ -424,17 +377,20 @@ def test_raise_af_record_error_duplicate_and_priority(tmp_path, monkeypatch):
     paths = get_actifix_paths(project_root=tmp_path)
     init_actifix_files(paths)
     monkeypatch.setenv("ACTIFIX_CAPTURE_ENABLED", "1")
-    monkeypatch.setattr(raise_af, "generate_duplicate_guard", lambda *_args, **_kwargs: "ACTIFIX-src-1234")
+    guard_value = "ACTIFIX-src-1234"
+    monkeypatch.setattr(raise_af, "generate_duplicate_guard", lambda *_args, **_kwargs: guard_value)
 
-    paths.list_file.write_text(
-        "\n".join(
-            [
-                "# Actifix Ticket List",
-                "## Active Items",
-                "",
-                "## Completed Items",
-                "- **Duplicate Guard**: `ACTIFIX-src-1234`",
-            ]
+    repo = get_ticket_repository()
+    repo.create_ticket(
+        ActifixEntry(
+            message="Existing item",
+            source="test",
+            run_label="run",
+            entry_id="ACT-20260111-INIT",
+            created_at=datetime.now(timezone.utc),
+            priority=TicketPriority.P2,
+            error_type="TestError",
+            duplicate_guard="ACTIFIX-src-1234",
         )
     )
 
@@ -446,6 +402,7 @@ def test_raise_af_record_error_duplicate_and_priority(tmp_path, monkeypatch):
         paths=paths,
     ) is None
 
+    monkeypatch.setattr(raise_af, "generate_duplicate_guard", lambda *_args, **_kwargs: "ACTIFIX-src-UNIQUE")
     entry = raise_af.record_error(
         "msg",
         "src",

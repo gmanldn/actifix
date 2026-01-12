@@ -39,9 +39,11 @@ from actifix.persistence.storage import (
     StorageNotFoundError,
 )
 from actifix.persistence.paths import configure_storage_paths, reset_storage_paths
+from actifix.persistence.ticket_repo import get_ticket_repository
 from actifix.testing import TestRunner, run_tests
 from actifix.testing.system import build_system_tests
-from actifix.state_paths import get_actifix_paths, init_actifix_files
+from actifix.state_paths import get_actifix_paths, get_raise_af_sentinel, init_actifix_files
+from actifix.raise_af import ActifixEntry, TicketPriority
 
 
 def test_quick_start_output(capsys):
@@ -169,7 +171,9 @@ def test_api_version_endpoint_git_unchecked(tmp_path, monkeypatch):
 
 def test_bootstrap_context_creates_paths(tmp_path):
     paths = bootstrap(project_root=tmp_path)
-    assert paths.list_file.exists()
+    assert paths.base_dir.exists()
+    sentinel = get_raise_af_sentinel(paths)
+    assert sentinel.exists()
 
     with ActifixContext(project_root=tmp_path) as ctx_paths:
         assert ctx_paths.base_dir.exists()
@@ -195,30 +199,17 @@ def test_health_parsing_and_breaches(tmp_path):
 
     paths = get_actifix_paths(project_root=tmp_path)
     init_actifix_files(paths)
-    paths.list_file.write_text(
-        "\n".join(
-            [
-                "# Actifix Ticket List",
-                "",
-                "## Active Items",
-                "",
-                "### ACT-20260101-AAAAAA - [P0] Error: Old",
-                "- **Priority**: P0",
-                "- **Error Type**: Error",
-                "- **Source**: `test.py:1`",
-                "- **Run**: test-run",
-                f"- **Created**: {created}",
-                "- **Duplicate Guard**: `guard`",
-                "",
-                "**Checklist:**",
-                "- [ ] Documented",
-                "- [ ] Functioning",
-                "- [ ] Tested",
-                "- [ ] Completed",
-                "",
-                "## Completed Items",
-                "",
-            ]
+    repo = get_ticket_repository()
+    repo.create_ticket(
+        ActifixEntry(
+            message="Old ticket",
+            source="test/test_coverage_core.py",
+            run_label="health",
+            entry_id="ACT-20260101-AAAAAA",
+            created_at=datetime.fromisoformat(created),
+            priority=TicketPriority.P0,
+            error_type="Error",
+            duplicate_guard="guard",
         )
     )
 
@@ -232,7 +223,7 @@ def test_health_parsing_and_breaches(tmp_path):
 def test_health_missing_artifacts(tmp_path):
     paths = get_actifix_paths(project_root=tmp_path)
     init_actifix_files(paths)
-    paths.list_file.unlink()
+    paths.rollup_file.unlink()
     health = get_health(paths)
     assert any("Missing file" in warning for warning in health.warnings)
 

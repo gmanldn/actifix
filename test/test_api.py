@@ -22,6 +22,8 @@ except ImportError:
 import sys
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
+from actifix.persistence.ticket_repo import get_ticket_repository
+from actifix.raise_af import ActifixEntry, TicketPriority
 from actifix.state_paths import get_actifix_paths, init_actifix_files
 
 
@@ -161,30 +163,20 @@ class TestAPIWithData:
     
     def test_health_with_tickets(self, temp_project):
         """Test health endpoint with tickets present."""
-        # Add a test ticket
         paths = get_actifix_paths(project_root=temp_project)
-        list_content = """# ACTIFIX Ticket List
-
-## Active Items
-
-## ACT-20260110-ABCD1234 [P2] TestError: Test message
-
-**Error Type**: TestError
-**Source**: `test.py:10`
-**Run**: test-run
-**Created**: 2026-01-10T12:00:00Z
-**Duplicate Guard**: `hash123`
-
-**Checklist:**
-- [ ] Documented
-- [ ] Functioning
-- [ ] Tested
-- [ ] Completed
-
-## Completed Items
-
-"""
-        paths.list_file.write_text(list_content)
+        repo = get_ticket_repository()
+        repo.create_ticket(
+            ActifixEntry(
+                message="Test ticket",
+                source="test/test_api.py:health",
+                run_label="api",
+                entry_id="ACT-20260110-ABCD1234",
+                created_at=datetime.now(timezone.utc),
+                priority=TicketPriority.P2,
+                error_type="TestError",
+                duplicate_guard="hash123",
+            )
+        )
         
         from actifix.api import create_app
         app = create_app(temp_project)
@@ -198,28 +190,19 @@ class TestAPIWithData:
         """Test tickets endpoint returns ticket data."""
         # Add a test ticket
         paths = get_actifix_paths(project_root=temp_project)
-        list_content = """# ACTIFIX Ticket List
-
-## Active Items
-
-## ACT-20260110-ABCD1234 [P1] ImportError: Module not found
-
-**Error Type**: ImportError
-**Source**: `main.py:25`
-**Run**: production
-**Created**: 2026-01-10T12:00:00Z
-**Duplicate Guard**: `hash456`
-
-**Checklist:**
-- [ ] Documented
-- [ ] Functioning
-- [ ] Tested
-- [ ] Completed
-
-## Completed Items
-
-"""
-        paths.list_file.write_text(list_content)
+        repo = get_ticket_repository()
+        repo.create_ticket(
+            ActifixEntry(
+                message="ImportError failure",
+                source="test/test_api.py:tickets",
+                run_label="api",
+                entry_id="ACT-20260110-ABCD1234",
+                created_at=datetime.now(timezone.utc),
+                priority=TicketPriority.P1,
+                error_type="ImportError",
+                duplicate_guard="hash456",
+            )
+        )
         
         from actifix.api import create_app
         app = create_app(temp_project)

@@ -28,21 +28,26 @@ class ActifixPaths:
     base_dir: Path
     state_dir: Path
     logs_dir: Path
-    rollup_file: Path
-    log_file: Path
-    aflog_file: Path
     fallback_queue_file: Path
     
     quarantine_dir: Path
     test_logs_dir: Path
+    aflog_file: Path
+    rollup_file: Path
+    log_file: Path
+    history_file: Path
     
     @property
     def all_artifacts(self) -> List[Path]:
         """Return all core artifacts that must exist for health checks."""
+        sentinel = self.state_dir / RAISE_AF_SENTINEL_FILENAME
         return [
             self.rollup_file,
-            self.log_file,
+            self.history_file,
             self.aflog_file,
+            self.log_file,
+            self.fallback_queue_file,
+            sentinel,
         ]
 
 
@@ -86,12 +91,13 @@ def _build_paths(
         base_dir=resolved_base,
         state_dir=resolved_state,
         logs_dir=resolved_logs,
-        rollup_file=resolved_base / "ACTIFIX.md",
-        log_file=resolved_base / "ACTIFIX-LOG.md",
-        aflog_file=resolved_base / "AFLog.txt",
         fallback_queue_file=resolved_state / "actifix_fallback_queue.json",
         quarantine_dir=resolved_state / "quarantine",
         test_logs_dir=resolved_state / "test_logs",
+        aflog_file=resolved_logs / "AFLog.txt",
+        rollup_file=resolved_base / "ACTIFIX.md",
+        log_file=resolved_logs / "actifix.log",
+        history_file=resolved_base / "ACTIFIX-LOG.md",
     )
 
 
@@ -106,7 +112,7 @@ def ensure_actifix_dirs(paths: ActifixPaths) -> None:
 
 def init_actifix_files(paths: Optional[ActifixPaths] = None) -> ActifixPaths:
     """
-    Ensure all Actifix directories and files exist with default content.
+    Ensure all Actifix directories exist. Database is the canonical storage.
     
     Returns:
         ActifixPaths used for initialization.
@@ -115,19 +121,16 @@ def init_actifix_files(paths: Optional[ActifixPaths] = None) -> ActifixPaths:
         paths = get_actifix_paths()
     
     ensure_actifix_dirs(paths)
-    
-    if not paths.rollup_file.exists():
-        paths.rollup_file.write_text(
-            "# ACTIFIX Error Rollup\n\n"
-            "Most recent issues will appear here.\n",
-            encoding="utf-8",
-        )
-    
-    if not paths.log_file.exists():
-        paths.log_file.write_text("# ACTIFIX Log\n", encoding="utf-8")
-    
-    if not paths.aflog_file.exists():
-        paths.aflog_file.write_text("", encoding="utf-8")
+
+    for artifact in (
+        paths.rollup_file,
+        paths.history_file,
+        paths.log_file,
+        paths.aflog_file,
+        paths.fallback_queue_file,
+    ):
+        artifact.parent.mkdir(parents=True, exist_ok=True)
+        artifact.touch(exist_ok=True)
 
     # Write sentinel to enforce Raise_AF-only change policy
     sentinel = paths.state_dir / RAISE_AF_SENTINEL_FILENAME

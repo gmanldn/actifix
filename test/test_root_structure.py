@@ -21,8 +21,11 @@ ALLOWED_ROOT_FILES = {
     "pyproject.toml",
     "README.md",
     "AGENTS.md",
+    "LICENSE",
+    "CHANGELOG.md",
     # User-requested root scripts
     "start.py",
+    "start_50_tasks.py",
     "test.py",
 }
 
@@ -35,6 +38,7 @@ ALLOWED_ROOT_DIRS = {
     "actifix-frontend",  # Frontend
     "logs",          # Log files
     "data",          # Data files
+    "test_logs",     # Structured test logs
 }
 
 # Hidden items are always allowed (e.g., .git, .venv, .actifix)

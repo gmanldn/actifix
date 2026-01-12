@@ -57,7 +57,7 @@ python -m actifix.config --reset
 #### Issue: Tickets not being created
 **Symptoms:**
 - `record_error()` returns None
-- No entries in ACTIFIX-LIST.md
+- No rows in `data/actifix.db`'s `tickets` table
 
 **Diagnosis:**
 ```bash

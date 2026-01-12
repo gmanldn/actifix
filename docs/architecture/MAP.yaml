@@ -318,21 +318,6 @@ modules:
   depends_on:
   - core.raise_af
   - runtime.state
-- id: tooling.migrate_to_db
-  domain: tooling
-  owner: tooling
-  summary: Legacy migration script to seed the SQLite ticket database from archived Markdown lists
-  entrypoints:
-  - src/actifix/migrate_to_db.py
-  contracts:
-  - ingest historical Markdown exports when an archive is provided
-  - import entries into the canonical SQLite store
-  - preserve all ticket metadata for audit
-  depends_on:
-  - core.raise_af
-  - infra.persistence.ticket_repo
-  - runtime.state
-
 - id: core.ai_client
   domain: core
   owner: core

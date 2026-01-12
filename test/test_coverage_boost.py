@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import os
+from datetime import datetime, timezone
 from pathlib import Path
+import uuid
 
 import pytest
 
@@ -12,6 +13,7 @@ from actifix.do_af import (
     fix_highest_priority_ticket,
     process_next_ticket,
     StatefulTicketManager,
+    TicketInfo,
 )
 from actifix.log_utils import atomic_write
 from actifix.persistence.atomic import (
@@ -37,36 +39,25 @@ from actifix.simple_ticket_attack import (
 from actifix.state_paths import get_actifix_paths, init_actifix_files
 from actifix.testing import TestRunner
 from actifix.testing.system import build_system_tests
-from actifix.raise_af import TicketPriority
+from actifix.persistence.ticket_repo import get_ticket_repository
+from actifix.raise_af import ActifixEntry, TicketPriority
 
 
-def _write_list(paths, content: str) -> None:
-    atomic_write(paths.list_file, content)
-
-
-def _basic_ticket_block(ticket_id: str, priority: str, message: str, status: str = "Open") -> str:
-    return "\n".join(
-        [
-            f"### {ticket_id} - [{priority}] Error: {message}",
-            f"- **Priority**: {priority}",
-            "- **Error Type**: Error",
-            "- **Source**: `tests.py:1`",
-            "- **Run**: test-run",
-            "- **Created**: 2026-01-11T00:00:00+00:00",
-            "- **Duplicate Guard**: `ACTIFIX-test-guard`",
-            f"- **Status**: {status}",
-            "- **Owner**: None",
-            "- **Branch**: None",
-            "- **Lease Expires**: None",
-            "",
-            "**Checklist:**",
-            "- [ ] Documented",
-            "- [ ] Functioning",
-            "- [ ] Tested",
-            "- [ ] Completed",
-            "",
-        ]
+def _create_ticket(ticket_id: str, priority: TicketPriority, message: str = "Test issue") -> ActifixEntry:
+    repo = get_ticket_repository()
+    entry = ActifixEntry(
+        message=message,
+        source="test/test_coverage_boost.py:helper",
+        run_label="test-run",
+        entry_id=ticket_id,
+        created_at=datetime.now(timezone.utc),
+        priority=priority,
+        error_type="TestError",
+        stack_trace="",
+        duplicate_guard=f"{ticket_id}-{uuid.uuid4().hex}",
     )
+    repo.create_ticket(entry)
+    return entry
 
 
 def test_simple_ticket_attack_builds_messages_and_dry_run(monkeypatch):
@@ -93,170 +84,111 @@ def test_simple_ticket_attack_main_dry_run(monkeypatch, capsys):
     assert "Prepared" in captured
 
 
-def test_stateful_ticket_manager_refreshes_and_replaces_completed(tmp_path, monkeypatch):
-    monkeypatch.setenv("ACTIFIX_CHANGE_ORIGIN", "raise_af")
+def test_stateful_ticket_manager_refreshes_and_replaces_completed(tmp_path):
     paths = get_actifix_paths(project_root=tmp_path)
     init_actifix_files(paths)
 
-    completed_id = "ACT-20260111-BBBBB"
-
-    content = "\n".join(
-        [
-            "# Actifix Ticket List",
-            "## Active Items",
-            _basic_ticket_block(completed_id, "P2", "Open item"),
-            "## Completed Items",
-            _basic_ticket_block(completed_id, "P1", "Done item", status="Completed").replace(
-                "- [ ] Completed", "- [x] Completed"
-            ),
-        ]
-    )
-    _write_list(paths, content)
+    ticket_id = "ACT-20260111-BBBBB"
+    _create_ticket(ticket_id, TicketPriority.P2)
+    assert mark_ticket_complete(ticket_id, summary="Closed", paths=paths)
 
     manager = StatefulTicketManager(paths=paths, cache_ttl=0)
     stats = manager.get_stats()
     assert stats["total"] == 1
     assert stats["completed"] == 1
+    assert not manager.get_open_tickets()
     manager.invalidate_cache()
 
 
-def test_get_open_tickets_uncached_parses_active_section(tmp_path, monkeypatch):
-    monkeypatch.setenv("ACTIFIX_CHANGE_ORIGIN", "raise_af")
+def test_get_open_tickets_uncached_reads_database(tmp_path):
     paths = get_actifix_paths(project_root=tmp_path)
     init_actifix_files(paths)
 
     ticket_id = "ACT-20260111-CCCC1"
-    content = "\n".join(
-        [
-            "# Actifix Ticket List",
-            "## Active Items",
-            _basic_ticket_block(ticket_id, "P0", "Priority item"),
-            "## Completed Items",
-        ]
-    )
-    _write_list(paths, content)
+    created_entry = _create_ticket(ticket_id, TicketPriority.P0)
 
     tickets = get_open_tickets(paths=paths, use_cache=False)
-    assert len(tickets) == 1
-    assert tickets[0].ticket_id == ticket_id
+    assert any(ticket.ticket_id == created_entry.ticket_id for ticket in tickets)
 
 
-def test_mark_ticket_complete_moves_and_updates_summary(tmp_path, monkeypatch):
-    monkeypatch.setenv("ACTIFIX_CHANGE_ORIGIN", "raise_af")
+def test_mark_ticket_complete_records_summary(tmp_path):
     paths = get_actifix_paths(project_root=tmp_path)
     init_actifix_files(paths)
 
     ticket_id = "ACT-20260111-DDDD1"
-    content = "\n".join(
-        [
-            "# Actifix Ticket List",
-            "## Active Items",
-            _basic_ticket_block(ticket_id, "P2", "Needs fix"),
-            "## Completed Items",
-        ]
-    )
-    _write_list(paths, content)
+    created_entry = _create_ticket(ticket_id, TicketPriority.P2)
 
-    assert mark_ticket_complete(ticket_id, summary="Closed", paths=paths) is True
-    updated = paths.list_file.read_text()
-    assert "## Completed Items" in updated
-    assert "- Summary: Closed" in updated
+    assert mark_ticket_complete(ticket_id, summary="Closed", paths=paths)
+    stored = get_ticket_repository().get_ticket(ticket_id)
+    assert stored["status"] == "Completed"
+    assert stored["completion_summary"] == "Closed"
 
 
-def test_mark_ticket_complete_updates_existing_summary(tmp_path, monkeypatch):
-    monkeypatch.setenv("ACTIFIX_CHANGE_ORIGIN", "raise_af")
+def test_mark_ticket_complete_can_reapply_summary_after_reopen(tmp_path):
     paths = get_actifix_paths(project_root=tmp_path)
     init_actifix_files(paths)
 
     ticket_id = "ACT-20260111-EEEE1"
-    block = _basic_ticket_block(ticket_id, "P3", "Summary change") + "- Summary: Old\n"
-    content = "\n".join(
-        [
-            "# Actifix Ticket List",
-            "## Active Items",
-            block,
-            "## Completed Items",
-        ]
-    )
-    _write_list(paths, content)
+    _create_ticket(ticket_id, TicketPriority.P3)
 
-    assert mark_ticket_complete(ticket_id, summary="New summary", paths=paths) is True
-    updated = paths.list_file.read_text()
-    assert "- Summary: New summary" in updated
+    assert mark_ticket_complete(ticket_id, summary="First summary", paths=paths)
+    repo = get_ticket_repository()
+    repo.update_ticket(ticket_id, {"status": "Open", "completed": 0})
+
+    assert mark_ticket_complete(ticket_id, summary="Second summary", paths=paths)
+    stored = repo.get_ticket(ticket_id)
+    assert stored["completion_summary"] == "Second summary"
 
 
-def test_mark_ticket_complete_idempotent_guard(tmp_path, monkeypatch):
-    monkeypatch.setenv("ACTIFIX_CHANGE_ORIGIN", "raise_af")
+def test_mark_ticket_complete_idempotent_guard(tmp_path):
     paths = get_actifix_paths(project_root=tmp_path)
     init_actifix_files(paths)
 
     ticket_id = "ACT-20260111-FFFF1"
-    completed_block = _basic_ticket_block(ticket_id, "P2", "Already done", status="Completed").replace(
-        "- [ ] Completed", "- [x] Completed"
-    )
-    content = "\n".join(
-        [
-            "# Actifix Ticket List",
-            "## Active Items",
-            completed_block,
-            "## Completed Items",
-        ]
-    )
-    _write_list(paths, content)
+    _create_ticket(ticket_id, TicketPriority.P2)
+    assert mark_ticket_complete(ticket_id, summary="First pass", paths=paths)
 
     assert mark_ticket_complete(ticket_id, summary="Ignored", paths=paths) is False
+    aflog_content = paths.aflog_file.read_text()
+    assert "TICKET_ALREADY_COMPLETED" in aflog_content
+    assert "idempotency_guard" in aflog_content
 
 
-def test_fix_highest_priority_ticket_paths(tmp_path, monkeypatch):
-    monkeypatch.setenv("ACTIFIX_CHANGE_ORIGIN", "raise_af")
+def test_fix_highest_priority_ticket_paths(tmp_path):
     paths = get_actifix_paths(project_root=tmp_path)
     init_actifix_files(paths)
-
-    empty_content = "\n".join(
-        [
-            "# Actifix Ticket List",
-            "## Active Items",
-            "## Completed Items",
-        ]
-    )
-    _write_list(paths, empty_content)
 
     result = fix_highest_priority_ticket(paths=paths)
     assert result["processed"] is False
 
-    ticket_id = "ACT-20260111-ABCD1"
-    content = "\n".join(
-        [
-            "# Actifix Ticket List",
-            "## Active Items",
-            _basic_ticket_block(ticket_id, "P1", "Needs attention"),
-            "## Completed Items",
-        ]
-    )
-    _write_list(paths, content)
-
+    low_ticket = _create_ticket("ACT-20260111-ABCD1", TicketPriority.P1)
+    high_ticket = _create_ticket("ACT-20260111-ABCD2", TicketPriority.P0)
     result = fix_highest_priority_ticket(paths=paths, summary="Handled")
     assert result["processed"] is True
-    assert result["ticket_id"] == ticket_id
+    assert result["ticket_id"] == high_ticket.ticket_id
 
 
-def test_process_next_ticket_no_tickets(tmp_path, monkeypatch):
-    monkeypatch.setenv("ACTIFIX_CHANGE_ORIGIN", "raise_af")
+def test_process_next_ticket_no_tickets(tmp_path):
     paths = get_actifix_paths(project_root=tmp_path)
     init_actifix_files(paths)
 
-    _write_list(
-        paths,
-        "\n".join(
-            [
-                "# Actifix Ticket List",
-                "## Active Items",
-                "## Completed Items",
-            ]
-        ),
-    )
+    assert process_next_ticket(paths=paths, use_ai=False) is None
 
-    assert process_next_ticket(paths=paths) is None
+
+def test_process_next_ticket_with_handler(tmp_path):
+    paths = get_actifix_paths(project_root=tmp_path)
+    init_actifix_files(paths)
+
+    entry = _create_ticket("ACT-20260111-ZZZZ", TicketPriority.P3)
+
+    def handler(info: TicketInfo) -> bool:
+        assert info.ticket_id == entry.ticket_id
+        return True
+
+    ticket = process_next_ticket(ai_handler=handler, paths=paths, use_ai=False)
+    assert ticket is not None
+    stored = get_ticket_repository().get_ticket(entry.ticket_id)
+    assert stored["status"] == "Completed"
 
 
 class FailingStorageBackend(StorageBackend):

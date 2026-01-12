@@ -139,16 +139,7 @@ class TestCycleReporter:
         
         atomic_write(log_path, json.dumps(cycle, indent=2))
         
-        log_event(
-            self.paths.aflog_file,
-            "TEST_CYCLE_COMPLETED",
-            f"Test cycle {self.cycle_name} completed",
-            extra={
-                "run_id": self.run_id,
-                "passed": result.passed,
-                "failed": result.failed,
-                "errors": result.errors,
-            }
-        )
+        # Log test cycle completion (database is canonical, no text files)
+        # log_event removed as database is the canonical storage
         
         return log_path

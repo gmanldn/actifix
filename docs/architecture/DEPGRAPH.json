@@ -128,12 +128,6 @@
       "label": "testing"
     },
     {
-      "id": "tooling.migrate_to_db",
-      "domain": "tooling",
-      "owner": "tooling",
-      "label": "migrate_to_db"
-    },
-    {
       "id": "tooling.simple_ticket_attack",
       "domain": "tooling",
       "owner": "tooling",
@@ -421,21 +415,6 @@
       "from": "core.raise_af",
       "to": "infra.logging",
       "reason": "core.raise_af depends on infra.logging"
-    },
-    {
-      "from": "tooling.migrate_to_db",
-      "to": "core.raise_af",
-      "reason": "tooling.migrate_to_db depends on core.raise_af"
-    },
-    {
-      "from": "tooling.migrate_to_db",
-      "to": "infra.persistence.ticket_repo",
-      "reason": "tooling.migrate_to_db depends on infra.persistence.ticket_repo"
-    },
-    {
-      "from": "tooling.migrate_to_db",
-      "to": "runtime.state",
-      "reason": "tooling.migrate_to_db depends on runtime.state"
     },
     {
       "from": "tooling.simple_ticket_attack",
