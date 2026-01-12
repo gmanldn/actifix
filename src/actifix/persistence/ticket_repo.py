@@ -326,45 +326,50 @@ class TicketRepository:
         now = datetime.now(timezone.utc)
         lease_expires = now + lease_duration
         
-        with self.pool.transaction() as conn:
-            # Check if ticket exists and is not locked (or lease expired)
-            cursor = conn.execute(
-                """
-                SELECT id, locked_by, locked_at, lease_expires 
-                FROM tickets 
-                WHERE id = ? AND (
-                    locked_by IS NULL 
-                    OR lease_expires < ?
+        try:
+            with self.pool.transaction() as conn:
+                # Check if ticket exists and is not locked (or lease expired)
+                cursor = conn.execute(
+                    """
+                    SELECT id, locked_by, locked_at, lease_expires 
+                    FROM tickets 
+                    WHERE id = ? AND (
+                        locked_by IS NULL 
+                        OR lease_expires < ?
+                    )
+                    """,
+                    (ticket_id, serialize_timestamp(now))
                 )
-                """,
-                (ticket_id, serialize_timestamp(now))
-            )
-            
-            row = cursor.fetchone()
-            if row is None:
+
+                row = cursor.fetchone()
+                if row is None:
+                    return None
+
+                # Acquire lock
+                conn.execute(
+                    """
+                    UPDATE tickets 
+                    SET locked_by = ?, locked_at = ?, lease_expires = ?, status = 'In Progress'
+                    WHERE id = ?
+                    """,
+                    (
+                        locked_by,
+                        serialize_timestamp(now),
+                        serialize_timestamp(lease_expires),
+                        ticket_id,
+                    )
+                )
+
+                return TicketLock(
+                    ticket_id=ticket_id,
+                    locked_by=locked_by,
+                    locked_at=now,
+                    lease_expires=lease_expires,
+                )
+        except sqlite3.OperationalError as exc:
+            if "locked" in str(exc).lower():
                 return None
-            
-            # Acquire lock
-            conn.execute(
-                """
-                UPDATE tickets 
-                SET locked_by = ?, locked_at = ?, lease_expires = ?, status = 'In Progress'
-                WHERE id = ?
-                """,
-                (
-                    locked_by,
-                    serialize_timestamp(now),
-                    serialize_timestamp(lease_expires),
-                    ticket_id,
-                )
-            )
-            
-            return TicketLock(
-                ticket_id=ticket_id,
-                locked_by=locked_by,
-                locked_at=now,
-                lease_expires=lease_expires,
-            )
+            raise
     
     def release_lock(self, ticket_id: str, locked_by: str) -> bool:
         """

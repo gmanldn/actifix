@@ -5,10 +5,12 @@
 Tests for the SQLite-backed ticket repository (CRUD, locking, stats).
 """
 
+from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
+import sqlite3
 
 from actifix.persistence.database import reset_database_pool, serialize_timestamp
 from actifix.persistence.ticket_repo import (
@@ -110,6 +112,22 @@ def test_ticket_repository_next_ticket_and_duplicates(ticket_repo_env):
 
     completed = repo.get_completed_tickets()
     assert completed == []
+
+
+def test_acquire_lock_ignores_sqlite_locked(ticket_repo_env, monkeypatch):
+    repo: TicketRepository = ticket_repo_env
+
+    entry = _build_entry("ACT-20260114-LOCKERR", TicketPriority.P2, "Locked test")
+    repo.create_ticket(entry)
+
+    @contextmanager
+    def locked_transaction():
+        raise sqlite3.OperationalError("database is locked")
+        yield
+
+    monkeypatch.setattr(repo.pool, "transaction", locked_transaction)
+
+    assert repo.acquire_lock(entry.entry_id, locked_by="agent-locked") is None
 
 
 def test_ticket_repository_expired_lock_cleanup(ticket_repo_env):

@@ -10,6 +10,7 @@ Provides thread-safe connection pooling and automatic schema migrations.
 Version: 1.0.0
 """
 
+import atexit
 import contextlib
 import os
 import json
@@ -393,6 +394,9 @@ def reset_database_pool() -> None:
             _global_pool.close_all()
             _global_pool = None
 
+
+# Ensure pool closes when the interpreter exits
+atexit.register(reset_database_pool)
 
 # Utility functions for serialization
 
