@@ -195,28 +195,86 @@ def idempotent_append(
 
 
 def log_event(
-    path: Path,
-    event_type: str,
-    message: str,
+    event_type: str | Path,
+    message: Optional[str] = None,
+    *legacy_message,
     ticket_id: Optional[str] = None,
     extra: Optional[dict] = None,
+    source: Optional[str] = None,
+    level: str = 'INFO',
+    correlation_id: Optional[str] = None,
+    # DEPRECATED: path parameter for backward compatibility
+    path: Optional[Path] = None,
 ) -> None:
     """
-    Log a structured event to AFLog.
+    Log a structured event to the database event_log table.
     
-    Format: TIMESTAMP | EVENT_TYPE | TICKET_ID | MESSAGE | EXTRA
+    MIGRATION NOTE: Now uses database storage instead of AFLog.txt.
+    The 'path' parameter is deprecated and ignored.
     
     Args:
-        path: AFLog file path.
-        event_type: Type of event (e.g., TICKET_CREATED, DISPATCH_STARTED).
+        event_type: Type of event (e.g., TICKET_CREATED, DISPATCH_STARTED). Legacy
+            callers may still pass the AF Log path first (signature:
+            `log_event(path, event_type, message, ...)`) and this helper will
+            auto-shift the arguments for you.
         message: Human-readable message.
         ticket_id: Optional ticket ID.
-        extra: Optional extra data.
+        extra: Optional extra data dictionary.
+        source: Optional source module/function.
+        level: Log level (DEBUG, INFO, WARNING, ERROR, CRITICAL).
+        correlation_id: Optional correlation ID for tracing.
+        path: DEPRECATED - ignored (for backward compatibility).
     """
-    timestamp = datetime.now(timezone.utc).isoformat()
-    ticket_str = ticket_id or "-"
-    extra_str = str(extra) if extra else "-"
-    
-    line = f"{timestamp} | {event_type} | {ticket_str} | {message} | {extra_str}\n"
-    
-    append_with_guard(path, line)
+    try:
+        from .persistence.event_repo import get_event_repository
+        import json
+
+        # Support the legacy signature that passed the AF log path first.
+        if isinstance(event_type, (Path, os.PathLike)):
+            legacy_path = Path(event_type)
+            if message is None or not legacy_message:
+                raise TypeError("log_event requires an event_type and message")
+            legacy_payload = legacy_message[0]
+            if len(legacy_message) > 1:
+                raise TypeError("Unexpected extra positional arguments to log_event")
+            event_type = message
+            message = legacy_payload
+            if path is None:
+                path = legacy_path
+
+        if message is None:
+            raise TypeError("log_event requires an event_type and message")
+
+        # Convert extra dict to JSON string
+        extra_json = None
+        if extra:
+            try:
+                extra_json = json.dumps(extra, default=str)
+            except Exception:
+                extra_json = str(extra)
+        
+        # Log to database
+        repo = get_event_repository()
+        repo.log_event(
+            event_type=event_type,
+            message=message,
+            ticket_id=ticket_id,
+            correlation_id=correlation_id,
+            extra_json=extra_json,
+            source=source,
+            level=level,
+        )
+
+        if path:
+            try:
+                timestamp = datetime.now(timezone.utc).isoformat()
+                entry = (
+                    f"{timestamp} | {level} | "
+                    f"{event_type} | {message}\n"
+                )
+                append_with_guard(Path(path), entry)
+            except Exception:
+                pass
+    except Exception:
+        # Silently fail to avoid recursive logging errors
+        pass
