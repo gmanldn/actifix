@@ -73,11 +73,11 @@ class EventRepository:
         try:
             ts = timestamp or datetime.now(timezone.utc)
             ts_str = serialize_timestamp(ts)
-            
+
             with self.pool.transaction() as conn:
                 cursor = conn.execute(
                     """
-                    INSERT INTO event_log 
+                    INSERT INTO event_log
                     (timestamp, event_type, message, ticket_id, correlation_id, extra_json, source, level)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                     """,

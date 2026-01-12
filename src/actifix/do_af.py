@@ -246,7 +246,7 @@ def mark_ticket_complete(
         log_event(
             paths.aflog_file,
             "TICKET_ALREADY_COMPLETED",
-            f"Skipped already-completed ticket: {ticket_id}",
+            f"Skipped already-completed ticket: {ticket_id} (idempotency_guard)",
             ticket_id=ticket_id,
             extra={
                 "status": existing.get("status"),
