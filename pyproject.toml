@@ -39,6 +39,11 @@ dev = [
     "mypy>=1.0",
     "ruff>=0.1",
 ]
+web = [
+    "flask>=3.0",
+    "flask-cors>=4.0",
+    "psutil>=5.9",
+]
 
 [project.urls]
 Homepage = "https://github.com/gmanldn/actifix"

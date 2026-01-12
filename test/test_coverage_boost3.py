@@ -261,7 +261,8 @@ def test_api_event_level_and_no_flask(monkeypatch):
     assert api._map_event_type_to_level("TESTING", "run") == "TEST"
     assert api._map_event_type_to_level("TICKET_CLOSED", "done") == "SUCCESS"
 
-    monkeypatch.setattr(api, "FLASK_AVAILABLE", False)
+    # Mock _ensure_web_dependencies to return False (simulating failed install)
+    monkeypatch.setattr(api, "_ensure_web_dependencies", lambda: False)
     with pytest.raises(ImportError):
         api.create_app()
 

@@ -22,6 +22,50 @@ except ImportError:
     Flask = None
     CORS = None
 
+
+def _ensure_web_dependencies() -> bool:
+    """
+    Ensure Flask and flask-cors are installed. Auto-install if missing.
+    
+    Returns:
+        True if dependencies are available, False otherwise.
+    """
+    global FLASK_AVAILABLE, Flask, CORS
+    
+    if FLASK_AVAILABLE:
+        return True
+    
+    print("Flask dependencies not found. Installing...")
+    print("Running: pip install flask flask-cors psutil")
+    
+    try:
+        import subprocess
+        result = subprocess.run(
+            [sys.executable, "-m", "pip", "install", "flask", "flask-cors", "psutil"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        print("✓ Successfully installed Flask dependencies")
+        
+        # Try importing again
+        try:
+            from flask import Flask, jsonify, request
+            from flask_cors import CORS
+            FLASK_AVAILABLE = True
+            return True
+        except ImportError as e:
+            print(f"✗ Failed to import Flask after installation: {e}")
+            return False
+    except subprocess.CalledProcessError as e:
+        print(f"✗ Failed to install Flask dependencies: {e}")
+        print(f"STDOUT: {e.stdout}")
+        print(f"STDERR: {e.stderr}")
+        return False
+    except Exception as e:
+        print(f"✗ Unexpected error during installation: {e}")
+        return False
+
 from . import __version__
 from .health import get_health, check_sla_breaches
 from .do_af import (
@@ -229,17 +273,40 @@ def create_app(project_root: Optional[Path] = None) -> "Flask":
     Returns:
         Configured Flask application.
     """
-    if not FLASK_AVAILABLE:
+    if not _ensure_web_dependencies():
         raise ImportError(
             "Flask and flask-cors are required for the API server. "
             "Install with: pip install flask flask-cors"
         )
     
-    app = Flask(__name__)
+    # Import here after ensuring dependencies are available
+    from flask import Flask, jsonify, request
+    from flask_cors import CORS
+    
+    # Configure Flask to serve static files from actifix-frontend
+    root = project_root or Path.cwd()
+    frontend_dir = root / 'actifix-frontend'
+    
+    app = Flask(
+        __name__,
+        static_folder=str(frontend_dir),
+        static_url_path=''
+    )
     CORS(app)  # Enable CORS for frontend
     
     # Store project root in app config
-    app.config['PROJECT_ROOT'] = project_root or Path.cwd()
+    app.config['PROJECT_ROOT'] = root
+    app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0  # Disable static file caching in development
+    
+    @app.route('/', methods=['GET'])
+    def serve_index():
+        """Serve the dashboard frontend."""
+        response = app.send_static_file('index.html')
+        # Disable caching for development
+        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+        return response
     
     @app.route('/api/health', methods=['GET'])
     def api_health():
