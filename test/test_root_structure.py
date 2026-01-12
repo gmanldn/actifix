@@ -27,6 +27,7 @@ ALLOWED_ROOT_FILES = {
     "start.py",
     "start_50_tasks.py",
     "test.py",
+    "bounce.py",
 }
 
 # Allowed directories in project root (non-hidden)

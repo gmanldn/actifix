@@ -134,6 +134,12 @@
       "label": "simple_ticket_attack"
     },
     {
+      "id": "tooling.bounce",
+      "domain": "tooling",
+      "owner": "tooling",
+      "label": "bounce"
+    },
+    {
       "id": "core.ai_client",
       "domain": "core",
       "owner": "core",
@@ -431,6 +437,11 @@
       "from": "tooling.simple_ticket_attack",
       "to": "runtime.state",
       "reason": "tooling.simple_ticket_attack depends on runtime.state"
+    },
+    {
+      "from": "tooling.bounce",
+      "to": "bootstrap.main",
+      "reason": "tooling.bounce depends on bootstrap.main"
     },
     {
       "from": "core.ai_client",
