@@ -4,4 +4,4 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "actifix"
-vversion = "2.7.9"
+version = "2.7.11"

@@ -29,6 +29,7 @@ import threading
 import time
 import webbrowser
 import signal
+import atexit
 from pathlib import Path
 from typing import Optional
 
@@ -38,6 +39,12 @@ FRONTEND_DIR = ROOT / "actifix-frontend"
 DEFAULT_FRONTEND_PORT = 8080
 DEFAULT_API_PORT = 5001
 VERSION_LINE_RE = re.compile(r'^version\s*=\s*["\'](?P<version>[^"\']+)["\']', re.MULTILINE)
+
+# Global singleton instances - only one of each can exist
+_API_SERVER_INSTANCE: Optional[threading.Thread] = None
+_API_SERVER_LOCK = threading.Lock()
+_FRONTEND_MANAGER_INSTANCE: Optional['FrontendManager'] = None
+_FRONTEND_LOCK = threading.Lock()
 
 
 def log(message: str) -> None:
@@ -99,30 +106,39 @@ def kill_processes_on_port(port: int) -> None:
 
 
 def start_api_server(port: int, project_root: Path) -> threading.Thread:
-    """Launch the API server in a background thread."""
-    def run_server():
-        try:
-            from actifix.api import create_app
-            app = create_app(project_root)
-            # Use werkzeug's run_simple for better control
-            from werkzeug.serving import run_simple
-            run_simple(
-                '127.0.0.1', 
-                port, 
-                app, 
-                use_reloader=False, 
-                use_debugger=False,
-                threaded=True,
-            )
-        except ImportError as e:
-            log(f"API server failed to start: {e}")
-            log("Install Flask with: pip install flask flask-cors")
-        except Exception as e:
-            log(f"API server error: {e}")
-    
-    thread = threading.Thread(target=run_server, daemon=True)
-    thread.start()
-    return thread
+    """Launch the API server in a background thread. Enforces singleton - only one instance can exist."""
+    global _API_SERVER_INSTANCE
+
+    with _API_SERVER_LOCK:
+        if _API_SERVER_INSTANCE is not None and _API_SERVER_INSTANCE.is_alive():
+            log("API server already running - refusing to start duplicate instance")
+            return _API_SERVER_INSTANCE
+
+        def run_server():
+            try:
+                from actifix.api import create_app
+                app = create_app(project_root)
+                # Use werkzeug's run_simple for better control
+                from werkzeug.serving import run_simple
+                run_simple(
+                    '127.0.0.1',
+                    port,
+                    app,
+                    use_reloader=False,
+                    use_debugger=False,
+                    threaded=True,
+                )
+            except ImportError as e:
+                log(f"API server failed to start: {e}")
+                log("Install Flask with: pip install flask flask-cors")
+            except Exception as e:
+                log(f"API server error: {e}")
+
+        thread = threading.Thread(target=run_server, daemon=True)
+        thread.start()
+        _API_SERVER_INSTANCE = thread
+        log("API server instance created (singleton enforced)")
+        return thread
 
 
 def read_project_version(project_root: Path) -> Optional[str]:
@@ -143,22 +159,46 @@ def read_project_version(project_root: Path) -> Optional[str]:
 
 
 class FrontendManager:
-    """Thread-safe helper for managing the frontend server process."""
+    """Thread-safe helper for managing the frontend server process. Enforces singleton pattern."""
+
+    _instance: Optional['FrontendManager'] = None
+    _instance_lock = threading.Lock()
+
+    def __new__(cls, port: int) -> 'FrontendManager':
+        """Enforce singleton pattern - only one FrontendManager can exist."""
+        with cls._instance_lock:
+            if cls._instance is None:
+                instance = super().__new__(cls)
+                cls._instance = instance
+                log("FrontendManager singleton instance created")
+            else:
+                log("FrontendManager singleton already exists - returning existing instance")
+            return cls._instance
 
     def __init__(self, port: int) -> None:
-        self.port = port
-        self._lock = threading.Lock()
-        self._server: Optional[subprocess.Popen] = None
+        # Only initialize once
+        if not hasattr(self, '_initialized'):
+            self.port = port
+            self._lock = threading.Lock()
+            self._server: Optional[subprocess.Popen] = None
+            self._initialized = True
+            # Register cleanup on exit
+            atexit.register(self._cleanup_on_exit)
 
     def start(self) -> subprocess.Popen:
         with self._lock:
+            if self._server is not None and self._server.poll() is None:
+                log("Frontend server already running - refusing to start duplicate instance")
+                return self._server
             self._server = start_frontend(self.port)
+            log("Frontend server instance created (singleton enforced)")
             return self._server
 
     def restart(self) -> Optional[subprocess.Popen]:
         with self._lock:
             self._terminate_current()
             self._server = start_frontend(self.port)
+            log("Frontend server restarted (singleton enforced)")
             return self._server
 
     def get_process(self) -> Optional[subprocess.Popen]:
@@ -175,6 +215,11 @@ class FrontendManager:
                 self._server.kill()
             finally:
                 self._server = None
+
+    def _cleanup_on_exit(self) -> None:
+        """Cleanup handler called on exit."""
+        with self._lock:
+            self._terminate_current()
 
 
 def start_version_monitor(
@@ -242,9 +287,10 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
         help="Run health check after init and exit",
     )
     parser.add_argument(
-        "--no-browser",
+        "--browser",
         action="store_true",
-        help="Do not open the browser automatically",
+        default=False,
+        help="Open the browser automatically (disabled by default to prevent unwanted windows)",
     )
     parser.add_argument(
         "--no-api",
@@ -305,11 +351,15 @@ def main(argv: Optional[list[str]] = None) -> int:
     url = f"http://localhost:{args.frontend_port}"
     log(f"Frontend available at {url}")
 
-    if not args.no_browser:
+    # Browser launch is disabled by default to prevent unwanted windows
+    if args.browser:
         try:
             webbrowser.open(url)
+            log("Browser window opened")
         except Exception:
             log("Browser launch failed; open the URL manually.")
+    else:
+        log("Browser launch disabled (use --browser to enable)")
 
     log("")
     log("=" * 50)
