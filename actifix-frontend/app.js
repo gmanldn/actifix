@@ -672,7 +672,7 @@ const SettingsView = () => {
     h('div', { className: 'panel-header' },
       h('div', { className: 'panel-title' },
         h('span', { className: 'panel-title-icon' }, '🔧'),
-        'AI SETTINGS'
+        'Settings'
       )
     ),
     h('div', { style: { padding: '24px' } },
