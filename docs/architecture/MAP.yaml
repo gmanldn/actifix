@@ -329,6 +329,17 @@ modules:
   depends_on:
   - core.raise_af
   - runtime.state
+- id: tooling.bounce
+  domain: tooling
+  owner: tooling
+  summary: Script to stop and restart Actifix processes
+  entrypoints:
+  - bounce.py
+  contracts:
+  - stop existing frontend and API processes
+  - relaunch application via start.py with Raise_AF gate
+  depends_on:
+  - bootstrap.main
 - id: core.ai_client
   domain: core
   owner: core
