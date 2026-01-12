@@ -55,6 +55,10 @@ def test_event_repository_records_and_filters() -> None:
     repo = EventRepository()
     assert repo.get_event_count() == 0
 
+    # Create tickets for FK constraint
+    _create_ticket_for_event(repo, "ACT-001")
+    _create_ticket_for_event(repo, "ACT-002")
+
     event_id_alpha = repo.log_event(
         event_type="alpha",
         message="First entry",

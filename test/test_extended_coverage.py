@@ -632,8 +632,12 @@ class TestLogUtils:
     
     def test_log_error_handling(self, tmp_path):
         """Test log handles write errors gracefully."""
-        with pytest.raises(OSError):
+        # log_event should not raise exceptions even with invalid paths
+        # It silently fails to avoid recursive logging errors
+        try:
             log_event(Path("/nonexistent/path.log"), "EVENT", "Message")
+        except Exception as e:
+            pytest.fail(f"log_event should not raise exceptions, but raised: {e}")
 
 
 # ===== BATCH 9: Path Management Tests (15 tests) =====
