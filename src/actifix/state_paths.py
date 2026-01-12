@@ -132,6 +132,10 @@ def init_actifix_files(paths: Optional[ActifixPaths] = None) -> ActifixPaths:
         artifact.parent.mkdir(parents=True, exist_ok=True)
         artifact.touch(exist_ok=True)
 
+    base_aflog = paths.base_dir / "AFLog.txt"
+    base_aflog.parent.mkdir(parents=True, exist_ok=True)
+    base_aflog.touch(exist_ok=True)
+
     # Write sentinel to enforce Raise_AF-only change policy
     sentinel = paths.state_dir / RAISE_AF_SENTINEL_FILENAME
     if not sentinel.exists():

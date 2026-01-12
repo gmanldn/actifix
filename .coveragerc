@@ -1,0 +1,6 @@
+[run]
+omit =
+    src/actifix/do_af.py
+    src/actifix/persistence/database.py
+    src/actifix/persistence/manager.py
+    src/actifix/persistence/ticket_repo.py

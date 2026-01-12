@@ -93,6 +93,13 @@ from .ticket_repo import (
     reset_ticket_repository,
 )
 
+from .event_repo import (
+    EventRepository,
+    EventFilter,
+    get_event_repository,
+    reset_event_repository,
+)
+
 __version__ = "1.0.0"
 
 __all__ = [
@@ -145,4 +152,10 @@ __all__ = [
     "TicketLock",
     "get_ticket_repository",
     "reset_ticket_repository",
+    
+    # Event Repository
+    "EventRepository",
+    "EventFilter",
+    "get_event_repository",
+    "reset_event_repository",
 ]

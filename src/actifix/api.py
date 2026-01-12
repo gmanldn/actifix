@@ -349,7 +349,7 @@ def create_app(project_root: Optional[Path] = None) -> "Flask":
         """Get log file contents."""
         paths = get_actifix_paths(project_root=app.config['PROJECT_ROOT'])
         log_type = request.args.get('type', 'audit')
-        lines = request.args.get('lines', 100, type=int)
+        max_lines = request.args.get('lines', 100, type=int)
         log_files = {
             'audit': [
                 paths.log_file,
@@ -369,34 +369,62 @@ def create_app(project_root: Optional[Path] = None) -> "Flask":
         candidates = log_files.get(log_type, [])
         if not isinstance(candidates, list):
             candidates = [candidates]
+
+        log_file = None
+        for candidate in candidates:
+            if not candidate or not candidate.exists():
+                continue
+            if (
+                log_type == "audit"
+                and candidate == paths.log_file
+                and candidate.stat().st_size == 0
+            ):
+                continue
+            log_file = candidate
+            break
+
+        if log_file is None:
+            log_file = next((p for p in candidates if p and p.exists()), candidates[0] if candidates else None)
         
-        log_file = next((p for p in candidates if p and p.exists()), candidates[0] if candidates else None)
-        
-        if not log_file or not log_file.exists():
+        if not log_file:
             return jsonify({
                 'content': [],
-                'file': str(log_file) if log_file else 'unknown',
+                'file': 'unknown',
                 'error': 'Log file not found',
             })
-        
+
+        source_files = [log_file]
+        if (
+            log_type == "audit"
+            and paths.aflog_file.exists()
+            and paths.aflog_file not in source_files
+        ):
+            source_files.append(paths.aflog_file)
+
+        combined_lines = []
         try:
-            content = log_file.read_text(encoding='utf-8', errors='replace')
-            log_lines = content.strip().split('\n')
-            
-            # Get last N lines
-            recent_lines = log_lines[-lines:] if len(log_lines) > lines else log_lines
-            
-            # Parse lines into structured format
+            for source in source_files:
+                if not source.exists():
+                    continue
+                content = source.read_text(encoding='utf-8', errors='replace').strip()
+                if not content:
+                    continue
+                file_lines = content.split('\n')
+                combined_lines.extend(file_lines)
+
+            total_lines = len(combined_lines)
+            recent_lines = combined_lines[-max_lines:] if total_lines > max_lines else combined_lines
+
             parsed_lines = []
             for line in recent_lines:
                 parsed = _parse_log_line(line)
                 if parsed:
                     parsed_lines.append(parsed)
-            
+
             return jsonify({
                 'content': parsed_lines,
                 'file': str(log_file),
-                'total_lines': len(log_lines),
+                'total_lines': total_lines,
             })
         except Exception as e:
             return jsonify({
@@ -478,7 +506,7 @@ def create_app(project_root: Optional[Path] = None) -> "Flask":
     @app.route('/api/settings', methods=['GET'])
     def api_get_settings():
         """Get current AI settings (API key is masked for security)."""
-        config = get_config()
+        config = load_config(fail_fast=False)
         
         # Mask API key for security - only show first 4 and last 4 chars
         api_key = config.ai_api_key

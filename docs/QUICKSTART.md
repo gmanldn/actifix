@@ -109,12 +109,12 @@ actifix.track_development_progress(
 
 After setup, ACTIFIX emits structured data in these locations:
 
-- **`data/actifix.db`** - SQLite `tickets` table (priority, status, metadata, context, AI notes)
-- **`actifix/ACTIFIX.md`** - Quick rollup of the last 20 errors
-- **`actifix/ACTIFIX-LOG.md`** - Chronological log of completed tickets
-- **`actifix/AFLog.txt`** - Detailed audit trail for troubleshooting
+- **`data/actifix.db`** - SQLite `tickets` table (priority, status, metadata, context, AI notes); this is the only writable registry.
+- **`actifix/ACTIFIX.md`** - Read-only rollup of the last 20 errors (derived from the database for quick audits)
+- **`actifix/ACTIFIX-LOG.md`** - Generated completion log (chronological history from the DB)
+- **`actifix/AFLog.txt`** - Lifecycle audit trail (read-only diagnostic stream sourced from the ticket table)
 
-> **Tasking reminder:** `data/actifix.db` is the canonical task registry; `ACTIFIX.md`, `ACTIFIX-LOG.md`, and `AFLog.txt` are read-only snapshots that help you audit capture but must never be edited directly. Legacy Markdown files such as `TASK_LIST.md` or `Actifix-list.md` were retired with the database migration—use `actifix.raise_af`, DoAF, or the API to create, query, and resolve tickets.
+> **Tasking reminder:** `data/actifix.db` is the canonical source of truth for tasks. The repository no longer ships with `TASK_LIST.md`, `Actifix-list.md`, or any other writable Markdown task list—the migration to a database-first workflow is complete. Use `actifix.raise_af`, DoAF, the REST API, or direct SQL queries against `data/actifix.db` to create, view, and complete tickets, and treat the Markdown artifacts as generated, read-only snapshots.
 
 Each ticket includes:
 - 🆔 Unique ID (e.g., `ACT-20261001-ABC123`)

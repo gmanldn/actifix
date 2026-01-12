@@ -165,10 +165,12 @@ actifix.track_development_progress(
 
 Actifix creates the following artifacts:
 
-- **data/actifix.db**: SQLite ticket database (priority, status, AI notes, context)
-- **ACTIFIX.md**: Rollup of the last 20 errors (quick overview)
-- **ACTIFIX-LOG.md**: Chronological log of completed tickets
-- **AFLog.txt**: Detailed lifecycle log for troubleshooting
+- **data/actifix.db**: SQLite ticket database (priority, status, AI notes, context); this is the canonical, writable task store.
+- **ACTIFIX.md**: Read-only rollup of the last 20 errors generated from the database for quick auditing.
+- **ACTIFIX-LOG.md**: Chronological completion log derived from the tickets table.
+- **AFLog.txt**: Lifecycle audit trail that mirrors database activity (read-only).
+
+> Legacy Markdown task files such as `TASK_LIST.md` or `Actifix-list.md` were retired when the database-first model was adopted—only the `tickets` table in `data/actifix.db` is actively managed.
 
 ### Ticket Format
 

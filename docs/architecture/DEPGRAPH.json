@@ -146,6 +146,12 @@
       "label": "paths"
     },
     {
+      "id": "infra.persistence.event_repo",
+      "domain": "infra",
+      "owner": "persistence",
+      "label": "event_repo"
+    },
+    {
       "id": "infra.persistence.database",
       "domain": "infra",
       "owner": "persistence",

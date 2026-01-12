@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import Optional, List, Dict, Any, Iterator
 
 # Schema version for migrations
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 # Database schema with indexing and locking support
 SCHEMA_SQL = """
@@ -66,6 +66,79 @@ CREATE TABLE IF NOT EXISTS tickets (
     CHECK (status IN ('Open', 'In Progress', 'Completed'))
 );
 
+-- Event log table (replaces AFLog.txt)
+CREATE TABLE IF NOT EXISTS event_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    event_type TEXT NOT NULL,           -- TICKET_CREATED, DISPATCH_STARTED, etc.
+    message TEXT NOT NULL,
+    ticket_id TEXT,                      -- FK to tickets.id (nullable)
+    correlation_id TEXT,                 -- For tracing across operations
+    extra_json TEXT,                     -- JSON serialized extra data
+    source TEXT,                         -- Source file/function
+    level TEXT DEFAULT 'INFO',           -- DEBUG, INFO, WARNING, ERROR, CRITICAL
+    
+    FOREIGN KEY (ticket_id) REFERENCES tickets(id) ON DELETE SET NULL
+);
+
+-- Fallback queue table (replaces actifix_fallback_queue.json)
+CREATE TABLE IF NOT EXISTS fallback_queue (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    entry_id TEXT NOT NULL,             -- The ticket ID being queued
+    operation TEXT NOT NULL,            -- "create_ticket", "update", etc.
+    payload_json TEXT NOT NULL,         -- Serialized ActifixEntry
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    retry_count INTEGER DEFAULT 0,
+    last_retry TIMESTAMP,
+    status TEXT DEFAULT 'pending',      -- pending, processing, failed, completed
+    error_message TEXT,
+    
+    UNIQUE(entry_id, operation)         -- Prevent duplicate queue entries
+);
+
+-- Quarantine table (replaces quarantine/*.md files)
+CREATE TABLE IF NOT EXISTS quarantine (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    entry_id TEXT UNIQUE NOT NULL,      -- quarantine_YYYYMMDD_HHMMSS_ffffff
+    original_source TEXT NOT NULL,      -- File path, ticket ID, etc.
+    reason TEXT NOT NULL,
+    content TEXT NOT NULL,              -- The quarantined content
+    original_content_hash TEXT,         -- SHA256 for integrity
+    quarantined_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    recovered_at TIMESTAMP,             -- NULL if not recovered
+    recovery_notes TEXT,
+    status TEXT DEFAULT 'quarantined'   -- quarantined, recovered, deleted
+);
+
+-- Views for rollup/history (replaces ACTIFIX.md and ACTIFIX-LOG.md)
+CREATE VIEW IF NOT EXISTS v_recent_tickets AS
+SELECT 
+    id,
+    priority,
+    error_type,
+    message,
+    source,
+    created_at,
+    status
+FROM tickets
+ORDER BY created_at DESC
+LIMIT 20;
+
+CREATE VIEW IF NOT EXISTS v_ticket_history AS
+SELECT 
+    id,
+    priority,
+    error_type,
+    message,
+    source,
+    created_at,
+    updated_at,
+    completion_summary,
+    status
+FROM tickets
+WHERE status = 'Completed'
+ORDER BY updated_at DESC;
+
 -- Indexes for fast queries
 CREATE INDEX IF NOT EXISTS idx_tickets_priority ON tickets(priority);
 CREATE INDEX IF NOT EXISTS idx_tickets_status ON tickets(status);
@@ -75,6 +148,22 @@ CREATE INDEX IF NOT EXISTS idx_tickets_locked ON tickets(locked_by, locked_at);
 CREATE INDEX IF NOT EXISTS idx_tickets_lease ON tickets(lease_expires);
 CREATE INDEX IF NOT EXISTS idx_tickets_owner ON tickets(owner);
 CREATE INDEX IF NOT EXISTS idx_tickets_correlation ON tickets(correlation_id);
+
+-- Event log indexes
+CREATE INDEX IF NOT EXISTS idx_event_log_timestamp ON event_log(timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_event_log_event_type ON event_log(event_type);
+CREATE INDEX IF NOT EXISTS idx_event_log_ticket_id ON event_log(ticket_id);
+CREATE INDEX IF NOT EXISTS idx_event_log_correlation_id ON event_log(correlation_id);
+CREATE INDEX IF NOT EXISTS idx_event_log_level ON event_log(level);
+
+-- Fallback queue indexes
+CREATE INDEX IF NOT EXISTS idx_fallback_queue_status ON fallback_queue(status);
+CREATE INDEX IF NOT EXISTS idx_fallback_queue_created ON fallback_queue(created_at);
+
+-- Quarantine indexes
+CREATE INDEX IF NOT EXISTS idx_quarantine_status ON quarantine(status);
+CREATE INDEX IF NOT EXISTS idx_quarantine_source ON quarantine(original_source);
+CREATE INDEX IF NOT EXISTS idx_quarantine_date ON quarantine(quarantined_at DESC);
 """
 
 
@@ -201,8 +290,12 @@ class DatabasePool:
             from_version: Current schema version.
             to_version: Target schema version.
         """
-        # Future migrations will go here
-        # For now, just update version tracking
+        # Migration from v1 to v2: Add event_log, fallback_queue, quarantine tables
+        if from_version == 1 and to_version >= 2:
+            # Execute the full schema (CREATE IF NOT EXISTS protects existing tables)
+            conn.executescript(SCHEMA_SQL)
+        
+        # Update version tracking
         conn.execute(
             "INSERT INTO schema_version (version) VALUES (?)",
             (to_version,)

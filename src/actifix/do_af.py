@@ -248,7 +248,10 @@ def mark_ticket_complete(
             "TICKET_ALREADY_COMPLETED",
             f"Skipped already-completed ticket: {ticket_id}",
             ticket_id=ticket_id,
-            extra={"status": existing.get("status")},
+            extra={
+                "status": existing.get("status"),
+                "reason": "idempotency_guard",
+            },
         )
         return False
 
@@ -474,12 +477,11 @@ def process_next_ticket(
             except Exception as e:
                 log_event(
                     paths.aflog_file,
-                    "AI_SYSTEM_ERROR",
-                    f"AI system error: {e}",
+                    "AI_DISPATCH_EXCEPTION",
+                    f"AI processing exception: {e}",
                     ticket_id=ticket.ticket_id,
-                    extra={"error": str(e)}
+                    extra={"error": str(e)},
                 )
-
         if ai_handler:
             try:
                 success = ai_handler(ticket)

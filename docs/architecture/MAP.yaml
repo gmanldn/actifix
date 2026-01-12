@@ -196,6 +196,17 @@ modules:
   - directory helpers
   depends_on:
   - infra.logging
+
+- id: infra.persistence.event_repo
+  domain: infra
+  owner: persistence
+  summary: Lightweight event repository for diagnostics and testing helpers
+  entrypoints:
+  - src/actifix/persistence/event_repo.py
+  contracts:
+  - store simple events for instrumentation
+  - provide resettable hooks for tests
+  depends_on: []
 - id: infra.persistence.database
   domain: infra
   owner: persistence

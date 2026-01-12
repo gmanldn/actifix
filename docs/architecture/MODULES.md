@@ -139,6 +139,15 @@ This file catalogs the architectural modules of the Actifix system. It provides 
 **Contracts:** thread-safe connection pooling; automatic schema migrations; WAL mode for concurrency  
 **Depends on:** infra.logging  
 
+## infra.persistence.event_repo
+
+**Domain:** infra  
+**Owner:** persistence  
+**Summary:** Lightweight in-memory event repository for diagnostics and testing  
+**Entrypoints:** src/actifix/persistence/event_repo.py  
+**Contracts:** store instrumentation events; expose a resettable cache for tests  
+**Depends on:** infra.logging  
+
 ## infra.persistence.ticket_repo
 
 **Domain:** infra  
