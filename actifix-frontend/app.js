@@ -138,8 +138,18 @@ const NavigationRail = ({ activeView, onViewChange, logAlert }) => {
 };
 
 const VersionBadge = () => {
-  const { data, loading } = useFetch('/version', 60000);
+  const [prevVersion, setPrevVersion] = useState(null);
+  const { data, loading } = useFetch('/version', REFRESH_INTERVAL);
   const version = data?.version || '—';
+
+  useEffect(() => {
+    if (!loading && prevVersion && version !== prevVersion) {
+      console.log(`Detected version change ${prevVersion} -> ${version}; reloading page.`);
+      window.location.reload();
+    }
+    setPrevVersion(version);
+  }, [version, loading]);
+
   const gitChecked = data?.git_checked ?? false;
   const clean = data?.clean ?? false;
   const branchLabel = data?.branch ? `branch ${data.branch}` : 'branch unknown';

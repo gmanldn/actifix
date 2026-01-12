@@ -7,7 +7,7 @@ Actifix - Generic Error Tracking and Management Framework
 A sophisticated error tracking system with AI integration, context capture,
 and self-improvement capabilities. Originally inspired by the pokertool actifix system.
 
-Version: 2.6.18 (Generic)
+Version: 2.7.5 (Generic)
 """
 
 from .raise_af import (
@@ -40,7 +40,7 @@ from .state_paths import (
 )
 from .health import get_health, run_health_check, format_health_report
 
-__version__ = "2.6.21"
+__version__ = "2.7.6"
 __author__ = "Actifix Framework"
 __description__ = "Generic Error Tracking and Management Framework with AI Integration"
 

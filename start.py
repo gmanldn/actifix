@@ -28,6 +28,7 @@ import sys
 import threading
 import time
 import webbrowser
+import signal
 from pathlib import Path
 from typing import Optional
 
@@ -83,6 +84,18 @@ def start_frontend(port: int) -> subprocess.Popen:
     """Launch the static frontend server."""
     cmd = [sys.executable, "-m", "http.server", str(port)]
     return subprocess.Popen(cmd, cwd=FRONTEND_DIR, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+def kill_processes_on_port(port: int) -> None:
+    """Terminate any processes listening on the given TCP port."""
+    try:
+        result = subprocess.run(["lsof", "-ti", f"tcp:{port}"], capture_output=True, text=True)
+        pids = [pid for pid in result.stdout.splitlines() if pid.strip()]
+        for pid in pids:
+            if pid.isdigit():
+                log(f"Killing stale process {pid} on port {port}")
+                os.kill(int(pid), signal.SIGTERM)
+    except Exception:
+        pass
 
 
 def start_api_server(port: int, project_root: Path) -> threading.Thread:
@@ -182,8 +195,12 @@ def start_version_monitor(
             if current_version != last_version:
                 log(
                     f"Detected version change "
-                    f"{last_version or 'unknown'} -> {current_version or 'unknown'}; bouncing frontend."
+                    f"{last_version or 'unknown'} -> {current_version or 'unknown'}; killing old UI processes and restarting frontend."
                 )
+                try:
+                    kill_processes_on_port(manager.port)
+                except Exception:
+                    pass
                 manager.restart()
                 last_version = current_version
 
@@ -263,8 +280,10 @@ def main(argv: Optional[list[str]] = None) -> int:
         return 1
 
     if is_port_in_use(args.frontend_port):
-        log(f"Port {args.frontend_port} is already in use. Stop the existing process or choose another port.")
-        return 1
+        log(f"Stale processes detected on port {args.frontend_port}; killing them to ensure latest UI")
+        kill_processes_on_port(args.frontend_port)
+        # Give processes time to terminate
+        time.sleep(0.5)
 
     if not args.no_api and is_port_in_use(args.api_port):
         log(f"API port {args.api_port} is already in use. Stop the existing process or choose another port.")

@@ -25,38 +25,31 @@ except ImportError:
 
 def _ensure_web_dependencies() -> bool:
     """
-    Ensure Flask and flask-cors are installed. Auto-install if missing.
+    Ensure Flask dependencies are installed. Auto-install if missing.
     
     Returns:
         True if dependencies are available, False otherwise.
     """
     global FLASK_AVAILABLE, Flask, CORS
-    
+
     if FLASK_AVAILABLE:
         return True
-    
+
     print("Flask dependencies not found. Installing...")
-    print("Running: pip install flask flask-cors psutil")
-    
+    print("Running: pip install flask flask-cors")
+
     try:
-        import subprocess
         result = subprocess.run(
-            [sys.executable, "-m", "pip", "install", "flask", "flask-cors", "psutil"],
+            [sys.executable, "-m", "pip", "install", "flask", "flask-cors"],
             capture_output=True,
             text=True,
             check=True,
         )
         print("✓ Successfully installed Flask dependencies")
-        
-        # Try importing again
-        try:
-            from flask import Flask, jsonify, request
-            from flask_cors import CORS
-            FLASK_AVAILABLE = True
-            return True
-        except ImportError as e:
-            print(f"✗ Failed to import Flask after installation: {e}")
-            return False
+        from flask import Flask, jsonify, request
+        from flask_cors import CORS
+        FLASK_AVAILABLE = True
+        return True
     except subprocess.CalledProcessError as e:
         print(f"✗ Failed to install Flask dependencies: {e}")
         print(f"STDOUT: {e.stdout}")

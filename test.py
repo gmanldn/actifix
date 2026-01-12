@@ -80,7 +80,11 @@ def run_pytest(coverage: bool, quick: bool, pattern: Optional[str]) -> Dict[str,
         cmd += ["-k", pattern]
     
     if coverage:
-        cmd += ["--cov=src/actifix", "--cov-report=term-missing"]
+        try:
+            import pytest_cov  # noqa: F401
+            cmd += ["--cov=src/actifix", "--cov-report=term-missing"]
+        except ImportError:
+            print("pytest-cov plugin not found; skipping coverage reporting")
     
     env = os.environ.copy()
     env.setdefault("PYTHONPATH", str(ROOT / "src"))

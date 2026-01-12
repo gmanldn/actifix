@@ -54,6 +54,14 @@ python -m actifix.config --reset
 
 ### Runtime Issues
 
+#### Issue: UI shows outdated version after restart
+**Symptoms:**
+- Dashboard shows previous version even after updating/restarting
+
+**Solution:**
+- Launcher kills stale frontend processes on startup and version changes.
+- Front-end auto-detects version changes and reloads the page to show the latest version.
+
 #### Issue: Tickets not being created
 **Symptoms:**
 - `record_error()` returns None
