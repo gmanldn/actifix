@@ -138,16 +138,23 @@ const NavigationRail = ({ activeView, onViewChange, logAlert }) => {
 };
 
 const VersionBadge = () => {
-  const [prevVersion, setPrevVersion] = useState(null);
-  const { data, loading } = useFetch('/version', REFRESH_INTERVAL);
+const [prevVersion, setPrevVersion] = useState(null);
+const firstVersionCheck = useRef(true);
+const { data, loading } = useFetch('/version', REFRESH_INTERVAL);
   const version = data?.version || '—';
 
   useEffect(() => {
-    if (!loading && prevVersion && version !== prevVersion) {
+    if (loading) return;
+    if (firstVersionCheck.current) {
+      firstVersionCheck.current = false;
+      setPrevVersion(version);
+      return;
+    }
+    if (version !== prevVersion) {
       console.log(`Detected version change ${prevVersion} -> ${version}; reloading page.`);
       window.location.reload();
+      setPrevVersion(version);
     }
-    setPrevVersion(version);
   }, [version, loading]);
 
   const gitChecked = data?.git_checked ?? false;
