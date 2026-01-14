@@ -1,6 +1,6 @@
 schema_version: arch-map.v1
 meta:
-  generated_at: '2026-01-10T20:35:39.679770+00:00'
+  generated_at: "2026-01-10T20:35:39.679770+00:00"
   generator: update_architecture_docs.py
   generator_version: 2.0.0
   source_commit: current_development
@@ -18,6 +18,8 @@ domains:
   summary: Error handling, ticket management, automated remediation
 - id: tooling
   summary: Testing, quality assurance, architecture validation
+- id: plugins
+  summary: Plugin discovery, validation, and lifecycle orchestration
 modules:
 - id: bootstrap.main
   domain: runtime
@@ -196,7 +198,6 @@ modules:
   - directory helpers
   depends_on:
   - infra.logging
-
 - id: infra.persistence.event_repo
   domain: infra
   owner: persistence
@@ -371,6 +372,96 @@ modules:
   - extensible pattern system
   depends_on:
   - core.raise_af
+- id: plugins.protocol
+  domain: plugins
+  owner: plugins
+  summary: Standard metadata and health contracts for plugins
+  entrypoints:
+  - src/actifix/plugins/protocol.py
+  contracts:
+  - define plugin metadata and health contracts
+  depends_on: []
+- id: plugins.registry
+  domain: plugins
+  owner: plugins
+  summary: Registry managing plugin lifecycle and observability
+  entrypoints:
+  - src/actifix/plugins/registry.py
+  contracts:
+  - enforce one-time registration per plugin name
+  - log lifecycle events through centralized logging
+  - expose context helpers for temporary plugins
+  depends_on:
+  - infra.logging
+  - plugins.protocol
+- id: plugins.validation
+  domain: plugins
+  owner: plugins
+  summary: Metadata validation and capability enforcement
+  entrypoints:
+  - src/actifix/plugins/validation.py
+  contracts:
+  - validate plugin metadata schema before registration
+  - enforce semantic versioning for plugin releases
+  - log and surface validation failures for diagnostics
+  depends_on:
+  - infra.logging
+  - plugins.protocol
+- id: plugins.sandbox
+  domain: plugins
+  owner: plugins
+  summary: Isolation layer and safe registration wrapper
+  entrypoints:
+  - src/actifix/plugins/sandbox.py
+  contracts:
+  - contain plugin failures during register/unregister
+  - report load failures via raise_af with structured tickets
+  - keep registry state consistent when plugins crash
+  depends_on:
+  - core.raise_af
+  - infra.logging
+  - plugins.registry
+  - plugins.validation
+- id: plugins.loader
+  domain: plugins
+  owner: plugins
+  summary: Entry-point discovery, instantiation, and registration
+  entrypoints:
+  - src/actifix/plugins/loader.py
+  contracts:
+  - discover plugins through actifix.plugins entry points
+  - validate and sandbox every plugin before registration
+  - publish load summaries and failure reasons
+  depends_on:
+  - core.raise_af
+  - infra.logging
+  - plugins.registry
+  - plugins.validation
+  - plugins.sandbox
+- id: plugins.api
+  domain: plugins
+  owner: plugins
+  summary: Public API exports for plugin authors
+  entrypoints:
+  - src/actifix/plugins/__init__.py
+  contracts:
+  - re-export plugin protocol helpers and registry references
+  - document activation steps for entry-point based extensions
+  depends_on:
+  - plugins.protocol
+  - plugins.registry
+- id: plugins.builtin
+  domain: plugins
+  owner: plugins
+  summary: Self-testing plugin that exercises plugin lifecycle and health
+  entrypoints:
+  - src/actifix/plugins/builtin.py
+  contracts:
+  - verify registry sandboxing and health checks
+  - provide a built-in example plugin for documentation
+  depends_on:
+  - plugins.registry
+  - plugins.protocol
 contracts:
 - id: contract.logging
   summary: All modules must log via centralized logging system with correlation IDs
@@ -385,6 +476,11 @@ contracts:
   - infra.persistence.queue
   - infra.persistence.manager
   - tooling.testing
+  - plugins.registry
+  - plugins.validation
+  - plugins.sandbox
+  - plugins.loader
+  - plugins.api
   enforced_by:
   - infra.logging
 - id: contract.error_isolation
@@ -392,6 +488,7 @@ contracts:
   applies_to:
   - core.raise_af
   - core.do_af
+  - plugins.sandbox
   enforced_by:
   - core.quarantine
 - id: contract.quality_gates
@@ -403,6 +500,8 @@ contracts:
   - core.raise_af
   - core.do_af
   - infra.persistence.manager
+  - plugins.loader
+  - plugins.validation
   enforced_by:
   - tooling.testing
   - infra.health
@@ -416,3 +515,16 @@ contracts:
   enforced_by:
   - infra.persistence.atomic
   - infra.persistence.health
+- id: contract.plugin_integrity
+  summary: Plugin metadata, lifecycle, and health must always be validated
+  applies_to:
+  - plugins.protocol
+  - plugins.registry
+  - plugins.validation
+  - plugins.sandbox
+  - plugins.loader
+  - plugins.api
+  - plugins.builtin
+  enforced_by:
+  - infra.logging
+  - tooling.testing

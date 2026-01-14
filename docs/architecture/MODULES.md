@@ -236,4 +236,4 @@ This file catalogs the architectural modules of the Actifix system. It provides 
 **Summary:** Quality assurance and testing framework  
 **Entrypoints:** src/actifix/testing/__init__.py, test.py  
 **Contracts:** enforce quality gates; maintain test coverage; validate architecture  
-**Depends on:** bootstrap.main, infra.logging, tooling.testing.system, tooling.testing.reporting  
+**Depends on:** bootstrap.main, infra.logging, tooling.testing.system, tooling.testing.reporting

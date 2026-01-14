@@ -314,20 +314,20 @@ class TicketRepository:
     ) -> Optional[TicketLock]:
         """
         Acquire lock on a ticket with lease expiry.
-        
+
         Args:
             ticket_id: Ticket ID to lock.
             locked_by: Identifier for lock holder.
             lease_duration: How long the lock is valid.
-        
+
         Returns:
             TicketLock if acquired, None if already locked or not found.
         """
         now = datetime.now(timezone.utc)
         lease_expires = now + lease_duration
-        
+
         try:
-            with self.pool.transaction() as conn:
+            with self.pool.transaction(immediate=True) as conn:
                 # Check if ticket exists and is not locked (or lease expired)
                 cursor = conn.execute(
                     """
@@ -374,15 +374,15 @@ class TicketRepository:
     def release_lock(self, ticket_id: str, locked_by: str) -> bool:
         """
         Release lock on a ticket.
-        
+
         Args:
             ticket_id: Ticket ID to unlock.
             locked_by: Must match current lock holder.
-        
+
         Returns:
             True if released, False if not locked or wrong holder.
         """
-        with self.pool.transaction() as conn:
+        with self.pool.transaction(immediate=True) as conn:
             cursor = conn.execute(
                 """
                 UPDATE tickets 
@@ -401,19 +401,19 @@ class TicketRepository:
     ) -> Optional[TicketLock]:
         """
         Renew lease on existing lock.
-        
+
         Args:
             ticket_id: Ticket ID.
             locked_by: Must match current lock holder.
             lease_duration: New lease duration.
-        
+
         Returns:
             Updated TicketLock if renewed, None if not locked or wrong holder.
         """
         now = datetime.now(timezone.utc)
         new_expiry = now + lease_duration
-        
-        with self.pool.transaction() as conn:
+
+        with self.pool.transaction(immediate=True) as conn:
             cursor = conn.execute(
                 """
                 UPDATE tickets 
@@ -477,18 +477,18 @@ class TicketRepository:
     ) -> Optional[Dict[str, Any]]:
         """
         Atomically get the next highest-priority unlocked ticket and lock it.
-        
+
         This is the recommended method for concurrent AI agents to claim work.
         It ensures only one agent gets each ticket.
-        
+
         Args:
             locked_by: Identifier for lock holder (e.g., "agent-1", "agent-2").
             lease_duration: How long the lock is valid.
             priority_filter: Optional list of priorities to consider (e.g., ["P0", "P1"]).
-        
+
         Returns:
             Ticket data if acquired, None if no unlocked tickets available.
-        
+
         Example:
             >>> repo = get_ticket_repository()
             >>> ticket = repo.get_and_lock_next_ticket("agent-1")
@@ -498,8 +498,8 @@ class TicketRepository:
         """
         now = datetime.now(timezone.utc)
         lease_expires = now + lease_duration
-        
-        with self.pool.transaction() as conn:
+
+        with self.pool.transaction(immediate=True) as conn:
             # First, cleanup any expired locks to make tickets available
             conn.execute(
                 """

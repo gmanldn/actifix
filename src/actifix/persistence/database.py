@@ -239,13 +239,13 @@ class DatabasePool:
                 conn.row_factory = sqlite3.Row
                 
                 self._local.connection = conn
-                
+
                 # Initialize schema if this is first connection
-                if not self._initialized:
-                    with self._lock:
-                        if not self._initialized:
-                            self._initialize_schema(conn)
-                            self._initialized = True
+                # Note: Only acquire lock if we haven't already initialized
+                with self._lock:
+                    if not self._initialized:
+                        self._initialize_schema(conn)
+                        self._initialized = True
                 
             except sqlite3.Error as e:
                 raise DatabaseConnectionError(f"Failed to connect to database: {e}") from e
@@ -319,18 +319,23 @@ class DatabasePool:
             raise DatabaseError(f"Database operation failed: {e}") from e
     
     @contextlib.contextmanager
-    def transaction(self) -> Iterator[sqlite3.Connection]:
+    def transaction(self, immediate: bool = False) -> Iterator[sqlite3.Connection]:
         """
         Context manager for transactions.
-        
+
         Automatically commits on success, rolls back on error.
-        
+
+        Args:
+            immediate: If True, use BEGIN IMMEDIATE to acquire write locks upfront.
+                      Prevents lock upgrade conflicts in concurrent scenarios.
+
         Yields:
             Database connection.
         """
         conn = self._get_connection()
         try:
-            conn.execute("BEGIN")
+            begin_stmt = "BEGIN IMMEDIATE" if immediate else "BEGIN"
+            conn.execute(begin_stmt)
             yield conn
             conn.commit()
         except Exception:
