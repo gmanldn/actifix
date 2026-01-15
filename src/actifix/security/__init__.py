@@ -16,6 +16,21 @@ from .rate_limiter import (
     reset_rate_limiter,
 )
 
+from .auth import (
+    AuthRole,
+    AuthUser,
+    AuthToken,
+    AuthenticationError,
+    AuthorizationError,
+    TokenManager,
+    UserManager,
+    AuthorizationManager,
+    get_token_manager,
+    get_user_manager,
+    get_authorization_manager,
+    reset_auth_managers,
+)
+
 __all__ = [
     'SecretsScanner',
     'SecretMatch',
@@ -27,4 +42,16 @@ __all__ = [
     'APICall',
     'get_rate_limiter',
     'reset_rate_limiter',
+    'AuthRole',
+    'AuthUser',
+    'AuthToken',
+    'AuthenticationError',
+    'AuthorizationError',
+    'TokenManager',
+    'UserManager',
+    'AuthorizationManager',
+    'get_token_manager',
+    'get_user_manager',
+    'get_authorization_manager',
+    'reset_auth_managers',
 ]
