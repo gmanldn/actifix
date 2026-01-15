@@ -97,6 +97,11 @@ class ActifixConfig:
     # File limits
     max_log_size_bytes: int = 10 * 1024 * 1024  # 10MB
     max_list_entries: int = 1000
+
+    # Ticket limits
+    max_ticket_message_length: int = 5000  # Characters
+    max_file_context_size_bytes: int = 1 * 1024 * 1024  # 1MB
+    max_open_tickets: int = 10000
     
     # Testing
     min_coverage_percent: float = 80.0
@@ -210,6 +215,16 @@ def load_config(
             _get_env_sanitized("ACTIFIX_MAX_LIST_ENTRIES", "", value_type="numeric"), 1000
         ),
 
+        max_ticket_message_length=_parse_int(
+            _get_env_sanitized("ACTIFIX_MAX_MESSAGE_LENGTH", "", value_type="numeric"), 5000
+        ),
+        max_file_context_size_bytes=_parse_int(
+            _get_env_sanitized("ACTIFIX_MAX_FILE_CONTEXT_BYTES", "", value_type="numeric"), 1 * 1024 * 1024
+        ),
+        max_open_tickets=_parse_int(
+            _get_env_sanitized("ACTIFIX_MAX_OPEN_TICKETS", "", value_type="numeric"), 10000
+        ),
+
         min_coverage_percent=_parse_float(
             _get_env_sanitized("ACTIFIX_MIN_COVERAGE", "", value_type="numeric"), 80.0
         ),
@@ -290,6 +305,18 @@ def validate_config(config: ActifixConfig) -> list[str]:
         errors.append("Max log size must be positive")
     if config.max_list_entries <= 0:
         errors.append("Max list entries must be positive")
+
+    # Check ticket limits are positive and reasonable
+    if config.max_ticket_message_length <= 0:
+        errors.append("Max ticket message length must be positive")
+    if config.max_ticket_message_length > 1000000:
+        errors.append("Max ticket message length must be <= 1MB")
+    if config.max_file_context_size_bytes <= 0:
+        errors.append("Max file context size must be positive")
+    if config.max_file_context_size_bytes > 100 * 1024 * 1024:
+        errors.append("Max file context size must be <= 100MB")
+    if config.max_open_tickets <= 0:
+        errors.append("Max open tickets must be positive")
     
     # Check timeouts are positive
     if config.test_timeout_seconds <= 0:
