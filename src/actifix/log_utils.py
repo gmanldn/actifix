@@ -226,7 +226,6 @@ def log_event(
         path: DEPRECATED - ignored (for backward compatibility).
     """
     try:
-        from .persistence.event_repo import get_event_repository
         import json
 
         # Support the legacy signature that passed the AF log path first.
@@ -252,26 +251,33 @@ def log_event(
                 extra_json = json.dumps(extra, default=str)
             except Exception:
                 extra_json = str(extra)
-        
-        # Log to database
-        repo = get_event_repository()
-        repo.log_event(
-            event_type=event_type,
-            message=message,
-            ticket_id=ticket_id,
-            correlation_id=correlation_id,
-            extra_json=extra_json,
-            source=source,
-            level=level,
-        )
 
+        # Log to database (independent try-except to not block file logging)
+        try:
+            from .persistence.event_repo import get_event_repository
+            repo = get_event_repository()
+            repo.log_event(
+                event_type=event_type,
+                message=message,
+                ticket_id=ticket_id,
+                correlation_id=correlation_id,
+                extra_json=extra_json,
+                source=source,
+                level=level,
+            )
+        except Exception:
+            # Silently fail database logging to not block file logging
+            pass
+
+        # Log to AFLog file (independent from database logging)
         if path:
             try:
                 timestamp = datetime.now(timezone.utc).isoformat()
-                entry = (
-                    f"{timestamp} | {level} | "
-                    f"{event_type} | {message}\n"
-                )
+                entry = f"{timestamp} | {level} | {event_type} | {message}"
+                # Include extra data if present
+                if extra_json:
+                    entry += f" | extra={extra_json}"
+                entry += "\n"
                 append_with_guard(Path(path), entry)
             except Exception:
                 pass
