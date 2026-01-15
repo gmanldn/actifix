@@ -166,6 +166,16 @@ class AIClient:
         ticket_info: Dict[str, Any]
     ) -> AIResponse:
         """Call specific AI provider with rate limiting."""
+        # Validate provider is a valid AIProvider enum
+        if not isinstance(provider, AIProvider):
+            return AIResponse(
+                content="",
+                provider=provider,
+                model="unknown",
+                success=False,
+                error=f"Unknown provider: {provider}"
+            )
+
         # Check rate limits before making API calls
         rate_limiter = get_rate_limiter()
         provider_key = provider.value
