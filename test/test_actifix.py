@@ -176,6 +176,9 @@ class TestIntegration:
             # Mark complete
             success = mark_ticket_complete(
                 entry.ticket_id,
+                completion_notes="Fixed critical issue in integration test workflow",
+                test_steps="Ran full integration test suite",
+                test_results="All integration tests passed successfully",
                 summary="Fixed in integration test",
                 paths=paths,
             )

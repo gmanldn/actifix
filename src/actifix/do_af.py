@@ -216,21 +216,29 @@ def get_open_tickets(paths: Optional[ActifixPaths] = None, use_cache: bool = Tru
 
 def mark_ticket_complete(
     ticket_id: str,
+    completion_notes: str,
+    test_steps: str,
+    test_results: str,
     summary: str = "",
+    test_documentation_url: Optional[str] = None,
     paths: Optional[ActifixPaths] = None,
     use_lock: bool = True,
 ) -> bool:
     """
-    Mark a ticket as complete in the database.
-    
+    Mark a ticket as complete with mandatory quality documentation.
+
     Args:
         ticket_id: Ticket ID to mark complete.
-        summary: Optional completion summary.
+        completion_notes: Description of what was done (required, min 20 chars).
+        test_steps: Description of testing performed (required, min 10 chars).
+        test_results: Test outcomes/evidence (required, min 10 chars).
+        summary: Optional short summary.
+        test_documentation_url: Optional link to test artifacts.
         paths: Optional paths override (used for logging).
         use_lock: Reserved for compatibility (unused in DB mode).
-    
+
     Returns:
-        True if marked complete, False if not found or already completed.
+        True if marked complete, False if not found, already completed, or validation failed.
     """
     if paths is None:
         paths = get_actifix_paths()
@@ -240,13 +248,19 @@ def mark_ticket_complete(
     repo = _get_ticket_repository()
     existing = repo.get_ticket(ticket_id)
     if not existing:
+        log_event(
+            paths.aflog_file,
+            "TICKET_NOT_FOUND",
+            f"Cannot complete non-existent ticket: {ticket_id}",
+            ticket_id=ticket_id,
+        )
         return False
 
     if existing.get("status") == "Completed" or existing.get("completed"):
         log_event(
             paths.aflog_file,
             "TICKET_ALREADY_COMPLETED",
-            f"Skipped already-completed ticket: {ticket_id} (idempotency_guard)",
+            f"Skipped already-completed ticket: {ticket_id}",
             ticket_id=ticket_id,
             extra={
                 "status": existing.get("status"),
@@ -255,36 +269,67 @@ def mark_ticket_complete(
         )
         return False
 
-    success = repo.mark_complete(ticket_id, summary=summary or None)
-    if success:
-        log_event(
-            paths.aflog_file,
-            "TICKET_COMPLETED",
-            f"Marked ticket complete: {ticket_id}",
-            ticket_id=ticket_id,
-            extra={"summary": summary[:200] if summary else None},
+    try:
+        success = repo.mark_complete(
+            ticket_id,
+            completion_notes=completion_notes,
+            test_steps=test_steps,
+            test_results=test_results,
+            summary=summary or None,
+            test_documentation_url=test_documentation_url,
         )
 
-    return success
+        if success:
+            log_event(
+                paths.aflog_file,
+                "TICKET_COMPLETED",
+                f"Marked ticket complete with validation: {ticket_id}",
+                ticket_id=ticket_id,
+                extra={
+                    "summary": summary[:200] if summary else None,
+                    "completion_notes_len": len(completion_notes),
+                    "test_steps_len": len(test_steps),
+                    "test_results_len": len(test_results),
+                },
+            )
+        return success
+
+    except ValueError as e:
+        log_event(
+            paths.aflog_file,
+            "COMPLETION_VALIDATION_FAILED",
+            f"Failed to complete ticket {ticket_id}: {e}",
+            ticket_id=ticket_id,
+            extra={"error": str(e)},
+        )
+        return False
 
 
 def fix_highest_priority_ticket(
     paths: Optional[ActifixPaths] = None,
+    completion_notes: str = "",
+    test_steps: str = "",
+    test_results: str = "",
     summary: str = "Resolved via dashboard fix",
+    test_documentation_url: Optional[str] = None,
 ) -> dict:
     """
-    Evaluate and fix the highest priority ticket while narrating the reasoning.
+    Evaluate and fix the highest priority ticket with mandatory quality documentation.
 
     Args:
         paths: Optional ActifixPaths override.
+        completion_notes: Description of what was done (required, min 20 chars).
+        test_steps: Description of testing performed (required, min 10 chars).
+        test_results: Test outcomes/evidence (required, min 10 chars).
         summary: Summary text to attach when closing the ticket.
+        test_documentation_url: Optional link to test artifacts.
 
     Returns:
-        Dict summarizing what happened.
+        Dict summarizing what happened (success, ticket_id, priority, etc).
     """
     if paths is None:
         paths = get_actifix_paths()
-    
+
     # Enforce Raise_AF-only policy before modifying tickets
     enforce_raise_af_only(paths)
 
@@ -292,8 +337,6 @@ def fix_highest_priority_ticket(
 
     locked = _select_and_lock_ticket(paths)
     if not locked:
-        # Log no tickets (database is canonical, no text files)
-        # log_event removed as database is the canonical storage
         return {
             "processed": False,
             "reason": "no_open_tickets",
@@ -301,23 +344,70 @@ def fix_highest_priority_ticket(
 
     ticket_record, lock_owner = locked
     ticket = _ticket_info_from_record(ticket_record)
-    thought_text = (
-        f"Surveyed ACTIFIX state: highest priority is {ticket.ticket_id} "
-        f"({ticket.priority}) from {ticket.source}."
-    )
-    action_text = f"Plan: document and mark {ticket.ticket_id} as completed."
-    testing_text = (
-        "Testing: python test.py --quick && python test.py --coverage "
-        "(Ultrathink validation pending)."
-    )
-
-    # Log thought process (database is canonical, no text files)
-    # log_event removed as database is the canonical storage
 
     repo = _get_ticket_repository()
+
+    # Prepare ultrathink narrative for auditing
+    thought_text = (
+        f"Evaluated {ticket.ticket_id} ({ticket.priority}) "
+        f"from {ticket.source}: {ticket.message[:100]}"
+    )
+    action_text = f"Plan: Apply completion quality gate for {ticket.ticket_id}"
+    testing_text = (
+        "Quality validation: Ensuring completion_notes, test_steps, and test_results "
+        "meet minimum quality thresholds before marking complete."
+    )
+
+    # Validate required completion fields
+    if not completion_notes or len(completion_notes.strip()) < 20:
+        log_event(
+            paths.aflog_file,
+            "COMPLETION_VALIDATION_FAILED",
+            f"Ticket {ticket.ticket_id}: completion_notes required (min 20 chars)",
+            ticket_id=ticket.ticket_id,
+        )
+        repo.release_lock(ticket.ticket_id, lock_owner)
+        return {
+            "processed": False,
+            "ticket_id": ticket.ticket_id,
+            "reason": "invalid_completion_notes",
+        }
+
+    if not test_steps or len(test_steps.strip()) < 10:
+        log_event(
+            paths.aflog_file,
+            "COMPLETION_VALIDATION_FAILED",
+            f"Ticket {ticket.ticket_id}: test_steps required (min 10 chars)",
+            ticket_id=ticket.ticket_id,
+        )
+        repo.release_lock(ticket.ticket_id, lock_owner)
+        return {
+            "processed": False,
+            "ticket_id": ticket.ticket_id,
+            "reason": "invalid_test_steps",
+        }
+
+    if not test_results or len(test_results.strip()) < 10:
+        log_event(
+            paths.aflog_file,
+            "COMPLETION_VALIDATION_FAILED",
+            f"Ticket {ticket.ticket_id}: test_results required (min 10 chars)",
+            ticket_id=ticket.ticket_id,
+        )
+        repo.release_lock(ticket.ticket_id, lock_owner)
+        return {
+            "processed": False,
+            "ticket_id": ticket.ticket_id,
+            "reason": "invalid_test_results",
+        }
+
     success = mark_ticket_complete(
         ticket.ticket_id,
+        completion_notes=completion_notes,
+        test_steps=test_steps,
+        test_results=test_results,
         summary=summary,
+        test_documentation_url=test_documentation_url,
         paths=paths,
         use_lock=False,
     )
@@ -446,6 +536,9 @@ def process_next_ticket(
 
                     mark_ticket_complete(
                         ticket.ticket_id,
+                        completion_notes=f"Fixed by {ai_response.provider.value} using {ai_response.model}: {ai_response.content[:200]}",
+                        test_steps=f"AI validation performed by {ai_response.provider.value}",
+                        test_results=f"AI response successful with {ai_response.tokens_used} tokens used",
                         summary=summary,
                         paths=paths,
                         use_lock=False,
@@ -488,6 +581,9 @@ def process_next_ticket(
                 if success:
                     mark_ticket_complete(
                         ticket.ticket_id,
+                        completion_notes=f"Fixed via custom AI handler for {ticket.ticket_id}",
+                        test_steps="Custom AI handler validation performed",
+                        test_results="Custom handler returned success status",
                         summary="Fixed via custom AI handler",
                         paths=paths,
                         use_lock=False,

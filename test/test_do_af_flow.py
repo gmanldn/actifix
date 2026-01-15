@@ -66,7 +66,13 @@ def test_fix_highest_priority_ticket_triggers_logging(doaf_paths):
     entry = _build_entry("ACT-20260115-DOAF", TicketPriority.P0)
     repo.create_ticket(entry)
 
-    result = fix_highest_priority_ticket(paths=doaf_paths, summary="Automated dashboard fix")
+    result = fix_highest_priority_ticket(
+        paths=doaf_paths,
+        completion_notes="Fixed critical issue in dashboard workflow",
+        test_steps="Ran automated dashboard tests",
+        test_results="All dashboard tests passed",
+        summary="Automated dashboard fix"
+    )
     assert result["processed"] is True
     assert result["ticket_id"] == entry.entry_id
     assert repo.get_ticket(entry.entry_id)["status"] == "Completed"

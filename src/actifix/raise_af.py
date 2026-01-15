@@ -516,12 +516,29 @@ def _load_existing_queue(primary: Path, legacy: Path) -> tuple[list, Path]:
 def _persist_queue(queue: list, target: Path, legacy: Path) -> None:
     """Write queue to primary location and clean up legacy path if needed."""
     target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(json.dumps(queue, indent=2, default=str), encoding="utf-8")
-    if legacy.exists() and legacy != target:
+
+    # Write to temporary file first for atomicity - only delete legacy after successful write
+    temp_path = target.parent / f"{target.name}.tmp"
+    try:
+        # Write to temporary file
+        temp_path.write_text(json.dumps(queue, indent=2, default=str), encoding="utf-8")
+
+        # Move temp file to target (atomic operation on most filesystems)
+        temp_path.replace(target)
+
+        # Only unlink legacy file after successful write to target
+        if legacy.exists() and legacy != target:
+            try:
+                legacy.unlink()
+            except Exception:
+                pass
+    except Exception:
+        # Clean up temp file if it exists and write failed
         try:
-            legacy.unlink()
+            temp_path.unlink()
         except Exception:
             pass
+        raise
 
 
 def _queue_to_fallback(entry: ActifixEntry, base_dir: Path) -> bool:

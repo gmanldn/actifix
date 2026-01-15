@@ -28,7 +28,13 @@ def comprehensive_tickets():
         )
         repo.create_ticket(entry)
         if i <= 90:
-            repo.mark_complete(ticket_id, summary="Processed comprehensive test ticket")
+            repo.mark_complete(
+                ticket_id,
+                completion_notes=f"Comprehensive test {i:03d} completed successfully with full validation",
+                test_steps="Ran comprehensive test suite with 100 tickets",
+                test_results="90 tickets validated and marked complete with quality documentation",
+                summary="Processed comprehensive test ticket"
+            )
     return repo
 
 

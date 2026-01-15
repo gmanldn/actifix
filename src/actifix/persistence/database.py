@@ -346,6 +346,15 @@ class DatabasePool:
         """Close connection for current thread."""
         if hasattr(self._local, 'connection') and self._local.connection:
             try:
+                # Checkpoint WAL and sync to disk before closing to prevent data loss
+                if self.config.enable_wal:
+                    try:
+                        # RESTART checkpoint: blocks until all frames in WAL are transferred to database
+                        # This ensures data is properly persisted before connection closes
+                        self._local.connection.execute("PRAGMA wal_checkpoint(RESTART)")
+                    except sqlite3.Error:
+                        # Non-fatal: continue with close even if checkpoint fails
+                        pass
                 self._local.connection.close()
             except sqlite3.Error:
                 pass

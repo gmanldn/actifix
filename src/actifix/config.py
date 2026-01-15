@@ -5,11 +5,74 @@ Provides validated configuration with fail-fast behavior on invalid state.
 """
 
 import os
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional, Any
 
 from .state_paths import ActifixPaths, get_actifix_paths
+
+
+def _sanitize_env_value(value: Optional[str], value_type: str = "string") -> str:
+    """
+    Sanitize environment variable values to prevent injection attacks.
+
+    Args:
+        value: The environment variable value to sanitize.
+        value_type: Type of value - 'string', 'path', 'alphanumeric', 'numeric', 'identifier'.
+
+    Returns:
+        Sanitized value with whitespace trimmed and dangerous characters handled.
+    """
+    if not value:
+        return ""
+
+    # Always strip leading/trailing whitespace
+    value = value.strip()
+
+    if value_type == "path":
+        # For paths: allow alphanumeric, /, \, -, _, ., ~
+        # Remove null bytes and control characters
+        value = re.sub(r'[\x00-\x1f\x7f]', '', value)
+        # Collapse multiple slashes
+        value = re.sub(r'/+', '/', value)
+        return value
+
+    elif value_type == "alphanumeric":
+        # Only alphanumeric, underscore, hyphen, dot
+        return re.sub(r'[^a-zA-Z0-9_\-.]', '', value)
+
+    elif value_type == "numeric":
+        # Only digits (will be parsed as number later)
+        return re.sub(r'[^\d\-.]', '', value)
+
+    elif value_type == "identifier":
+        # Valid Python identifiers: alphanumeric, underscore (no starting digit)
+        return re.sub(r'[^a-zA-Z0-9_]', '', value)
+
+    elif value_type == "boolean":
+        # Boolean values - only accept specific words
+        return value.lower() if value.lower() in ("true", "false", "1", "0", "yes", "no", "on", "off") else ""
+
+    else:  # "string"
+        # For general strings: remove null bytes and control characters
+        return re.sub(r'[\x00-\x1f\x7f]', '', value)
+
+
+def _get_env_sanitized(key: str, default: str = "", value_type: str = "string") -> str:
+    """
+    Get environment variable value with sanitization.
+
+    Args:
+        key: Environment variable name.
+        default: Default value if not found.
+        value_type: Type of value for sanitization.
+
+    Returns:
+        Sanitized environment variable value.
+    """
+    value = os.environ.get(key, default)
+    return _sanitize_env_value(value, value_type)
 
 
 @dataclass
@@ -102,78 +165,79 @@ def load_config(
     """
     # Determine project root
     if project_root is None:
-        project_root = Path(os.environ.get(
+        project_root = Path(_get_env_sanitized(
             "ACTIFIX_PROJECT_ROOT",
-            os.getcwd()
+            os.getcwd(),
+            value_type="path"
         ))
     project_root = Path(project_root).resolve()
-    
+
     # Get paths
     paths = get_actifix_paths(project_root=project_root)
-    
+
     # Load from environment
     config = ActifixConfig(
         project_root=project_root,
         paths=paths,
-        
+
         capture_enabled=_parse_bool(
-            os.environ.get("ACTIFIX_CAPTURE_ENABLED", "1")
+            _get_env_sanitized("ACTIFIX_CAPTURE_ENABLED", "1", value_type="boolean")
         ),
         max_rollup_errors=_parse_int(
-            os.environ.get("ACTIFIX_MAX_ROLLUP_ERRORS", ""), 20
+            _get_env_sanitized("ACTIFIX_MAX_ROLLUP_ERRORS", "", value_type="numeric"), 20
         ),
         secret_redaction_enabled=_parse_bool(
-            os.environ.get("ACTIFIX_SECRET_REDACTION", "1")
+            _get_env_sanitized("ACTIFIX_SECRET_REDACTION", "1", value_type="boolean")
         ),
-        
+
         sla_p0_hours=_parse_int(
-            os.environ.get("ACTIFIX_SLA_P0_HOURS", ""), 1
+            _get_env_sanitized("ACTIFIX_SLA_P0_HOURS", "", value_type="numeric"), 1
         ),
         sla_p1_hours=_parse_int(
-            os.environ.get("ACTIFIX_SLA_P1_HOURS", ""), 4
+            _get_env_sanitized("ACTIFIX_SLA_P1_HOURS", "", value_type="numeric"), 4
         ),
         sla_p2_hours=_parse_int(
-            os.environ.get("ACTIFIX_SLA_P2_HOURS", ""), 24
+            _get_env_sanitized("ACTIFIX_SLA_P2_HOURS", "", value_type="numeric"), 24
         ),
         sla_p3_hours=_parse_int(
-            os.environ.get("ACTIFIX_SLA_P3_HOURS", ""), 72
+            _get_env_sanitized("ACTIFIX_SLA_P3_HOURS", "", value_type="numeric"), 72
         ),
-        
+
         max_log_size_bytes=_parse_int(
-            os.environ.get("ACTIFIX_MAX_LOG_SIZE", ""), 10 * 1024 * 1024
+            _get_env_sanitized("ACTIFIX_MAX_LOG_SIZE", "", value_type="numeric"), 10 * 1024 * 1024
         ),
         max_list_entries=_parse_int(
-            os.environ.get("ACTIFIX_MAX_LIST_ENTRIES", ""), 1000
+            _get_env_sanitized("ACTIFIX_MAX_LIST_ENTRIES", "", value_type="numeric"), 1000
         ),
-        
+
         min_coverage_percent=_parse_float(
-            os.environ.get("ACTIFIX_MIN_COVERAGE", ""), 80.0
+            _get_env_sanitized("ACTIFIX_MIN_COVERAGE", "", value_type="numeric"), 80.0
         ),
         test_timeout_seconds=_parse_float(
-            os.environ.get("ACTIFIX_TEST_TIMEOUT", ""), 300.0
+            _get_env_sanitized("ACTIFIX_TEST_TIMEOUT", "", value_type="numeric"), 300.0
         ),
-        
+
         dispatch_enabled=_parse_bool(
-            os.environ.get("ACTIFIX_DISPATCH_ENABLED", "1")
+            _get_env_sanitized("ACTIFIX_DISPATCH_ENABLED", "1", value_type="boolean")
         ),
         max_dispatch_retries=_parse_int(
-            os.environ.get("ACTIFIX_DISPATCH_RETRIES", ""), 3
+            _get_env_sanitized("ACTIFIX_DISPATCH_RETRIES", "", value_type="numeric"), 3
         ),
         dispatch_timeout_seconds=_parse_float(
-            os.environ.get("ACTIFIX_DISPATCH_TIMEOUT", ""), 600.0
+            _get_env_sanitized("ACTIFIX_DISPATCH_TIMEOUT", "", value_type="numeric"), 600.0
         ),
-        
+
         health_check_interval_seconds=_parse_float(
-            os.environ.get("ACTIFIX_HEALTH_INTERVAL", ""), 60.0
+            _get_env_sanitized("ACTIFIX_HEALTH_INTERVAL", "", value_type="numeric"), 60.0
         ),
         stale_lock_timeout_seconds=_parse_float(
-            os.environ.get("ACTIFIX_STALE_LOCK_TIMEOUT", ""), 300.0
+            _get_env_sanitized("ACTIFIX_STALE_LOCK_TIMEOUT", "", value_type="numeric"), 300.0
         ),
-        
-        ai_provider=os.environ.get("ACTIFIX_AI_PROVIDER", "openai"),
-        ai_api_key=os.environ.get("ACTIFIX_AI_API_KEY", ""),
-        ai_model=os.environ.get("ACTIFIX_AI_MODEL", ""),
-        ai_enabled=_parse_bool(os.environ.get("ACTIFIX_AI_ENABLED", "0")),
+
+        ai_provider=_get_env_sanitized("ACTIFIX_AI_PROVIDER", "openai", value_type="alphanumeric"),
+        ai_api_key=_get_env_sanitized("ACTIFIX_AI_API_KEY", "", value_type="string"),
+        ai_model=_get_env_sanitized("ACTIFIX_AI_MODEL", "", value_type="alphanumeric"),
+        ai_enabled=_parse_bool(_get_env_sanitized("ACTIFIX_AI_ENABLED", "0", value_type="boolean")),
     )
     
     # Validate configuration

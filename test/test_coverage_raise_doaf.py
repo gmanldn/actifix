@@ -41,7 +41,13 @@ def _seed_ticket(
     )
     repo.create_ticket(entry)
     if completed:
-        repo.mark_complete(ticket_id, summary=summary)
+        repo.mark_complete(
+            ticket_id,
+            completion_notes="Test ticket completed in seed helper function",
+            test_steps="Seeded with test harness",
+            test_results="All test seeds passed successfully",
+            summary=summary
+        )
     return entry
 
 
@@ -85,14 +91,28 @@ def test_mark_ticket_complete_and_idempotent(tmp_path):
 
     ticket_id = "ACT-20250102-AAAAA"
     _seed_ticket(ticket_id, completed=True)
-    assert do_af.mark_ticket_complete(ticket_id, paths=paths) is False
+    # Try to complete already-completed ticket (should return False)
+    assert do_af.mark_ticket_complete(
+        ticket_id,
+        completion_notes="Dummy notes for idempotency test",
+        test_steps="Dummy test steps",
+        test_results="Dummy test results",
+        paths=paths
+    ) is False
     assert "TICKET_ALREADY_COMPLETED" in paths.aflog_file.read_text()
 
     ticket_id = "ACT-20250102-BBBBB"
     repo = get_ticket_repository()
     _seed_ticket(ticket_id)
 
-    assert do_af.mark_ticket_complete(ticket_id, summary="New summary", paths=paths) is True
+    assert do_af.mark_ticket_complete(
+        ticket_id,
+        completion_notes="Fixed critical bug in ticket completion workflow",
+        test_steps="Ran full test suite for ticket completion",
+        test_results="All 450+ tests passed with 95% coverage",
+        summary="New summary",
+        paths=paths
+    ) is True
     stored = repo.get_ticket(ticket_id)
     assert stored["completion_summary"] == "New summary"
 

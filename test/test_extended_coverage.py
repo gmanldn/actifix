@@ -71,7 +71,13 @@ def _seed_ticket(
     )
     repo.create_ticket(entry)
     if completed:
-        repo.mark_complete(ticket_id, summary=summary)
+        repo.mark_complete(
+            ticket_id,
+            completion_notes="Extended coverage test ticket completed in seed",
+            test_steps="Seeded with extended coverage test harness",
+            test_results="All extended coverage tests passed",
+            summary=summary
+        )
     return entry
 
 
@@ -474,7 +480,7 @@ class TestDoAFProcessing:
         init_actifix_files(paths)
 
         entry = _seed_ticket("ACT-20260101-AAA118", TicketPriority.P2)
-        assert mark_ticket_complete(entry.ticket_id, summary="Done", paths=paths)
+        assert mark_ticket_complete(entry.ticket_id, completion_notes="Fixed critical test ticket successfully validated", test_steps="Test validation", test_results="Test passed", summary="Done", paths=paths)
 
         stored = get_ticket_repository().get_ticket(entry.ticket_id)
         assert stored["completion_summary"] == "Done"

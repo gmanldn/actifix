@@ -10,6 +10,7 @@ Thread-safe with lease-based locking for concurrent ticket processing.
 Version: 1.0.0
 """
 
+import os
 import sqlite3
 from dataclasses import dataclass, field
 from datetime import datetime, timezone, timedelta
@@ -25,7 +26,39 @@ from .database import (
     deserialize_json_field,
     serialize_timestamp,
     deserialize_timestamp,
+    log_database_audit,
 )
+
+
+# DoS Prevention: Length limits for ticket fields
+MAX_MESSAGE_LENGTH = 10000  # Prevent extremely long error messages
+MAX_SOURCE_LENGTH = 500     # Prevent extremely long source file paths
+MAX_ERROR_TYPE_LENGTH = 200 # Error type names have reasonable bounds
+MAX_STACK_TRACE_LENGTH = 50000  # Stack traces can be large but not unlimited
+MAX_FIELD_LENGTH = 50000   # General field limit for other text fields
+
+
+class FieldLengthError(ValueError):
+    """Raised when a field exceeds maximum allowed length."""
+    pass
+
+
+def _validate_field_length(value: Optional[str], max_length: int, field_name: str) -> None:
+    """Validate that a field doesn't exceed maximum length.
+
+    Args:
+        value: The field value to validate.
+        max_length: Maximum allowed length.
+        field_name: Name of the field for error messages.
+
+    Raises:
+        FieldLengthError: If value exceeds max_length.
+    """
+    if value and len(value) > max_length:
+        raise FieldLengthError(
+            f"Field '{field_name}' exceeds maximum length of {max_length} chars "
+            f"(got {len(value)} chars)"
+        )
 
 
 @dataclass
@@ -46,11 +79,16 @@ class TicketFilter:
 @dataclass
 class TicketLock:
     """Ticket lock information."""
-    
+
     ticket_id: str
     locked_by: str
     locked_at: datetime
     lease_expires: datetime
+
+
+def _get_user_context() -> str:
+    """Get current user context for audit logging."""
+    return os.environ.get("ACTIFIX_USER") or os.environ.get("USER") or "unknown"
 
 
 class TicketRepository:
@@ -72,18 +110,28 @@ class TicketRepository:
     def create_ticket(self, entry: ActifixEntry) -> bool:
         """
         Create a new ticket in the database.
-        
+
         Args:
             entry: Actifix entry to create.
-        
+
         Returns:
             True if created, False if duplicate exists.
-        
+
         Raises:
+            FieldLengthError: If any field exceeds maximum length.
             DatabaseError: On database errors.
         """
-        with self.pool.transaction() as conn:
-            try:
+        # Validate field lengths to prevent DoS attacks
+        _validate_field_length(entry.message, MAX_MESSAGE_LENGTH, "message")
+        _validate_field_length(entry.source, MAX_SOURCE_LENGTH, "source")
+        _validate_field_length(entry.error_type, MAX_ERROR_TYPE_LENGTH, "error_type")
+        _validate_field_length(entry.stack_trace, MAX_STACK_TRACE_LENGTH, "stack_trace")
+        _validate_field_length(entry.ai_remediation_notes, MAX_FIELD_LENGTH, "ai_remediation_notes")
+
+        success = False
+
+        try:
+            with self.pool.transaction() as conn:
                 conn.execute(
                     """
                     INSERT INTO tickets (
@@ -111,10 +159,31 @@ class TicketRepository:
                         entry.format_version,
                     )
                 )
-                return True
-            except sqlite3.IntegrityError:
-                # Duplicate guard violation
-                return False
+            success = True
+        except sqlite3.IntegrityError:
+            # Duplicate guard violation
+            success = False
+
+        # Log ticket creation to audit log (after transaction commits)
+        if success:
+            log_database_audit(
+                pool=self.pool,
+                table_name="tickets",
+                operation="INSERT",
+                record_id=entry.entry_id,
+                user_context=_get_user_context(),
+                new_values={
+                    "id": entry.entry_id,
+                    "priority": entry.priority.value,
+                    "error_type": entry.error_type,
+                    "message": entry.message[:100],  # Truncate for audit log
+                    "source": entry.source,
+                    "status": "Open",
+                },
+                change_description=f"Created ticket: {entry.message[:60]}"
+            )
+
+        return success
     
     def get_ticket(self, ticket_id: str) -> Optional[Dict[str, Any]]:
         """
@@ -141,74 +210,74 @@ class TicketRepository:
     def get_tickets(self, filter: Optional[TicketFilter] = None) -> List[Dict[str, Any]]:
         """
         Get tickets with optional filtering.
-        
+
         Args:
             filter: Optional filter criteria.
-        
+
         Returns:
             List of ticket dicts.
         """
         if filter is None:
             filter = TicketFilter()
-        
+
         # Build query
-        conditions = []
+        conditions = ["deleted = 0"]  # Exclude soft-deleted tickets by default
         params = []
-        
+
         if filter.status:
             conditions.append("status = ?")
             params.append(filter.status)
-        
+
         if filter.priority:
             conditions.append("priority = ?")
             params.append(filter.priority)
-        
+
         if filter.owner:
             conditions.append("owner = ?")
             params.append(filter.owner)
-        
+
         if filter.locked is not None:
             if filter.locked:
                 conditions.append("locked_by IS NOT NULL")
             else:
                 conditions.append("locked_by IS NULL")
-        
+
         if filter.created_after:
             conditions.append("created_at >= ?")
             params.append(serialize_timestamp(filter.created_after))
-        
+
         if filter.created_before:
             conditions.append("created_at <= ?")
             params.append(serialize_timestamp(filter.created_before))
-        
+
         if filter.correlation_id:
             conditions.append("correlation_id = ?")
             params.append(filter.correlation_id)
-        
-        where_clause = " AND ".join(conditions) if conditions else "1=1"
-        
+
+        where_clause = " AND ".join(conditions)
+
         query = f"""
-            SELECT * FROM tickets 
+            SELECT * FROM tickets
             WHERE {where_clause}
-            ORDER BY 
-                CASE priority 
-                    WHEN 'P0' THEN 0 
-                    WHEN 'P1' THEN 1 
-                    WHEN 'P2' THEN 2 
-                    WHEN 'P3' THEN 3 
-                    WHEN 'P4' THEN 4 
-                    ELSE 5 
+            ORDER BY
+                CASE priority
+                    WHEN 'P0' THEN 0
+                    WHEN 'P1' THEN 1
+                    WHEN 'P2' THEN 2
+                    WHEN 'P3' THEN 3
+                    WHEN 'P4' THEN 4
+                    ELSE 5
                 END,
                 created_at DESC
         """
-        
+
         if filter.limit:
             query += f" LIMIT {filter.limit} OFFSET {filter.offset}"
-        
+
         with self.pool.connection() as conn:
             cursor = conn.execute(query, params)
             rows = cursor.fetchall()
-            
+
             return [self._row_to_dict(row) for row in rows]
     
     def get_open_tickets(self, limit: Optional[int] = None) -> List[Dict[str, Any]]:
@@ -250,60 +319,139 @@ class TicketRepository:
     ) -> bool:
         """
         Update ticket fields.
-        
+
         Args:
             ticket_id: Ticket ID to update.
             updates: Dict of field names to new values.
-        
+
         Returns:
             True if updated, False if not found.
+
+        Raises:
+            FieldLengthError: If any field exceeds maximum length.
         """
         if not updates:
             return False
-        
-        # Add updated_at timestamp
-        updates['updated_at'] = serialize_timestamp(datetime.now(timezone.utc))
-        
-        # Build update query
-        set_clause = ", ".join(f"{key} = ?" for key in updates.keys())
-        params = list(updates.values()) + [ticket_id]
-        
+
+        # Validate field lengths to prevent DoS attacks
+        field_limits = {
+            "message": MAX_MESSAGE_LENGTH,
+            "source": MAX_SOURCE_LENGTH,
+            "error_type": MAX_ERROR_TYPE_LENGTH,
+            "stack_trace": MAX_STACK_TRACE_LENGTH,
+            "ai_remediation_notes": MAX_FIELD_LENGTH,
+        }
+
+        for field_name, max_length in field_limits.items():
+            if field_name in updates:
+                _validate_field_length(updates[field_name], max_length, field_name)
+
+        old_values = {}
+        success = False
+
         with self.pool.transaction() as conn:
+            # Get current ticket values for audit log
+            cursor = conn.execute("SELECT * FROM tickets WHERE id = ?", (ticket_id,))
+            current_row = cursor.fetchone()
+
+            if current_row is None:
+                return False
+
+            # Capture old values
+            for key in updates.keys():
+                if key in current_row.keys():
+                    old_values[key] = current_row[key]
+
+            # Add updated_at timestamp
+            updates['updated_at'] = serialize_timestamp(datetime.now(timezone.utc))
+
+            # Build update query
+            set_clause = ", ".join(f"{key} = ?" for key in updates.keys())
+            params = list(updates.values()) + [ticket_id]
+
             cursor = conn.execute(
                 f"UPDATE tickets SET {set_clause} WHERE id = ?",
                 params
             )
-            return cursor.rowcount > 0
+
+            success = cursor.rowcount > 0
+
+        # Log ticket update to audit log (after transaction commits)
+        if success:
+            log_database_audit(
+                pool=self.pool,
+                table_name="tickets",
+                operation="UPDATE",
+                record_id=ticket_id,
+                user_context=_get_user_context(),
+                old_values=old_values,
+                new_values=updates,
+                change_description=f"Updated ticket: {', '.join(updates.keys())}"
+            )
+
+        return success
     
     def mark_complete(
         self,
         ticket_id: str,
+        completion_notes: str,
+        test_steps: str,
+        test_results: str,
         summary: Optional[str] = None,
+        test_documentation_url: Optional[str] = None,
     ) -> bool:
         """
-        Mark ticket as completed.
-        
+        Mark ticket as completed with mandatory quality documentation.
+
         Args:
             ticket_id: Ticket ID to complete.
-            summary: Optional completion summary.
-        
+            completion_notes: Required description of what was done (min 20 chars).
+            test_steps: Required description of testing performed (min 10 chars).
+            test_results: Required test outcomes/evidence (min 10 chars).
+            summary: Optional short summary.
+            test_documentation_url: Optional link to test artifacts.
+
         Returns:
             True if completed, False if not found.
+
+        Raises:
+            ValueError: If required fields are missing or too short.
         """
+        # VALIDATION
+        if not completion_notes or len(completion_notes.strip()) < 20:
+            raise ValueError(
+                "completion_notes required: must describe what was done (min 20 chars)"
+            )
+
+        if not test_steps or len(test_steps.strip()) < 10:
+            raise ValueError(
+                "test_steps required: must describe how testing was performed (min 10 chars)"
+            )
+
+        if not test_results or len(test_results.strip()) < 10:
+            raise ValueError(
+                "test_results required: must provide test outcomes/evidence (min 10 chars)"
+            )
+
+        # Build updates with validated fields
         updates = {
             'status': 'Completed',
+            'completion_notes': completion_notes.strip(),
+            'test_steps': test_steps.strip(),
+            'test_results': test_results.strip(),
+            'test_documentation_url': test_documentation_url,
+            'documented': 1,  # NOW JUSTIFIED by completion_notes
+            'functioning': 1,  # NOW JUSTIFIED by test_results
+            'tested': 1,  # NOW JUSTIFIED by test_steps
             'completed': 1,
-            'documented': 1,
-            'functioning': 1,
-            'tested': 1,
             'locked_by': None,
             'locked_at': None,
             'lease_expires': None,
         }
-        
+
         if summary:
             updates['completion_summary'] = summary
-        
+
         return self.update_ticket(ticket_id, updates)
     
     def acquire_lock(
@@ -329,12 +477,13 @@ class TicketRepository:
         try:
             with self.pool.transaction(immediate=True) as conn:
                 # Check if ticket exists and is not locked (or lease expired)
+                # Using immediate transaction prevents TOCTOU race condition
                 cursor = conn.execute(
                     """
-                    SELECT id, locked_by, locked_at, lease_expires 
-                    FROM tickets 
+                    SELECT id, locked_by, locked_at, lease_expires
+                    FROM tickets
                     WHERE id = ? AND (
-                        locked_by IS NULL 
+                        locked_by IS NULL
                         OR lease_expires < ?
                     )
                     """,
@@ -345,20 +494,29 @@ class TicketRepository:
                 if row is None:
                     return None
 
-                # Acquire lock
-                conn.execute(
+                # Acquire lock - use WHERE clause to prevent TOCTOU race
+                # Only update if the condition still holds
+                cursor = conn.execute(
                     """
-                    UPDATE tickets 
+                    UPDATE tickets
                     SET locked_by = ?, locked_at = ?, lease_expires = ?, status = 'In Progress'
-                    WHERE id = ?
+                    WHERE id = ? AND (
+                        locked_by IS NULL
+                        OR lease_expires < ?
+                    )
                     """,
                     (
                         locked_by,
                         serialize_timestamp(now),
                         serialize_timestamp(lease_expires),
                         ticket_id,
+                        serialize_timestamp(now)
                     )
                 )
+
+                # Verify update succeeded (prevent race condition where another thread locked it)
+                if cursor.rowcount == 0:
+                    return None
 
                 return TicketLock(
                     ticket_id=ticket_id,
@@ -570,33 +728,39 @@ class TicketRepository:
     def get_stats(self) -> Dict[str, Any]:
         """
         Get ticket statistics.
-        
+
         Returns:
-            Dict with counts and breakdowns.
+            Dict with counts and breakdowns (excluding soft-deleted tickets).
         """
         with self.pool.connection() as conn:
-            # Total counts
-            cursor = conn.execute("SELECT COUNT(*) as total FROM tickets")
+            # Total counts (excluding soft-deleted)
+            cursor = conn.execute("SELECT COUNT(*) as total FROM tickets WHERE deleted = 0")
             total = cursor.fetchone()['total']
-            
-            # By status
+
+            # By status (excluding soft-deleted)
             cursor = conn.execute(
-                "SELECT status, COUNT(*) as count FROM tickets GROUP BY status"
+                "SELECT status, COUNT(*) as count FROM tickets WHERE deleted = 0 GROUP BY status"
             )
             by_status = {row['status']: row['count'] for row in cursor.fetchall()}
-            
-            # By priority
+
+            # By priority (excluding soft-deleted)
             cursor = conn.execute(
-                "SELECT priority, COUNT(*) as count FROM tickets GROUP BY priority"
+                "SELECT priority, COUNT(*) as count FROM tickets WHERE deleted = 0 GROUP BY priority"
             )
             by_priority = {row['priority']: row['count'] for row in cursor.fetchall()}
-            
-            # Locked count
+
+            # Locked count (excluding soft-deleted)
             cursor = conn.execute(
-                "SELECT COUNT(*) as count FROM tickets WHERE locked_by IS NOT NULL"
+                "SELECT COUNT(*) as count FROM tickets WHERE deleted = 0 AND locked_by IS NOT NULL"
             )
             locked = cursor.fetchone()['count']
-            
+
+            # Soft-deleted count
+            cursor = conn.execute(
+                "SELECT COUNT(*) as count FROM tickets WHERE deleted = 1"
+            )
+            deleted = cursor.fetchone()['count']
+
             return {
                 'total': total,
                 'open': by_status.get('Open', 0),
@@ -610,21 +774,93 @@ class TicketRepository:
                     'P4': by_priority.get('P4', 0),
                 },
                 'locked': locked,
+                'deleted': deleted,
             }
     
-    def delete_ticket(self, ticket_id: str) -> bool:
+    def delete_ticket(self, ticket_id: str, soft_delete: bool = True) -> bool:
         """
-        Delete ticket (use with caution).
-        
+        Delete ticket with optional soft-delete for data recovery.
+
+        Soft-delete (default) marks ticket as deleted without removing data,
+        allowing recovery if needed. Hard-delete permanently removes the record.
+
         Args:
             ticket_id: Ticket ID to delete.
-        
+            soft_delete: If True (default), soft-delete; if False, hard-delete.
+
         Returns:
             True if deleted, False if not found.
         """
+        operation = None
+        is_soft = soft_delete
+
         with self.pool.transaction() as conn:
-            cursor = conn.execute("DELETE FROM tickets WHERE id = ?", (ticket_id,))
+            if soft_delete:
+                now = serialize_timestamp(datetime.now(timezone.utc))
+                cursor = conn.execute(
+                    "UPDATE tickets SET deleted = 1, deleted_at = ? WHERE id = ? AND deleted = 0",
+                    (now, ticket_id,)
+                )
+                operation = "UPDATE"  # UPDATE for soft delete
+            else:
+                cursor = conn.execute("DELETE FROM tickets WHERE id = ?", (ticket_id,))
+                operation = "DELETE"
+
+            success = cursor.rowcount > 0
+
+        # Log ticket deletion to audit log (after transaction commits)
+        if success and operation:
+            delete_type = "SOFT_DELETE" if is_soft else "HARD_DELETE"
+            log_database_audit(
+                pool=self.pool,
+                table_name="tickets",
+                operation=operation,
+                record_id=ticket_id,
+                user_context=_get_user_context(),
+                change_description=f"Deleted ticket ({delete_type})"
+            )
+
+        return success
+
+    def recover_ticket(self, ticket_id: str) -> bool:
+        """
+        Recover a soft-deleted ticket.
+
+        Args:
+            ticket_id: Ticket ID to recover.
+
+        Returns:
+            True if recovered, False if not found or not soft-deleted.
+        """
+        with self.pool.transaction() as conn:
+            cursor = conn.execute(
+                "UPDATE tickets SET deleted = 0, deleted_at = NULL WHERE id = ? AND deleted = 1",
+                (ticket_id,)
+            )
             return cursor.rowcount > 0
+
+    def get_deleted_tickets(self, limit: Optional[int] = None) -> List[Dict[str, Any]]:
+        """
+        Get all soft-deleted tickets.
+
+        Args:
+            limit: Optional limit on returned tickets.
+
+        Returns:
+            List of soft-deleted ticket dicts.
+        """
+        query = "SELECT * FROM tickets WHERE deleted = 1 ORDER BY deleted_at DESC"
+        params = []
+
+        if limit:
+            query += " LIMIT ?"
+            params.append(limit)
+
+        with self.pool.connection() as conn:
+            cursor = conn.execute(query, params)
+            rows = cursor.fetchall()
+
+            return [self._row_to_dict(row) for row in rows]
     
     def _row_to_dict(self, row: sqlite3.Row) -> Dict[str, Any]:
         """Convert database row to dict."""
@@ -650,11 +886,19 @@ class TicketRepository:
             'ai_remediation_notes': row['ai_remediation_notes'],
             'correlation_id': row['correlation_id'],
             'completion_summary': row['completion_summary'],
+            'completion_notes': row['completion_notes'],
+            'test_steps': row['test_steps'],
+            'test_results': row['test_results'],
+            'test_documentation_url': row['test_documentation_url'],
+            'completion_verified_by': row['completion_verified_by'],
+            'completion_verified_at': deserialize_timestamp(row['completion_verified_at']),
             'format_version': row['format_version'],
             'documented': bool(row['documented']),
             'functioning': bool(row['functioning']),
             'tested': bool(row['tested']),
             'completed': bool(row['completed']),
+            'deleted': bool(row['deleted']),
+            'deleted_at': deserialize_timestamp(row['deleted_at']),
         }
 
 

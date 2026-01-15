@@ -63,7 +63,12 @@ def _seed_ticket(
     )
     repo.create_ticket(entry)
     if completed:
-        repo.mark_complete(ticket_id)
+        repo.mark_complete(
+            ticket_id,
+            completion_notes="Coverage boost test ticket completed via seed",
+            test_steps="Ran coverage boost test suite",
+            test_results="All coverage boost tests passed successfully"
+        )
     return entry
 
 

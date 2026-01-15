@@ -122,7 +122,13 @@ def test_api_logs_stats_and_tickets(api_workspace, monkeypatch):
     repo.create_ticket(open_entry)
     completed_entry = _build_ticket("ACT-CLOSE", TicketPriority.P2)
     repo.create_ticket(completed_entry)
-    repo.mark_complete(completed_entry.entry_id, summary="completed")
+    repo.mark_complete(
+        completed_entry.entry_id,
+        completion_notes="API endpoint test ticket completed successfully",
+        test_steps="Tested API endpoints with client",
+        test_results="API stats and tickets endpoints working correctly",
+        summary="completed"
+    )
 
     stats = client.get("/api/stats").get_json()
     assert stats["total"] >= 2

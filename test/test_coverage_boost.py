@@ -90,7 +90,7 @@ def test_stateful_ticket_manager_refreshes_and_replaces_completed(tmp_path):
 
     ticket_id = "ACT-20260111-BBBBB"
     _create_ticket(ticket_id, TicketPriority.P2)
-    assert mark_ticket_complete(ticket_id, summary="Closed", paths=paths)
+    assert mark_ticket_complete(ticket_id, completion_notes="Fixed critical test ticket successfully validated", test_steps="Test validation", test_results="Test passed", summary="Closed", paths=paths)
 
     manager = StatefulTicketManager(paths=paths, cache_ttl=0)
     stats = manager.get_stats()
@@ -118,7 +118,7 @@ def test_mark_ticket_complete_records_summary(tmp_path):
     ticket_id = "ACT-20260111-DDDD1"
     created_entry = _create_ticket(ticket_id, TicketPriority.P2)
 
-    assert mark_ticket_complete(ticket_id, summary="Closed", paths=paths)
+    assert mark_ticket_complete(ticket_id, completion_notes="Fixed critical test ticket successfully validated", test_steps="Test validation", test_results="Test passed", summary="Closed", paths=paths)
     stored = get_ticket_repository().get_ticket(ticket_id)
     assert stored["status"] == "Completed"
     assert stored["completion_summary"] == "Closed"
@@ -131,11 +131,11 @@ def test_mark_ticket_complete_can_reapply_summary_after_reopen(tmp_path):
     ticket_id = "ACT-20260111-EEEE1"
     _create_ticket(ticket_id, TicketPriority.P3)
 
-    assert mark_ticket_complete(ticket_id, summary="First summary", paths=paths)
+    assert mark_ticket_complete(ticket_id, completion_notes="Fixed critical test ticket successfully validated", test_steps="Test validation", test_results="Test passed", summary="First summary", paths=paths)
     repo = get_ticket_repository()
     repo.update_ticket(ticket_id, {"status": "Open", "completed": 0})
 
-    assert mark_ticket_complete(ticket_id, summary="Second summary", paths=paths)
+    assert mark_ticket_complete(ticket_id, completion_notes="Fixed critical test ticket successfully validated", test_steps="Test validation", test_results="Test passed", summary="Second summary", paths=paths)
     stored = repo.get_ticket(ticket_id)
     assert stored["completion_summary"] == "Second summary"
 
@@ -146,9 +146,9 @@ def test_mark_ticket_complete_idempotent_guard(tmp_path):
 
     ticket_id = "ACT-20260111-FFFF1"
     _create_ticket(ticket_id, TicketPriority.P2)
-    assert mark_ticket_complete(ticket_id, summary="First pass", paths=paths)
+    assert mark_ticket_complete(ticket_id, completion_notes="Fixed critical test ticket successfully validated", test_steps="Test validation", test_results="Test passed", summary="First pass", paths=paths)
 
-    assert mark_ticket_complete(ticket_id, summary="Ignored", paths=paths) is False
+    assert mark_ticket_complete(ticket_id, completion_notes="Fixed critical test ticket successfully validated", test_steps="Test validation", test_results="Test passed", summary="Ignored", paths=paths) is False
     aflog_content = paths.aflog_file.read_text()
     assert "TICKET_ALREADY_COMPLETED" in aflog_content
     assert "idempotency_guard" in aflog_content

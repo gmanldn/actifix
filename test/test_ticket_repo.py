@@ -81,8 +81,20 @@ def test_ticket_repository_locking_and_completion(ticket_repo_env):
     assert repo.release_lock(entry.entry_id, locked_by="agent-1") is True
 
     # Mark complete twice to ensure status remains completed
-    assert repo.mark_complete(entry.entry_id, summary="Done") is True
-    assert repo.mark_complete(entry.entry_id, summary="Already done") is True
+    assert repo.mark_complete(
+        entry.entry_id,
+        completion_notes="Fixed the locking issue in the repository layer",
+        test_steps="Ran pytest test_ticket_repo.py with concurrent tests",
+        test_results="All 12 concurrent locking tests passed",
+        summary="Done"
+    ) is True
+    assert repo.mark_complete(
+        entry.entry_id,
+        completion_notes="Fixed the locking issue in the repository layer",
+        test_steps="Ran pytest test_ticket_repo.py with concurrent tests",
+        test_results="All 12 concurrent locking tests passed",
+        summary="Already done"
+    ) is True
 
     ticket = repo.get_ticket(entry.entry_id)
     assert ticket["status"] == "Completed"
@@ -319,7 +331,13 @@ class TestConcurrentLocking:
 
         def complete_ticket(ticket_id):
             repo.acquire_lock(ticket_id, locked_by="completer", lease_duration=timedelta(seconds=10))
-            repo.mark_complete(ticket_id, summary=f"Completed {ticket_id}")
+            repo.mark_complete(
+                ticket_id,
+                completion_notes=f"Successfully completed ticket {ticket_id} in concurrent test",
+                test_steps="Ran concurrent completion test with 5 tickets",
+                test_results="All 5 tickets completed successfully without race conditions",
+                summary=f"Completed {ticket_id}"
+            )
 
         threads = [
             threading.Thread(target=complete_ticket, args=(entry.entry_id,))

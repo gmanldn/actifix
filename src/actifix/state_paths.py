@@ -12,9 +12,22 @@ Version: 2.1.0 (Generic)
 """
 
 import os
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, List
+
+
+def _sanitize_path(value: Optional[str]) -> str:
+    """Sanitize path environment variables to prevent injection."""
+    if not value:
+        return ""
+    value = value.strip()
+    # Remove null bytes and control characters
+    value = re.sub(r'[\x00-\x1f\x7f]', '', value)
+    # Collapse multiple slashes
+    value = re.sub(r'/+', '/', value)
+    return value
 
 
 RAISE_AF_SENTINEL_FILENAME = "RAISE_AF_ONLY"
@@ -53,10 +66,10 @@ class ActifixPaths:
 
 def _resolve_project_root(project_root: Optional[Path] = None) -> Path:
     """Resolve the project root, honoring ACTIFIX_PROJECT_ROOT override."""
-    return Path(
-        project_root
-        or os.environ.get("ACTIFIX_PROJECT_ROOT", Path.cwd())
-    ).resolve()
+    if project_root is not None:
+        return Path(project_root).resolve()
+    env_root = _sanitize_path(os.environ.get("ACTIFIX_PROJECT_ROOT", ""))
+    return Path(env_root or Path.cwd()).resolve()
 
 
 def _build_paths(
@@ -67,24 +80,24 @@ def _build_paths(
 ) -> ActifixPaths:
     """Construct an ActifixPaths instance from overrides and environment."""
     resolved_root = _resolve_project_root(project_root)
-    
-    resolved_base = (
-        Path(base_dir)
-        if base_dir is not None
-        else Path(os.environ.get("ACTIFIX_DATA_DIR", resolved_root / "actifix")).resolve()
-    )
-    
-    resolved_state = (
-        Path(state_dir)
-        if state_dir is not None
-        else Path(os.environ.get("ACTIFIX_STATE_DIR", resolved_root / ".actifix")).resolve()
-    )
-    
-    resolved_logs = (
-        Path(logs_dir)
-        if logs_dir is not None
-        else Path(os.environ.get("ACTIFIX_LOGS_DIR", resolved_root / "logs")).resolve()
-    )
+
+    if base_dir is not None:
+        resolved_base = Path(base_dir).resolve()
+    else:
+        env_base = _sanitize_path(os.environ.get("ACTIFIX_DATA_DIR", ""))
+        resolved_base = Path(env_base or (resolved_root / "actifix")).resolve()
+
+    if state_dir is not None:
+        resolved_state = Path(state_dir).resolve()
+    else:
+        env_state = _sanitize_path(os.environ.get("ACTIFIX_STATE_DIR", ""))
+        resolved_state = Path(env_state or (resolved_root / ".actifix")).resolve()
+
+    if logs_dir is not None:
+        resolved_logs = Path(logs_dir).resolve()
+    else:
+        env_logs = _sanitize_path(os.environ.get("ACTIFIX_LOGS_DIR", ""))
+        resolved_logs = Path(env_logs or (resolved_root / "logs")).resolve()
     
     return ActifixPaths(
         project_root=resolved_root,
