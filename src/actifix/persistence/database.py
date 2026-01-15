@@ -22,7 +22,90 @@ from pathlib import Path
 from typing import Optional, List, Dict, Any, Iterator
 
 # Schema version for migrations
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 5
+
+
+class DatabaseSecurityError(Exception):
+    """Raised when database path violates security requirements."""
+    pass
+
+
+def _validate_database_path(db_path: Path) -> None:
+    """
+    Validate database path isn't in shared or public directories.
+
+    Prevents data leakage by ensuring the database is stored in
+    user-owned private directories, not shared system locations.
+
+    Args:
+        db_path: Path to the database file.
+
+    Raises:
+        DatabaseSecurityError: If path is in unsafe location.
+    """
+    db_path = db_path.resolve()
+    path_str = str(db_path).lower()
+
+    # Dangerous common shared/public locations (after resolve() on macOS)
+    # On macOS, /tmp -> /private/tmp, /var/tmp -> /private/var/tmp, etc.
+    dangerous_patterns = [
+        # Unix/Linux
+        "/tmp",
+        "/var/tmp",
+        "/dev/shm",  # Shared memory
+        "/mnt",      # Mounted filesystems
+        "/media",    # Removable media
+        "/proc",
+        "/sys",
+        "/root/.trash",
+        "/root/trash",
+        # macOS equivalents (after resolve())
+        "/private/tmp",
+        "/private/var/tmp",
+        # Trash directories
+        "/.trash",
+        "/trash",
+        # Windows
+        "c:\\temp",
+        "c:\\users\\public",
+        "c:\\windows\\temp",
+        "%temp%",
+        "%tmp%",
+    ]
+
+    # Check for dangerous paths
+    for pattern in dangerous_patterns:
+        pattern_lower = pattern.lower()
+        # Check if path starts with pattern or contains it as a directory component
+        if (path_str.startswith(pattern_lower) or
+            f"/{pattern_lower}/" in path_str or
+            f"\\{pattern_lower}\\" in path_str):
+            raise DatabaseSecurityError(
+                f"Database path '{db_path}' is in a shared or public directory. "
+                f"Please use a private user directory (e.g., ~/.actifix or ./data)."
+            )
+
+    # Check file permissions if file exists
+    try:
+        if db_path.exists():
+            # Get file stat
+            stat_info = db_path.stat()
+            # Check if world-readable (mode & 0o004 != 0)
+            # or world-writable (mode & 0o002 != 0)
+            if stat_info.st_mode & 0o004:
+                raise DatabaseSecurityError(
+                    f"Database file '{db_path}' is world-readable. "
+                    f"Restrict file permissions with 'chmod 600'."
+                )
+            if stat_info.st_mode & 0o002:
+                raise DatabaseSecurityError(
+                    f"Database file '{db_path}' is world-writable. "
+                    f"Restrict file permissions with 'chmod 600'."
+                )
+    except (OSError, PermissionError) as e:
+        # If we can't check permissions, log warning but continue
+        # (might be on different filesystem or permission issue)
+        pass
 
 # Database schema with indexing and locking support
 SCHEMA_SQL = """
@@ -55,14 +138,24 @@ CREATE TABLE IF NOT EXISTS tickets (
     ai_remediation_notes TEXT,
     correlation_id TEXT,
     completion_summary TEXT,
+    completion_notes TEXT NOT NULL DEFAULT '',         -- What was done to fix
+    test_steps TEXT NOT NULL DEFAULT '',               -- How testing was performed
+    test_results TEXT NOT NULL DEFAULT '',             -- Test outcomes/evidence
+    test_documentation_url TEXT,                       -- Optional: Link to test artifacts
+    completion_verified_by TEXT,                       -- Optional: Who verified
+    completion_verified_at TIMESTAMP,                  -- Optional: When verified
     format_version TEXT DEFAULT '1.0',
-    
+
     -- Checklist fields
     documented BOOLEAN DEFAULT 0,
     functioning BOOLEAN DEFAULT 0,
     tested BOOLEAN DEFAULT 0,
     completed BOOLEAN DEFAULT 0,
-    
+
+    -- Soft delete support (prevents permanent data loss)
+    deleted BOOLEAN DEFAULT 0,
+    deleted_at TIMESTAMP,
+
     CHECK (priority IN ('P0', 'P1', 'P2', 'P3', 'P4')),
     CHECK (status IN ('Open', 'In Progress', 'Completed'))
 );
@@ -109,6 +202,23 @@ CREATE TABLE IF NOT EXISTS quarantine (
     recovered_at TIMESTAMP,             -- NULL if not recovered
     recovery_notes TEXT,
     status TEXT DEFAULT 'quarantined'   -- quarantined, recovered, deleted
+);
+
+-- Database audit log (tracks all ticket changes)
+CREATE TABLE IF NOT EXISTS database_audit_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    table_name TEXT NOT NULL,                  -- tickets, event_log, etc.
+    operation TEXT NOT NULL,                   -- INSERT, UPDATE, DELETE
+    record_id TEXT,                            -- ticket_id or record identifier
+    user_context TEXT,                         -- User who made the change
+    old_values TEXT,                           -- JSON of previous values
+    new_values TEXT,                           -- JSON of new values
+    change_description TEXT,                   -- Human-readable description
+    ip_address TEXT,                           -- IP address if web-based
+    session_id TEXT,                           -- Session identifier
+
+    CHECK (operation IN ('INSERT', 'UPDATE', 'DELETE'))
 );
 
 -- Views for rollup/history (replaces ACTIFIX.md and ACTIFIX-LOG.md)
@@ -165,6 +275,14 @@ CREATE INDEX IF NOT EXISTS idx_fallback_queue_created ON fallback_queue(created_
 CREATE INDEX IF NOT EXISTS idx_quarantine_status ON quarantine(status);
 CREATE INDEX IF NOT EXISTS idx_quarantine_source ON quarantine(original_source);
 CREATE INDEX IF NOT EXISTS idx_quarantine_date ON quarantine(quarantined_at DESC);
+
+-- Database audit log indexes
+CREATE INDEX IF NOT EXISTS idx_audit_log_timestamp ON database_audit_log(timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_log_table ON database_audit_log(table_name);
+CREATE INDEX IF NOT EXISTS idx_audit_log_operation ON database_audit_log(operation);
+CREATE INDEX IF NOT EXISTS idx_audit_log_record_id ON database_audit_log(record_id);
+CREATE INDEX IF NOT EXISTS idx_audit_log_user ON database_audit_log(user_context);
+CREATE INDEX IF NOT EXISTS idx_audit_log_table_record ON database_audit_log(table_name, record_id);
 """
 
 
@@ -216,40 +334,46 @@ class DatabasePool:
     
     def _get_connection(self) -> sqlite3.Connection:
         """Get or create connection for current thread."""
-        if not hasattr(self._local, 'connection') or self._local.connection is None:
-            try:
-                # Ensure database directory exists
-                self.config.db_path.parent.mkdir(parents=True, exist_ok=True)
-                
-                conn = sqlite3.connect(
-                    str(self.config.db_path),
-                    timeout=self.config.timeout,
-                    check_same_thread=self.config.check_same_thread,
-                    isolation_level=self.config.isolation_level,
-                )
-                
-                # Enable foreign keys
-                conn.execute("PRAGMA foreign_keys = ON")
-                
-                # Enable WAL mode for better concurrency
-                if self.config.enable_wal:
-                    conn.execute("PRAGMA journal_mode = WAL")
-                
-                # Row factory for dict-like access
-                conn.row_factory = sqlite3.Row
-                
-                self._local.connection = conn
+        # Fast path: if connection exists and schema is initialized, return immediately
+        if hasattr(self._local, 'connection') and self._local.connection is not None:
+            return self._local.connection
 
-                # Initialize schema if this is first connection
-                # Note: Only acquire lock if we haven't already initialized
-                with self._lock:
-                    if not self._initialized:
-                        self._initialize_schema(conn)
-                        self._initialized = True
-                
-            except sqlite3.Error as e:
-                raise DatabaseConnectionError(f"Failed to connect to database: {e}") from e
-        
+        # Slow path: need to create connection and potentially initialize schema
+        try:
+            # Ensure database directory exists
+            self.config.db_path.parent.mkdir(parents=True, exist_ok=True)
+
+            conn = sqlite3.connect(
+                str(self.config.db_path),
+                timeout=self.config.timeout,
+                check_same_thread=self.config.check_same_thread,
+                isolation_level=self.config.isolation_level,
+            )
+
+            # Enable foreign keys
+            conn.execute("PRAGMA foreign_keys = ON")
+
+            # Enable WAL mode for better concurrency
+            if self.config.enable_wal:
+                conn.execute("PRAGMA journal_mode = WAL")
+
+            # Row factory for dict-like access
+            conn.row_factory = sqlite3.Row
+
+            self._local.connection = conn
+
+            # Initialize schema if this is first connection
+            # Acquire lock to prevent race condition where multiple threads
+            # try to initialize schema simultaneously
+            with self._lock:
+                # Double-check pattern: check again inside lock
+                if not self._initialized:
+                    self._initialize_schema(conn)
+                    self._initialized = True
+
+        except sqlite3.Error as e:
+            raise DatabaseConnectionError(f"Failed to connect to database: {e}") from e
+
         return self._local.connection
     
     def _initialize_schema(self, conn: sqlite3.Connection) -> None:
@@ -285,7 +409,7 @@ class DatabasePool:
     def _migrate_schema(self, conn: sqlite3.Connection, from_version: int, to_version: int) -> None:
         """
         Run schema migrations.
-        
+
         Args:
             conn: Database connection.
             from_version: Current schema version.
@@ -295,7 +419,128 @@ class DatabasePool:
         if from_version == 1 and to_version >= 2:
             # Execute the full schema (CREATE IF NOT EXISTS protects existing tables)
             conn.executescript(SCHEMA_SQL)
-        
+
+        # Migration from v2 to v3: Add completion quality fields
+        if from_version == 2 and to_version >= 3:
+            try:
+                # Check if columns already exist (in case migration was partially applied)
+                cursor = conn.execute("PRAGMA table_info(tickets)")
+                column_names = {row[1] for row in cursor.fetchall()}
+
+                # Add missing columns
+                if 'completion_notes' not in column_names:
+                    conn.execute(
+                        "ALTER TABLE tickets ADD COLUMN completion_notes TEXT NOT NULL DEFAULT ''"
+                    )
+
+                if 'test_steps' not in column_names:
+                    conn.execute(
+                        "ALTER TABLE tickets ADD COLUMN test_steps TEXT NOT NULL DEFAULT ''"
+                    )
+
+                if 'test_results' not in column_names:
+                    conn.execute(
+                        "ALTER TABLE tickets ADD COLUMN test_results TEXT NOT NULL DEFAULT ''"
+                    )
+
+                if 'test_documentation_url' not in column_names:
+                    conn.execute(
+                        "ALTER TABLE tickets ADD COLUMN test_documentation_url TEXT"
+                    )
+
+                if 'completion_verified_by' not in column_names:
+                    conn.execute(
+                        "ALTER TABLE tickets ADD COLUMN completion_verified_by TEXT"
+                    )
+
+                if 'completion_verified_at' not in column_names:
+                    conn.execute(
+                        "ALTER TABLE tickets ADD COLUMN completion_verified_at TIMESTAMP"
+                    )
+
+                conn.commit()
+            except sqlite3.Error as e:
+                # Non-fatal: columns may already exist
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
+
+        # Migration from v3 to v4: Add soft delete support
+        if from_version <= 3 and to_version >= 4:
+            try:
+                cursor = conn.execute("PRAGMA table_info(tickets)")
+                column_names = {row[1] for row in cursor.fetchall()}
+
+                if 'deleted' not in column_names:
+                    conn.execute(
+                        "ALTER TABLE tickets ADD COLUMN deleted BOOLEAN DEFAULT 0"
+                    )
+
+                if 'deleted_at' not in column_names:
+                    conn.execute(
+                        "ALTER TABLE tickets ADD COLUMN deleted_at TIMESTAMP"
+                    )
+
+                # Create index for soft delete queries
+                conn.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_tickets_deleted ON tickets(deleted)"
+                )
+
+                conn.commit()
+            except sqlite3.Error as e:
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
+
+        # Migration from v4 to v5: Add database audit log table
+        if from_version <= 4 and to_version >= 5:
+            try:
+                cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='database_audit_log'")
+                if cursor.fetchone() is None:
+                    # Create audit log table
+                    conn.execute("""
+                        CREATE TABLE database_audit_log (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                            table_name TEXT NOT NULL,
+                            operation TEXT NOT NULL,
+                            record_id TEXT,
+                            user_context TEXT,
+                            old_values TEXT,
+                            new_values TEXT,
+                            change_description TEXT,
+                            ip_address TEXT,
+                            session_id TEXT,
+                            CHECK (operation IN ('INSERT', 'UPDATE', 'DELETE'))
+                        )
+                    """)
+
+                    # Create indexes for audit log
+                    indexes = [
+                        "CREATE INDEX idx_audit_log_timestamp ON database_audit_log(timestamp DESC)",
+                        "CREATE INDEX idx_audit_log_table ON database_audit_log(table_name)",
+                        "CREATE INDEX idx_audit_log_operation ON database_audit_log(operation)",
+                        "CREATE INDEX idx_audit_log_record_id ON database_audit_log(record_id)",
+                        "CREATE INDEX idx_audit_log_user ON database_audit_log(user_context)",
+                        "CREATE INDEX idx_audit_log_table_record ON database_audit_log(table_name, record_id)",
+                    ]
+
+                    for idx in indexes:
+                        try:
+                            conn.execute(idx)
+                        except sqlite3.Error:
+                            # Index may already exist, continue
+                            pass
+
+                conn.commit()
+            except sqlite3.Error as e:
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
+
         # Update version tracking
         conn.execute(
             "INSERT INTO schema_version (version) VALUES (?)",
@@ -352,6 +597,9 @@ class DatabasePool:
                         # RESTART checkpoint: blocks until all frames in WAL are transferred to database
                         # This ensures data is properly persisted before connection closes
                         self._local.connection.execute("PRAGMA wal_checkpoint(RESTART)")
+                        # Force filesystem sync to ensure data is physically written to disk
+                        # This prevents data loss even in case of power failure or OS crash
+                        self._local.connection.execute("PRAGMA fullfsync = ON")
                     except sqlite3.Error:
                         # Non-fatal: continue with close even if checkpoint fails
                         pass
@@ -390,7 +638,10 @@ def get_database_pool(db_path: Optional[Path] = None) -> DatabasePool:
         from pathlib import Path as _Path
         env_db_path = os.environ.get("ACTIFIX_DB_PATH")
         db_path = Path(env_db_path).expanduser() if env_db_path else (_Path.cwd() / "data" / "actifix.db")
-    
+
+    # Validate database path for security
+    _validate_database_path(db_path)
+
     with _pool_lock:
         if _global_pool is None or _global_pool.config.db_path != db_path:
             config = DatabaseConfig(db_path=db_path)
@@ -454,3 +705,66 @@ def deserialize_timestamp(ts_str: Optional[str]) -> Optional[datetime]:
         return datetime.fromisoformat(ts_str)
     except (ValueError, TypeError):
         return None
+
+
+def log_database_audit(
+    pool: Optional[DatabasePool] = None,
+    table_name: str = "",
+    operation: str = "",
+    record_id: Optional[str] = None,
+    user_context: Optional[str] = None,
+    old_values: Optional[Dict[str, Any]] = None,
+    new_values: Optional[Dict[str, Any]] = None,
+    change_description: Optional[str] = None,
+    ip_address: Optional[str] = None,
+    session_id: Optional[str] = None,
+) -> bool:
+    """
+    Log a database change to the audit log table.
+
+    Args:
+        pool: Database pool (uses global pool if None).
+        table_name: Table that was modified (tickets, event_log, etc.).
+        operation: Operation performed (INSERT, UPDATE, DELETE).
+        record_id: ID of the record that was modified.
+        user_context: User who made the change.
+        old_values: Previous values as dict (will be JSON serialized).
+        new_values: New values as dict (will be JSON serialized).
+        change_description: Human-readable description of the change.
+        ip_address: IP address of the requester (if applicable).
+        session_id: Session identifier (if applicable).
+
+    Returns:
+        True if logged successfully, False otherwise.
+    """
+    if pool is None:
+        pool = get_database_pool()
+
+    try:
+        with pool.transaction() as conn:
+            conn.execute(
+                """
+                INSERT INTO database_audit_log (
+                    table_name, operation, record_id, user_context,
+                    old_values, new_values, change_description,
+                    ip_address, session_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    table_name,
+                    operation,
+                    record_id,
+                    user_context,
+                    serialize_json_field(old_values),
+                    serialize_json_field(new_values),
+                    change_description,
+                    ip_address,
+                    session_id,
+                )
+            )
+        return True
+    except Exception as e:
+        # Log audit failure but don't raise to avoid disrupting main operations
+        import sys
+        print(f"Failed to log database audit: {e}", file=sys.stderr)
+        return False
