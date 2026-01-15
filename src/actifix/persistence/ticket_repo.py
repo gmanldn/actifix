@@ -349,7 +349,9 @@ class TicketRepository:
         old_values = {}
         success = False
 
-        with self.pool.transaction() as conn:
+        # Use BEGIN IMMEDIATE to acquire write locks upfront and prevent
+        # lock escalation conflicts in concurrent scenarios
+        with self.pool.transaction(immediate=True) as conn:
             # Get current ticket values for audit log
             cursor = conn.execute("SELECT * FROM tickets WHERE id = ?", (ticket_id,))
             current_row = cursor.fetchone()
