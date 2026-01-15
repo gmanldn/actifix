@@ -31,6 +31,19 @@ from .auth import (
     reset_auth_managers,
 )
 
+from .credentials import (
+    CredentialType,
+    Credential,
+    CredentialStorageError,
+    CredentialRetrievalError,
+    MacOSKeychain,
+    WindowsCredentialManager,
+    FileSystemCredentialStore,
+    CredentialManager,
+    get_credential_manager,
+    reset_credential_manager,
+)
+
 __all__ = [
     'SecretsScanner',
     'SecretMatch',
@@ -54,4 +67,14 @@ __all__ = [
     'get_user_manager',
     'get_authorization_manager',
     'reset_auth_managers',
+    'CredentialType',
+    'Credential',
+    'CredentialStorageError',
+    'CredentialRetrievalError',
+    'MacOSKeychain',
+    'WindowsCredentialManager',
+    'FileSystemCredentialStore',
+    'CredentialManager',
+    'get_credential_manager',
+    'reset_credential_manager',
 ]
