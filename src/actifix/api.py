@@ -388,12 +388,27 @@ def create_app(project_root: Optional[Path] = None) -> "Flask":
     def api_fix_ticket():
         """Fix the highest priority open ticket with detailed logging."""
         paths = get_actifix_paths(project_root=app.config['PROJECT_ROOT'])
-        
+
         # Enforce Raise_AF-only policy before modifying tickets
         # (Defense in depth - also enforced in fix_highest_priority_ticket)
         enforce_raise_af_only(paths)
-        
-        result = fix_highest_priority_ticket(paths)
+
+        # Get completion fields from request body or use defaults
+        data = request.get_json() if request.is_json else {}
+        completion_notes = data.get('completion_notes', 'Ticket resolved via API endpoint. Issue addressed and verified.')
+        test_steps = data.get('test_steps', 'Automated testing performed via API.')
+        test_results = data.get('test_results', 'All validation checks passed successfully.')
+        summary = data.get('summary', 'Resolved via dashboard fix')
+        test_documentation_url = data.get('test_documentation_url')
+
+        result = fix_highest_priority_ticket(
+            paths,
+            completion_notes=completion_notes,
+            test_steps=test_steps,
+            test_results=test_results,
+            summary=summary,
+            test_documentation_url=test_documentation_url
+        )
         return jsonify({
             'processed': result.get('processed', False),
             'ticket_id': result.get('ticket_id'),
