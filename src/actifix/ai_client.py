@@ -23,6 +23,7 @@ import time
 from .config import get_config
 from .log_utils import log_event
 from .state_paths import get_actifix_paths
+from .security.rate_limiter import get_rate_limiter, RateLimitError
 
 
 class AIProvider(Enum):
@@ -164,25 +165,69 @@ class AIClient:
         prompt: str,
         ticket_info: Dict[str, Any]
     ) -> AIResponse:
-        """Call specific AI provider."""
-        if provider == AIProvider.CLAUDE_LOCAL:
-            return self._call_claude_local(prompt, ticket_info)
-        elif provider == AIProvider.CLAUDE_API:
-            return self._call_claude_api(prompt, ticket_info)
-        elif provider == AIProvider.OPENAI:
-            return self._call_openai(prompt, ticket_info)
-        elif provider == AIProvider.OLLAMA:
-            return self._call_ollama(prompt, ticket_info)
-        elif provider == AIProvider.FREE_ALTERNATIVE:
-            return self._call_free_alternative(prompt, ticket_info)
-        else:
-            return AIResponse(
+        """Call specific AI provider with rate limiting."""
+        # Check rate limits before making API calls
+        rate_limiter = get_rate_limiter()
+        provider_key = provider.value
+
+        try:
+            rate_limiter.check_rate_limit(provider_key)
+        except RateLimitError as e:
+            response = AIResponse(
                 content="",
                 provider=provider,
                 model="unknown",
                 success=False,
-                error=f"Unknown provider: {provider}"
+                error=str(e)
             )
+            # Record rate limit violation
+            rate_limiter.record_call(
+                provider_key,
+                success=False,
+                error=f"Rate limit exceeded: {e}"
+            )
+            return response
+
+        # Call the appropriate provider
+        try:
+            if provider == AIProvider.CLAUDE_LOCAL:
+                response = self._call_claude_local(prompt, ticket_info)
+            elif provider == AIProvider.CLAUDE_API:
+                response = self._call_claude_api(prompt, ticket_info)
+            elif provider == AIProvider.OPENAI:
+                response = self._call_openai(prompt, ticket_info)
+            elif provider == AIProvider.OLLAMA:
+                response = self._call_ollama(prompt, ticket_info)
+            elif provider == AIProvider.FREE_ALTERNATIVE:
+                response = self._call_free_alternative(prompt, ticket_info)
+            else:
+                response = AIResponse(
+                    content="",
+                    provider=provider,
+                    model="unknown",
+                    success=False,
+                    error=f"Unknown provider: {provider}"
+                )
+
+            # Record the API call
+            rate_limiter.record_call(
+                provider_key,
+                success=response.success,
+                tokens_used=response.tokens_used,
+                cost_usd=response.cost_usd,
+                error=response.error if not response.success else None
+            )
+
+            return response
+
+        except Exception as e:
+            # Record failure
+            rate_limiter.record_call(
+                provider_key,
+                success=False,
+                error=str(e)
+            )
+            raise
     
     def _call_claude_local(self, prompt: str, ticket_info: Dict[str, Any]) -> AIResponse:
         """Call Claude using local CLI (if logged in)."""
