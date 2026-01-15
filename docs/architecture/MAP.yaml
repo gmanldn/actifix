@@ -16,6 +16,8 @@ domains:
   summary: Logging, health monitoring, persistence, observability
 - id: core
   summary: Error handling, ticket management, automated remediation
+- id: security
+  summary: Authentication, authorization, rate limiting, secrets management
 - id: tooling
   summary: Testing, quality assurance, architecture validation
 - id: plugins
@@ -372,6 +374,97 @@ modules:
   - extensible pattern system
   depends_on:
   - core.raise_af
+- id: core.recovery
+  domain: core
+  owner: core
+  summary: State recovery and transaction rollback mechanisms
+  entrypoints:
+  - src/actifix/recovery.py
+  contracts:
+  - recover from incomplete operations
+  - rollback failed transactions
+  - maintain consistent state
+  depends_on:
+  - infra.logging
+  - infra.persistence.manager
+- id: security.api
+  domain: security
+  owner: security
+  summary: Security module public API and exports
+  entrypoints:
+  - src/actifix/security/__init__.py
+  contracts:
+  - re-export security interfaces
+  - centralize security exports
+  depends_on:
+  - security.auth
+  - security.credentials
+  - security.rate_limiter
+  - security.secrets_scanner
+- id: security.auth
+  domain: security
+  owner: security
+  summary: Authentication and authorization implementation
+  entrypoints:
+  - src/actifix/security/auth.py
+  contracts:
+  - JWT token validation
+  - RBAC enforcement
+  - session management
+  depends_on:
+  - infra.logging
+  - security.credentials
+- id: security.credentials
+  domain: security
+  owner: security
+  summary: Credential management and password hashing
+  entrypoints:
+  - src/actifix/security/credentials.py
+  contracts:
+  - PBKDF2 password hashing
+  - credential storage and retrieval
+  - secure comparison functions
+  depends_on:
+  - infra.logging
+- id: security.rate_limiter
+  domain: security
+  owner: security
+  summary: Token bucket rate limiting per minute/hour/day
+  entrypoints:
+  - src/actifix/security/rate_limiter.py
+  contracts:
+  - enforce per-minute limits
+  - enforce per-hour limits
+  - enforce per-day limits
+  - track request metrics
+  depends_on:
+  - infra.logging
+  - runtime.config
+- id: security.secrets_scanner
+  domain: security
+  owner: security
+  summary: Secrets and sensitive data detection
+  entrypoints:
+  - src/actifix/security/secrets_scanner.py
+  contracts:
+  - detect API keys in logs
+  - detect credentials in output
+  - sanitize sensitive data
+  depends_on:
+  - infra.logging
+- id: plugins.permissions
+  domain: plugins
+  owner: plugins
+  summary: Plugin permission and capability management
+  entrypoints:
+  - src/actifix/plugins/permissions.py
+  contracts:
+  - define plugin permissions
+  - enforce capability-based security
+  - validate plugin access
+  depends_on:
+  - plugins.protocol
+  - security.auth
 - id: plugins.protocol
   domain: plugins
   owner: plugins

@@ -403,6 +403,16 @@ class TicketRepository:
         """
         Mark ticket as completed with mandatory quality documentation.
 
+        Performs TWO checks:
+        1. IDEMPOTENCY: Prevents re-completion of already-finished tickets
+           (returns False if already completed)
+        2. QUALITY GATE: Validates completion evidence fields
+           (raises ValueError if validation fails)
+
+        NOTE: The application layer (do_af.py:mark_ticket_complete) also
+        performs idempotency checks before calling this method. This creates
+        defense-in-depth: idempotency is checked at both layers.
+
         Args:
             ticket_id: Ticket ID to complete.
             completion_notes: Required description of what was done (min 20 chars).
@@ -412,12 +422,28 @@ class TicketRepository:
             test_documentation_url: Optional link to test artifacts.
 
         Returns:
-            True if completed, False if not found.
+            True if completed, False if not found or already completed.
 
         Raises:
-            ValueError: If required fields are missing or too short.
+            ValueError: If completion evidence fields are missing or too short.
         """
-        # VALIDATION
+        # Get ticket (for update) and idempotency check
+        existing = self.get_ticket(ticket_id)
+        if not existing:
+            return False
+
+        # IDEMPOTENCY CHECK
+        # Prevents re-completion of already-finished tickets.
+        # NOTE: This check is ALSO performed in the application layer
+        # (do_af.py:mark_ticket_complete) before calling this method, but
+        # we keep it here for defense-in-depth. Calling this method directly
+        # (not through mark_ticket_complete) will still get idempotency protection.
+        if existing.get('status') == 'Completed' or existing.get('completed'):
+            return False
+
+        # QUALITY GATE VALIDATION
+        # These validations are the core quality gate mechanism.
+        # They ensure NO ticket can be marked complete without evidence.
         if not completion_notes or len(completion_notes.strip()) < 20:
             raise ValueError(
                 "completion_notes required: must describe what was done (min 20 chars)"

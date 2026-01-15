@@ -358,48 +358,9 @@ def fix_highest_priority_ticket(
         "meet minimum quality thresholds before marking complete."
     )
 
-    # Validate required completion fields
-    if not completion_notes or len(completion_notes.strip()) < 20:
-        log_event(
-            paths.aflog_file,
-            "COMPLETION_VALIDATION_FAILED",
-            f"Ticket {ticket.ticket_id}: completion_notes required (min 20 chars)",
-            ticket_id=ticket.ticket_id,
-        )
-        repo.release_lock(ticket.ticket_id, lock_owner)
-        return {
-            "processed": False,
-            "ticket_id": ticket.ticket_id,
-            "reason": "invalid_completion_notes",
-        }
-
-    if not test_steps or len(test_steps.strip()) < 10:
-        log_event(
-            paths.aflog_file,
-            "COMPLETION_VALIDATION_FAILED",
-            f"Ticket {ticket.ticket_id}: test_steps required (min 10 chars)",
-            ticket_id=ticket.ticket_id,
-        )
-        repo.release_lock(ticket.ticket_id, lock_owner)
-        return {
-            "processed": False,
-            "ticket_id": ticket.ticket_id,
-            "reason": "invalid_test_steps",
-        }
-
-    if not test_results or len(test_results.strip()) < 10:
-        log_event(
-            paths.aflog_file,
-            "COMPLETION_VALIDATION_FAILED",
-            f"Ticket {ticket.ticket_id}: test_results required (min 10 chars)",
-            ticket_id=ticket.ticket_id,
-        )
-        repo.release_lock(ticket.ticket_id, lock_owner)
-        return {
-            "processed": False,
-            "ticket_id": ticket.ticket_id,
-            "reason": "invalid_test_results",
-        }
+    # Note: Validation of completion fields is performed in mark_ticket_complete()
+    # and repo.mark_complete(). We pass the parameters directly and let the
+    # validation layers handle them. This avoids duplication at this level.
 
     success = mark_ticket_complete(
         ticket.ticket_id,
