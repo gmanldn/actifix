@@ -21,11 +21,12 @@ class TestActifixPaths:
     
     def test_get_actifix_paths_custom(self):
         from actifix.state_paths import get_actifix_paths
-        
+
         with tempfile.TemporaryDirectory() as tmpdir:
             base = Path(tmpdir) / "custom"
             paths = get_actifix_paths(base_dir=base)
-            assert paths.base_dir == base
+            # Compare resolved paths to handle symlink resolution (e.g., /var -> /private/var on macOS)
+            assert paths.base_dir == base.resolve()
 
 
 class TestLogUtils:
