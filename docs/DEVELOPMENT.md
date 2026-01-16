@@ -65,9 +65,9 @@ python -m actifix.health --comprehensive
 ### Branch Strategy
 
 - **main**: Production-ready code only
-- **develop**: Integration branch for features
-- **feature/***: Feature development branches
-- **hotfix/***: Critical fixes
+- **develop**: Integration branch for features and day-to-day work
+- **feature/***: Optional for large or experimental changes (not required)
+- **hotfix/***: Critical fixes when coordination is needed
 
 ### Commit Standards
 

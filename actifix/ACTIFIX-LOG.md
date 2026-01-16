@@ -2143,3 +2143,5 @@ Audit trail of all Actifix operations.
 2026-01-15T23:51:55.343750+00:00 | ACT-20260115-B7B29 | P2 | DevelopmentMilestone | Development milestone: Basic test suite created. Created comprehensive tests for core error capture functionality. Next: implement DoAF for ticket processing.
 2026-01-15T23:53:41.087001+00:00 | ACT-20260115-CAC5D | P2 | DevelopmentMilestone | Development milestone: Basic test suite created. Created comprehensive tests for core error capture functionality. Next: implement DoAF for ticket processing.
 2026-01-15T23:58:58.769173+00:00 | ACT-20260115-2CB32 | P2 | DevelopmentMilestone | Development milestone: Basic test suite created. Created comprehensive tests for core error capture functionality. Next: implement DoAF for ticket processing.
+2026-01-16T00:29:00.402381+00:00 | ACT-20260116-3A316 | P2 | PolicyUpdate | Simplify workflow docs to allow direct develop commits without per-change branches while keeping Raise_AF gate.
+2026-01-16T00:29:52.837149+00:00 | ACT-20260116-4CC84 | P2 | DatabaseSecurityError | query_open_tickets.py failed: actfix.db is world-readable; needs chmod 600 before ticket repo access.

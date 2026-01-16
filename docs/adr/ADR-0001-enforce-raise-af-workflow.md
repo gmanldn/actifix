@@ -26,7 +26,7 @@ We will enforce the Raise_AF workflow as a mandatory gate for all changes to the
 1. **Environment Variable Gate**: Set `ACTIFIX_CHANGE_ORIGIN=raise_af` as a required environment variable
 2. **Ticket Creation**: All work must begin by creating a ticket via `actifix.raise_af.record_error()`
 3. **Workflow Enforcement**: The system will fail fast if changes are attempted without proper ticket creation
-4. **Branch Workflow**: Create branch → work → commit → merge to develop → delete branch → push
+4. **Workflow**: Work directly on `develop` with regular pushes; no per-change branches required.
 5. **Documentation**: All changes must be documented in tickets with proper context
 
 The workflow steps are:
@@ -37,20 +37,13 @@ export ACTIFIX_CHANGE_ORIGIN=raise_af
 # 2. Create ticket via raise_af
 python -c "from actifix.raise_af import record_error; record_error(...)"
 
-# 3. Create branch
-git checkout -b feat/description
-
-# 4. Implement changes
+# 3. Implement changes directly on develop
 # ... development work ...
 
-# 5. Test and commit
+# 4. Test and commit
 python test.py --coverage
 git commit -m "feat(scope): description"
 
-# 6. Merge and cleanup
-git checkout develop
-git merge feat/description
-git branch -d feat/description
 git push
 ```
 
