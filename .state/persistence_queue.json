@@ -1,12 +1,12 @@
 [
   {
-    "entry_id": "QE-7A225713",
+    "entry_id": "QE-84ADCE5E",
     "operation": "write",
     "key": "k1",
     "content": "v1",
-    "created_at": "2026-01-14T06:35:08.475678+00:00",
+    "created_at": "2026-01-16T00:03:17.655153+00:00",
     "retry_count": 0,
-    "last_retry": "2026-01-15T03:46:29.167602+00:00",
+    "last_retry": null,
     "metadata": {}
   }
 ]
