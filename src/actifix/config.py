@@ -102,7 +102,15 @@ class ActifixConfig:
     max_ticket_message_length: int = 5000  # Characters
     max_file_context_size_bytes: int = 1 * 1024 * 1024  # 1MB
     max_open_tickets: int = 10000
-    
+
+    # Ticket throttling
+    ticket_throttling_enabled: bool = True
+    max_p2_tickets_per_hour: int = 15
+    max_p3_tickets_per_4h: int = 5
+    max_p4_tickets_per_day: int = 2
+    emergency_ticket_threshold: int = 200
+    emergency_window_minutes: int = 1
+
     # Testing
     min_coverage_percent: float = 80.0
     test_timeout_seconds: float = 300.0
