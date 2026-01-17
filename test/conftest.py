@@ -3,8 +3,11 @@ import sys
 import pytest
 from pathlib import Path
 
+# Load performance tracking plugin
+pytest_plugins = ["pytest_plugins"]
 
-# ===== PYTEST CONFIGURATION WITH PROGRESS =====
+
+# ===== PYTEST CONFIGURATION WITH PERFORMANCE TRACKING =====
 
 def pytest_configure(config):
     """Configure pytest with performance optimizations and test categorization."""
