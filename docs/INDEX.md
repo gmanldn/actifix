@@ -1,136 +1,52 @@
 # Actifix Documentation Index
 
-Welcome to the Actifix documentation! This index provides a comprehensive guide to all available documentation, organized by purpose and audience.
+This index keeps all documentation concise, cross-referenced, and aligned with the Actifix workflow. Start here, then follow the links that fit your role.
 
-## Quick Start
+## Quick access
+- **README** [../README.md](../README.md) – Project overview (capture, self-improvement, commands).
+- **QUICKSTART** [QUICKSTART.md](QUICKSTART.md) – Hands-on setup plus capture + ticket inspection snippets.
+- **INSTALLATION** [INSTALLATION.md](INSTALLATION.md) – Platform-specific install and environment variables.
+- **FRAMEWORK OVERVIEW** [FRAMEWORK_OVERVIEW.md](FRAMEWORK_OVERVIEW.md) – Purpose, architecture, release notes, and roadmap.
 
-- **[QUICKSTART.md](QUICKSTART.md)** - Get up and running in 5 minutes
-- **[INSTALLATION.md](INSTALLATION.md)** - Detailed installation guide
-- **[README.md](../README.md)** - Project overview and basic usage
+## User & operator guides
+- **MONITORING** [MONITORING.md](MONITORING.md) – Operational metrics, health checks, alerting patterns.
+- **TROUBLESHOOTING** [TROUBLESHOOTING.md](TROUBLESHOOTING.md) – Frequently seen issues with rapid remedies.
+- **TESTING** [TESTING.md](TESTING.md) – Testing philosophy and quality gate descriptions.
+- **TEST PERFORMANCE** [TEST_PERFORMANCE_OPTIMIZATION.md](TEST_PERFORMANCE_OPTIMIZATION.md) – Running fast, stable test suites.
+- **TEST MARKERS** [TEST_MARKERS_GUIDE.md](TEST_MARKERS_GUIDE.md) – Marker-based test selection guidelines.
+- **COVERAGE OPTIMIZATION** [COVERAGE_OPTIMIZATION.md](COVERAGE_OPTIMIZATION.md) and [notes/COVERAGE_OPTIMIZATION_SUMMARY.md](notes/COVERAGE_OPTIMIZATION_SUMMARY.md) – Improving coverage while keeping runs fast.
 
-## User Documentation
+## Developer & architecture resources
+- **DEVELOPMENT GUIDE** [DEVELOPMENT.md](DEVELOPMENT.md) – Workflow, QA gates, architecture validation, and doc standards.
+- **QUICKDEV** [QUICKDEV.md](QUICKDEV.md) – Focused workflows for agent-powered development sprints.
+- **ADR directory** [adr/](adr/) – Raised AF workflow and future architecture decisions.
+- **Architecture docs** – [ARCHITECTURE_CORE.md](architecture/ARCHITECTURE_CORE.md), [MODULES.md](architecture/MODULES.md), [MAP.yaml](architecture/MAP.yaml), [DEPGRAPH.json](architecture/DEPGRAPH.json) describe the canonical topology. Update everything when the module map changes.
+- **Notes** [notes/](notes/) – Summaries, debugging reports, and documentation planning (use only for reference).
 
-### Getting Started
-- **[FRAMEWORK_OVERVIEW.md](FRAMEWORK_OVERVIEW.md)** - Complete framework overview
-- **[QUICKSTART.md](QUICKSTART.md)** - Rapid setup guide
-- **[INSTALLATION.md](INSTALLATION.md)** - Installation instructions
+## Self-improvement & automation
+- **Token robustness campaign** [token_robustness_campaign.md](token_robustness_campaign.md) – Ongoing AI/robustness experiments.
+- **Ultrathink ticket summaries** [ultrathink_tickets_summary.md](ultrathink_tickets_summary.md) – Elevator notes from the most complex ticket bursts.
+- **Automation folder** [automation/](automation/) – Scripts that spawn mass-ticket workflows and diagnostics.
 
-### Usage Guides
-- **[src/actifix/README.md](../src/actifix/README.md)** - API reference and usage examples
-- **[actifix-frontend/README.md](../actifix-frontend/README.md)** - Web interface documentation
+## Legal & compliance
+- **LICENSE** [legal/LICENSE.md](legal/LICENSE.md)
 
-## Developer Documentation
+## Document status
+| Document | Status | Notes |
+|----------|--------|-------|
+| README | ✅ Updated 2026-01-17 | Landing overview for all audiences.
+| QUICKSTART | ✅ Updated 2026-01-17 | Hands-on install + capture.
+| FRAMEWORK_OVERVIEW | ✅ Updated 2026-01-17 | Architecture, release notes, roadmap.
+| DEVELOPMENT | ✅ Updated 2026-01-17 | Workflow, QA gates, architecture, docs.
+| ARCHITECTURE MAP/GRAPH | ✅ Auto-generated weekly | Source of truth for module graph.
+| TROUBLESHOOTING | 🚧 Conditional updates | Scoped fixes referenced in releases.
+| MONITORING | 🚧 Conditional updates | Refer to release notes for telemetry.
+| TESTING & OPTIMIZATION | ✅ Coverage guidelines in place | Balanced tests and performance tips.
 
-### Development Workflow
-- **[DEVELOPMENT.md](DEVELOPMENT.md)** - Development guide and standards
-- **[QUICKDEV.md](QUICKDEV.md)** - Fast development workflow for AI agents
-- **[AGENTS.md](../AGENTS.md)** - Agent instructions and mandatory rules
+## How to contribute docs
+1. Update the relevant document directly in the `docs/` folder.
+2. Sync `docs/INDEX.md` to include any new section.
+3. Link to architecture artifacts when structural changes occur.
+4. Release notes always live in the “Release Notes & Version History” section of `docs/FRAMEWORK_OVERVIEW.md`.
 
-### Architecture Documentation
-- **[architecture/ARCHITECTURE_CORE.md](architecture/ARCHITECTURE_CORE.md)** - Core architectural principles
-- **[architecture/MODULES.md](architecture/MODULES.md)** - Module catalog and dependencies
-- **[architecture/MAP.yaml](architecture/MAP.yaml)** - Canonical architecture map
-- **[architecture/DEPGRAPH.json](architecture/DEPGRAPH.json)** - Dependency graph
-
-### Testing & Quality
-- **[TESTING.md](TESTING.md)** - Testing strategy and guidelines *(Coming Soon)*
-- **Test Coverage Reports** - Available after running `python test/test_runner.py --coverage`
-
-## Reference Documentation
-
-### Release Information
-- **[FRAMEWORK_OVERVIEW.md](FRAMEWORK_OVERVIEW.md)** - Version history and release notes (see "Release Notes & Version History" section)
-- **[CHANGELOG.md](../CHANGELOG.md)** - Detailed version history (archived)
-- **[LICENSE](../LICENSE)** - MIT License terms
-
-### Configuration
-- **Environment Variables** - See [INSTALLATION.md](INSTALLATION.md#environment-variables)
-- **Configuration Files** - See [DEVELOPMENT.md](DEVELOPMENT.md#configuration)
-
-### Troubleshooting
-- **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** - Common issues and solutions *(Coming Soon)*
-- **[MONITORING.md](MONITORING.md)** - Operational monitoring guide *(Coming Soon)*
-
-## Architecture Overview
-
-```
-docs/
-├── INDEX.md                    # This file - documentation catalog
-├── QUICKSTART.md              # 5-minute setup guide
-├── INSTALLATION.md            # Detailed installation
-├── DEVELOPMENT.md             # Development workflow
-├── FRAMEWORK_OVERVIEW.md      # Complete framework overview + release notes
-├── QUICKDEV.md               # Fast development for AI agents
-├── ultrathink_tickets_summary.md  # Architecture tickets summary
-└── architecture/             # Architecture documentation
-    ├── ARCHITECTURE_CORE.md  # Core principles
-    ├── MODULES.md            # Module catalog
-    ├── MAP.yaml              # Architecture map
-    └── DEPGRAPH.json         # Dependency graph
-```
-
-**Note**: Release notes and version history are now maintained in `docs/FRAMEWORK_OVERVIEW.md` under the "Release Notes & Version History" section. `CHANGELOG.md` is archived for historical reference.
-
-## Documentation Standards
-
-All documentation follows these principles:
-
-1. **Purpose-Driven** - Each document clearly states its purpose and scope
-2. **Audience-Specific** - Content tailored for users, developers, or operators
-3. **Actionable** - Includes concrete steps and examples
-4. **Current** - Kept up-to-date with code changes
-5. **Cross-Referenced** - Links to related documentation
-
-## Contributing to Documentation
-
-When adding or updating documentation:
-
-1. **Follow the template** - Use existing docs as templates
-2. **Update this index** - Add new documents to the appropriate section
-3. **Cross-reference** - Link to related documentation
-4. **Test examples** - Ensure all code examples work
-5. **Review for clarity** - Have someone else review for clarity
-
-## Documentation Maintenance
-
-- **Freshness**: Architecture docs auto-generated every 7 days
-- **Validation**: Documentation links checked in CI
-- **Reviews**: All doc changes require review
-- **Versioning**: Major changes documented in `docs/FRAMEWORK_OVERVIEW.md` (Release Notes & Version History section)
-
-## Getting Help
-
-If you can't find what you're looking for:
-
-1. **Search this index** - Use Ctrl+F to find relevant sections
-2. **Check the architecture docs** - For technical implementation details
-3. **Review the code** - Source code in `src/actifix/` is well-documented
-4. **Ask questions** - Open an issue on GitHub
-
-## Document Status Legend
-
-- ✅ **Complete** - Comprehensive and current
-- 🚧 **In Progress** - Being actively developed
-- 📋 **Planned** - Scheduled for creation
-- ⚠️ **Needs Update** - Exists but may be outdated
-
-### Current Status
-
-| Document | Status | Last Updated |
-|----------|--------|--------------|
-| QUICKSTART.md | ✅ Complete | 2026-01-11 |
-| INSTALLATION.md | ✅ Complete | 2026-01-11 |
-| DEVELOPMENT.md | ✅ Complete | 2026-01-11 |
-| FRAMEWORK_OVERVIEW.md | ✅ Complete | 2026-01-11 |
-| QUICKDEV.md | ✅ Complete | 2026-01-11 |
-| architecture/ARCHITECTURE_CORE.md | ✅ Complete | 2026-01-10 |
-| architecture/MODULES.md | ✅ Complete | 2026-01-10 |
-| TESTING.md | 📋 Planned | - |
-| MONITORING.md | 📋 Planned | - |
-| TROUBLESHOOTING.md | 📋 Planned | - |
-
----
-
-**Last Updated**: 2026-01-11  
-**Maintained By**: Actifix Team  
-**Review Cycle**: Monthly
+_Last updated: 2026-01-17_
