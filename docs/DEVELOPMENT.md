@@ -226,7 +226,7 @@ Each module must:
 
 ```python
 # ✓ ALLOWED: Import from declared dependencies
-from actifix.logging import get_logger
+from actifix.log_utils import log_event
 from actifix.quarantine import isolate_error
 
 # ✗ FORBIDDEN: Import from non-declared dependencies  

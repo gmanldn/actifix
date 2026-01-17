@@ -17,7 +17,7 @@ class TestActifixPaths:
         
         paths = get_actifix_paths()
         assert paths.base_dir.name == "actifix"
-        assert paths.rollup_file.name == "ACTIFIX.md"
+        assert paths.log_file.name == "actifix.log"
     
     def test_get_actifix_paths_custom(self):
         from actifix.state_paths import get_actifix_paths
@@ -80,10 +80,12 @@ class TestRaiseAF:
     def test_record_error(self, monkeypatch):
         from actifix.raise_af import record_error
         from actifix.state_paths import get_actifix_paths
+        from actifix import enable_actifix_capture
         
         with tempfile.TemporaryDirectory() as tmpdir:
             db_path = Path(tmpdir) / "data" / "actifix.db"
             monkeypatch.setenv("ACTIFIX_DB_PATH", str(db_path))
+            enable_actifix_capture()
             paths = get_actifix_paths(base_dir=Path(tmpdir) / "actifix")
             
             entry = record_error(
@@ -148,11 +150,13 @@ class TestIntegration:
     
     def test_full_workflow(self):
         from actifix import record_error, get_health
+        from actifix import enable_actifix_capture
         from actifix.do_af import get_open_tickets, mark_ticket_complete
         from actifix.state_paths import get_actifix_paths
         
         with tempfile.TemporaryDirectory() as tmpdir:
             paths = get_actifix_paths(base_dir=Path(tmpdir) / "actifix")
+            enable_actifix_capture()
             
             # Record an error
             entry = record_error(

@@ -71,12 +71,15 @@ def isolate_actifix_db(monkeypatch, tmp_path):
     # Reset pools and repositories
     from actifix.persistence.database import reset_database_pool
     from actifix.persistence.ticket_repo import reset_ticket_repository
+    from actifix.persistence.event_repo import reset_event_repository
     
     reset_database_pool()
     reset_ticket_repository()
+    reset_event_repository()
     
     yield
     
     # Clean up after test
     reset_database_pool()
     reset_ticket_repository()
+    reset_event_repository()

@@ -11,14 +11,14 @@ Actifix is a self-improving error management framework that captures rich contex
 - 📦 **Drop-in usage**: Pure-stdlib Python package—import it, call `enable_actifix_capture()`, and start recording tickets immediately.
 - 🧠 **AI-native**: Generates remediation notes, normalized context, and 200k-token-friendly bundles for Claude, GPT, or any LLM.
 - 🔁 **Self-improvement mode**: Actifix watches its own development, opening tickets against itself as you code.
-- 🗂️ **Transparent artifacts**: SQLite ticket database (`data/actifix.db`) is the canonical store; `ACTIFIX.md`, `ACTIFIX-LOG.md`, and `AFLog.txt` are generated, read-only snapshots for auditing and diagnostics.
+- 🗂️ **Transparent artifacts**: SQLite ticket database (`data/actifix.db`) is the canonical store; rollups live in DB views (`v_recent_tickets`, `v_ticket_history`) and audit logs live in `event_log`.
 - 🛠️ **Configurable by environment**: Tune data/state directories, context capture limits, and capture enablement with env vars—no code changes needed.
 
 ## How It Works (Lifecycle)
 
 1) **Capture**: `enable_actifix_capture()` installs the global hooks; `record_error(...)` ingests an exception with stack trace, file context, and system state.  
 2) **Normalize**: Secret redaction, priority inference, duplicate guard hashing, and optional manual priority override.  
-3) **Persist**: Ticket data lands inside the canonical `data/actifix.db`; Markdown rollups and logs under `actifix/` are generated from that table and must not be edited manually.  
+3) **Persist**: Ticket data lands inside the canonical `data/actifix.db`; rollups and audit logs are queried from DB views and `event_log`.  
 4) **Dispatch (planned)**: `DoAF` ticket processor will route items for AI/automation, dedupe, and mark completion.  
 5) **Improve**: Self-development mode raises tickets against Actifix itself, keeping the framework honest and continually improving.
 
@@ -79,8 +79,8 @@ actifix.track_development_progress(
 sqlite3 data/actifix.db "SELECT id, priority, status, message, run_label FROM tickets ORDER BY
     CASE priority WHEN 'P0' THEN 0 WHEN 'P1' THEN 1 WHEN 'P2' THEN 2 WHEN 'P3' THEN 3 ELSE 4 END,
     created_at DESC LIMIT 30;"
-cat actifix/ACTIFIX.md        # latest 20 entries (read-only audit rollup)
-tail -n 50 actifix/AFLog.txt  # lifecycle log (generated from the DB)
+sqlite3 data/actifix.db "SELECT * FROM v_recent_tickets ORDER BY created_at DESC LIMIT 20;"
+sqlite3 data/actifix.db "SELECT timestamp, event_type, message FROM event_log ORDER BY timestamp DESC LIMIT 50;"
 ```
 
 ## Core API Surface
@@ -102,7 +102,7 @@ All work must begin by logging the condition through `actifix.raise_af.record_er
 ## Database-first Workflow
 
 - **Canonical store**: `data/actifix.db` holds every ticket, duplicate guard, status change, and remediation note. Treat it as the only writable source.
-- **Generated artifacts**: `ACTIFIX.md`, `ACTIFIX-LOG.md`, and `AFLog.txt` live inside `actifix/` for auditing; they are mirrors of the ticket database and must never be edited directly.
+- **Generated artifacts**: Rollups and audit logs are database views (`v_recent_tickets`, `v_ticket_history`) and `event_log`; no Markdown rollups are generated.
 - **Ticket access**: Use `actifix.raise_af.record_error`, `actifix.do_af` helpers, the REST API, or raw `sqlite3` queries to inspect, update, or complete work.
 - **Automation rule**: Manual Markdown task lists are forbidden—automation, AI, and developers rely on the schema in `data/actifix.db` to coordinate work.
 
@@ -129,16 +129,15 @@ actifix/
 │   └── test_actifix_basic.py
 ├── data/                 # Runtime storage
 │   └── actifix.db        # SQLite ticket database (canonical source of truth and only writable registry)
-├── actifix/              # Generated snapshots (do not edit)
-│   ├── ACTIFIX.md        # Error rollup (last 20 entries)
-│   ├── ACTIFIX-LOG.md    # Completion log derived from the DB
-│   └── AFLog.txt         # Lifecycle audit trail (read-only)
+├── actifix/              # Data directory for derived artifacts
 └── docs/                 # Documentation
 ```
 
+Root helpers `start.py` and `test.py` are symlinks to `scripts/start.py` and `test/test_runner.py` to avoid drift.
+
 ## Usage Patterns
 
-- **Production monitoring**: Enable capture in your app entrypoint; let Actifix classify and dedupe, then pull Markdown tickets into your ops workflow.  
+- **Production monitoring**: Enable capture in your app entrypoint; let Actifix classify and dedupe, then query tickets and rollups from the database.  
 - **Developer safety net**: Keep capture on in local/dev; Actifix auto-opens tickets for regressions and flaky behaviors while you work.  
 - **AI-assisted debugging**: Feed the ticket Markdown (with remediation notes) to your copilot for suggested fixes.  
 - **Self-hosted improvement**: Run `bootstrap_actifix_development()` inside this repo; Actifix will ticket its own issues while you add features.

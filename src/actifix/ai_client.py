@@ -526,8 +526,13 @@ class AIClient:
                     print("Invalid choice. Please enter 1-5.")
                     
             except KeyboardInterrupt:
-                # Re-raise KeyboardInterrupt to allow proper program termination
-                raise
+                return AIResponse(
+                    content="",
+                    provider=AIProvider.FREE_ALTERNATIVE,
+                    model="interrupted",
+                    success=False,
+                    error="User interrupted free alternative flow",
+                )
     
     def _build_fix_prompt(self, ticket_info: Dict[str, Any]) -> str:
         """Build the AI prompt for fixing the ticket."""

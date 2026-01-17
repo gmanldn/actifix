@@ -5,7 +5,7 @@ Focused instructions for AI agents and developers to build and ship Actifix add-
 ## What Makes a Module “Actifix-Ready”
 - **Single entrypoint**: Each module exposes a clear entry file under `src/actifix/<name>.py` (or a package with `__init__.py`), referenced in `arch/MAP.yaml` and `arch/MODULES.md`.
 - **Defined contract**: Document purpose, inputs/outputs, and dependencies. Keep contracts small and explicit.
-- **Central observability**: Use `pokertool.master_logging.get_logger` (via `src/actifix/log_utils.py`) and emit structured events; never create custom log files.
+- **Central observability**: Use `actifix.log_utils.log_event` and emit structured events; never create custom log files.
 - **Health and status**: Surface health signals via `get_health` or module-specific probes so the dashboard can show live status.
 - **Error routing through ACTIFIX**: Capture and report issues with `raise_af.record_error`—never bypass the ACTIFIX pipeline.
 - **Microservice mindset**: Treat each module as an independently testable unit with narrow APIs and no global state leakage.
@@ -17,7 +17,7 @@ Focused instructions for AI agents and developers to build and ship Actifix add-
 
 2) **Entrypoint scaffold**  
    - Create `src/actifix/<module>.py` (or a package).  
-   - Import logging via `from pokertool.master_logging import get_logger` (or `from actifix.log_utils import get_logger` depending on existing patterns).  
+   - Import logging via `from actifix.log_utils import log_event`.  
    - Add a `bootstrap()` or `run()` function that is side-effect free on import.
 
 3) **API shape**  
@@ -80,21 +80,19 @@ Focused instructions for AI agents and developers to build and ship Actifix add-
 ## Example Skeleton (Python)
 ```python
 # src/actifix/alerts.py
-from pokertool.master_logging import get_logger
+from actifix.log_utils import log_event
 from actifix.state_paths import get_actifix_paths
 from actifix.raise_af import record_error
 
-logger = get_logger(__name__)
-
 def bootstrap(project_root=None):
     paths = get_actifix_paths(project_root=project_root)
-    logger.info("alerts bootstrap started", extra={"paths": paths.as_dict()})
+    log_event("ALERTS_BOOTSTRAP", "alerts bootstrap started", extra={"paths": str(paths)})
     return paths
 
 def enqueue_alert(paths, payload):
     try:
         # core logic here (pure if possible)
-        logger.info("alert queued", extra={"priority": payload.get("priority", "P2")})
+        log_event("ALERT_QUEUED", "alert queued", extra={"priority": payload.get("priority", "P2")})
     except Exception as exc:
         record_error(
             message=str(exc),
@@ -109,7 +107,7 @@ def enqueue_alert(paths, payload):
 - Registered in `arch/MAP.yaml` and `arch/MODULES.md` with accurate entrypoints.
 - Routes (if any) live in `src/actifix/api.py` and are JSON-only.
 - Health signals emitted and visible on the dashboard.
-- Logging goes through the shared logger; no new log files.
+- Logging goes through `log_event`; no new log files.
 - Errors flow through ACTIFIX ticketing.
 - Tests cover happy paths, error paths, and persistence/queue interactions where relevant.
 

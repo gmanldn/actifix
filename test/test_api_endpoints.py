@@ -22,13 +22,20 @@ from actifix.persistence.ticket_repo import (
 )
 from actifix.raise_af import ActifixEntry, TicketPriority
 from actifix.state_paths import get_actifix_paths, init_actifix_files
+from actifix.log_utils import log_event
 
 
 def _write_log(paths):
-    paths.aflog_file.write_text(
-        "2026-01-12T00:00:00Z | TICKET_COMPLETED | ACT-1 | Completed via API | {}\n"
-        "2026-01-12T01:00:00Z | ASCII_BANNER | ACT-1 | ✓ Banner line\n",
-        encoding="utf-8",
+    log_event(
+        "TICKET_COMPLETED",
+        "Completed via API",
+        ticket_id="ACT-1",
+        level="SUCCESS",
+    )
+    log_event(
+        "ASCII_BANNER",
+        "✓ Banner line",
+        ticket_id="ACT-1",
     )
 
 

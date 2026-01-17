@@ -29,8 +29,8 @@ def cmd_init(args: argparse.Namespace) -> int:
     init_actifix_files(paths)
     
     print(f"✓ Created {paths.base_dir}")
-    print(f"✓ Created {paths.rollup_file.name}")
-    print(f"✓ Created {paths.log_file.name}")
+    print(f"✓ Created {paths.state_dir}")
+    print(f"✓ Created {paths.logs_dir}")
     print(f"\nActifix initialized successfully!")
     
     return 0

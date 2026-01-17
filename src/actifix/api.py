@@ -69,6 +69,7 @@ from .do_af import (
 )
 from .raise_af import enforce_raise_af_only
 from .state_paths import get_actifix_paths
+from .persistence.event_repo import get_event_repository, EventFilter
 from .config import get_config, set_config, load_config
 
 # Server start time for uptime calculation
@@ -421,90 +422,79 @@ def create_app(project_root: Optional[Path] = None) -> "Flask":
     
     @app.route('/api/logs', methods=['GET'])
     def api_logs():
-        """Get log file contents."""
-        paths = get_actifix_paths(project_root=app.config['PROJECT_ROOT'])
+        """Get log entries (database-backed, with optional setup log file)."""
         log_type = request.args.get('type', 'audit')
         max_lines = request.args.get('lines', 100, type=int)
-        log_files = {
-            'audit': [
-                paths.log_file,
-                paths.aflog_file,
-            ],
-            'errors': [
-                paths.log_file,
-                paths.aflog_file,
-            ],
-        }
+        if log_type == "setup":
+            setup_log = app.config['PROJECT_ROOT'] / 'logs' / 'setup.log'
+            if not setup_log.exists():
+                return jsonify({
+                    'content': [],
+                    'file': 'logs/setup.log',
+                    'error': 'Log file not found',
+                })
+            try:
+                content = setup_log.read_text(encoding='utf-8', errors='replace').strip()
+                file_lines = content.split('\n') if content else []
+                recent_lines = file_lines[-max_lines:] if len(file_lines) > max_lines else file_lines
+                parsed_lines = []
+                for line in recent_lines:
+                    parsed = _parse_log_line(line)
+                    if parsed:
+                        parsed_lines.append(parsed)
+                return jsonify({
+                    'content': parsed_lines,
+                    'file': str(setup_log),
+                    'total_lines': len(file_lines),
+                })
+            except Exception as e:
+                return jsonify({
+                    'content': [],
+                    'file': str(setup_log),
+                    'error': str(e),
+                })
 
-        # Also check for setup.log
-        setup_log = app.config['PROJECT_ROOT'] / 'logs' / 'setup.log'
-        if setup_log.exists():
-            log_files['setup'] = [setup_log]
-
-        candidates = log_files.get(log_type, [])
-        if not isinstance(candidates, list):
-            candidates = [candidates]
-
-        log_file = None
-        for candidate in candidates:
-            if not candidate or not candidate.exists():
-                continue
-            if (
-                log_type == "audit"
-                and candidate == paths.log_file
-                and candidate.stat().st_size == 0
-            ):
-                continue
-            log_file = candidate
-            break
-
-        if log_file is None:
-            log_file = next((p for p in candidates if p and p.exists()), candidates[0] if candidates else None)
-        
-        if not log_file:
-            return jsonify({
-                'content': [],
-                'file': 'unknown',
-                'error': 'Log file not found',
-            })
-
-        source_files = [log_file]
-        if (
-            log_type == "audit"
-            and paths.aflog_file.exists()
-            and paths.aflog_file not in source_files
-        ):
-            source_files.append(paths.aflog_file)
-
-        combined_lines = []
         try:
-            for source in source_files:
-                if not source.exists():
-                    continue
-                content = source.read_text(encoding='utf-8', errors='replace').strip()
-                if not content:
-                    continue
-                file_lines = content.split('\n')
-                combined_lines.extend(file_lines)
+            repo = get_event_repository()
+            limit = max_lines if max_lines > 0 else 100
+            if log_type == "errors":
+                raw_events = repo.get_events(EventFilter(limit=max(limit * 5, 100)))
+                events = [
+                    event for event in raw_events
+                    if (event.get("level") or "").upper() in {"ERROR", "CRITICAL"}
+                ]
+            else:
+                events = repo.get_recent_events(limit=limit)
 
-            total_lines = len(combined_lines)
-            recent_lines = combined_lines[-max_lines:] if total_lines > max_lines else combined_lines
+            events = list(reversed(events))
+            if len(events) > max_lines:
+                events = events[-max_lines:]
 
             parsed_lines = []
-            for line in recent_lines:
-                parsed = _parse_log_line(line)
-                if parsed:
-                    parsed_lines.append(parsed)
+            for event in events:
+                event_type = event.get("event_type") or "LOG"
+                message = event.get("message") or ""
+                level = (event.get("level") or "").upper()
+                if not level:
+                    level = _map_event_type_to_level(event_type, message)
+                parsed_lines.append({
+                    "timestamp": event.get("timestamp") or "",
+                    "event": event_type,
+                    "ticket": event.get("ticket_id") or "-",
+                    "text": message,
+                    "extra": event.get("extra_json"),
+                    "level": level,
+                })
 
             return jsonify({
                 'content': parsed_lines,
-                'file': str(log_file),
-                'total_lines': total_lines,
+                'file': 'data/actifix.db:event_log',
+                'total_lines': len(events),
             })
         except Exception as e:
             return jsonify({
                 'content': [],
-                'file': str(log_file),
+                'file': 'data/actifix.db:event_log',
                 'error': str(e),
             })
     

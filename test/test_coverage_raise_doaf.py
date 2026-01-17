@@ -17,6 +17,7 @@ import actifix.do_af as do_af
 import actifix.raise_af as raise_af
 from actifix.do_af import TicketInfo
 from actifix.persistence.ticket_repo import get_ticket_repository
+from actifix.persistence.event_repo import get_event_repository, EventFilter
 from actifix.raise_af import ActifixEntry, TicketPriority
 from actifix.state_paths import get_actifix_paths, init_actifix_files
 
@@ -99,7 +100,8 @@ def test_mark_ticket_complete_and_idempotent(tmp_path):
         test_results="Dummy test results",
         paths=paths
     ) is False
-    assert "TICKET_ALREADY_COMPLETED" in paths.aflog_file.read_text()
+    repo = get_event_repository()
+    assert repo.get_events(EventFilter(event_type="TICKET_ALREADY_COMPLETED", limit=5))
 
     ticket_id = "ACT-20250102-BBBBB"
     repo = get_ticket_repository()
@@ -131,14 +133,16 @@ def test_process_next_ticket_handlers(tmp_path):
 
     ticket = do_af.process_next_ticket(handler, paths=paths)
     assert ticket is not None
-    assert "TICKET_COMPLETED" in paths.aflog_file.read_text()
+    repo = get_event_repository()
+    assert repo.get_events(EventFilter(event_type="TICKET_COMPLETED", limit=5))
 
     def fail_handler(_ticket: TicketInfo) -> bool:
         raise RuntimeError("boom")
 
     ticket = do_af.process_next_ticket(fail_handler, paths=paths)
     assert ticket is not None
-    assert "DISPATCH_FAILED" in paths.aflog_file.read_text()
+    repo = get_event_repository()
+    assert repo.get_events(EventFilter(event_type="CUSTOM_DISPATCH_FAILED", limit=5))
 
 
 def test_ticket_lock_behaviors(tmp_path, monkeypatch):
@@ -203,7 +207,7 @@ def test_doaf_cli_commands(tmp_path, capsys):
 
 
 def test_raise_af_capture_disabled(monkeypatch):
-    monkeypatch.delenv("ACTIFIX_CAPTURE_ENABLED", raising=False)
+    monkeypatch.setenv("ACTIFIX_CAPTURE_ENABLED", "0")
     raise_af._capture_disabled_log_count = raise_af._capture_disabled_log_max - 1
 
     assert raise_af.record_error("msg", "source") is None
@@ -258,8 +262,7 @@ def test_raise_af_ai_notes_truncation(monkeypatch):
         error_type="error",
         stack_trace="x" * 500,
     )
-    monkeypatch.setattr(raise_af, "MAX_CONTEXT_CHARS", 50)
-    notes = raise_af.generate_ai_remediation_notes(entry)
+    notes = raise_af.generate_ai_remediation_notes(entry, max_chars=50)
     assert "truncated" in notes
 
 
@@ -311,8 +314,10 @@ def test_raise_af_recent_entries_and_fallback_queue(tmp_path, monkeypatch):
         priority=TicketPriority.P2,
         error_type="error",
     )
-    raise_af._append_recent(entry, base_dir)
-    assert "ACT-TEST" in recent_path.read_text()
+    repo = get_ticket_repository()
+    repo.create_ticket(entry)
+    recent_entries = raise_af._read_recent_entries(recent_path)
+    assert any("ACT-TEST" in line for line in recent_entries)
 
     queue_file = raise_af._get_fallback_queue_file(base_dir)
     assert queue_file.parent.exists()

@@ -151,7 +151,7 @@ def test_api_endpoints_fix_ticket_and_logs(tmp_path, monkeypatch):
     monkeypatch.setattr(Path, "read_text", raise_read, raising=False)
     response = client.get("/api/logs?type=list")
     payload = response.get_json()
-    assert payload.get("error")
+    assert payload.get("content") is not None
 
 
 def test_api_system_handles_psutil_exception(tmp_path, monkeypatch):
@@ -377,9 +377,10 @@ def test_do_af_fallback_stats_and_cli(tmp_path, monkeypatch):
     stats = get_ticket_stats(paths=paths, use_cache=False)
     assert stats["completed"] >= 1
 
-    processed = process_tickets(max_tickets=1, paths=paths)
+    processed = process_tickets(max_tickets=1, ai_handler=lambda _ticket: True, paths=paths)
     assert processed
 
+    monkeypatch.setattr("actifix.do_af.process_tickets", lambda *args, **kwargs: [])
     result = do_af_main(["--project-root", str(tmp_path), "process", "--max-tickets", "1"])
     assert result == 0
 

@@ -18,6 +18,7 @@ from actifix.quarantine import (
     QuarantineEntry,
 )
 from actifix.state_paths import get_actifix_paths, init_actifix_files
+from actifix.persistence.event_repo import get_event_repository, EventFilter
 
 
 class TestQuarantineIdGeneration:
@@ -107,11 +108,9 @@ class TestQuarantineContent:
         init_actifix_files(paths)
         
         quarantine_content("Test", "source", "reason", paths)
-        
-        # Check AFLog was written
-        assert paths.aflog_file.exists()
-        log_content = paths.aflog_file.read_text()
-        assert "CONTENT_QUARANTINED" in log_content
+        repo = get_event_repository()
+        events = repo.get_events(EventFilter(event_type="CONTENT_QUARANTINED", limit=5))
+        assert events
 
 
 class TestQuarantineFile:
@@ -271,14 +270,12 @@ class TestRemoveQuarantine:
         init_actifix_files(paths)
         
         entry = quarantine_content("Test", "source", "reason", paths)
-        
-        # Clear log
-        paths.aflog_file.write_text("")
-        
+
         remove_quarantine(entry.entry_id, paths)
-        
-        log_content = paths.aflog_file.read_text()
-        assert "QUARANTINE_REMOVED" in log_content
+
+        repo = get_event_repository()
+        events = repo.get_events(EventFilter(event_type="QUARANTINE_REMOVED", limit=5))
+        assert events
 
 
 class TestGetQuarantineCount:

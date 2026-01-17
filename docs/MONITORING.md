@@ -52,21 +52,20 @@ python -m actifix.health --comprehensive
 ## Log Monitoring
 
 ### Log Locations
-- Application logs: `logs/actifix.log`
-- Health logs: `logs/health.log`
-- Error logs: `logs/errors/`
-- Audit logs: `actifix/AFLog.txt`
+- Database event log: `data/actifix.db` (`event_log` table)
+- Ticket rollups: `v_recent_tickets`, `v_ticket_history` views
+- Optional process logs: `logs/` (if configured by deployment)
 
 ### Log Patterns to Monitor
 ```bash
-# Critical errors
-grep "CRITICAL\|FATAL" logs/actifix.log
+# Critical errors from event log
+sqlite3 data/actifix.db "SELECT timestamp, event_type, message FROM event_log WHERE level IN ('CRITICAL','ERROR') ORDER BY timestamp DESC LIMIT 50;"
 
 # SLA breaches
-grep "SLA_BREACH" logs/health.log
+sqlite3 data/actifix.db "SELECT id, priority, created_at FROM tickets WHERE status != 'Completed' ORDER BY created_at DESC LIMIT 20;"
 
-# Database issues
-grep "database\|sqlite" logs/actifix.log | grep -i error
+# Database issues (event log)
+sqlite3 data/actifix.db "SELECT timestamp, event_type, message FROM event_log WHERE message LIKE '%sqlite%' ORDER BY timestamp DESC LIMIT 50;"
 ```
 
 ## Performance Monitoring

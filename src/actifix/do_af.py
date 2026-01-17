@@ -252,7 +252,6 @@ def mark_ticket_complete(
     existing = repo.get_ticket(ticket_id)
     if not existing:
         log_event(
-            paths.aflog_file,
             "TICKET_NOT_FOUND",
             f"Cannot complete non-existent ticket: {ticket_id}",
             ticket_id=ticket_id,
@@ -261,7 +260,6 @@ def mark_ticket_complete(
 
     if existing.get("status") == "Completed" or existing.get("completed"):
         log_event(
-            paths.aflog_file,
             "TICKET_ALREADY_COMPLETED",
             f"Skipped already-completed ticket: {ticket_id}",
             ticket_id=ticket_id,
@@ -284,7 +282,6 @@ def mark_ticket_complete(
 
         if success:
             log_event(
-                paths.aflog_file,
                 "TICKET_COMPLETED",
                 f"Marked ticket complete with validation: {ticket_id}",
                 ticket_id=ticket_id,
@@ -299,7 +296,6 @@ def mark_ticket_complete(
 
     except ValueError as e:
         log_event(
-            paths.aflog_file,
             "COMPLETION_VALIDATION_FAILED",
             f"Failed to complete ticket {ticket_id}: {e}",
             ticket_id=ticket_id,
@@ -380,7 +376,6 @@ def fix_highest_priority_ticket(
 
     if not success:
         log_event(
-            paths.aflog_file,
             "DISPATCH_FAILED",
             f"Unable to close ticket {ticket.ticket_id} via dashboard fix",
             ticket_id=ticket.ticket_id,
@@ -393,7 +388,6 @@ def fix_highest_priority_ticket(
 
     closure_text = f"Ticket {ticket.ticket_id} closed after dashboard fix."
     log_event(
-        paths.aflog_file,
         "TICKET_CLOSED",
         closure_text,
         ticket_id=ticket.ticket_id,
@@ -407,7 +401,6 @@ def fix_highest_priority_ticket(
     ]
     for idx, line in enumerate(banner_lines):
         log_event(
-            paths.aflog_file,
             "ASCII_BANNER",
             line,
             ticket_id=ticket.ticket_id,
@@ -449,7 +442,6 @@ def process_next_ticket(
     locked = _select_and_lock_ticket(paths)
     if not locked:
         log_event(
-            paths.aflog_file,
             "NO_TICKETS",
             "No open tickets to process"
         )
@@ -460,7 +452,6 @@ def process_next_ticket(
     repo = _get_ticket_repository()
 
     log_event(
-        paths.aflog_file,
         "DISPATCH_STARTED",
         f"Processing ticket: {ticket.ticket_id}",
         ticket_id=ticket.ticket_id,
@@ -485,7 +476,6 @@ def process_next_ticket(
                 }
 
                 log_event(
-                    paths.aflog_file,
                     "AI_PROCESSING",
                     f"Requesting AI fix for ticket: {ticket.ticket_id}",
                     ticket_id=ticket.ticket_id
@@ -509,7 +499,6 @@ def process_next_ticket(
                     )
 
                     log_event(
-                        paths.aflog_file,
                         "AI_DISPATCH_SUCCESS",
                         f"AI successfully fixed ticket: {ticket.ticket_id}",
                         ticket_id=ticket.ticket_id,
@@ -524,7 +513,6 @@ def process_next_ticket(
                     return ticket
                 else:
                     log_event(
-                        paths.aflog_file,
                         "AI_DISPATCH_FAILED",
                         f"AI failed to fix ticket: {ai_response.error}",
                         ticket_id=ticket.ticket_id,
@@ -533,7 +521,6 @@ def process_next_ticket(
 
             except Exception as e:
                 log_event(
-                    paths.aflog_file,
                     "AI_DISPATCH_EXCEPTION",
                     f"AI processing exception: {e}",
                     ticket_id=ticket.ticket_id,
@@ -553,7 +540,6 @@ def process_next_ticket(
                         use_lock=False,
                     )
                     log_event(
-                        paths.aflog_file,
                         "CUSTOM_DISPATCH_SUCCESS",
                         f"Custom AI handler completed: {ticket.ticket_id}",
                         ticket_id=ticket.ticket_id
@@ -561,7 +547,6 @@ def process_next_ticket(
                     return ticket
             except Exception as e:
                 log_event(
-                    paths.aflog_file,
                     "CUSTOM_DISPATCH_FAILED",
                     f"Custom AI handler failed: {e}",
                     ticket_id=ticket.ticket_id,

@@ -11,7 +11,7 @@ ACTIFIX is a sophisticated error tracking and management framework that can **tr
 - **AI-native:** Produces consistent, compact tickets ready for Claude, GPT, or any LLM to propose fixes.
 - **Self-development:** Bootstrap once and ACTIFIX will open tickets against its own codebase as you work.
 - **Reliability & safety:** Atomic writes, fallback queues, secret redaction, and health checks to avoid silent failures.
-- **Human-readable artifacts:** SQLite ticket database (`data/actifix.db`), Markdown rollup (`ACTIFIX.md`), and lifecycle logs (`AFLog.txt`).
+- **Human-readable artifacts:** SQLite ticket database (`data/actifix.db`), rollup views (`v_recent_tickets`, `v_ticket_history`), and audit events (`event_log`).
 
 ### 💡 Why Choose ACTIFIX?
 
@@ -110,11 +110,11 @@ actifix.track_development_progress(
 After setup, ACTIFIX emits structured data in these locations:
 
 - **`data/actifix.db`** - SQLite `tickets` table (priority, status, metadata, context, AI notes); this is the only writable registry.
-- **`actifix/ACTIFIX.md`** - Read-only rollup of the last 20 errors (derived from the database for quick audits)
-- **`actifix/ACTIFIX-LOG.md`** - Generated completion log (chronological history from the DB)
-- **`actifix/AFLog.txt`** - Lifecycle audit trail (read-only diagnostic stream sourced from the ticket table)
+- **`v_recent_tickets`** - Read-only rollup of the last 20 errors (derived from the database for quick audits).
+- **`v_ticket_history`** - Generated completion log (chronological history from the DB).
+- **`event_log`** - Lifecycle audit trail (read-only diagnostic stream sourced from the ticket table).
 
-> **Tasking reminder:** `data/actifix.db` is the canonical source of truth for tasks. The repository no longer ships with `TASK_LIST.md`, `Actifix-list.md`, or any other writable Markdown task list—the migration to a database-first workflow is complete. Use `actifix.raise_af`, DoAF, the REST API, or direct SQL queries against `data/actifix.db` to create, view, and complete tickets, and treat the Markdown artifacts as generated, read-only snapshots.
+> **Tasking reminder:** `data/actifix.db` is the canonical source of truth for tasks. The repository no longer ships with `TASK_LIST.md`, `Actifix-list.md`, or any other writable Markdown task list—the migration to a database-first workflow is complete. Use `actifix.raise_af`, DoAF, the REST API, or direct SQL queries against `data/actifix.db` to create, view, and complete tickets, and treat the DB views as the read-only rollups.
 
 Each ticket includes:
 - 🆔 Unique ID (e.g., `ACT-20261001-ABC123`)
@@ -207,7 +207,7 @@ except Exception as exc:
         error_type=type(exc).__name__,
     )
 ```
-Then use `sqlite3 data/actifix.db "SELECT id, priority, status, message FROM tickets ORDER BY created_at DESC LIMIT 5;"` and `cat actifix/ACTIFIX.md` to inspect the capture.
+Then use `sqlite3 data/actifix.db "SELECT id, priority, status, message FROM tickets ORDER BY created_at DESC LIMIT 5;"` and `sqlite3 data/actifix.db "SELECT * FROM v_recent_tickets;"` to inspect the capture.
 
 ## Task Registry
 `data/actifix.db` is the **single authoritative registry** for Actifix tasks. Always create tickets via `actifix.record_error(...)`, `DoAF`, or the CLI—the database is the only writeable source of truth. Legacy Markdown task lists were retired long ago and no longer exist in this workspace.
@@ -228,9 +228,9 @@ python3 -m http.server 8080
 Open http://localhost:8080 to view the Actifix dashboard. No build step is required.
 
 ## Directory Layout & Environment
-- Defaults: tickets in `actifix/`, state in `.actifix/`, logs in `logs/`.
+- Defaults: tickets in `data/actifix.db`, data dir in `actifix/`, state in `.actifix/`, logs in `logs/`.
 - Override via env vars: `ACTIFIX_DATA_DIR`, `ACTIFIX_STATE_DIR`, `ACTIFIX_LOGS_DIR`, `ACTIFIX_CAPTURE_ENABLED=1`.
-- Generated artifacts: `data/actifix.db` (tickets), `ACTIFIX.md` (rollup), `ACTIFIX-LOG.md` (history), `AFLog.txt` (audit).
+- Generated artifacts: `data/actifix.db` (tickets), `v_recent_tickets` (rollup), `v_ticket_history` (history), `event_log` (audit).
 
 ## Next Steps
 - Integrate into your app by calling `actifix.enable_actifix_capture()` early and `actifix.install_exception_handler()` during development to auto-capture uncaught exceptions.

@@ -91,7 +91,6 @@ To recover this content:
     
     # Log the quarantine
     log_event(
-        paths.aflog_file,
         "CONTENT_QUARANTINED",
         f"Quarantined content from {source}: {reason}",
         extra={
@@ -245,7 +244,6 @@ def remove_quarantine(
             backup.unlink()
         
         log_event(
-            paths.aflog_file,
             "QUARANTINE_REMOVED",
             f"Removed quarantine entry: {entry_id}",
         )

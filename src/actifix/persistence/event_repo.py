@@ -11,6 +11,7 @@ Version: 2.0.0
 """
 
 import json
+import sqlite3
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
@@ -75,15 +76,26 @@ class EventRepository:
             ts_str = serialize_timestamp(ts)
 
             with self.pool.transaction() as conn:
-                cursor = conn.execute(
-                    """
-                    INSERT INTO event_log
-                    (timestamp, event_type, message, ticket_id, correlation_id, extra_json, source, level)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (ts_str, event_type, message, ticket_id, correlation_id, extra_json, source, level)
-                )
-                return cursor.lastrowid
+                try:
+                    cursor = conn.execute(
+                        """
+                        INSERT INTO event_log
+                        (timestamp, event_type, message, ticket_id, correlation_id, extra_json, source, level)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (ts_str, event_type, message, ticket_id, correlation_id, extra_json, source, level)
+                    )
+                    return cursor.lastrowid
+                except sqlite3.IntegrityError:
+                    cursor = conn.execute(
+                        """
+                        INSERT INTO event_log
+                        (timestamp, event_type, message, ticket_id, correlation_id, extra_json, source, level)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (ts_str, event_type, message, None, correlation_id, extra_json, source, level)
+                    )
+                    return cursor.lastrowid
         except Exception:
             # Silently fail to avoid recursive logging errors
             return None

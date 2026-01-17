@@ -252,6 +252,7 @@ modules:
   - infra.logging
   - core.quarantine
   - infra.persistence.ticket_repo
+  - security.ticket_throttler
 - id: core.do_af
   domain: core
   owner: core
@@ -339,7 +340,7 @@ modules:
   owner: tooling
   summary: Script to stop and restart Actifix processes
   entrypoints:
-  - bounce.py
+  - scripts/bounce.py
   contracts:
   - stop existing frontend and API processes
   - relaunch application via scripts/start.py with Raise_AF gate

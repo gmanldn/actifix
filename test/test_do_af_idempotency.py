@@ -16,6 +16,7 @@ from actifix.do_af import mark_ticket_complete, get_open_tickets, get_completed_
 from actifix.raise_af import ActifixEntry, TicketPriority
 from actifix.persistence.database import reset_database_pool
 from actifix.persistence.ticket_repo import get_ticket_repository, reset_ticket_repository
+from actifix.persistence.event_repo import get_event_repository, EventFilter
 from actifix.state_paths import get_actifix_paths
 
 
@@ -36,10 +37,9 @@ def temp_actifix_paths(monkeypatch):
             logs_dir=base / "logs",
         )
 
-        # Create directories and log files
+        # Create directories
         paths.base_dir.mkdir(parents=True, exist_ok=True)
         paths.logs_dir.mkdir(parents=True, exist_ok=True)
-        paths.aflog_file.write_text("")
 
         yield paths
 
@@ -80,10 +80,11 @@ def test_idempotency_guard_prevents_double_completion(temp_actifix_paths):
     )
     assert result2 is False
 
-    # Verify AFLog has skip event
-    aflog_content = paths.aflog_file.read_text()
-    assert "TICKET_ALREADY_COMPLETED" in aflog_content
-    assert "idempotency_guard" in aflog_content
+    # Verify event log has skip event
+    repo = get_event_repository()
+    events = repo.get_events(EventFilter(event_type="TICKET_ALREADY_COMPLETED", limit=10))
+    assert any(event.get("event_type") == "TICKET_ALREADY_COMPLETED" for event in events)
+    assert any("idempotency_guard" in (event.get("extra_json") or "") for event in events)
 
 
 def test_ticket_queries_use_database(temp_actifix_paths):

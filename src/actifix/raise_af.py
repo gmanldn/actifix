@@ -43,7 +43,7 @@ from .state_paths import (
     init_actifix_files,
     ActifixPaths,
 )
-from .log_utils import append_with_guard, log_event
+from .log_utils import log_event
 from .config import get_config
 
 
@@ -181,7 +181,8 @@ def _get_cached_actifix_paths(base_dir: Optional[Path] = None) -> ActifixPaths:
         return cached
 
     _PATH_CACHE_STATS["misses"] += 1
-    paths = get_actifix_paths(base_dir=base_dir)
+    project_root = Path(base_dir).resolve().parent if base_dir else None
+    paths = get_actifix_paths(project_root=project_root, base_dir=base_dir)
     _PATH_CACHE[key] = paths
     return paths
 
@@ -649,9 +650,6 @@ def ensure_scaffold(base_dir: Path) -> None:
     base_dir.mkdir(parents=True, exist_ok=True)
     paths = _get_cached_actifix_paths(base_dir=base_dir)
     init_actifix_files(paths)
-    fallback_aflog = base_dir / "AFLog.txt"
-    fallback_aflog.parent.mkdir(parents=True, exist_ok=True)
-    fallback_aflog.touch(exist_ok=True)
 
 
 
@@ -1000,9 +998,7 @@ def record_error(
             # Throttle recording failure shouldn't block ticket creation
             pass
 
-        _append_rollup_entry(active_paths, entry)
         log_event(
-            active_paths.aflog_file,
             "TICKET_CREATED",
             f"Recorded ticket {entry.entry_id}",
             ticket_id=entry.entry_id,
@@ -1010,9 +1006,7 @@ def record_error(
         )
         replay_fallback_queue(base_dir_path)
     except Exception:
-        _append_rollup_entry(active_paths, entry)
         log_event(
-            active_paths.aflog_file,
             "FALLBACK_QUEUE",
             f"Queued ticket {entry.entry_id} for later replay",
             ticket_id=entry.entry_id,
@@ -1024,32 +1018,39 @@ def record_error(
 
 
 def _append_rollup_entry(paths: ActifixPaths, entry: ActifixEntry) -> None:
-    """Append a simple summary line to the rollup/history files."""
-    try:
-        message = entry.message.replace("\n", " ").strip()
-        line = (
-            f"{entry.created_at.isoformat()} | {entry.entry_id} | "
-            f"{entry.priority.value} | {entry.error_type} | {message}\n"
-        )
-        append_with_guard(paths.rollup_file, line)
-        append_with_guard(paths.history_file, line)
-    except Exception:
-        pass
+    """No-op: rollup/history are now database views."""
+    return None
 
 
 def _read_recent_entries(recent_path: Path) -> list[str]:
-    """Read recent rollup entries from the ACTIFIX.md file."""
-    if not recent_path.exists():
+    """Read recent rollup entries from the database view."""
+    try:
+        from .persistence.database import get_database_pool
+
+        pool = get_database_pool()
+        with pool.connection() as conn:
+            cursor = conn.execute(
+                """
+                SELECT created_at, id, priority, error_type, message
+                FROM v_recent_tickets
+                ORDER BY created_at DESC
+                """
+            )
+            entries = []
+            for row in cursor.fetchall():
+                message = (row["message"] or "").replace("\n", " ").strip()
+                entries.append(
+                    f"{row['created_at']} | {row['id']} | {row['priority']} | "
+                    f"{row['error_type']} | {message}"
+                )
+            return entries
+    except Exception:
         return []
-    lines = [line.strip() for line in recent_path.read_text(encoding="utf-8").splitlines()]
-    return [line for line in lines if line]
 
 
 def _append_recent(entry: ActifixEntry, base_dir: Path) -> None:
-    """Append an Actifix entry to the recent rollup file for compatibility."""
-    paths = _get_cached_actifix_paths(base_dir=base_dir)
-    init_actifix_files(paths)
-    _append_rollup_entry(paths, entry)
+    """Compatibility shim (no-op)."""
+    return None
 
 
 def parse_args(argv=None) -> argparse.Namespace:

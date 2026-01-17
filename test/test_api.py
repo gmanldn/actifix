@@ -267,15 +267,11 @@ class TestLogParsing:
         if not FLASK_AVAILABLE:
             pytest.skip("Flask not available")
         
-        # Write test log content
-        paths = get_actifix_paths(project_root=temp_project)
-        paths.log_file.write_text("""INFO: Normal log line
-ERROR: Something went wrong
-WARNING: Be careful
-✓ Success operation
-✗ Failed operation
-⚠ Warning indicator
-""")
+        from actifix.log_utils import log_event
+        log_event("LOG", "Normal log line", level="INFO")
+        log_event("LOG", "Something went wrong", level="ERROR")
+        log_event("LOG", "Be careful", level="WARNING")
+        log_event("LOG", "Success operation", level="SUCCESS")
         
         from actifix.api import create_app
         app = create_app(temp_project)

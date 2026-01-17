@@ -164,21 +164,18 @@ Add to your build pipeline:
 
 ## Directory Structure
 
-After installation, actifix creates:
+After installation, Actifix creates:
 
 ```
-actifix_state/
-├── logs/
-│   ├── actifix.log
-│   ├── health.log
-│   └── errors/
-├── quarantine/
-│   └── corrupted_state/
-├── tickets/
-│   ├── active/
-│   └── resolved/
-└── config/
-    └── runtime.json
+project-root/
+├── data/
+│   └── actifix.db                # SQLite ticket store
+├── .actifix/
+│   ├── actifix_fallback_queue.json
+│   ├── quarantine/
+│   └── RAISE_AF_ONLY
+├── logs/                         # Optional runtime logs
+└── actifix/                      # Data directory for derived artifacts
 ```
 
 ## Troubleshooting

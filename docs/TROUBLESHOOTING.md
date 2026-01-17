@@ -323,10 +323,10 @@ print(f'Violations: {violations}')
 ### Log Analysis
 ```bash
 # View recent errors
-tail -n 50 logs/actifix.log | grep ERROR
+sqlite3 data/actifix.db "SELECT timestamp, event_type, message FROM event_log WHERE level='ERROR' ORDER BY timestamp DESC LIMIT 50;"
 
 # Check audit trail
-tail -n 100 actifix/AFLog.txt
+sqlite3 data/actifix.db "SELECT timestamp, event_type, message FROM event_log ORDER BY timestamp DESC LIMIT 100;"
 
 # Analyze error patterns
 python -m actifix.analysis --error-patterns

@@ -41,6 +41,14 @@ __version__ = "3.2.0"
 __author__ = "Actifix Framework"
 __description__ = "Generic Error Tracking and Management Framework with AI Integration"
 
+
+def quick_start() -> None:
+    """Print a quick-start guide for the core API."""
+    print("Actifix Quick Start")
+    print("1) enable_actifix_capture()")
+    print("2) record_error(message, source, run_label, error_type, priority=None)")
+
+
 __all__ = [
     "record_error",
     "ActifixEntry",
@@ -65,4 +73,5 @@ __all__ = [
     "generate_duplicate_guard",
     "ensure_scaffold",
     "ACTIFIX_CAPTURE_ENV_VAR",
+    "quick_start",
 ]

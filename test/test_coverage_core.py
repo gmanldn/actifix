@@ -101,7 +101,7 @@ def test_api_logs_invalid_type(tmp_path):
     with app.test_client() as client:
         response = client.get("/api/logs?type=unknown")
         data = response.get_json()
-        assert data.get("error") == "Log file not found"
+        assert data.get("content") is not None
 
 
 def test_api_system_with_psutil(tmp_path, monkeypatch):
@@ -183,7 +183,7 @@ def test_bootstrap_enable_disable_capture(monkeypatch):
     enable_actifix_capture()
     assert os.environ.get("ACTIFIX_CAPTURE_ENABLED") == "1"
     disable_actifix_capture()
-    assert os.environ.get("ACTIFIX_CAPTURE_ENABLED") is None
+    assert os.environ.get("ACTIFIX_CAPTURE_ENABLED") == "0"
 
 
 def test_exception_handler_install_uninstall():
@@ -223,7 +223,7 @@ def test_health_parsing_and_breaches(tmp_path):
 def test_health_missing_artifacts(tmp_path):
     paths = get_actifix_paths(project_root=tmp_path)
     init_actifix_files(paths)
-    paths.rollup_file.unlink()
+    paths.log_file.unlink()
     health = get_health(paths)
     assert any("Missing file" in warning for warning in health.warnings)
 
