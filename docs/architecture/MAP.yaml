@@ -321,6 +321,7 @@ modules:
   depends_on:
   - bootstrap.main
   - infra.logging
+  - core.raise_af
   - tooling.testing.system
   - tooling.testing.reporting
 - id: tooling.simple_ticket_attack

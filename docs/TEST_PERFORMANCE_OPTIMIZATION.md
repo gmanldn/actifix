@@ -203,6 +203,13 @@ pytest -m db -v
 # Review database_profiler report for optimizations
 ```
 
+## Automated Hang Detection
+
+- The `SlowTestTracker` pytest plugin now records any test that exceeds the 30 second hang threshold via `actifix.raise_af.record_error`. Those P0 `TestHang` tickets include the nodeid, runtime, and marker set so you can trace which test triggered the timeout.
+- This resolves **ACT-20260117-76E69**, **ACT-20260117-E9F71**, and **ACT-20260117-B9020** by making the test-level hang data available directly in `data/actifix.db` even if the hang is skipped in fast runs.
+- Query the canonical store after a hang with `sqlite3 data/actifix.db "SELECT id, priority, message FROM tickets WHERE error_type='TestHang';"` or reuse `scripts/view_tickets.py` to triage exposures before rerunning `pytest --runslow`.
+- Slow tests are still skipped unless `--runslow` is provided, so the default CI cycle avoids the 30 second timeout while the ticket pipeline keeps a log of any hangers for follow-up work.
+
 ## Monitoring and Maintenance
 
 ### Weekly Performance Review

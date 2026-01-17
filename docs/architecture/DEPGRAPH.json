@@ -105,6 +105,7 @@
     {"from": "tooling.testing.reporting", "to": "tooling.testing.system", "reason": "tooling.testing.reporting depends on tooling.testing.system"},
     {"from": "tooling.testing", "to": "bootstrap.main", "reason": "tooling.testing depends on bootstrap.main"},
     {"from": "tooling.testing", "to": "infra.logging", "reason": "tooling.testing depends on infra.logging"},
+    {"from": "tooling.testing", "to": "core.raise_af", "reason": "tooling.testing uses raise_af to record hang tickets"},
     {"from": "tooling.testing", "to": "tooling.testing.system", "reason": "tooling.testing depends on tooling.testing.system"},
     {"from": "tooling.testing", "to": "tooling.testing.reporting", "reason": "tooling.testing depends on tooling.testing.reporting"},
     {"from": "plugins.registry", "to": "infra.logging", "reason": "plugins.registry depends on infra.logging"},

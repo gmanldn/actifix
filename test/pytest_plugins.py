@@ -6,9 +6,18 @@ Automatically detects slow tests and categorizes them.
 Generates reports for performance analysis.
 """
 
-import pytest
+import sys
 from collections import defaultdict
+from pathlib import Path
 from typing import Dict, List
+
+ROOT = Path(__file__).resolve().parents[1]
+SRC_PATH = ROOT / "src"
+if str(SRC_PATH) not in sys.path:
+    sys.path.insert(0, str(SRC_PATH))
+
+import pytest
+from actifix.raise_af import TicketPriority, record_error
 
 
 class SlowTestTracker:
@@ -57,6 +66,7 @@ class SlowTestTracker:
         if not self.slow_tests:
             if self.hang_tests:
                 self._report_hangs()
+                self._record_hang_tickets()
             return
 
         print("\n" + "=" * 80)
@@ -90,6 +100,7 @@ class SlowTestTracker:
         print("\n" + "=" * 80)
         if self.hang_tests:
             self._report_hangs()
+            self._record_hang_tickets()
 
     def _report_hangs(self):
         """Print diagnostics for tests that exceed the hang threshold."""
@@ -103,6 +114,28 @@ class SlowTestTracker:
                 f"{i:2d}. {test['duration_ms']:8.1f}ms | {markers_str:20s} | {test['name']}"
             )
         print("\n" + "=" * 80)
+
+    def _record_hang_tickets(self) -> None:
+        """Record P0 tickets for tests that exceeded the hang threshold."""
+        for test in self.hang_tests:
+            markers_str = ", ".join(test["markers"]) if test["markers"] else "unmarked"
+            message = (
+                f"Pytest hang detected: {test['name']} took {test['duration_ms']:.1f}ms "
+                f"(markers: {markers_str})"
+            )
+            try:
+                record_error(
+                    message=message,
+                    source="test/pytest_plugins.py::SlowTestTracker",
+                    run_label="test-suite",
+                    error_type="TestHang",
+                    priority=TicketPriority.P0,
+                    stack_trace=f"Markers: {markers_str}",
+                    capture_context=False,
+                )
+                print(f"  ✗ Raised hang ticket for {test['name']} ({markers_str})")
+            except Exception as exc:
+                print(f"  ⚠️  Failed to record hang for {test['name']}: {exc}")
 
 
 # Global tracker instance
