@@ -14,26 +14,26 @@ import os
 import sys
 import traceback
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Callable, Tuple, Any
 
 from .raise_af import record_error, ACTIFIX_CAPTURE_ENV_VAR, enforce_raise_af_only
 from .state_paths import get_actifix_paths, init_actifix_files, ActifixPaths
 
 
-def enable_actifix_capture():
+def enable_actifix_capture() -> None:
     """Enable actifix error capture for development."""
     os.environ[ACTIFIX_CAPTURE_ENV_VAR] = "1"
 
 
-def disable_actifix_capture():
+def disable_actifix_capture() -> None:
     """Disable actifix error capture."""
     os.environ[ACTIFIX_CAPTURE_ENV_VAR] = "0"
 
 
-def capture_exception(exc_type, exc_value, exc_traceback):
+def capture_exception(exc_type: Any, exc_value: Any, exc_traceback: Any) -> None:
     """
     Capture exceptions in actifix development.
-    
+
     This can be set as the global exception handler during development
     so that actifix automatically tracks its own bugs.
     """
@@ -67,54 +67,54 @@ def capture_exception(exc_type, exc_value, exc_traceback):
         print(f"[Actifix] Failed to capture error: {e}")
 
 
-def install_exception_handler():
+def install_exception_handler() -> Callable:
     """Install global exception handler for actifix development."""
     original_handler = sys.excepthook
-    
-    def actifix_excepthook(exc_type, exc_value, exc_traceback):
+
+    def actifix_excepthook(exc_type: Any, exc_value: Any, exc_traceback: Any) -> None:
         # Capture with actifix first
         capture_exception(exc_type, exc_value, exc_traceback)
-        
+
         # Then call the original handler
         original_handler(exc_type, exc_value, exc_traceback)
-    
+
     sys.excepthook = actifix_excepthook
     return original_handler
 
 
-def uninstall_exception_handler(original_handler):
+def uninstall_exception_handler(original_handler: Callable) -> None:
     """Restore the original exception handler."""
     sys.excepthook = original_handler
 
 
-def bootstrap_actifix_development():
+def bootstrap_actifix_development() -> Callable:
     """
     Bootstrap actifix for self-development.
-    
+
     Call this at the start of actifix development to enable
     automatic error tracking during the development process.
     """
     print("[Actifix] Bootstrapping self-development mode...")
-    
+
     # Enable error capture
     enable_actifix_capture()
-    
+
     # Install exception handler
     original_handler = install_exception_handler()
-    
+
     # Create initial directories
     from .state_paths import get_actifix_data_dir, get_actifix_state_dir
-    
+
     data_dir = get_actifix_data_dir()
     state_dir = get_actifix_state_dir()
-    
+
     data_dir.mkdir(parents=True, exist_ok=True)
     state_dir.mkdir(parents=True, exist_ok=True)
-    
+
     print(f"[Actifix] Data directory: {data_dir}")
     print(f"[Actifix] State directory: {state_dir}")
     print("[Actifix] Self-development mode active - actifix will track its own development issues!")
-    
+
     return original_handler
 
 
@@ -142,7 +142,7 @@ def shutdown() -> None:
 class ActifixContext:
     """Context manager to bootstrap Actifix lifecycle."""
 
-    def __init__(self, project_root: Optional[Path] = None):
+    def __init__(self, project_root: Optional[Path] = None) -> None:
         self.project_root = project_root
         self.paths: Optional[ActifixPaths] = None
 
@@ -150,11 +150,11 @@ class ActifixContext:
         self.paths = bootstrap(self.project_root)
         return self.paths
 
-    def __exit__(self, exc_type, exc_value, exc_traceback) -> None:
+    def __exit__(self, exc_type: Any, exc_value: Any, exc_traceback: Any) -> None:
         shutdown()
 
 
-def create_initial_ticket():
+def create_initial_ticket() -> None:
     """
     Create an initial ticket for actifix development.
 
@@ -177,7 +177,7 @@ def create_initial_ticket():
         )
 
 
-def track_development_progress(milestone: str, details: str = ""):
+def track_development_progress(milestone: str, details: str = "") -> None:
     """
     Track development milestones as actifix tickets.
 

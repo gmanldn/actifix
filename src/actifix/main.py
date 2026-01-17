@@ -120,11 +120,11 @@ def cmd_test(args: argparse.Namespace) -> int:
         from .log_utils import atomic_write
         import tempfile
         
-        def test_basic():
+        def test_basic() -> None:
             paths = get_actifix_paths()
             assert paths.base_dir.exists()
-        
-        def test_record():
+
+        def test_record() -> None:
             entry = record_error("TestError", "test", "test/test_runner.py:1", "P3")
             assert entry is not None
         
