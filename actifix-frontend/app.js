@@ -10,6 +10,8 @@ const { useState, useEffect, useRef, createElement: h } = React;
 const API_BASE = 'http://localhost:5001/api';
 const REFRESH_INTERVAL = 5000;
 const LOG_REFRESH_INTERVAL = 3000;
+const TICKET_REFRESH_INTERVAL = 4000;
+const TICKET_LIMIT = 250;
 
 // ============================================================================
 // Utility Functions
@@ -58,6 +60,34 @@ const getStatusColor = (status) => {
   return colors[status] || '#6b7280';
 };
 
+const PRIORITY_ORDER = ['P0', 'P1', 'P2', 'P3', 'P4'];
+const PRIORITY_LABELS = {
+  P0: 'Critical',
+  P1: 'High',
+  P2: 'Medium',
+  P3: 'Low',
+  P4: 'Deferred',
+};
+
+const normalizePriority = (priority) => (
+  PRIORITY_ORDER.includes(priority) ? priority : 'P4'
+);
+
+const groupTicketsByPriority = (tickets) => {
+  const grouped = {};
+  PRIORITY_ORDER.forEach((priority) => {
+    grouped[priority] = { open: [], completed: [] };
+  });
+
+  tickets.forEach((ticket) => {
+    const priority = normalizePriority(ticket.priority);
+    const bucket = ticket.status === 'completed' ? 'completed' : 'open';
+    grouped[priority][bucket].push(ticket);
+  });
+
+  return grouped;
+};
+
 // ============================================================================
 // Custom Hooks
 // ============================================================================
@@ -66,15 +96,17 @@ const useFetch = (endpoint, interval = REFRESH_INTERVAL) => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [lastUpdated, setLastUpdated] = useState(null);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await fetch(`${API_BASE}${endpoint}`);
+        const response = await fetch(`${API_BASE}${endpoint}`, { cache: 'no-store' });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const json = await response.json();
         setData(json);
         setError(null);
+        setLastUpdated(new Date());
       } catch (err) {
         setError(err.message);
       } finally {
@@ -87,7 +119,7 @@ const useFetch = (endpoint, interval = REFRESH_INTERVAL) => {
     return () => clearInterval(timer);
   }, [endpoint, interval]);
 
-  return { data, loading, error };
+  return { data, loading, error, lastUpdated };
 };
 
 // ============================================================================
@@ -359,12 +391,13 @@ const OverviewView = () => {
         )
       ),
       tickets?.tickets && tickets.tickets.length > 0 ? h('div', { className: 'ticket-list' },
-        tickets.tickets.slice(0, 15).map((ticket, i) =>
-          h('div', { key: ticket.ticket_id || i, className: 'ticket-item' },
+        tickets.tickets.slice(0, 15).map((ticket, i) => {
+          const priority = normalizePriority(ticket.priority);
+          return h('div', { key: ticket.ticket_id || i, className: 'ticket-item' },
             h('div', { className: 'ticket-item-header' },
               h('span', {
-                className: `priority-badge ${ticket.priority.toLowerCase()}`
-              }, ticket.priority),
+                className: `priority-badge ${priority.toLowerCase()}`
+              }, priority),
               h('span', {
                 className: `status-badge ${ticket.status}`
               }, ticket.status),
@@ -378,8 +411,8 @@ const OverviewView = () => {
             h('div', { className: 'ticket-meta' },
               h('span', null, '📁 ', ticket.source || 'unknown')
             )
-          )
-        )
+          );
+        })
       ) : h('div', { style: { padding: '24px', textAlign: 'center', color: 'var(--text-dim)' } }, 'No tickets found')
     )
   );
@@ -387,48 +420,84 @@ const OverviewView = () => {
 
 // Tickets View Component
 const TicketsView = () => {
-  const { data, loading, error } = useFetch('/tickets');
+  const { data, loading, error, lastUpdated } = useFetch(`/tickets?limit=${TICKET_LIMIT}`, TICKET_REFRESH_INTERVAL);
 
   if (loading) return h(LoadingSpinner);
   if (error) return h(ErrorDisplay, { message: error });
 
   const tickets = data?.tickets || [];
+  const groupedTickets = groupTicketsByPriority(tickets);
+  const updatedLabel = lastUpdated
+    ? lastUpdated.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+    : '—';
 
-  return h('div', { className: 'panel' },
+  const renderTicketCard = (ticket, index) => {
+    const priority = normalizePriority(ticket.priority);
+    return h('article', { key: ticket.ticket_id || index, className: `ticket-card ${ticket.status}` },
+      h('div', { className: 'ticket-card-header' },
+        h('span', { className: `priority-badge ${priority.toLowerCase()}` }, priority),
+        h('span', { className: `status-badge ${ticket.status}` }, ticket.status),
+        h('span', { className: 'ticket-id' }, ticket.ticket_id?.slice(0, 10) || 'N/A')
+      ),
+      h('div', { className: 'ticket-card-title' }, ticket.error_type || 'Unknown'),
+      h('div', { className: 'ticket-card-message' }, ticket.message || ''),
+      h('div', { className: 'ticket-card-meta' },
+        h('span', null, '📁 ', ticket.source || 'unknown'),
+        h('span', null, '⏱ ', formatRelativeTime(ticket.created))
+      )
+    );
+  };
+
+  return h('div', { className: 'panel tickets-board' },
     h('div', { className: 'panel-header' },
       h('div', { className: 'panel-title' },
         h('span', { className: 'panel-title-icon' }, '🎫'),
         'ALL TICKETS'
       ),
       h('div', { className: 'panel-actions' },
+        h('span', { className: 'tickets-live' },
+          h('span', { className: 'tickets-live-dot' }),
+          'Live',
+          h('span', { className: 'tickets-live-time' }, `Updated ${updatedLabel}`)
+        ),
         h('span', { className: 'text-muted', style: { fontSize: '11px' } },
           `${data?.total_open ?? 0} open • ${data?.total_completed ?? 0} completed`
         )
       )
     ),
-    tickets.length > 0 ? h('div', { className: 'ticket-list' },
-      tickets.map((ticket, i) =>
-        h('div', { key: ticket.ticket_id || i, className: 'ticket-item' },
-          h('div', { className: 'ticket-item-header' },
-            h('span', {
-              className: `priority-badge ${ticket.priority.toLowerCase()}`
-            }, ticket.priority),
-            h('span', {
-              className: `status-badge ${ticket.status}`
-            }, ticket.status),
-            h('span', { className: 'ticket-id' }, ticket.ticket_id?.slice(0, 12) || 'N/A'),
-            h('span', { className: 'text-dim', style: { fontSize: '10px', marginLeft: 'auto' } },
-              formatRelativeTime(ticket.created)
+    tickets.length > 0 ? h('div', { className: 'priority-lanes' },
+      PRIORITY_ORDER.map((priority) => {
+        const group = groupedTickets[priority];
+        const openTickets = group?.open || [];
+        const completedTickets = group?.completed || [];
+        const label = PRIORITY_LABELS[priority] || 'Priority';
+
+        return h('section', {
+          key: priority,
+          className: 'priority-lane',
+          'data-priority': priority,
+        },
+          h('div', { className: 'priority-lane-header' },
+            h('div', { className: 'priority-lane-title' },
+              h('span', { className: `priority-badge ${priority.toLowerCase()}` }, priority),
+              h('div', { className: 'priority-lane-label' }, label)
+            ),
+            h('div', { className: 'priority-lane-counts' },
+              h('span', { className: 'lane-count open' }, `${openTickets.length} open`),
+              h('span', { className: 'lane-count completed' }, `${completedTickets.length} done`)
             )
           ),
-          h('div', { className: 'ticket-type' }, ticket.error_type || 'Unknown'),
-          h('div', { className: 'ticket-message' }, ticket.message || ''),
-          h('div', { className: 'ticket-meta' },
-            h('span', null, '📁 ', ticket.source || 'unknown'),
-            h('span', null, '🏷️ ', ticket.created ? formatTime(ticket.created) : 'N/A')
+          openTickets.length > 0
+            ? openTickets.map(renderTicketCard)
+            : h('div', { className: 'lane-empty' }, 'No open tickets'),
+          completedTickets.length > 0 && h('details', { className: 'lane-completed' },
+            h('summary', null, `Show ${completedTickets.length} completed`),
+            h('div', { className: 'lane-completed-list' },
+              completedTickets.map(renderTicketCard)
+            )
           )
-        )
-      )
+        );
+      })
     ) : h('div', { style: { padding: '24px', textAlign: 'center', color: 'var(--text-dim)' } }, 'No tickets found')
   );
 };

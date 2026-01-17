@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Move the consolidated test runner into `test/test_runner.py` and align the docs/architecture references with the new path
+- Refresh the dashboard ticket feed more frequently and group tickets by priority lanes in the UI
 
 ## [2.7.0] - 2026-01-11
 
