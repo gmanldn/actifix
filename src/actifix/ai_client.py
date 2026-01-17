@@ -394,26 +394,28 @@ class AIClient:
     
     def _call_ollama(self, prompt: str, ticket_info: Dict[str, Any]) -> AIResponse:
         """Call local Ollama instance."""
+        ollama_model = self.config.ollama_model
+
         try:
             import requests
-            
+
             # Try to connect to local Ollama
             response = requests.post(
                 "http://localhost:11434/api/generate",
                 json={
-                    "model": "codellama:7b",
+                    "model": ollama_model,
                     "prompt": prompt,
                     "stream": False
                 },
                 timeout=300
             )
-            
+
             if response.status_code == 200:
                 result = response.json()
                 return AIResponse(
                     content=result.get("response", ""),
                     provider=AIProvider.OLLAMA,
-                    model="codellama:7b",
+                    model=ollama_model,
                     success=True,
                     cost_usd=0.0  # Free local model
                 )
@@ -421,16 +423,16 @@ class AIClient:
                 return AIResponse(
                     content="",
                     provider=AIProvider.OLLAMA,
-                    model="codellama:7b",
+                    model=ollama_model,
                     success=False,
                     error=f"Ollama HTTP {response.status_code}"
                 )
-                
+
         except ImportError:
             return AIResponse(
                 content="",
                 provider=AIProvider.OLLAMA,
-                model="codellama:7b",
+                model=ollama_model,
                 success=False,
                 error="requests package not installed"
             )
@@ -438,7 +440,7 @@ class AIClient:
             return AIResponse(
                 content="",
                 provider=AIProvider.OLLAMA,
-                model="codellama:7b",
+                model=ollama_model,
                 success=False,
                 error=f"Ollama error: {e}"
             )

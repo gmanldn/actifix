@@ -128,6 +128,7 @@ class ActifixConfig:
     ai_provider: str = "openai"  # openai, anthropic, google, openrouter, ollama
     ai_api_key: str = ""
     ai_model: str = ""  # e.g., gpt-4, claude-3-sonnet, gemini-pro
+    ollama_model: str = "codellama:7b"  # Default Ollama model
     ai_enabled: bool = False
 
 
@@ -278,6 +279,7 @@ def load_config(
         ai_provider=_get_env_sanitized("ACTIFIX_AI_PROVIDER", "openai", value_type="alphanumeric"),
         ai_api_key=_get_env_sanitized("ACTIFIX_AI_API_KEY", "", value_type="string"),
         ai_model=_get_env_sanitized("ACTIFIX_AI_MODEL", "", value_type="alphanumeric"),
+        ollama_model=_get_env_sanitized("ACTIFIX_OLLAMA_MODEL", "codellama:7b", value_type="alphanumeric"),
         ai_enabled=_parse_bool(_get_env_sanitized("ACTIFIX_AI_ENABLED", "0", value_type="boolean")),
     )
     
