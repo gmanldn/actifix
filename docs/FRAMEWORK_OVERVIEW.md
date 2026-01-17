@@ -51,6 +51,7 @@ Refer to `docs/architecture/MAP.yaml`, `architecture/MODULES.md`, and `architect
 ## Release notes snapshot
 | Version | Highlights |
 |---------|------------|
+| **3.3.4** (2026-01-18) | Security stabilisation: automatically tighten `data/actifix.db` permissions before validation so the world-readable guard rails no longer block legitimate database creation. |
 | **3.3.3** (2026-01-17) | Automated hang detection: pytest slow-test tracker now raises Actifix P0 `TestHang` tickets for tests exceeding the 30s timeout, making the problematic nodeids visible through `data/actifix.db` and closing the relevant P0 tickets. |
 | **3.3.2** (2026-01-17) | Stability release—10s pytest timeout, `--runslow` guard, slow-test tracker, developer loop reliability improvements.<br>Documented validations in `docs/DEVELOPMENT.md`. |
 | **2.7.0** (2026-01-11) | Production-ready AI stack: multi-provider AI client, database persistence with ticket repository, migrations, health monitoring, quarantine, architecture compliance tooling. |
