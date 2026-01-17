@@ -14,7 +14,7 @@ import sys
 from pathlib import Path
 
 # Add src directory to path to import actifix modules
-project_root = Path(__file__).parent
+project_root = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(project_root / "src"))
 
 from actifix.persistence.ticket_repo import get_ticket_repository

@@ -10,11 +10,11 @@ Actifix scaffold, enables error capture, runs a quick health check, and
 serves both the static web interface and API backend.
 
 Usage:
-    python start.py                     # init + health + start web UI + API
-    python start.py --setup-only        # init only, no servers
-    python start.py --health-only       # health check and exit
-    python start.py --frontend-port 8081
-    python start.py --api-port 5002
+    python scripts/start.py                     # init + health + start web UI + API
+    python scripts/start.py --setup-only        # init only, no servers
+    python scripts/start.py --health-only       # health check and exit
+    python scripts/start.py --frontend-port 8081
+    python scripts/start.py --api-port 5002
 """
 
 from __future__ import annotations
@@ -33,7 +33,7 @@ import atexit
 from pathlib import Path
 from typing import Optional
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parents[1]
 SRC_DIR = ROOT / "src"
 FRONTEND_DIR = ROOT / "actifix-frontend"
 DEFAULT_FRONTEND_PORT = 8080

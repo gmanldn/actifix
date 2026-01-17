@@ -17,8 +17,9 @@ import tempfile
 import os
 import sqlite3
 
+ROOT = Path(__file__).resolve().parents[1]
 # Add src to path
-sys.path.insert(0, str(Path(__file__).parent / "src"))
+sys.path.insert(0, str(ROOT / "src"))
 
 from actifix.persistence.database import reset_database_pool, get_database_pool
 from actifix.persistence.ticket_repo import (

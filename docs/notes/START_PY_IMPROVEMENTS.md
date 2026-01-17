@@ -1,7 +1,7 @@
-# start.py Improvements Summary
+# scripts/start.py Improvements Summary
 
 ## Overview
-Enhanced `start.py` with beautiful, color-coded terminal output and intelligent default behavior.
+Enhanced `scripts/start.py` with beautiful, color-coded terminal output and intelligent default behavior.
 
 ## Changes Made
 
@@ -49,7 +49,7 @@ Now automatically sets `ACTIFIX_CHANGE_ORIGIN=raise_af` if not set:
 - Clear messages about what's being configured
 
 ### 5. **Default Behavior**
-**NOW**: `python3 start.py` starts EVERYTHING by default:
+**NOW**: `python3 scripts/start.py` starts EVERYTHING by default:
 - ✅ API server on port 5001
 - ✅ Frontend on port 8080
 - ✅ Version monitoring
@@ -90,7 +90,7 @@ Clean shutdown messages:
 
 ### Simple Startup (New Default)
 ```bash
-python3 start.py
+python3 scripts/start.py
 ```
 
 This now:
@@ -103,27 +103,27 @@ This now:
 
 ### With Browser Auto-Open
 ```bash
-python3 start.py --browser
+python3 scripts/start.py --browser
 ```
 
 ### Frontend Only (No API)
 ```bash
-python3 start.py --no-api
+python3 scripts/start.py --no-api
 ```
 
 ### Health Check Only
 ```bash
-python3 start.py --health-only
+python3 scripts/start.py --health-only
 ```
 
 ### Setup Only (No Servers)
 ```bash
-python3 start.py --setup-only
+python3 scripts/start.py --setup-only
 ```
 
 ### Custom Ports
 ```bash
-python3 start.py --frontend-port 3000 --api-port 8000
+python3 scripts/start.py --frontend-port 3000 --api-port 8000
 ```
 
 ## Benefits
@@ -217,7 +217,7 @@ Press Ctrl+C to stop all servers
 - **Migration path**: If you relied on no-API default, use `--no-api` flag
 
 ### For Scripts
-If you have scripts that call `start.py`, they will continue to work:
+If you have scripts that call `scripts/start.py`, they will continue to work:
 - All command-line flags preserved
 - Exit codes unchanged
 - Output format enhanced but parseable
@@ -233,10 +233,10 @@ Potential improvements:
 
 ## Conclusion
 
-`start.py` is now a professional, user-friendly launcher that:
+`scripts/start.py` is now a professional, user-friendly launcher that:
 - Works perfectly with no arguments
 - Provides clear, color-coded feedback
 - Sets up everything automatically
 - Looks great and is easy to use
 
-Just run `python3 start.py` and everything works! 🎉
+Just run `python3 scripts/start.py` and everything works! 🎉

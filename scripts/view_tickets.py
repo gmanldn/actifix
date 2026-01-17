@@ -11,8 +11,9 @@ import json
 from pathlib import Path
 from datetime import datetime
 
+ROOT = Path(__file__).resolve().parents[1]
 # Add src to path
-sys.path.insert(0, str(Path(__file__).parent / "src"))
+sys.path.insert(0, str(ROOT / "src"))
 
 from actifix.persistence.ticket_repo import TicketRepository, TicketFilter
 from actifix.persistence.database import get_database_pool
@@ -58,7 +59,7 @@ def main():
     print()
 
     # Initialize database and repository
-    db_path = Path(__file__).parent / "data" / "actifix.db"
+    db_path = ROOT / "data" / "actifix.db"
 
     if not db_path.exists():
         print(f"Error: Database not found at {db_path}")

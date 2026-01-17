@@ -3,13 +3,14 @@
 bounce.py
 
 Stops any running Actifix backend or frontend processes, then restarts the
-Actifix application via start.py, honoring the Raise_AF gate.
+Actifix application via scripts/start.py, honoring the Raise_AF gate.
 """
 
 import os
 import signal
 import subprocess
 import sys
+from pathlib import Path
 
 # Environment variable required by Actifix change gate
 os.environ['ACTIFIX_CHANGE_ORIGIN'] = 'raise_af'
@@ -56,9 +57,11 @@ def main():
         print(" → No running Actifix processes detected.")
 
     # Relaunch Actifix via start.py
-    print("Restarting Actifix backend via start.py...")
+    print("Restarting Actifix backend via scripts/start.py...")
     python = sys.executable or 'python3'
-    subprocess.Popen([python, 'start.py'])
+    root = Path(__file__).resolve().parents[1]
+    start_script = root / "scripts" / "start.py"
+    subprocess.Popen([python, str(start_script)])
     print(" → Actifix restart initiated.")
 
 

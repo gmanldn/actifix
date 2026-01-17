@@ -14,8 +14,8 @@ import sys
 from pathlib import Path
 from datetime import datetime, timezone
 
-# Add src to path
-sys.path.insert(0, str(Path(__file__).parent / "src"))
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "src"))
 
 from actifix.persistence.ticket_repo import get_ticket_repository, TicketFilter
 
