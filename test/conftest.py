@@ -7,11 +7,25 @@ from pathlib import Path
 # ===== PYTEST CONFIGURATION WITH PROGRESS =====
 
 def pytest_configure(config):
-    """Configure pytest with optimizations."""
-    # Add custom markers
-    config.addinivalue_line("markers", "slow: marks tests as slow (deselect with '-m \"not slow\"')")
-    config.addinivalue_line("markers", "integration: marks tests as integration tests")
-    config.addinivalue_line("markers", "unit: marks tests as unit tests")
+    """Configure pytest with performance optimizations and test categorization."""
+    # Add custom markers for test categorization
+    markers = [
+        "unit: Fast unit tests with minimal dependencies (< 100ms)",
+        "integration: Integration tests that involve multiple components (100ms - 1s)",
+        "slow: Slow tests that may take > 1s (database-heavy, network, large fixtures)",
+        "very_slow: Tests known to take > 5 seconds",
+        "db: Tests that perform database operations (likely slow)",
+        "api: API endpoint tests",
+        "performance: Performance or benchmark tests",
+        "security: Security-related tests",
+        "architecture: Architecture validation tests",
+        "concurrent: Concurrent/threading tests",
+        "io: File I/O tests",
+        "network: Network/external service tests",
+    ]
+
+    for marker in markers:
+        config.addinivalue_line("markers", marker)
 
     # Pytest-timeout configuration
     config.option.timeout = 30
@@ -21,6 +35,7 @@ def pytest_configure(config):
     import logging
     logging.getLogger("urllib3").setLevel(logging.WARNING)
     logging.getLogger("requests").setLevel(logging.WARNING)
+    logging.getLogger("sqlite3").setLevel(logging.WARNING)
 
 
 @pytest.fixture(scope="session", autouse=True)
