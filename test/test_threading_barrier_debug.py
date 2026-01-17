@@ -237,7 +237,6 @@ def test_barrier_with_locks():
 
         if completed_count == 3 and acquired_count == 3:
             print("SUCCESS: All threads completed and acquired locks!")
-            return True
         else:
             print("FAILURE: Not all threads completed or acquired locks!")
             print("\nPOSSIBLE ROOT CAUSES:")
@@ -248,7 +247,9 @@ def test_barrier_with_locks():
             if acquired_count < completed_count:
                 print("  1. Ticket locking logic has a race condition")
                 print("  2. Database isolation level may be causing issues")
-            return False
+
+        assert completed_count == 3, f"Expected 3 threads to complete, got {completed_count}"
+        assert acquired_count == 3, f"Expected 3 locks to be acquired, got {acquired_count}"
 
     finally:
         cleanup_test_env()
@@ -288,10 +289,10 @@ def test_simple_barrier():
 
     if passed_count == 3:
         print("SUCCESS: Barrier works correctly!")
-        return True
     else:
         print("FAILURE: Barrier test failed!")
-        return False
+
+    assert passed_count == 3, f"Expected 3 threads to pass barrier, got {passed_count}"
 
 
 def inspect_database_pool_config():
@@ -322,14 +323,22 @@ if __name__ == "__main__":
     print("ACTIFIX THREADING AND LOCKING DEBUG TEST")
     print("=" * 80)
 
-    # Run control test first
-    control_result = test_simple_barrier()
+    try:
+        # Run control test first
+        test_simple_barrier()
+        control_result = True
+    except AssertionError:
+        control_result = False
 
     # Inspect configuration
     inspect_database_pool_config()
 
-    # Run main test
-    main_result = test_barrier_with_locks()
+    try:
+        # Run main test
+        test_barrier_with_locks()
+        main_result = True
+    except AssertionError:
+        main_result = False
 
     # Summary
     print("\n" + "=" * 80)

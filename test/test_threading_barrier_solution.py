@@ -151,7 +151,7 @@ def run_barrier_test(test_name: str, acquire_lock_fn, repo: TicketRepository) ->
             print(f"    Error: {results['errors'][i]}")
         print(f"    Duration: {results['lock_held_duration'][i]:.4f}s")
 
-    return succeeded == 3
+    assert succeeded == 3, f"Expected all 3 threads to succeed, got {succeeded}"
 
 
 def test_current_behavior():
@@ -163,19 +163,17 @@ def test_current_behavior():
             lock = repo.acquire_lock(ticket_id, locked_by, timedelta(seconds=5))
             return lock is not None
 
-        success = run_barrier_test(
-            "Current Behavior (DEFERRED isolation)",
-            acquire_lock_current,
-            repo
-        )
-
-        if not success:
+        try:
+            run_barrier_test(
+                "Current Behavior (DEFERRED isolation)",
+                acquire_lock_current,
+                repo
+            )
+            print("\n✓ All threads succeeded (may happen under low contention)")
+        except AssertionError:
             print("\n⚠️  This demonstrates the issue: not all threads succeeded.")
             print("   The database lock prevents concurrent acquire_lock() calls.")
-        else:
-            print("\n✓ All threads succeeded (may happen under low contention)")
-
-        return success
+            raise
 
     finally:
         cleanup_test_env()
@@ -239,19 +237,14 @@ def test_solution_1_immediate():
                     return False
                 raise
 
-        success = run_barrier_test(
+        run_barrier_test(
             "Solution 1: BEGIN IMMEDIATE (Acquires locks upfront)",
             acquire_lock_immediate,
             repo
         )
 
-        if success:
-            print("\n✓ Solution 1 WORKS: Using BEGIN IMMEDIATE ensures all threads can acquire locks!")
-            print("  Why: IMMEDIATE acquires the RESERVED lock immediately, preventing lock upgrades.")
-        else:
-            print("\n⚠ Solution 1 had issues.")
-
-        return success
+        print("\n✓ Solution 1 WORKS: Using BEGIN IMMEDIATE ensures all threads can acquire locks!")
+        print("  Why: IMMEDIATE acquires the RESERVED lock immediately, preventing lock upgrades.")
 
     finally:
         cleanup_test_env()
@@ -288,19 +281,14 @@ def test_solution_2_retry():
                     else:
                         raise
 
-        success = run_barrier_test(
+        run_barrier_test(
             "Solution 2: Retry with Exponential Backoff",
             acquire_lock_with_retry,
             repo
         )
 
-        if success:
-            print("\n✓ Solution 2 WORKS: Exponential backoff allows threads to eventually succeed!")
-            print("  Why: When one thread's transaction completes, others retry and succeed.")
-        else:
-            print("\n⚠ Solution 2 had issues.")
-
-        return success
+        print("\n✓ Solution 2 WORKS: Exponential backoff allows threads to eventually succeed!")
+        print("  Why: When one thread's transaction completes, others retry and succeed.")
 
     finally:
         cleanup_test_env()
@@ -378,13 +366,25 @@ if __name__ == "__main__":
     print("=" * 80)
 
     # Test current behavior
-    current_result = test_current_behavior()
+    try:
+        test_current_behavior()
+        current_result = True
+    except AssertionError:
+        current_result = False
 
     # Test solution 1
-    solution1_result = test_solution_1_immediate()
+    try:
+        test_solution_1_immediate()
+        solution1_result = True
+    except AssertionError:
+        solution1_result = False
 
     # Test solution 2
-    solution2_result = test_solution_2_retry()
+    try:
+        test_solution_2_retry()
+        solution2_result = True
+    except AssertionError:
+        solution2_result = False
 
     # Performance comparison
     compare_performance()
