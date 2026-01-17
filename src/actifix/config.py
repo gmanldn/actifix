@@ -232,6 +232,24 @@ def load_config(
         max_open_tickets=_parse_int(
             _get_env_sanitized("ACTIFIX_MAX_OPEN_TICKETS", "", value_type="numeric"), 10000
         ),
+        ticket_throttling_enabled=_parse_bool(
+            _get_env_sanitized("ACTIFIX_TICKET_THROTTLING_ENABLED", "1", value_type="boolean")
+        ),
+        max_p2_tickets_per_hour=_parse_int(
+            _get_env_sanitized("ACTIFIX_MAX_P2_TICKETS_PER_HOUR", "", value_type="numeric"), 15
+        ),
+        max_p3_tickets_per_4h=_parse_int(
+            _get_env_sanitized("ACTIFIX_MAX_P3_TICKETS_PER_4H", "", value_type="numeric"), 5
+        ),
+        max_p4_tickets_per_day=_parse_int(
+            _get_env_sanitized("ACTIFIX_MAX_P4_TICKETS_PER_DAY", "", value_type="numeric"), 2
+        ),
+        emergency_ticket_threshold=_parse_int(
+            _get_env_sanitized("ACTIFIX_EMERGENCY_TICKET_THRESHOLD", "", value_type="numeric"), 200
+        ),
+        emergency_window_minutes=_parse_int(
+            _get_env_sanitized("ACTIFIX_EMERGENCY_WINDOW_MINUTES", "", value_type="numeric"), 1
+        ),
 
         min_coverage_percent=_parse_float(
             _get_env_sanitized("ACTIFIX_MIN_COVERAGE", "", value_type="numeric"), 80.0
@@ -325,7 +343,17 @@ def validate_config(config: ActifixConfig) -> list[str]:
         errors.append("Max file context size must be <= 100MB")
     if config.max_open_tickets <= 0:
         errors.append("Max open tickets must be positive")
-    
+    if config.max_p2_tickets_per_hour <= 0:
+        errors.append("Max P2 tickets per hour must be positive")
+    if config.max_p3_tickets_per_4h <= 0:
+        errors.append("Max P3 tickets per 4 hours must be positive")
+    if config.max_p4_tickets_per_day <= 0:
+        errors.append("Max P4 tickets per day must be positive")
+    if config.emergency_ticket_threshold <= 0:
+        errors.append("Emergency ticket threshold must be positive")
+    if config.emergency_window_minutes <= 0:
+        errors.append("Emergency window minutes must be positive")
+
     # Check timeouts are positive
     if config.test_timeout_seconds <= 0:
         errors.append("Test timeout must be positive")

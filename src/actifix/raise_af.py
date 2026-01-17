@@ -27,13 +27,14 @@ import os
 import re
 import subprocess
 import sys
+import time
 import traceback
 import uuid
 from dataclasses import dataclass, field, asdict
 from datetime import datetime, timezone, timedelta
 from enum import Enum
 from pathlib import Path
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Tuple
 
 from .state_paths import (
     get_actifix_state_dir,
@@ -43,6 +44,7 @@ from .state_paths import (
     ActifixPaths,
 )
 from .log_utils import append_with_guard, log_event
+from .config import get_config
 
 
 class TicketPriority(str, Enum):
@@ -98,6 +100,24 @@ MAX_CONTEXT_CHARS = 800_000
 FILE_CONTEXT_MAX_CHARS = int(os.getenv("ACTIFIX_FILE_CONTEXT_MAX_CHARS", "2000"))
 SYSTEM_STATE_MAX_CHARS = int(os.getenv("ACTIFIX_SYSTEM_STATE_MAX_CHARS", "1500"))
 
+# AI remediation notes sizing and context gating
+AI_REMEDIATION_MAX_CHARS = int(os.getenv("ACTIFIX_AI_REMEDIATION_MAX_CHARS", "2000"))
+AI_REMEDIATION_DRY_RUN_ENV = "ACTIFIX_AI_REMEDIATION_DRY_RUN"
+CONTEXT_TRUNCATION_CHARS = int(os.getenv("ACTIFIX_CONTEXT_TRUNCATION_CHARS", "4096"))
+SYSTEM_STATE_ENV_CACHE_TTL_SECONDS = int(os.getenv("ACTIFIX_SYSTEM_STATE_CACHE_TTL", "30"))
+MINIMAL_CONTEXT_PRIORITIES = {
+    token.strip().upper()
+    for token in os.getenv("ACTIFIX_CONTEXT_MINIMAL_PRIORITIES", "P1").split(",")
+    if token.strip()
+}
+STRUCTURED_MESSAGE_ENV = "ACTIFIX_ENFORCE_STRUCTURED_MESSAGES"
+STRUCTURED_MESSAGE_ENFORCED = os.getenv(STRUCTURED_MESSAGE_ENV, "0").strip().lower() not in {
+    "0",
+    "false",
+    "no",
+    "off",
+}
+
 # Environment variable to enable/disable capture
 ACTIFIX_CAPTURE_ENV_VAR = "ACTIFIX_CAPTURE_ENABLED"
 ACTIFIX_CHANGE_ORIGIN_ENV = "ACTIFIX_CHANGE_ORIGIN"
@@ -107,6 +127,15 @@ DUPLICATE_REOPEN_WINDOW = timedelta(hours=24)
 # Fallback queue for when database writes are unavailable
 FALLBACK_QUEUE_FILE = get_actifix_state_dir() / "actifix_fallback_queue.json"
 LEGACY_FALLBACK_QUEUE = ".actifix_fallback_queue.json"
+
+# Caches for repeated operations
+_PATH_CACHE: Dict[str, ActifixPaths] = {}
+_PATH_CACHE_STATS: Dict[str, int] = {"hits": 0, "misses": 0}
+_SYSTEM_STATE_ENV_CACHE: Dict[str, Any] = {
+    "signature": None,
+    "payload": {},
+    "timestamp": 0.0,
+}
 
 # Module-level counter for capture disabled logging (avoid log spam)
 _capture_disabled_log_count = 0
@@ -131,6 +160,125 @@ def _log_capture_disabled(source: str, error_type: str) -> None:
         )
     except Exception:
         pass
+
+
+def _path_cache_key(base_dir: Optional[Path]) -> str:
+    """Produce a cache key for Actifix paths based on the base directory."""
+    if base_dir:
+        try:
+            return str(Path(base_dir).resolve())
+        except Exception:
+            return str(base_dir)
+    return "default"
+
+
+def _get_cached_actifix_paths(base_dir: Optional[Path] = None) -> ActifixPaths:
+    """Cache Actifix path lookups to reduce repeated resolution cost."""
+    key = _path_cache_key(base_dir)
+    cached = _PATH_CACHE.get(key)
+    if cached:
+        _PATH_CACHE_STATS["hits"] += 1
+        return cached
+
+    _PATH_CACHE_STATS["misses"] += 1
+    paths = get_actifix_paths(base_dir=base_dir)
+    _PATH_CACHE[key] = paths
+    return paths
+
+
+def _snapshot_path_cache_stats() -> Dict[str, int]:
+    """Return a snapshot of the path cache metrics."""
+    return {
+        "hits": _PATH_CACHE_STATS["hits"],
+        "misses": _PATH_CACHE_STATS["misses"],
+        "cache_size": len(_PATH_CACHE),
+    }
+
+
+def _get_cached_env_vars() -> Dict[str, str]:
+    """Cache sanitized environment snapshots used in system state."""
+    now = time.time()
+    env_vars = {
+        k: redact_secrets_from_text(str(v))
+        for k, v in os.environ.items()
+        if k.startswith(("ACTIFIX", "PYTHONPATH"))
+    }
+    signature = tuple(sorted(env_vars.items()))
+
+    cache_entry = _SYSTEM_STATE_ENV_CACHE
+    if (
+        cache_entry["signature"] == signature
+        and now - cache_entry["timestamp"] < SYSTEM_STATE_ENV_CACHE_TTL_SECONDS
+    ):
+        return dict(cache_entry["payload"])
+
+    cache_entry["signature"] = signature
+    cache_entry["payload"] = dict(env_vars)
+    cache_entry["timestamp"] = now
+    return dict(env_vars)
+
+
+def _truncate_context_text(text: str, max_chars: int) -> str:
+    """Truncate context text while keeping head/tail lines for readability."""
+    if not text or len(text) <= max_chars:
+        return text
+
+    head = text[: max_chars // 2]
+    tail = text[-(max_chars // 2) :]
+    head_border = head.rfind("\n")
+    tail_border = tail.find("\n")
+
+    head = head[: head_border] if head_border > 0 else head
+    tail = tail[tail_border + 1 :] if tail_border >= 0 else tail
+
+    return f"{head}\n... (truncated) ...\n{tail}"
+
+
+def _ensure_structured_message(message: str) -> str:
+    """Ensure the ticket message includes structured sections when enforced."""
+    if not message:
+        return message
+
+    lower = message.lower()
+    if all(section.lower() in lower for section in ("Root Cause", "Impact", "Action")):
+        return message
+
+    return (
+        f"Root Cause: {message.strip()}\n"
+        "Impact: Requires focused token and robustness work.\n"
+        "Action: Implement the described improvements and document the results."
+    )
+
+
+def _compact_value(value: Any) -> Optional[Any]:
+    """Recursively compact values for the fallback queue payload."""
+    if value is None:
+        return None
+    if isinstance(value, str):
+        trimmed = value.strip()
+        return trimmed if trimmed else None
+    if isinstance(value, dict):
+        compacted = {}
+        for key, val in value.items():
+            condensed = _compact_value(val)
+            if condensed is not None:
+                compacted[key] = condensed
+        return compacted if compacted else None
+    if isinstance(value, list):
+        compacted = [_compact_value(item) for item in value]
+        compacted = [item for item in compacted if item is not None]
+        return compacted if compacted else None
+    return value
+
+
+def _compact_queue_entry(entry_dict: Dict[str, Any]) -> Dict[str, Any]:
+    """Strip empty fields and trim whitespace before persisting to the fallback queue."""
+    compacted = {}
+    for key, value in entry_dict.items():
+        refined = _compact_value(value)
+        if refined is not None:
+            compacted[key] = refined
+    return compacted
 
 
 def _get_current_correlation_id() -> Optional[str]:
@@ -166,7 +314,7 @@ def enforce_raise_af_only(
     disabled via ACTIFIX_ENFORCE_RAISE_AF=0). Sentinel file in state dir
     enables enforcement by default for this repo.
     """
-    active_paths = paths or get_actifix_paths()
+    active_paths = paths or _get_cached_actifix_paths()
     sentinel = get_raise_af_sentinel(active_paths)
 
     enforce_flag = os.getenv(ACTIFIX_ENFORCE_RAISE_AF_ENV, "1").strip().lower()
@@ -198,8 +346,7 @@ def _normalize_for_guard(text: str) -> str:
     if not text:
         return ""
 
-    normalized = re.sub(r'\d+', 'N', text)
-    normalized = re.sub(r'/[^\s]+/', '/PATH/', normalized)
+    normalized = re.sub(r'/[^\s]+/', '/PATH/', text)
     return normalized.lower().strip()[:200]
 
 
@@ -244,7 +391,7 @@ def redact_secrets_from_text(text: str) -> str:
     Removes or masks:
     - API keys (various formats)
     - Passwords in URLs or config
-    - Bearer tokens
+    - Authorization tokens
     - AWS credentials
     - Email addresses
     - IP addresses (optional, keep for debugging)
@@ -265,7 +412,7 @@ def redact_secrets_from_text(text: str) -> str:
         (r'(?i)(secret[_-]?key|secret_token)\s*[=:]\s*["\']?([a-zA-Z0-9_\-]{16,})["\']?',
          r'\1=***REDACTED***'),
 
-        # Bearer tokens
+        # Authorization tokens (e.g., Bearer)
         (r'(?i)(bearer\s+)([a-zA-Z0-9_\-\.]+)', r'\1***REDACTED***'),
         (r'(?i)(authorization[:\s]+)([a-zA-Z0-9_\-\.]+)', r'\1***REDACTED***'),
 
@@ -315,7 +462,7 @@ def redact_secrets_from_text(text: str) -> str:
 def capture_stack_trace() -> str:
     """Capture current stack trace with context, redacting secrets."""
     trace = traceback.format_exc()
-    return redact_secrets_from_text(trace)
+    return _truncate_context_text(redact_secrets_from_text(trace), CONTEXT_TRUNCATION_CHARS)
 
 
 def capture_file_context(source: str, max_lines: int = 50) -> Dict[str, str]:
@@ -357,8 +504,12 @@ def capture_file_context(source: str, max_lines: int = 50) -> Dict[str, str]:
                 start = max(0, line_num - 10)
                 end = min(len(lines), line_num + 10)
                 snippet_lines = lines[start:end]
-                context[str(source_path)] = "\n".join(
+                snippet_text = "\n".join(
                     f"{i+start+1}: {line}" for i, line in enumerate(snippet_lines)
+                )
+                context[str(source_path)] = _truncate_context_text(
+                    snippet_text,
+                    CONTEXT_TRUNCATION_CHARS,
                 )
             else:
                 # Just get first N lines
@@ -371,17 +522,12 @@ def capture_file_context(source: str, max_lines: int = 50) -> Dict[str, str]:
 
 def capture_system_state() -> Dict[str, Any]:
     """Capture system state for debugging context."""
-    env_vars = {
-        k: redact_secrets_from_text(str(v))
-        for k, v in os.environ.items()
-        if k.startswith(("ACTIFIX", "PYTHONPATH"))
-    }
-
     state = {
         "cwd": str(Path.cwd()),
         "python_version": sys.version,
         "platform": sys.platform,
-        "env_vars": env_vars,
+        "env_vars": _get_cached_env_vars(),
+        "path_cache": _snapshot_path_cache_stats(),
     }
 
     # Try to get git info
@@ -431,47 +577,69 @@ def classify_priority(error_type: str, message: str, source: str) -> TicketPrior
     return TicketPriority.P2
 
 
-def generate_ai_remediation_notes(entry: 'ActifixEntry') -> str:
-    """Generate detailed AI remediation notes for AI processing."""
+def preview_ai_remediation_notes(
+    entry: 'ActifixEntry',
+    max_chars: Optional[int] = None,
+) -> Tuple[str, Dict[str, Any]]:
+    """Preview the structured AI remediation notes and token metrics."""
+    limit = max_chars or AI_REMEDIATION_MAX_CHARS
+    stack_snippet = _truncate_context_text(
+        entry.stack_trace or "(No stack trace captured)",
+        CONTEXT_TRUNCATION_CHARS,
+    )
+
     notes_parts = [
-        f"Error Type: {entry.error_type}",
-        f"Error Message: {entry.message}",
-        f"Source Location: {entry.source}",
-        f"Priority: {entry.priority.value}",
-        "",
-        "REMEDIATION REQUIREMENTS:",
-        "1. Read and follow ALL project documentation",
-        "2. Identify root cause from stack trace and file context",
-        "3. Implement fix following existing code patterns",
-        "4. Write comprehensive tests (95%+ coverage required)",
-        "5. Update documentation if behavior changes",
-        "6. Run full test suite to ensure no regressions",
-        "7. Commit with conventional message format",
-        "8. Ensure code quality standards are met",
+        f"Root Cause: {entry.error_type} @ {entry.source}",
+        f"Impact: ticket {entry.entry_id} ({entry.priority.value}) requires a code-level fix",
+        f"Action: Implement the documented robustness improvements and re-run {Path(__file__).stem} tests",
         "",
         "STACK TRACE:",
-        entry.stack_trace or "(No stack trace captured)",
-        "",
+        stack_snippet,
     ]
 
-    # Add file context if available
     if entry.file_context:
-        notes_parts.append("FILE CONTEXT:")
-        for path, snippet in entry.file_context.items():
-            notes_parts.append(f"\n--- {path} ---")
-            notes_parts.append(snippet[:FILE_CONTEXT_MAX_CHARS])
+        notes_parts.append("")
+        notes_parts.append("FILE CONTEXT SNAPSHOTS:")
+        for path, snippet in list(entry.file_context.items())[:3]:
+            lines = [line for line in snippet.splitlines() if line.strip()]
+            if not lines:
+                continue
+            first = lines[0][:200]
+            last = lines[-1][:200]
+            notes_parts.append(f"- {Path(path).name}: {first} ... {last}")
 
-    # Add system state
-    notes_parts.append("\nSYSTEM STATE:")
-    notes_parts.append(json.dumps(entry.system_state, indent=2, default=str)[:SYSTEM_STATE_MAX_CHARS])
+    state_keys = sorted(entry.system_state.keys())
+    if state_keys:
+        notes_parts.append("")
+        notes_parts.append("SYSTEM STATE KEYS:")
+        notes_parts.append(", ".join(state_keys))
 
     full_notes = "\n".join(notes_parts)
+    truncated = _truncate_context_text(full_notes, limit)
+    truncated = truncated.strip()
 
-    # Ensure we don't exceed max context
-    if len(full_notes) > MAX_CONTEXT_CHARS:
-        full_notes = full_notes[:MAX_CONTEXT_CHARS] + "\n... (truncated for context window)"
+    stats = {
+        "ai_notes_char_count": len(truncated),
+        "ai_notes_char_limit": limit,
+        "ai_notes_truncated": len(full_notes) > len(truncated),
+        "ai_notes_overflow": max(0, len(full_notes) - len(truncated)),
+        "stack_snippet_chars": len(stack_snippet),
+    }
 
-    return full_notes
+    return truncated, stats
+
+
+def generate_ai_remediation_notes(entry: 'ActifixEntry', max_chars: Optional[int] = None) -> str:
+    """Generate detailed AI remediation notes for AI processing."""
+    notes, stats = preview_ai_remediation_notes(entry, max_chars=max_chars)
+    metrics = entry.system_state.setdefault("ai_remediation_metrics", {})
+    metrics.update(stats)
+
+    if os.getenv(AI_REMEDIATION_DRY_RUN_ENV, "").strip().lower() in {"1", "true", "yes", "on"}:
+        entry.system_state["ai_remediation_preview"] = notes
+        return notes
+
+    return notes
 
 
 
@@ -479,7 +647,7 @@ def generate_ai_remediation_notes(entry: 'ActifixEntry') -> str:
 def ensure_scaffold(base_dir: Path) -> None:
     """Create Actifix directory and artifacts if missing."""
     base_dir.mkdir(parents=True, exist_ok=True)
-    paths = get_actifix_paths(base_dir=base_dir)
+    paths = _get_cached_actifix_paths(base_dir=base_dir)
     init_actifix_files(paths)
     fallback_aflog = base_dir / "AFLog.txt"
     fallback_aflog.parent.mkdir(parents=True, exist_ok=True)
@@ -496,7 +664,7 @@ def _get_fallback_queue_file(base_dir: Path) -> Path:
     directory exists. A legacy queue file in the base directory is still
     read for backward compatibility and then migrated.
     """
-    paths = get_actifix_paths(base_dir=base_dir)
+    paths = _get_cached_actifix_paths(base_dir=base_dir)
     queue_file = paths.fallback_queue_file
     queue_file.parent.mkdir(parents=True, exist_ok=True)
     return queue_file
@@ -549,7 +717,7 @@ def _queue_to_fallback(entry: ActifixEntry, base_dir: Path) -> bool:
         queue, source_path = _load_existing_queue(queue_file, legacy_file)
 
         # Add entry to queue
-        queue.append(entry.to_dict())
+        queue.append(_compact_queue_entry(entry.to_dict()))
 
         # Write back
         _persist_queue(queue, queue_file, legacy_file)
@@ -645,6 +813,7 @@ def record_error(
     skip_duplicate_check: bool = False,
     skip_ai_notes: bool = False,
     paths: Optional[ActifixPaths] = None,
+    force_context: bool = False,
 ) -> Optional[ActifixEntry]:
     """
     Record an error across Actifix files with detailed context.
@@ -661,14 +830,17 @@ def record_error(
         skip_duplicate_check: Skip duplicate checking (use for testing only)
         skip_ai_notes: Skip AI notes generation (for performance)
         paths: Optional ActifixPaths override (takes precedence over base_dir)
+        force_context: Ignore priority gates when True and keep context capture.
 
     Returns:
         ActifixEntry with all captured context, or None if duplicate detected
     """
     # Resolve paths
-    active_paths = paths
-    if active_paths is None:
-        active_paths = get_actifix_paths(base_dir=base_dir) if base_dir else get_actifix_paths()
+    active_paths = paths or (
+        _get_cached_actifix_paths(base_dir=base_dir)
+        if base_dir
+        else _get_cached_actifix_paths()
+    )
     base_dir_path = active_paths.base_dir
 
     # Enforce Raise_AF-only policy before proceeding
@@ -680,16 +852,8 @@ def record_error(
     clean_run_label = run_label.strip() or "unspecified"
     clean_error_type = error_type.strip() or "unknown"
 
-    # Capture is opt-in: only raise tickets when explicitly enabled
-    env_flag = os.getenv(ACTIFIX_CAPTURE_ENV_VAR, "").strip().lower()
-    capture_enabled = env_flag in {"1", "true", "yes", "on", "debug"}
-    
-    if paths is not None and env_flag not in {"0", "false", "no", "off"}:
-        # Explicit paths imply caller wants capture even if env is unset
-        capture_enabled = True
-    if not capture_enabled:
-        _log_capture_disabled(clean_source, clean_error_type)
-        return None
+    if STRUCTURED_MESSAGE_ENFORCED:
+        clean_message = _ensure_structured_message(clean_message)
 
     ensure_scaffold(base_dir_path)
     init_actifix_files(active_paths)
@@ -722,16 +886,78 @@ def record_error(
             priority = TicketPriority(priority)
         except Exception:
             priority = None
-    
+
     if priority is None:
         priority = classify_priority(clean_error_type, clean_message, clean_source)
 
+    effective_capture_context = capture_context
+    context_gate_triggered = (
+        capture_context
+        and not force_context
+        and priority.value in MINIMAL_CONTEXT_PRIORITIES
+    )
+    if context_gate_triggered:
+        effective_capture_context = False
+
+    config = get_config()
+
+    env_flag = os.getenv(ACTIFIX_CAPTURE_ENV_VAR, "").strip().lower()
+    _positive_capture = {"1", "true", "yes", "on", "debug"}
+    _negative_capture = {"0", "false", "no", "off"}
+    capture_enabled = config.capture_enabled
+
+    if env_flag in _positive_capture:
+        capture_enabled = True
+    elif env_flag in _negative_capture:
+        capture_enabled = False
+
+    if paths is not None and env_flag not in _negative_capture:
+        capture_enabled = True
+
+    if not capture_enabled:
+        _log_capture_disabled(clean_source, clean_error_type)
+        return None
+
+    context_meta = {
+        "requested": capture_context,
+        "effective": effective_capture_context,
+        "priority_gate": priority.value if context_gate_triggered else None,
+        "force_context": force_context,
+        "token_savings_estimate": CONTEXT_TRUNCATION_CHARS if context_gate_triggered else 0,
+    }
+
+    # THROTTLE CHECK: Prevent ticket floods
+    try:
+        from .security.ticket_throttler import get_ticket_throttler, TicketThrottleError
+
+        if config.ticket_throttling_enabled:
+            throttler = get_ticket_throttler()
+            throttler.check_throttle(priority, clean_error_type)
+    except TicketThrottleError as e:
+        # Throttle limit exceeded - log and return None
+        try:
+            import logging
+            logger = logging.getLogger("actifix.raise_af")
+            logger.warning(f"Ticket throttled: {e}")
+        except Exception:
+            pass
+        return None
+    except Exception:
+        # Throttle check failed - continue anyway (fail open)
+        pass
+
     # Capture context
+    path_cache_snapshot = _snapshot_path_cache_stats()
     file_context = {}
-    system_state = {}
-    if capture_context:
+    if effective_capture_context:
         file_context = capture_file_context(clean_source)
         system_state = capture_system_state()
+    else:
+        system_state = {"path_cache": path_cache_snapshot}
+
+    system_state.setdefault("path_cache", path_cache_snapshot)
+    system_state.setdefault("context_control", context_meta)
+    system_state.setdefault("context_control", context_meta)
 
     # Capture correlation ID from context
     correlation_id = _get_current_correlation_id()
@@ -762,6 +988,18 @@ def record_error(
         created = repo.create_ticket(entry)
         if not created:
             return None
+
+        # Record ticket creation in throttler
+        try:
+            from .security.ticket_throttler import get_ticket_throttler
+
+            if config.ticket_throttling_enabled:
+                throttler = get_ticket_throttler()
+                throttler.record_ticket(priority, entry.entry_id, clean_error_type)
+        except Exception:
+            # Throttle recording failure shouldn't block ticket creation
+            pass
+
         _append_rollup_entry(active_paths, entry)
         log_event(
             active_paths.aflog_file,
@@ -809,7 +1047,7 @@ def _read_recent_entries(recent_path: Path) -> list[str]:
 
 def _append_recent(entry: ActifixEntry, base_dir: Path) -> None:
     """Append an Actifix entry to the recent rollup file for compatibility."""
-    paths = get_actifix_paths(base_dir=base_dir)
+    paths = _get_cached_actifix_paths(base_dir=base_dir)
     init_actifix_files(paths)
     _append_rollup_entry(paths, entry)
 

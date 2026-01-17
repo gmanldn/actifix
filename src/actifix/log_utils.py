@@ -10,6 +10,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
+LOG_ROTATION_THRESHOLD_BYTES = int(
+    os.getenv("ACTIFIX_LOG_ROTATION_THRESHOLD_BYTES", str(8 * 1024 * 1024))
+)
+LOG_ROTATION_KEEP_FILES = int(os.getenv("ACTIFIX_LOG_ROTATION_KEEP_FILES", "3"))
+
 
 def atomic_write(path: Path, content: str, encoding: str = "utf-8") -> None:
     """
@@ -118,6 +123,39 @@ def trim_to_line_boundary(content: str, max_bytes: int) -> str:
     return truncated
 
 
+def _rotate_log_file(path: Path, threshold: int, keep: int) -> None:
+    """Rotate the log file when it exceeds the configured threshold."""
+    if keep <= 0:
+        return
+    path = Path(path)
+    if not path.exists():
+        return
+
+    try:
+        if path.stat().st_size < threshold:
+            return
+    except OSError:
+        return
+
+    try:
+        for idx in range(keep - 1, 0, -1):
+            src = path.with_name(f"{path.name}.{idx}")
+            dst = path.with_name(f"{path.name}.{idx + 1}")
+            if dst.exists():
+                dst.unlink()
+            if src.exists():
+                src.replace(dst)
+
+        rotated = path.with_name(f"{path.name}.1")
+        if rotated.exists():
+            rotated.unlink()
+        path.replace(rotated)
+        path.touch()
+    except OSError:
+        # Rotation failure should not block logging
+        return
+
+
 def append_with_guard(
     path: Path,
     content: str,
@@ -137,6 +175,8 @@ def append_with_guard(
         encoding: Text encoding.
     """
     path = Path(path)
+
+    _rotate_log_file(path, LOG_ROTATION_THRESHOLD_BYTES, LOG_ROTATION_KEEP_FILES)
     
     # Read existing content
     existing = ""
