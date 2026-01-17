@@ -159,22 +159,27 @@ def _rotate_log_file(path: Path, threshold: int, keep: int) -> None:
 def append_with_guard(
     path: Path,
     content: str,
-    max_size_bytes: int = 10 * 1024 * 1024,  # 10MB default
+    max_size_bytes: Optional[int] = None,
     encoding: str = "utf-8",
 ) -> None:
     """
     Append content to file with size limit enforcement.
-    
+
     If file exceeds max size after append, trims from the beginning
     at line boundaries.
-    
+
     Args:
         path: Target file path.
         content: Content to append.
-        max_size_bytes: Maximum file size in bytes.
+        max_size_bytes: Maximum file size in bytes. Defaults to config.max_log_size_bytes.
         encoding: Text encoding.
     """
     path = Path(path)
+
+    # Use config default if not specified
+    if max_size_bytes is None:
+        from .config import get_config
+        max_size_bytes = get_config().max_log_size_bytes
 
     _rotate_log_file(path, LOG_ROTATION_THRESHOLD_BYTES, LOG_ROTATION_KEEP_FILES)
     
@@ -249,8 +254,8 @@ def log_event(
     """
     Log a structured event to the database event_log table.
     
-    MIGRATION NOTE: Now uses database storage instead of AFLog.txt.
-    The 'path' parameter is deprecated and ignored.
+    MIGRATION NOTE: Uses database storage; file logging is deprecated.
+    The 'path' parameter is ignored for backward compatibility.
     
     Args:
         event_type: Type of event (e.g., TICKET_CREATED, DISPATCH_STARTED). Legacy
@@ -309,18 +314,6 @@ def log_event(
             # Silently fail database logging to not block file logging
             pass
 
-        # Log to AFLog file (independent from database logging)
-        if path:
-            try:
-                timestamp = datetime.now(timezone.utc).isoformat()
-                entry = f"{timestamp} | {level} | {event_type} | {message}"
-                # Include extra data if present
-                if extra_json:
-                    entry += f" | extra={extra_json}"
-                entry += "\n"
-                append_with_guard(Path(path), entry)
-            except Exception:
-                pass
     except Exception:
         # Silently fail to avoid recursive logging errors
         pass
