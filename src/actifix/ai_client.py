@@ -308,9 +308,10 @@ class AIClient:
                 )
             
             client = anthropic.Anthropic(api_key=api_key)
-            
+
+            # TODO: Make model configurable via config
             response = client.messages.create(
-                model="claude-3-sonnet-20240229",
+                model="claude-3-5-sonnet-20241022",
                 max_tokens=4000,
                 messages=[{"role": "user", "content": prompt}]
             )
@@ -318,7 +319,7 @@ class AIClient:
             return AIResponse(
                 content=response.content[0].text,
                 provider=AIProvider.CLAUDE_API,
-                model="claude-3-sonnet",
+                model="claude-3-5-sonnet-20241022",
                 success=True,
                 tokens_used=response.usage.input_tokens + response.usage.output_tokens,
                 cost_usd=self._estimate_claude_cost(response.usage.input_tokens, response.usage.output_tokens)
