@@ -591,26 +591,9 @@ class TicketRepository:
 
         try:
             with self.pool.transaction(immediate=True) as conn:
-                # Check if ticket exists and is not locked (or lease expired)
-                # Using immediate transaction prevents TOCTOU race condition
-                cursor = conn.execute(
-                    """
-                    SELECT id, locked_by, locked_at, lease_expires
-                    FROM tickets
-                    WHERE id = ? AND (
-                        locked_by IS NULL
-                        OR lease_expires < ?
-                    )
-                    """,
-                    (ticket_id, serialize_timestamp(now))
-                )
-
-                row = cursor.fetchone()
-                if row is None:
-                    return None
-
-                # Acquire lock - use WHERE clause to prevent TOCTOU race
-                # Only update if the condition still holds
+                # Acquire lock directly without separate SELECT to eliminate TOCTOU race
+                # The WHERE clause ensures we only lock if ticket is available or lease expired
+                # This is atomic - no window for another transaction to interfere
                 cursor = conn.execute(
                     """
                     UPDATE tickets
@@ -629,7 +612,7 @@ class TicketRepository:
                     )
                 )
 
-                # Verify update succeeded (prevent race condition where another thread locked it)
+                # If no rows updated, ticket doesn't exist or is already locked
                 if cursor.rowcount == 0:
                     return None
 
