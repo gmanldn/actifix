@@ -1,0 +1,71 @@
+name: Strict Test Enforcement
+
+on:
+  push:
+    branches: [ develop, main ]
+  pull_request:
+    branches: [ develop, main ]
+
+jobs:
+  strict-test-gate:
+    runs-on: ubuntu-latest
+    name: Zero-Tolerance Test Policy
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.14"
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e .
+        pip install -e ".[web]" 2>/dev/null || true
+        pip install pytest pytest-cov coverage
+
+    - name: Run full test suite with strict enforcement
+      run: |
+        python test/test_runner.py --coverage
+      env:
+        ACTIFIX_CHANGE_ORIGIN: raise_af
+        ACTIFIX_CAPTURE_ENABLED: "0"
+
+    - name: Enforce 100% test pass rate
+      run: |
+        # This step ensures no test failures are tolerated
+        # The test_runner.py exits with 0 only if all tests pass
+        echo "✓ All tests passed with zero tolerance policy"
+      if: success()
+
+    - name: Fail on any test failure
+      run: |
+        echo "✗ Test failure detected - zero tolerance policy violation"
+        exit 1
+      if: failure()
+
+  commit-quality-check:
+    runs-on: ubuntu-latest
+    name: Commit Quality Enforcement
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Check for test-breaking changes
+      run: |
+        # Verify no hardcoded failures or skip markers in core modules
+        if grep -r "@pytest.mark.skip\|@skip\|skip(" src/actifix/ --include="*.py"; then
+          echo "✗ Skip markers found in production code - violates zero tolerance"
+          exit 1
+        fi
+        echo "✓ No skip markers in production code"
+
+    - name: Verify tests are not disabled
+      run: |
+        # Check for disabled tests in test files
+        if grep -r "@pytest.mark.skip\|@skip" test/ --include="*.py" | grep -v "# Exception:" ; then
+          echo "⚠ WARNING: Skipped tests found - verify they are justified"
+        fi
+        echo "✓ Test enforcement check passed"
