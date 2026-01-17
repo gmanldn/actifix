@@ -227,6 +227,8 @@ cd /Users/georgeridout/Repos/actifix
 ACTIFIX_CAPTURE_ENABLED=1 python3 -m pytest test/test_actifix_basic.py -v
 ```
 
+Pytest now defaults to a 10 second timeout and skips known slow/hanging files (barrier/concurrency helpers, API startup flows, etc.) unless you pass `--runslow`. The slow-test tracker reports any runs exceeding 30 seconds so you can triage and rerun with `--runslow` when appropriate.
+
 ### Self-Improvement Demo
 
 ```bash
@@ -236,6 +238,18 @@ python3 test/test_actifix_basic.py
 ```
 
 ## Release Notes & Version History
+
+### Version 3.3.2 - Test Suite Stability & Tracking (2026-01-17)
+
+**Testing & Reliability Release** - Make the developer test loop predictable and fast despite hang-prone suites.
+
+#### Added
+- Optional `--runslow` flag that includes barrier/concurrency/API/AI tests while keeping the default suite lean.
+- Slow-test tracker now explicitly lists any tests that exceed the 30 second hang threshold.
+
+#### Changed
+- Pytest default timeout lowered to 10 seconds so hung tests fail fast.
+- Documented the slow-test workflow in `docs/DEVELOPMENT.md` so the new guard rails are discoverable.
 
 ### Version 2.7.0 - AI Integration & Database Persistence (2026-01-11)
 

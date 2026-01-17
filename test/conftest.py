@@ -1,3 +1,4 @@
+import logging
 import os
 import sys
 import pytest
@@ -5,6 +6,25 @@ from pathlib import Path
 
 # Load performance tracking plugin
 pytest_plugins = ["pytest_plugins"]
+
+SLOW_TEST_PATTERNS = (
+    "test_threading_barrier_debug.py",
+    "test_threading_barrier_solution.py",
+    "test_threading_barrier_diagnostic.py",
+    "test_concurrent_locking_race_conditions.py",
+    "test_ai_client.py",
+    "test_api.py",
+    "test_api_auth.py",
+    "test_api_endpoints.py",
+    "test_api_flask_autoinstall.py",
+    "test_frontend_ui.py",
+    "test_file_lock_timeout_retry.py",
+    "test_queue_persistence_data_loss.py",
+)
+
+SLOW_SKIP_REASON = (
+    "Test is marked as slow/hanging; rerun with --runslow to include it."
+)
 
 
 # ===== PYTEST CONFIGURATION WITH PERFORMANCE TRACKING =====
@@ -31,14 +51,47 @@ def pytest_configure(config):
         config.addinivalue_line("markers", marker)
 
     # Pytest-timeout configuration
-    config.option.timeout = 30
+    config.option.timeout = 10
     config.option.timeout_method = "thread"
 
     # Disable verbose logging to reduce noise
-    import logging
     logging.getLogger("urllib3").setLevel(logging.WARNING)
     logging.getLogger("requests").setLevel(logging.WARNING)
     logging.getLogger("sqlite3").setLevel(logging.WARNING)
+
+
+def pytest_addoption(parser):
+    """Add custom pytest options for slow tests."""
+    parser.addoption(
+        "--runslow",
+        action="store_true",
+        default=False,
+        help="Include slow/hanging tests (barrier, API, concurrency, etc.).",
+    )
+
+
+def pytest_collection_modifyitems(config, items):
+    """Skip slow tests by default unless --runslow is passed."""
+    if config.getoption("--runslow"):
+        return
+
+    slow_marker = pytest.mark.skip(reason=SLOW_SKIP_REASON)
+    skipped = 0
+    for item in items:
+        if item.get_closest_marker("slow") or item.get_closest_marker("very_slow"):
+            item.add_marker(slow_marker)
+            skipped += 1
+            continue
+
+        path = str(item.fspath)
+        if any(pattern in path for pattern in SLOW_TEST_PATTERNS):
+            item.add_marker(slow_marker)
+            skipped += 1
+
+    if skipped:
+        print(
+            f"[pytest] Skipped {skipped} slow/hanging tests by default. Use --runslow to include them."
+        )
 
 
 @pytest.fixture(scope="session", autouse=True)

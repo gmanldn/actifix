@@ -133,6 +133,10 @@ python -m pytest test/architecture/
 python -m pytest test/ --cov=src/actifix --cov-report=html
 ```
 
+### Slow/Hanging Tests
+
+The pytest run now defaults to a 10 second timeout and automatically skips known slow/hanging files (threading barriers, concurrency-heavy ticket processing, API startup flows, etc.) unless you pass `--runslow`. Skipped tests are reported at the start of the run, and the slow-test tracker prints any tests that hit the 30 second hang threshold so you can triage the culprit before rerunning with `--runslow`.
+
 ### Test Requirements
 
 All tests must:

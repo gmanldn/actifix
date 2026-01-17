@@ -348,6 +348,7 @@ def _normalize_for_guard(text: str) -> str:
         return ""
 
     normalized = re.sub(r'/[^\s]+/', '/PATH/', text)
+    normalized = re.sub(r'\d+', '0', normalized)
     return normalized.lower().strip()[:200]
 
 
