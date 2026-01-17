@@ -1,6 +1,6 @@
 schema_version: arch-map.v1
 meta:
-  generated_at: "2026-01-10T20:35:39.679770+00:00"
+  generated_at: "2026-01-16T04:05:00.000000+00:00"
   generator: update_architecture_docs.py
   generator_version: 2.0.0
   source_commit: current_development
@@ -9,6 +9,7 @@ meta:
   - Single source of truth for actifix architecture contexts
   - Keep aligned with quality gates and architecture compliance
   - Auto-generated - includes persistence and testing subsystems
+  - Run record-error simple ticket attack to generate 500 tickets
 domains:
 - id: runtime
   summary: Bootstrap, configuration, state management, lifecycle
@@ -340,7 +341,7 @@ modules:
   - bounce.py
   contracts:
   - stop existing frontend and API processes
-  - relaunch application via start.py with Raise_AF gate
+  - relaunch application via scripts/start.py with Raise_AF gate
   depends_on:
   - bootstrap.main
 - id: core.ai_client
@@ -452,6 +453,19 @@ modules:
   - sanitize sensitive data
   depends_on:
   - infra.logging
+- id: security.ticket_throttler
+  domain: security
+  owner: security
+  summary: Ticket flood protection with priority-aware throttling and emergency braking
+  entrypoints:
+  - src/actifix/security/ticket_throttler.py
+  contracts:
+  - enforce per-priority ticket rate limits for P2/P3/P4
+  - activate an emergency brake when floods exceed configured thresholds
+  - persist throttle history for durability and observability
+  depends_on:
+  - runtime.state
+  - core.raise_af
 - id: plugins.permissions
   domain: plugins
   owner: plugins

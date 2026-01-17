@@ -1,7 +1,7 @@
 {
   "schema_version": "arch-depgraph.v1",
   "meta": {
-    "generated_at": "2026-01-10T20:35:39.694130+00:00",
+    "generated_at": "2026-01-16T04:05:00.000000+00:00",
     "generator": "update_architecture_docs.py",
     "generator_version": "2.0.0",
     "source_commit": "current_development"
@@ -40,6 +40,7 @@
     {"id": "security.credentials", "domain": "security", "owner": "security", "label": "credentials"},
     {"id": "security.rate_limiter", "domain": "security", "owner": "security", "label": "rate_limiter"},
     {"id": "security.secrets_scanner", "domain": "security", "owner": "security", "label": "secrets_scanner"},
+    {"id": "security.ticket_throttler", "domain": "security", "owner": "security", "label": "ticket_throttler"},
     {"id": "plugins.permissions", "domain": "plugins", "owner": "plugins", "label": "permissions"},
     {"id": "plugins.protocol", "domain": "plugins", "owner": "plugins", "label": "protocol"},
     {"id": "plugins.registry", "domain": "plugins", "owner": "plugins", "label": "registry"},
@@ -134,6 +135,9 @@
     {"from": "security.rate_limiter", "to": "infra.logging", "reason": "security.rate_limiter depends on infra.logging"},
     {"from": "security.rate_limiter", "to": "runtime.config", "reason": "security.rate_limiter depends on runtime.config"},
     {"from": "security.secrets_scanner", "to": "infra.logging", "reason": "security.secrets_scanner depends on infra.logging"},
+    {"from": "core.raise_af", "to": "security.ticket_throttler", "reason": "core.raise_af depends on security.ticket_throttler"},
+    {"from": "security.ticket_throttler", "to": "core.raise_af", "reason": "security.ticket_throttler imports TicketPriority from core.raise_af"},
+    {"from": "security.ticket_throttler", "to": "runtime.state", "reason": "security.ticket_throttler uses Actifix paths for throttle storage"},
     {"from": "plugins.permissions", "to": "plugins.protocol", "reason": "plugins.permissions depends on plugins.protocol"},
     {"from": "plugins.permissions", "to": "security.auth", "reason": "plugins.permissions depends on security.auth"}
   ]

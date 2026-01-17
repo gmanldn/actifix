@@ -2,7 +2,7 @@ import threading
 from types import SimpleNamespace
 from pathlib import Path
 
-import start
+from scripts import start
 
 
 class DummyProcess:

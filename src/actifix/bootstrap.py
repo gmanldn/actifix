@@ -27,8 +27,7 @@ def enable_actifix_capture():
 
 def disable_actifix_capture():
     """Disable actifix error capture."""
-    if ACTIFIX_CAPTURE_ENV_VAR in os.environ:
-        del os.environ[ACTIFIX_CAPTURE_ENV_VAR]
+    os.environ[ACTIFIX_CAPTURE_ENV_VAR] = "0"
 
 
 def capture_exception(exc_type, exc_value, exc_traceback):

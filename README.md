@@ -40,7 +40,7 @@ cd actifix
 # Pure stdlib; no pip install required to start using the framework
 ```
 
-> `python start.py` now watches `pyproject.toml` once per minute and restarts the static frontend server automatically when the project version changes so the UI refreshes after pushes.
+> `python scripts/start.py` now watches `pyproject.toml` once per minute and restarts the static frontend server automatically when the project version changes so the UI refreshes after pushes.
 
 ### Capture Your First Error
 ```python
@@ -140,6 +140,11 @@ actifix/
 - **Developer safety net**: Keep capture on in local/dev; Actifix auto-opens tickets for regressions and flaky behaviors while you work.  
 - **AI-assisted debugging**: Feed the ticket Markdown (with remediation notes) to your copilot for suggested fixes.  
 - **Self-hosted improvement**: Run `bootstrap_actifix_development()` inside this repo; Actifix will ticket its own issues while you add features.
+
+-It is absolutely critical that when an AI agent is asked to 'work on' or 'complete' tickets that it actually makes the needed changes to the codebase and checks they are made using actifix rules.
+
+-Commit and push after every single ticket completed ALWAYS. Keep the working directory clean.
+
 
 ## Roadmap Snapshot
 

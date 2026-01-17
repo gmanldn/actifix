@@ -7,6 +7,93 @@ Ticket Repository - Database operations for Actifix tickets
 Provides CRUD operations with locking, filtering, and duplicate prevention.
 Thread-safe with lease-based locking for concurrent ticket processing.
 
+LEASE-BASED LOCKING MECHANISM:
+
+This module implements a sophisticated lease-based distributed locking pattern
+that is essential for concurrent ticket processing in a multi-agent environment.
+
+Why Lease-Based Locking?
+------------------------
+Traditional persistent locks can deadlock if a process crashes while holding a lock.
+Lease-based locking prevents this through automatic expiry:
+
+1. When a lock is acquired, it has a fixed duration (default: 1 hour)
+2. If the lock holder doesn't renew it before expiry, the lock automatically expires
+3. Other processes can then acquire the same ticket, preventing deadlock scenarios
+4. Lock holders must periodically renew locks on tickets they're still processing
+
+Lock Acquisition Strategy:
+--------------------------
+The lock acquisition uses SQLite's IMMEDIATE transactions to prevent TOCTOU
+(Time-Of-Check-Time-Of-Use) race conditions:
+
+1. Start an IMMEDIATE transaction (acquires write lock immediately)
+2. Check ticket status and expiry time atomically
+3. Update lock fields only if conditions still hold
+4. Commit atomic transaction - this prevents other threads from interleaving
+
+Key Properties:
+- ATOMIC: Lock check and acquisition are indivisible
+- SAFE: No TOCTOU race conditions between threads
+- RELIABLE: Automatic cleanup of stale locks prevents deadlock
+- FAIR: get_and_lock_next_ticket() ensures each thread gets different tickets
+
+Default Lease Duration (1 Hour):
+--------------------------------
+The 1-hour default was chosen based on these considerations:
+
+1. LONG ENOUGH: Gives typical AI agents sufficient time to process complex tickets
+   - Most ticket processing takes 5-30 minutes
+   - 1 hour provides 2-12x safety margin
+   - Accounts for occasional network delays
+
+2. SHORT ENOUGH: Prevents blocking for too long if a process crashes
+   - System can recover from failed agents within 1 hour
+   - Doesn't leave tickets locked for days/weeks
+   - Balances availability vs. processing safety
+
+3. CONFIGURABLE: Can be tuned per-deployment via lease_duration parameter
+   - Fast agents can renew frequently
+   - Slow systems can use longer leases
+   - Emergency overrides possible with shorter leases
+
+Lock Lifecycle Example:
+-----------------------
+>>> # Agent 1 acquires lock
+>>> lock = repo.acquire_lock("ACT-20260114-ABC12", "agent-1", lease_duration=timedelta(hours=1))
+>>> # Agent works on ticket... processing takes 30 minutes
+>>> # Agent renews lock before it expires (e.g., after 50 minutes)
+>>> renewed = repo.renew_lock("ACT-20260114-ABC12", "agent-1", lease_duration=timedelta(hours=1))
+>>> # Agent finishes and completes ticket
+>>> repo.release_lock("ACT-20260114-ABC12", "agent-1")
+>>> # If agent crashed without releasing, lock auto-expires after 1 hour
+>>> # Then other agents can acquire it via get_and_lock_next_ticket()
+
+TICKET THROTTLING & LIMITS:
+
+The repository enforces several configurable limits to prevent DoS attacks
+and system overload:
+
+1. Message Length Limit (max_ticket_message_length)
+   - Prevents extremely long error messages from consuming disk space
+   - Default: 5000 characters
+   - Configurable via ACTIFIX_MAX_MESSAGE_LENGTH env var
+
+2. File Context Size Limit (max_file_context_size_bytes)
+   - Prevents large captured file context from bloating the database
+   - Default: 1MB
+   - Configurable via ACTIFIX_MAX_FILE_CONTEXT_BYTES env var
+   - Enforced at both create and update time
+
+3. Open Tickets Limit (max_open_tickets)
+   - Prevents system from accumulating too many unprocessed tickets
+   - Default: 10000
+   - Configurable via ACTIFIX_MAX_OPEN_TICKETS env var
+   - Enforced at create time to prevent queue overflow
+
+All limits are validated against configuration and raise appropriate exceptions
+when exceeded, providing clear error messages with actual vs. maximum values.
+
 Version: 1.0.0
 """
 

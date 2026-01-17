@@ -16,6 +16,14 @@ from .rate_limiter import (
     reset_rate_limiter,
 )
 
+from .ticket_throttler import (
+    TicketThrottler,
+    TicketThrottleError,
+    ThrottleConfig,
+    get_ticket_throttler,
+    reset_ticket_throttler,
+)
+
 from .auth import (
     AuthRole,
     AuthUser,
@@ -55,6 +63,11 @@ __all__ = [
     'APICall',
     'get_rate_limiter',
     'reset_rate_limiter',
+    'TicketThrottler',
+    'TicketThrottleError',
+    'ThrottleConfig',
+    'get_ticket_throttler',
+    'reset_ticket_throttler',
     'AuthRole',
     'AuthUser',
     'AuthToken',

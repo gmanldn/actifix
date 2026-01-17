@@ -49,6 +49,11 @@ class ActifixPaths:
     rollup_file: Path
     log_file: Path
     history_file: Path
+
+    @property
+    def data_dir(self) -> Path:
+        """Alias for the Actifix data directory (base_dir)."""
+        return self.base_dir
     
     @property
     def all_artifacts(self) -> List[Path]:

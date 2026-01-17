@@ -19,9 +19,7 @@ SRC_DIR = ROOT / "src"
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
-# Import start module
-sys.path.insert(0, str(ROOT))
-import start
+from scripts import start
 
 
 class TestBackendSingleton(unittest.TestCase):
@@ -35,7 +33,7 @@ class TestBackendSingleton(unittest.TestCase):
         """Clean up after test."""
         start._API_SERVER_INSTANCE = None
 
-    @patch('start.threading.Thread')
+    @patch('scripts.start.threading.Thread')
     def test_backend_singleton_first_call(self, mock_thread_class):
         """Test that first call creates backend instance."""
         mock_thread = MagicMock()
@@ -49,7 +47,7 @@ class TestBackendSingleton(unittest.TestCase):
         self.assertEqual(start._API_SERVER_INSTANCE, mock_thread)
         mock_thread.start.assert_called_once()
 
-    @patch('start.threading.Thread')
+    @patch('scripts.start.threading.Thread')
     def test_backend_singleton_prevents_duplicate(self, mock_thread_class):
         """Test that second call returns existing instance and refuses to create duplicate."""
         mock_thread = MagicMock()
@@ -164,7 +162,7 @@ class TestFrontendSingleton(unittest.TestCase):
         for manager in managers:
             self.assertIs(manager, managers[0])
 
-    @patch('start.start_frontend')
+    @patch('scripts.start.start_frontend')
     def test_frontend_start_prevents_duplicate_process(self, mock_start_frontend):
         """Test that calling start() multiple times on same manager doesn't create duplicate processes."""
         mock_process = MagicMock()
@@ -202,13 +200,13 @@ class TestBrowserWindowsPrevention(unittest.TestCase):
         # Browser should be enabled with flag
         self.assertTrue(args.browser)
 
-    @patch('start.webbrowser.open')
-    @patch('start.FrontendManager')
-    @patch('start.start_api_server')
-    @patch('start.start_version_monitor')
-    @patch('start.is_port_in_use')
-    @patch('start.ensure_scaffold')
-    @patch('start.clean_bytecode_cache')
+    @patch('scripts.start.webbrowser.open')
+    @patch('scripts.start.FrontendManager')
+    @patch('scripts.start.start_api_server')
+    @patch('scripts.start.start_version_monitor')
+    @patch('scripts.start.is_port_in_use')
+    @patch('scripts.start.ensure_scaffold')
+    @patch('scripts.start.clean_bytecode_cache')
     def test_browser_not_opened_by_default(
         self,
         mock_clean,
@@ -244,13 +242,13 @@ class TestBrowserWindowsPrevention(unittest.TestCase):
         # webbrowser.open should NOT be called
         mock_webbrowser.assert_not_called()
 
-    @patch('start.webbrowser.open')
-    @patch('start.FrontendManager')
-    @patch('start.start_api_server')
-    @patch('start.start_version_monitor')
-    @patch('start.is_port_in_use')
-    @patch('start.ensure_scaffold')
-    @patch('start.clean_bytecode_cache')
+    @patch('scripts.start.webbrowser.open')
+    @patch('scripts.start.FrontendManager')
+    @patch('scripts.start.start_api_server')
+    @patch('scripts.start.start_version_monitor')
+    @patch('scripts.start.is_port_in_use')
+    @patch('scripts.start.ensure_scaffold')
+    @patch('scripts.start.clean_bytecode_cache')
     def test_browser_opened_with_flag(
         self,
         mock_clean,
@@ -300,8 +298,8 @@ class TestEndToEndSingletonEnforcement(unittest.TestCase):
         start._API_SERVER_INSTANCE = None
         start.FrontendManager._instance = None
 
-    @patch('start.threading.Thread')
-    @patch('start.start_frontend')
+    @patch('scripts.start.threading.Thread')
+    @patch('scripts.start.start_frontend')
     def test_complete_singleton_enforcement(self, mock_start_frontend, mock_thread_class):
         """Test that both backend and frontend maintain singleton across multiple operations."""
         # Mock backend thread
