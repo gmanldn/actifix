@@ -343,6 +343,18 @@ class DatabasePool:
             # Ensure database directory exists
             self.config.db_path.parent.mkdir(parents=True, exist_ok=True)
 
+            # Create database file with secure permissions BEFORE SQLite creates it
+            # This prevents the window where the file exists with world-readable permissions
+            if not self.config.db_path.exists():
+                # Touch the file and immediately set secure permissions
+                self.config.db_path.touch(mode=0o600, exist_ok=True)
+            else:
+                # File exists - ensure it has secure permissions
+                try:
+                    os.chmod(self.config.db_path, 0o600)
+                except OSError:
+                    pass
+
             conn = sqlite3.connect(
                 str(self.config.db_path),
                 timeout=self.config.timeout,
@@ -648,6 +660,25 @@ def get_database_pool(db_path: Optional[Path] = None) -> DatabasePool:
             _global_pool = DatabasePool(config)
         
         return _global_pool
+
+
+def get_database_connection(paths: Optional[object] = None) -> sqlite3.Connection:
+    """
+    Backward-compatible helper to get a raw database connection.
+
+    Accepts an optional paths object with a project_root attribute. Uses
+    ACTIFIX_DB_PATH when set, otherwise falls back to <project_root>/data/actifix.db.
+    """
+    env_db_path = os.environ.get("ACTIFIX_DB_PATH")
+    if env_db_path:
+        db_path = Path(env_db_path).expanduser()
+    elif paths is not None and hasattr(paths, "project_root"):
+        db_path = Path(getattr(paths, "project_root")) / "data" / "actifix.db"
+    else:
+        db_path = Path.cwd() / "data" / "actifix.db"
+
+    pool = get_database_pool(db_path=db_path)
+    return pool._get_connection()
 
 
 def reset_database_pool() -> None:
