@@ -32,6 +32,7 @@ class AIProvider(Enum):
     """Supported AI providers."""
     CLAUDE_LOCAL = "claude_local"
     CLAUDE_API = "claude_api"
+    OPENAI_CLI = "openai_cli"
     OPENAI = "openai"
     OLLAMA = "ollama"
     FREE_ALTERNATIVE = "free_alternative"
@@ -55,15 +56,18 @@ class AIClient:
     
     Fallback chain:
     1. Claude Code (local auth if available)
-    2. Claude API (if API key available)
-    3. GPT-4 Turbo (if API key available)
-    4. Free alternative (user prompt)
+    2. OpenAI CLI session (if logged in)
+    3. Claude API (if API key available)
+    4. GPT-4 Turbo API (if key available)
+    5. Optional Ollama local runtime
+    6. Free alternative prompts (include OpenRouter Mimo Flash / offline Ollama guidance)
     """
     
     def __init__(self) -> None:
         self.config = get_config()
         self.paths = get_actifix_paths()
         self._claude_local_available = None
+        self._openai_cli_logged_in = None
         self._api_keys_checked = False
         
     def generate_fix(
