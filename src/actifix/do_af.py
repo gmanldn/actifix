@@ -23,11 +23,14 @@ import time
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Optional, Callable, Iterator
+from typing import Optional, Callable, Iterator, TYPE_CHECKING
 
 from .log_utils import atomic_write, log_event
 from .raise_af import enforce_raise_af_only
 from .state_paths import ActifixPaths, get_actifix_paths, init_actifix_files
+
+if TYPE_CHECKING:
+    from .persistence.ticket_repo import TicketRepository
 
 
 # --- Token-Efficient State Cache ---
@@ -56,7 +59,7 @@ class StatefulTicketManager:
     Token-efficient ticket manager with a lightweight repository cache.
     """
     
-    def __init__(self, paths: Optional[ActifixPaths] = None, cache_ttl: int = 60):
+    def __init__(self, paths: Optional[ActifixPaths] = None, cache_ttl: int = 60) -> None:
         self.paths = paths or get_actifix_paths()
         self.cache = TicketCacheState(cache_ttl_seconds=cache_ttl)
         self._lock = threading.Lock()
@@ -171,7 +174,7 @@ def _ticket_info_from_record(record: dict) -> TicketInfo:
     )
 
 
-def _get_ticket_repository():
+def _get_ticket_repository() -> 'TicketRepository':
     from .persistence.ticket_repo import get_ticket_repository
     return get_ticket_repository()
 

@@ -52,7 +52,7 @@ class ErrorPattern:
 class ErrorClassifier:
     """Advanced error classifier using patterns and machine learning."""
     
-    def __init__(self):
+    def __init__(self) -> None:
         self.patterns = self._load_error_patterns()
         self.keyword_index = self._build_keyword_index()
         

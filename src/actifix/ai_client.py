@@ -58,7 +58,7 @@ class AIClient:
     4. Free alternative (user prompt)
     """
     
-    def __init__(self):
+    def __init__(self) -> None:
         self.config = get_config()
         self.paths = get_actifix_paths()
         self._claude_local_available = None
