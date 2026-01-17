@@ -209,7 +209,12 @@ class TestActifixBasic:
         """Test fallback queue when database writes fail."""
         from actifix.raise_af import record_error
         from actifix.persistence import ticket_repo
-        
+        from actifix import raise_af
+
+        # Reset global repository and clear path cache to ensure clean state
+        ticket_repo.reset_ticket_repository()
+        raise_af._PATH_CACHE.clear()
+
         state_dir = temp_actifix_dir / ".actifix_state"
         monkeypatch.setenv("ACTIFIX_STATE_DIR", str(state_dir))
 
@@ -241,13 +246,16 @@ class TestActifixSelfDevelopment:
     def test_track_development_progress(self, temp_actifix_dir, monkeypatch):
         """Test tracking development milestones."""
         actifix.enable_actifix_capture()
-        
+
+        # Enable milestone tracking as tickets (required by design)
+        monkeypatch.setenv("ACTIFIX_TRACK_MILESTONES_AS_TICKETS", "1")
+
         # Track a development milestone
         actifix.track_development_progress(
             "Core error capture implemented",
             "RaiseAF.py completed with full context capture"
         )
-        
+
         # Check that milestone was recorded
         from actifix.persistence.ticket_repo import get_ticket_repository
         repo = get_ticket_repository()
