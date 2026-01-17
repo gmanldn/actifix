@@ -46,14 +46,77 @@ _API_SERVER_LOCK = threading.Lock()
 _FRONTEND_MANAGER_INSTANCE: Optional['FrontendManager'] = None
 _FRONTEND_LOCK = threading.Lock()
 
+# ANSI Color codes for terminal output
+class Color:
+    """ANSI color codes for beautiful terminal output."""
+    RED = '\033[91m'
+    GREEN = '\033[92m'
+    BLUE = '\033[94m'
+    YELLOW = '\033[93m'
+    CYAN = '\033[96m'
+    MAGENTA = '\033[95m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
+    RESET = '\033[0m'
+
+    @staticmethod
+    def disable_on_windows():
+        """Disable colors on Windows if ANSI not supported."""
+        if sys.platform == 'win32':
+            try:
+                import ctypes
+                kernel32 = ctypes.windll.kernel32
+                kernel32.SetConsoleMode(kernel32.GetStdHandle(-11), 7)
+            except:
+                # Fallback: disable colors
+                Color.RED = Color.GREEN = Color.BLUE = ''
+                Color.YELLOW = Color.CYAN = Color.MAGENTA = ''
+                Color.BOLD = Color.UNDERLINE = Color.RESET = ''
+
+Color.disable_on_windows()
+
 
 def log(message: str) -> None:
     """Standard log prefix for launcher output."""
     print(f"[Actifix] {message}")
 
 
+def log_info(message: str) -> None:
+    """Log informational message in blue."""
+    print(f"{Color.BLUE}[INFO]{Color.RESET} {message}")
+
+
+def log_success(message: str) -> None:
+    """Log success message in green."""
+    print(f"{Color.GREEN}[✓]{Color.RESET} {message}")
+
+
+def log_error(message: str) -> None:
+    """Log error message in red."""
+    print(f"{Color.RED}[✗]{Color.RESET} {message}")
+
+
+def log_warning(message: str) -> None:
+    """Log warning message in yellow."""
+    print(f"{Color.YELLOW}[!]{Color.RESET} {message}")
+
+
+def log_step(step_num: int, total: int, message: str) -> None:
+    """Log a step in a multi-step process."""
+    print(f"{Color.CYAN}[{step_num}/{total}]{Color.RESET} {message}")
+
+
+def print_banner(text: str) -> None:
+    """Print a banner with the given text."""
+    line = "=" * 60
+    print(f"\n{Color.BOLD}{Color.CYAN}{line}{Color.RESET}")
+    print(f"{Color.BOLD}{Color.CYAN}{text.center(60)}{Color.RESET}")
+    print(f"{Color.BOLD}{Color.CYAN}{line}{Color.RESET}\n")
+
+
 def clean_bytecode_cache() -> None:
     """Remove stale .pyc files to avoid version mismatches."""
+    log_info("Cleaning bytecode cache...")
     cleaned = 0
     for pyc in SRC_DIR.rglob("*.pyc"):
         try:
@@ -62,11 +125,15 @@ def clean_bytecode_cache() -> None:
         except OSError:
             pass
     if cleaned:
-        log(f"Removed {cleaned} .pyc file(s)")
+        log_success(f"Removed {cleaned} stale .pyc file(s)")
+    else:
+        log_info("Bytecode cache is clean")
 
 
 def ensure_scaffold() -> None:
     """Create Actifix directories and files if missing."""
+    log_info("Initializing Actifix environment...")
+
     if str(SRC_DIR) not in sys.path:
         sys.path.insert(0, str(SRC_DIR))
 
@@ -74,10 +141,32 @@ def ensure_scaffold() -> None:
     from actifix.state_paths import get_actifix_paths, init_actifix_files
     from actifix.raise_af import ACTIFIX_CAPTURE_ENV_VAR, enforce_raise_af_only
 
+    # Set required environment variable for Raise_AF enforcement
+    if "ACTIFIX_CHANGE_ORIGIN" not in os.environ:
+        os.environ["ACTIFIX_CHANGE_ORIGIN"] = "raise_af"
+        log_info("Set ACTIFIX_CHANGE_ORIGIN=raise_af (required for operation)")
+
     os.environ.setdefault(ACTIFIX_CAPTURE_ENV_VAR, "1")
-    paths = get_actifix_paths()
-    enforce_raise_af_only(paths)
-    init_actifix_files(paths)
+
+    try:
+        paths = get_actifix_paths()
+        enforce_raise_af_only(paths)
+        init_actifix_files(paths)
+        log_success("Actifix environment initialized")
+
+        # Get database path
+        env_db = os.environ.get("ACTIFIX_DB_PATH")
+        if env_db:
+            db_path = Path(env_db)
+        else:
+            db_path = paths.project_root / "data" / "actifix.db"
+
+        log_info(f"Project root: {paths.project_root}")
+        log_info(f"State directory: {paths.state_dir}")
+        log_info(f"Database: {db_path}")
+    except Exception as e:
+        log_error(f"Failed to initialize Actifix: {e}")
+        raise
 
 
 def is_port_in_use(port: int) -> bool:
@@ -97,12 +186,82 @@ def kill_processes_on_port(port: int) -> None:
     try:
         result = subprocess.run(["lsof", "-ti", f"tcp:{port}"], capture_output=True, text=True)
         pids = [pid for pid in result.stdout.splitlines() if pid.strip()]
+        if pids:
+            log_warning(f"Found {len(pids)} stale process(es) on port {port}")
         for pid in pids:
             if pid.isdigit():
-                log(f"Killing stale process {pid} on port {port}")
+                log_info(f"Terminating process {pid}...")
                 os.kill(int(pid), signal.SIGTERM)
+                log_success(f"Terminated process {pid}")
+    except Exception as e:
+        log_error(f"Failed to kill processes on port {port}: {e}")
+
+
+def cleanup_existing_instances() -> None:
+    """Kill any existing Actifix processes before starting new ones."""
+    log_info("Checking for existing Actifix instances...")
+
+    cleaned = False
+
+    # Get current process ID to avoid killing ourselves
+    current_pid = os.getpid()
+
+    try:
+        # Find all start.py processes except this one
+        result = subprocess.run(
+            ["pgrep", "-f", "start.py"],
+            capture_output=True,
+            text=True
+        )
+
+        if result.returncode == 0:
+            pids = [pid.strip() for pid in result.stdout.splitlines() if pid.strip()]
+            for pid_str in pids:
+                if pid_str.isdigit():
+                    pid = int(pid_str)
+                    if pid != current_pid:
+                        try:
+                            log_info(f"Terminating existing start.py process {pid}")
+                            os.kill(pid, signal.SIGTERM)
+                            cleaned = True
+                        except ProcessLookupError:
+                            pass
+                        except Exception as e:
+                            log_warning(f"Could not kill process {pid}: {e}")
+    except FileNotFoundError:
+        # pgrep not available, try alternative method
+        try:
+            result = subprocess.run(
+                ["ps", "aux"],
+                capture_output=True,
+                text=True
+            )
+            for line in result.stdout.splitlines():
+                if "start.py" in line and str(current_pid) not in line:
+                    try:
+                        pid = int(line.split()[1])
+                        log_info(f"Terminating existing start.py process {pid}")
+                        os.kill(pid, signal.SIGTERM)
+                        cleaned = True
+                    except (ValueError, IndexError, ProcessLookupError):
+                        pass
+        except Exception:
+            pass
     except Exception:
         pass
+
+    # Kill any http.server processes on our ports
+    for port in [DEFAULT_FRONTEND_PORT, DEFAULT_API_PORT]:
+        if is_port_in_use(port):
+            log_warning(f"Port {port} is in use")
+            kill_processes_on_port(port)
+            cleaned = True
+
+    if cleaned:
+        log_success("Cleaned up existing instances")
+        time.sleep(0.5)  # Give processes time to terminate
+    else:
+        log_success("No existing instances found")
 
 
 def start_api_server(port: int, project_root: Path) -> threading.Thread:
@@ -111,13 +270,16 @@ def start_api_server(port: int, project_root: Path) -> threading.Thread:
 
     with _API_SERVER_LOCK:
         if _API_SERVER_INSTANCE is not None and _API_SERVER_INSTANCE.is_alive():
-            log("API server already running - refusing to start duplicate instance")
+            log_warning("API server already running - refusing to start duplicate instance")
             return _API_SERVER_INSTANCE
+
+        log_info(f"Starting API server on port {port}...")
 
         def run_server():
             try:
                 from actifix.api import create_app
                 app = create_app(project_root)
+                log_success(f"API server initialized on http://127.0.0.1:{port}")
                 # Use werkzeug's run_simple for better control
                 from werkzeug.serving import run_simple
                 run_simple(
@@ -129,15 +291,16 @@ def start_api_server(port: int, project_root: Path) -> threading.Thread:
                     threaded=True,
                 )
             except ImportError as e:
-                log(f"API server failed to start: {e}")
-                log("Install Flask with: pip install flask flask-cors")
+                log_error(f"API server failed to start: {e}")
+                log_error("Install Flask with: pip install flask flask-cors")
             except Exception as e:
-                log(f"API server error: {e}")
+                log_error(f"API server error: {e}")
 
         thread = threading.Thread(target=run_server, daemon=True)
         thread.start()
         _API_SERVER_INSTANCE = thread
-        log("API server instance created (singleton enforced)")
+        # Give the server a moment to start
+        time.sleep(0.5)
         return thread
 
 
@@ -188,17 +351,20 @@ class FrontendManager:
     def start(self) -> subprocess.Popen:
         with self._lock:
             if self._server is not None and self._server.poll() is None:
-                log("Frontend server already running - refusing to start duplicate instance")
+                log_warning("Frontend server already running - refusing to start duplicate instance")
                 return self._server
+            log_info(f"Starting frontend server on port {self.port}...")
             self._server = start_frontend(self.port)
-            log("Frontend server instance created (singleton enforced)")
+            time.sleep(0.3)  # Give server time to start
+            log_success(f"Frontend server started on http://localhost:{self.port}")
             return self._server
 
     def restart(self) -> Optional[subprocess.Popen]:
         with self._lock:
+            log_info("Restarting frontend server...")
             self._terminate_current()
             self._server = start_frontend(self.port)
-            log("Frontend server restarted (singleton enforced)")
+            log_success("Frontend server restarted")
             return self._server
 
     def get_process(self) -> Optional[subprocess.Popen]:
@@ -208,10 +374,12 @@ class FrontendManager:
     def _terminate_current(self) -> None:
         if self._server and self._server.poll() is None:
             try:
-                log("Stopping frontend to apply refreshed version...")
+                log_info("Stopping frontend server...")
                 self._server.terminate()
                 self._server.wait(timeout=5)
+                log_success("Frontend server stopped")
             except subprocess.TimeoutExpired:
+                log_warning("Frontend server didn't stop gracefully, forcing...")
                 self._server.kill()
             finally:
                 self._server = None
@@ -238,9 +406,9 @@ def start_version_monitor(
             time.sleep(interval_seconds)
             current_version = read_project_version(project_root)
             if current_version != last_version:
-                log(
-                    f"Detected version change "
-                    f"{last_version or 'unknown'} -> {current_version or 'unknown'}; killing old UI processes and restarting frontend."
+                log_info(
+                    f"Version change detected: "
+                    f"{last_version or 'unknown'} -> {current_version or 'unknown'}"
                 )
                 try:
                     kill_processes_on_port(manager.port)
@@ -256,9 +424,19 @@ def start_version_monitor(
 
 def run_health_check() -> bool:
     """Run Actifix health check and return True if healthy."""
-    from actifix.health import run_health_check
-    result = run_health_check(print_report=True)
-    return bool(getattr(result, "healthy", False))
+    log_info("Running health check...")
+    try:
+        from actifix.health import run_health_check
+        result = run_health_check(print_report=True)
+        is_healthy = bool(getattr(result, "healthy", False))
+        if is_healthy:
+            log_success("Health check passed!")
+        else:
+            log_error("Health check failed - see details above")
+        return is_healthy
+    except Exception as e:
+        log_error(f"Health check error: {e}")
+        return False
 
 
 def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
@@ -301,86 +479,138 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
 
 
 def main(argv: Optional[list[str]] = None) -> int:
+    """Main entry point with beautiful color-coded output."""
     args = parse_args(argv)
 
+    # Print startup banner
+    print_banner("ACTIFIX STARTUP")
+
+    # Step 0: Cleanup existing instances first
+    cleanup_existing_instances()
+
+    total_steps = 5 if not args.no_api else 4
+    current_step = 0
+
+    # Step 1: Clean cache
+    current_step += 1
+    log_step(current_step, total_steps, "Cleaning Python bytecode cache")
     os.environ.setdefault("PYTHONDONTWRITEBYTECODE", "1")
     clean_bytecode_cache()
-    ensure_scaffold()
+
+    # Step 2: Initialize environment
+    current_step += 1
+    log_step(current_step, total_steps, "Initializing Actifix environment")
+    try:
+        ensure_scaffold()
+    except Exception as e:
+        log_error(f"Initialization failed: {e}")
+        return 1
+
+    # Optional: Setup dock icon on macOS
     try:
         from actifix.dock_icon import setup_dock_icon
         setup_dock_icon()
+        log_info("Dock icon configured (macOS)")
     except Exception:
         # Dock icon setup is best-effort; ignore failures on non-macOS
         pass
 
+    # Handle special modes
     if args.health_only:
+        print_banner("HEALTH CHECK")
         healthy = run_health_check()
         return 0 if healthy else 1
 
     if args.setup_only:
-        log("Initialization complete (setup-only mode).")
+        log_success("Initialization complete (setup-only mode)")
         return 0
 
+    # Step 3: Validate frontend directory
+    current_step += 1
+    log_step(current_step, total_steps, "Validating frontend directory")
     if not FRONTEND_DIR.exists():
-        log(f"Frontend directory missing: {FRONTEND_DIR}")
+        log_error(f"Frontend directory missing: {FRONTEND_DIR}")
         return 1
+    log_success(f"Frontend directory found: {FRONTEND_DIR}")
 
+    # Final port check (should be clean after cleanup_existing_instances)
     if is_port_in_use(args.frontend_port):
-        log(f"Stale processes detected on port {args.frontend_port}; killing them to ensure latest UI")
+        log_warning(f"Port {args.frontend_port} still in use, forcing cleanup")
         kill_processes_on_port(args.frontend_port)
-        # Give processes time to terminate
         time.sleep(0.5)
 
     if not args.no_api and is_port_in_use(args.api_port):
-        log(f"API port {args.api_port} is already in use. Stop the existing process or choose another port.")
-        return 1
+        log_warning(f"API port {args.api_port} still in use, forcing cleanup")
+        kill_processes_on_port(args.api_port)
+        time.sleep(0.5)
 
-    # Start API server first (in background thread)
+        # Final check
+        if is_port_in_use(args.api_port):
+            log_error(f"Could not free API port {args.api_port}")
+            log_error("Try manually: pkill -f 'start.py' or use --api-port <PORT>")
+            return 1
+
+    # Step 4: Start API server (if enabled)
     api_thread = None
     if not args.no_api:
-        log(f"Starting Actifix API server on port {args.api_port}...")
-        api_thread = start_api_server(args.api_port, ROOT)
-        # Give the API server a moment to start
-        time.sleep(0.5)
-        log(f"API available at http://localhost:{args.api_port}/api/")
+        current_step += 1
+        log_step(current_step, total_steps, "Starting API server")
+        try:
+            api_thread = start_api_server(args.api_port, ROOT)
+        except Exception as e:
+            log_error(f"Failed to start API server: {e}")
+            return 1
 
-    log(f"Starting Actifix static frontend on port {args.frontend_port}...")
-    frontend_manager = FrontendManager(args.frontend_port)
-    frontend_manager.start()
-    start_version_monitor(frontend_manager, ROOT)
+    # Step 5: Start frontend server
+    current_step += 1
+    log_step(current_step, total_steps, "Starting frontend server")
+    try:
+        frontend_manager = FrontendManager(args.frontend_port)
+        frontend_manager.start()
+        start_version_monitor(frontend_manager, ROOT)
+    except Exception as e:
+        log_error(f"Failed to start frontend server: {e}")
+        return 1
+
+    # Success banner
+    print_banner("ACTIFIX IS READY!")
+
+    # Display access information
     url = f"http://localhost:{args.frontend_port}"
-    log(f"Frontend available at {url}")
+    print(f"{Color.BOLD}{Color.GREEN}Frontend:{Color.RESET}  {Color.CYAN}{url}{Color.RESET}")
+    if not args.no_api:
+        api_url = f"http://localhost:{args.api_port}/api/"
+        print(f"{Color.BOLD}{Color.GREEN}API:{Color.RESET}       {Color.CYAN}{api_url}{Color.RESET}")
 
-    # Browser launch is disabled by default to prevent unwanted windows
+    print()
+
+    # Optional: Open browser
     if args.browser:
         try:
+            log_info("Opening browser...")
             webbrowser.open(url)
-            log("Browser window opened")
+            log_success("Browser opened")
         except Exception:
-            log("Browser launch failed; open the URL manually.")
+            log_warning("Browser launch failed - please open URL manually")
     else:
-        log("Browser launch disabled (use --browser to enable)")
+        log_info("Tip: Use --browser flag to auto-open browser")
 
-    log("")
-    log("=" * 50)
-    log("  ACTIFIX DASHBOARD")
-    log("=" * 50)
-    log(f"  Frontend: http://localhost:{args.frontend_port}")
-    if not args.no_api:
-        log(f"  API:      http://localhost:{args.api_port}/api/")
-    log("")
-    log("  Press Ctrl+C to stop")
-    log("=" * 50)
+    print()
+    print(f"{Color.YELLOW}Press Ctrl+C to stop all servers{Color.RESET}")
+    print()
 
+    # Keep process alive
     try:
-        # Keep process alive until interrupted
         while True:
             time.sleep(1.0)
             current_server = frontend_manager.get_process()
             if current_server and current_server.poll() is not None:
-                return current_server.returncode or 0
+                log_error("Frontend server stopped unexpectedly")
+                return current_server.returncode or 1
     except KeyboardInterrupt:
-        log("\nStopping servers...")
+        print()
+        log_info("Shutdown signal received...")
+        log_info("Stopping servers...")
         current_server = frontend_manager.get_process()
         if current_server:
             current_server.terminate()
@@ -388,7 +618,8 @@ def main(argv: Optional[list[str]] = None) -> int:
                 current_server.wait(timeout=5)
             except subprocess.TimeoutExpired:
                 current_server.kill()
-        log("Stopped.")
+        log_success("All servers stopped")
+        log_success("Goodbye!")
         return 0
 
 

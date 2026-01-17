@@ -156,27 +156,49 @@ class ActifixContext:
 
 
 def create_initial_ticket():
-    """Create an initial ticket for actifix development."""
-    record_error(
-        message="Actifix framework initialization - beginning self-development",
-        source="bootstrap.py:create_initial_ticket",
-        run_label="actifix-bootstrap",
-        error_type="FrameworkInitialization",
-        stack_trace="",
-        capture_context=True
-    )
+    """
+    Create an initial ticket for actifix development.
+
+    DEPRECATED: This function creates tracking tickets that pollute the error
+    ticket database. Consider using dedicated milestone/progress tracking instead.
+
+    ROOT CAUSE: bootstrap.py was creating "error" tickets for tracking purposes,
+    but these aren't real errors - they're milestones. This should use a separate
+    tracking mechanism (e.g., dedicated milestones table, logging, or external tool).
+    """
+    # Only create if explicitly requested via environment variable
+    if os.environ.get("ACTIFIX_CREATE_BOOTSTRAP_TICKET") == "1":
+        record_error(
+            message="Actifix framework initialization - beginning self-development",
+            source="bootstrap.py:create_initial_ticket",
+            run_label="actifix-bootstrap",
+            error_type="FrameworkInitialization",
+            stack_trace="",
+            capture_context=True
+        )
 
 
 def track_development_progress(milestone: str, details: str = ""):
-    """Track development milestones as actifix tickets."""
-    record_error(
-        message=f"Development milestone: {milestone}. {details}",
-        source="bootstrap.py:track_development_progress", 
-        run_label="actifix-development",
-        error_type="DevelopmentMilestone",
-        stack_trace="",
-        capture_context=False
-    )
+    """
+    Track development milestones as actifix tickets.
+
+    DEPRECATED: This function creates tracking tickets that pollute the error
+    ticket database. Use dedicated milestone tracking instead.
+
+    ROOT CAUSE: Using error tickets for milestone tracking is an anti-pattern.
+    Milestones should be tracked separately (e.g., in a milestones table, log file,
+    or external project management tool), not as "errors" in the ticket system.
+    """
+    # Only create if explicitly requested via environment variable
+    if os.environ.get("ACTIFIX_TRACK_MILESTONES_AS_TICKETS") == "1":
+        record_error(
+            message=f"Development milestone: {milestone}. {details}",
+            source="bootstrap.py:track_development_progress",
+            run_label="actifix-development",
+            error_type="DevelopmentMilestone",
+            stack_trace="",
+            capture_context=False
+        )
 
 
 if __name__ == "__main__":
