@@ -86,13 +86,14 @@ class AIClient:
         
         # Determine provider order
         providers = self._get_provider_order(preferred_provider)
-        
-        last_error = None
-        
+
+        # Collect all errors instead of overwriting
+        all_errors = []
+
         for provider in providers:
             # Log attempt (database is canonical, no text files)
             # log_event removed as database is the canonical storage
-            
+
             for attempt in range(max_retries):
                 try:
                     response = self._call_provider(provider, prompt, ticket_info)
@@ -101,22 +102,24 @@ class AIClient:
                         # log_event removed as database is the canonical storage
                         return response
                     else:
-                        last_error = response.error
+                        if response.error:
+                            all_errors.append(f"{provider.value}: {response.error}")
                         # Log failure (database is canonical, no text files)
                         # log_event removed as database is the canonical storage
-                        
+
                         if attempt < max_retries - 1:
                             time.sleep(2 ** attempt)  # Exponential backoff
-                            
+
                 except Exception as e:
-                    last_error = str(e)
+                    all_errors.append(f"{provider.value} (attempt {attempt + 1}): {str(e)}")
                     # Log exception (database is canonical, no text files)
                     # log_event removed as database is the canonical storage
-                    
+
                     if attempt < max_retries - 1:
                         time.sleep(2 ** attempt)
-        
+
         # All providers failed
+        last_error = "; ".join(all_errors) if all_errors else "All AI providers failed"
         return AIResponse(
             content="",
             provider=AIProvider.FREE_ALTERNATIVE,
