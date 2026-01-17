@@ -6,6 +6,9 @@ __pycache__/
 .actifix/test_logs/
 .actifix/
 .state/
+data/actifix.db
+data/actifix.db-shm
+data/actifix.db-wal
 actifix/ACTIFIX-LIST.md
 actifix/ACTIFIX.md
 actifix/ACTIFIX-LOG.md
