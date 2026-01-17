@@ -101,3 +101,14 @@ def isolate_actifix_db(monkeypatch, tmp_path):
     reset_database_pool()
     reset_ticket_repository()
     reset_event_repository()
+
+
+@pytest.fixture(scope="session", autouse=True)
+def database_profiler_session():
+    """Database profiler for the entire test session."""
+    from database_profiler import get_database_profiler
+
+    profiler = get_database_profiler()
+    yield profiler
+    # Report at end of session
+    profiler.report()
