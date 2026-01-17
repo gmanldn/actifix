@@ -4,8 +4,10 @@
 """
 AI Client - Multi-provider AI integration with fallback chain
 
-Supports Claude Code (local auth), GPT-4 Turbo, and free alternatives.
-Implements automatic fallback logic for robust ticket processing.
+Supports Claude Code (local auth), OpenAI CLI sessions, GPT-4 Turbo API keys,
+OpenRouter "Mimo Flash" free tier, Ollama, and guided manual fallbacks.
+Implements automatic fallback logic for robust ticket processing with
+account-first detection.
 
 Version: 1.0.0
 """
