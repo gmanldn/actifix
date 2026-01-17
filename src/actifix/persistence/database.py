@@ -614,12 +614,25 @@ class DatabasePool:
                         # RESTART checkpoint: blocks until all frames in WAL are transferred to database
                         # This ensures data is properly persisted before connection closes
                         self._local.connection.execute("PRAGMA wal_checkpoint(RESTART)")
-                        # Force filesystem sync to ensure data is physically written to disk
-                        # This prevents data loss even in case of power failure or OS crash
-                        self._local.connection.execute("PRAGMA fullfsync = ON")
+                        # Explicit commit to ensure all transactions are flushed
+                        self._local.connection.commit()
                     except sqlite3.Error:
                         # Non-fatal: continue with close even if checkpoint fails
                         pass
+
+                # Perform explicit fsync on the database file itself
+                # This ensures data is physically written to disk, preventing data loss
+                # in case of power failure or OS crash after the checkpoint
+                try:
+                    db_fd = os.open(str(self.config.db_path), os.O_RDONLY)
+                    try:
+                        os.fsync(db_fd)
+                    finally:
+                        os.close(db_fd)
+                except (OSError, IOError):
+                    # Non-fatal: database may not exist or be accessible
+                    pass
+
                 self._local.connection.close()
             except sqlite3.Error:
                 pass
