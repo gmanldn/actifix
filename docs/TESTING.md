@@ -163,6 +163,12 @@ show_missing = true
 skip_covered = false
 ```
 
+### Coverage performance tuning
+
+- `test/test_runner.py --coverage` auto-enables `pytest-xdist` when the plugin is installed and `ACTIFIX_DISABLE_XDIST` is unset, so parallel workers speed up the coverage pass.
+- Override the worker count with `ACTIFIX_XDIST_WORKERS=<N>` or disable the parallel stage via `ACTIFIX_DISABLE_XDIST=1` if you need deterministic sequencing.
+- Install `pytest-xdist` once (e.g., `pip install pytest-xdist`) to get these faster coverage runs without changing the enforced command.
+
 ## Test Structure
 
 ### Directory Layout

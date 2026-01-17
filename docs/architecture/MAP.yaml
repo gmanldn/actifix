@@ -316,6 +316,7 @@ modules:
   contracts:
   - enforce quality gates
   - maintain test coverage
+  - accelerate coverage cycles by enabling parallel pytest-xdist runs when available
   - validate architecture
   depends_on:
   - bootstrap.main

@@ -309,10 +309,34 @@ python -m actifix.quarantine --status
 ### Release Process
 
 1. **Version Increment**: Update version in `pyproject.toml`
-2. **Changelog**: Document changes in `CHANGELOG.md`  
-3. **Architecture Update**: Refresh architecture documentation if needed
-4. **Quality Validation**: Full test suite + manual verification
-5. **Tag Release**: Create git tag with version
+2. **Release Notes**: Document changes in `docs/FRAMEWORK_OVERVIEW.md` (Release Notes & Version History section)
+3. **Changelog**: Update `CHANGELOG.md` for historical reference
+4. **Architecture Update**: Refresh architecture documentation if needed
+5. **Quality Validation**: Full test suite + manual verification
+6. **Tag Release**: Create git tag with version
+
+### Documentation Standards
+
+#### No New Documentation Files
+**IMPORTANT**: Do not create new documentation files (e.g., `*_PLAN.md`, `ROADMAP.md`, `DESIGN.md`, or feature-specific `.md` files). Instead:
+
+1. **Blend into existing docs**: Add content to appropriate existing documentation files
+2. **Update main docs**: Use `docs/FRAMEWORK_OVERVIEW.md` for feature documentation and release notes
+3. **Update INDEX.md**: Add cross-references to new sections in existing docs
+4. **Follow structure**: Maintain the existing documentation hierarchy
+
+#### Documentation Workflow
+- **Features**: Document in `docs/FRAMEWORK_OVERVIEW.md` under appropriate sections
+- **Release Notes**: Add to `docs/FRAMEWORK_OVERVIEW.md` "Release Notes & Version History" section
+- **API Changes**: Update `src/actifix/README.md` and relevant framework docs
+- **Architecture**: Update `docs/architecture/` files for structural changes
+- **Cross-reference**: Always link between related documentation
+
+#### Why This Matters
+- **Single source of truth**: Avoids fragmented documentation
+- **Discoverability**: Users know where to look for information
+- **Maintainability**: Easier to keep documentation current
+- **Consistency**: Uniform documentation structure across the project
 
 ## Performance Considerations
 

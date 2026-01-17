@@ -235,6 +235,110 @@ cd /Users/georgeridout/Repos/actifix
 python3 test/test_actifix_basic.py
 ```
 
+## Release Notes & Version History
+
+### Version 2.7.0 - AI Integration & Database Persistence (2026-01-11)
+
+**Major Release** - Production-ready with multi-provider AI support and robust data storage.
+
+#### Added
+- Multi-provider AI integration with automatic fallback chain
+- Claude Code local auth detection
+- Claude API integration
+- OpenAI GPT-4 Turbo integration
+- Ollama local model support
+- Free alternative user prompts
+- Automatic provider fallback
+- Cost tracking and logging
+- SQLite database backend with connection pooling
+- Ticket repository with CRUD operations and locking
+- Database migration script for importing tickets
+- Enhanced persistence layer with atomic operations
+- Comprehensive testing framework
+- Architecture compliance validation
+- Health monitoring system
+- Quarantine system for error isolation
+
+#### Changed
+- Improved error capture with rich context
+- Enhanced ticket processing workflow
+- Better AI remediation notes generation
+- Optimized state management
+- Refined architecture documentation
+
+#### Fixed
+- Thread safety issues in database operations
+- Memory leaks in long-running processes
+- Error handling edge cases
+- Configuration validation bugs
+
+### Version 2.6.0 - Self-Improving Framework (2026-01-10)
+
+**Major Release** - Introducing the self-improving error management framework.
+
+#### Added
+- Self-improving error management framework
+- Production-grade error capture with priority classification
+- AI-native ticket generation
+- Self-development mode for framework improvement
+- Transparent Markdown artifacts
+- Configurable environment variables
+- Web dashboard frontend
+- Comprehensive documentation suite
+
+#### Changed
+- Refactored core architecture for better modularity
+- Improved error classification algorithm
+- Enhanced duplicate detection mechanism
+- Better secret redaction capabilities
+
+#### Fixed
+- Race conditions in concurrent error capture
+- File corruption issues during atomic writes
+- Memory usage optimization
+- Performance bottlenecks in ticket processing
+
+### Version 2.5.0 - Foundation (2026-01-09)
+
+**Foundation Release** - Initial framework implementation.
+
+#### Added
+- Initial framework implementation
+- Basic error capture and ticket creation
+- Simple file-based persistence
+- Command-line interface
+- Basic testing infrastructure
+
+#### Changed
+- Initial architecture design
+- Core module structure
+- Basic configuration system
+
+### Version 2.0.0 - Inception (2026-01-01)
+
+**Initial Release** - Project inception and core concept development.
+
+#### Added
+- Project inception
+- Core concept development
+- Initial design documents
+
+---
+
+## Migration Guide
+
+### Upgrading to 2.7.0
+- Tickets are now stored exclusively in `data/actifix.db`; existing Markdown archives are ignored and no manual migration is required because the database is already authoritative
+- Update configuration for AI provider settings
+- Review new environment variables for AI integration
+
+### Upgrading to 2.6.0
+- No breaking changes from 2.5.0
+- New configuration options available
+- Web dashboard requires static file serving
+
+---
+
 ## Roadmap
 
 ### Phase 1: Core Framework ✅

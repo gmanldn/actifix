@@ -39,7 +39,8 @@ Welcome to the Actifix documentation! This index provides a comprehensive guide 
 ## Reference Documentation
 
 ### Release Information
-- **[CHANGELOG.md](../CHANGELOG.md)** - Version history and release notes
+- **[FRAMEWORK_OVERVIEW.md](FRAMEWORK_OVERVIEW.md)** - Version history and release notes (see "Release Notes & Version History" section)
+- **[CHANGELOG.md](../CHANGELOG.md)** - Detailed version history (archived)
 - **[LICENSE](../LICENSE)** - MIT License terms
 
 ### Configuration
@@ -58,7 +59,7 @@ docs/
 ├── QUICKSTART.md              # 5-minute setup guide
 ├── INSTALLATION.md            # Detailed installation
 ├── DEVELOPMENT.md             # Development workflow
-├── FRAMEWORK_OVERVIEW.md      # Complete framework overview
+├── FRAMEWORK_OVERVIEW.md      # Complete framework overview + release notes
 ├── QUICKDEV.md               # Fast development for AI agents
 ├── ultrathink_tickets_summary.md  # Architecture tickets summary
 └── architecture/             # Architecture documentation
@@ -67,6 +68,8 @@ docs/
     ├── MAP.yaml              # Architecture map
     └── DEPGRAPH.json         # Dependency graph
 ```
+
+**Note**: Release notes and version history are now maintained in `docs/FRAMEWORK_OVERVIEW.md` under the "Release Notes & Version History" section. `CHANGELOG.md` is archived for historical reference.
 
 ## Documentation Standards
 
@@ -93,7 +96,7 @@ When adding or updating documentation:
 - **Freshness**: Architecture docs auto-generated every 7 days
 - **Validation**: Documentation links checked in CI
 - **Reviews**: All doc changes require review
-- **Versioning**: Major changes documented in CHANGELOG.md
+- **Versioning**: Major changes documented in `docs/FRAMEWORK_OVERVIEW.md` (Release Notes & Version History section)
 
 ## Getting Help
 

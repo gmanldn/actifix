@@ -8,9 +8,14 @@ All Changes Must Start via Raise_AF
 1.1 **Readme** Always read the readme
 3. **Version bump**: Increment version in `pyproject.toml` after every commit
 4. **No plan docs**: Never create `*_PLAN.md`, `ROADMAP.md`, `DESIGN.md` files
-5. **All errors via raise_af**: Use `actifix.raise_af.record_error()` for all error capture
-6. **Raise_AF gate**: Set `ACTIFIX_CHANGE_ORIGIN=raise_af` before running Actifix or making changes (enforced)
-7. **Architecture graph first**: Always open `docs/architecture/MAP.yaml` and `docs/architecture/DEPGRAPH.json` before starting work so you understand the canonical module/edge graph, and ensure every change is reflected there before committing.
+5. **No new documentation files**: Do not create new documentation files (e.g., feature-specific `.md` files). Instead, blend content into existing docs:
+   - Use `docs/FRAMEWORK_OVERVIEW.md` for feature documentation and release notes
+   - Update `docs/INDEX.md` to cross-reference new sections
+   - Update `docs/DEVELOPMENT.md` for development workflow changes
+   - Maintain the existing documentation hierarchy
+6. **All errors via raise_af**: Use `actifix.raise_af.record_error()` for all error capture
+7. **Raise_AF gate**: Set `ACTIFIX_CHANGE_ORIGIN=raise_af` before running Actifix or making changes (enforced)
+8. **Architecture graph first**: Always open `docs/architecture/MAP.yaml` and `docs/architecture/DEPGRAPH.json` before starting work so you understand the canonical module/edge graph, and ensure every change is reflected there before committing.
 
 ```bash
 # Commit convention

@@ -12,6 +12,7 @@ progress output and writes stage summaries to state_dir/test_logs.
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
 import os
 import subprocess
@@ -185,13 +186,45 @@ def raise_tickets_for_pytest_failures(junit_file: Path, paths) -> int:
     return tickets_raised
 
 
-def run_pytest(coverage: bool, quick: bool, pattern: Optional[str]) -> Dict[str, Any]:
+def run_pytest(coverage: bool, quick: bool, pattern: Optional[str], fast_coverage: bool = False) -> Dict[str, Any]:
     """Execute pytest with optional coverage and pattern filtering."""
     cmd: List[str] = [sys.executable, "-m", "pytest"]
+
+    # Parallelize coverage runs when optional pytest-xdist is installed/configured
+    def _collect_xdist_args() -> List[str]:
+        """Return pytest-xdist args when available or configured via env."""
+        if os.getenv("ACTIFIX_DISABLE_XDIST"):
+            return []
+        worker_override = os.getenv("ACTIFIX_XDIST_WORKERS")
+        if worker_override:
+            return ["-n", worker_override]
+        if importlib.util.find_spec("xdist") is None:
+            return []
+        return ["-n", "auto"]
 
     # Add JUnit XML output for failure tracking
     junit_file = ROOT / ".pytest_results.xml"
     cmd += ["--junit-xml", str(junit_file)]
+
+    if coverage:
+        try:
+            import pytest_cov  # noqa: F401
+            cmd += ["--cov=src/actifix", "--cov-report=term-missing"]
+        except ImportError:
+            print("pytest-cov plugin not found; skipping coverage reporting")
+
+        # Fast coverage mode: exclude slow tests and use parallel execution
+        if fast_coverage:
+            print("  → Fast coverage mode: excluding slow tests and using parallel execution")
+            cmd += ["-m", "not slow"]
+            cmd.extend(_collect_xdist_args())
+        else:
+            # Full coverage: run all tests, but still use parallel if available
+            cmd.extend(_collect_xdist_args())
+    else:
+        # Non-coverage runs can also use fast mode
+        if fast_coverage:
+            cmd += ["-m", "not slow"]
 
     if quick:
         # Quick mode keeps the suite narrow and quiet
@@ -201,13 +234,6 @@ def run_pytest(coverage: bool, quick: bool, pattern: Optional[str]) -> Dict[str,
 
     if pattern:
         cmd += ["-k", pattern]
-
-    if coverage:
-        try:
-            import pytest_cov  # noqa: F401
-            cmd += ["--cov=src/actifix", "--cov-report=term-missing"]
-        except ImportError:
-            print("pytest-cov plugin not found; skipping coverage reporting")
 
     env = os.environ.copy()
     env.setdefault("PYTHONPATH", str(ROOT / "src"))
@@ -234,6 +260,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     parser = argparse.ArgumentParser(description="Actifix test runner")
     parser.add_argument("--quick", action="store_true", help="Run a faster subset of tests")
     parser.add_argument("--coverage", action="store_true", help="Include coverage reporting")
+    parser.add_argument("--fast-coverage", action="store_true", help="Fast coverage mode (exclude slow tests, use parallel execution)")
     parser.add_argument("--pattern", type=str, help="Pytest -k pattern")
     args = parser.parse_args(argv)
     
@@ -243,7 +270,9 @@ def main(argv: Optional[list[str]] = None) -> int:
     plan = system_summary["plan"]
     result = system_summary["result"]
     
-    pytest_stage = run_pytest(args.coverage, args.quick, args.pattern)
+    # Use fast coverage mode if specified, otherwise use regular coverage
+    use_fast_coverage = args.fast_coverage or (args.coverage and os.getenv("ACTIFIX_FAST_COVERAGE"))
+    pytest_stage = run_pytest(args.coverage, args.quick, args.pattern, fast_coverage=use_fast_coverage)
     reporter.record_stage(
         "pytest",
         pytest_stage["returncode"] == 0,

@@ -93,7 +93,7 @@ sqlite3 data/actifix.db "SELECT timestamp, event_type, message FROM event_log OR
 
 See `src/actifix/` for implementation details: `raise_af.py` (capture engine), `bootstrap.py` (self-development), and `state_paths.py` (state management).
 
-- All logging should happen into the database never make new .md files.
+- All logging should happen into the database. Never create new .md files for documentation - blend changes into existing docs in the `docs/` directory.
 
 ## Raise_AF Ticketing Requirement
 
@@ -162,6 +162,8 @@ ACTIFIX_CAPTURE_ENABLED=1 python3 -m pytest test/test_actifix_basic.py -v
 # Self-improvement demo (creates tickets against the framework itself)
 python3 test/test_actifix_basic.py
 ```
+
+> Coverage runs (`python test/test_runner.py --coverage`) automatically request `pytest-xdist`-based parallelism when the plugin is available. Install it (`pip install pytest-xdist`) for faster coverage stages, control the worker count via `ACTIFIX_XDIST_WORKERS`, or opt out with `ACTIFIX_DISABLE_XDIST=1`.
 
 ## License
 
