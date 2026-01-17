@@ -15,7 +15,10 @@ All Changes Must Start via Raise_AF
    - Maintain the existing documentation hierarchy
 6. **All errors via raise_af**: Use `actifix.raise_af.record_error()` for all error capture
 7. **Raise_AF gate**: Set `ACTIFIX_CHANGE_ORIGIN=raise_af` before running Actifix or making changes (enforced)
-8. **Architecture graph first**: Always open `docs/architecture/MAP.yaml` and `docs/architecture/DEPGRAPH.json` before starting work so you understand the canonical module/edge graph, and ensure every change is reflected there before committing.
+8. **Architecture graph first**: Always open `docs/architecture/MAP.yaml` and `docs/architecture/DEPGRAPH.json` before starting work so you understand the canonical module/edge graph, and ensure every change is reflected there before committing
+9. **Rules** 
+Always follow the actifix rules.
+Always commit after every ticket and push.
 
 ```bash
 # Commit convention
