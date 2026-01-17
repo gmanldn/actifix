@@ -111,11 +111,35 @@ def bootstrap_actifix_development() -> Callable:
     data_dir.mkdir(parents=True, exist_ok=True)
     state_dir.mkdir(parents=True, exist_ok=True)
 
+    ensure_ticket_database(get_actifix_paths(project_root=Path.cwd()))
+
     print(f"[Actifix] Data directory: {data_dir}")
     print(f"[Actifix] State directory: {state_dir}")
     print("[Actifix] Self-development mode active - actifix will track its own development issues!")
 
     return original_handler
+
+
+def ensure_ticket_database(paths: ActifixPaths) -> Path:
+    """
+    Ensure the ticket database exists and is initialized.
+
+    Returns:
+        Path to the ticket database file.
+    """
+    from .persistence.database import get_database_pool
+
+    env_db_path = os.environ.get("ACTIFIX_DB_PATH")
+    db_path = Path(env_db_path).expanduser() if env_db_path else (paths.project_root / "data" / "actifix.db")
+
+    pool = get_database_pool(db_path=db_path)
+    with pool.connection() as conn:
+        conn.execute("SELECT 1")
+
+    if not db_path.exists():
+        raise FileNotFoundError(f"Ticket database not found after initialization: {db_path}")
+
+    return db_path
 
 
 def bootstrap(project_root: Optional[Path] = None) -> ActifixPaths:
@@ -131,6 +155,7 @@ def bootstrap(project_root: Optional[Path] = None) -> ActifixPaths:
     enforce_raise_af_only(get_actifix_paths(project_root=project_root))
     paths = get_actifix_paths(project_root=project_root)
     init_actifix_files(paths)
+    ensure_ticket_database(paths)
     return paths
 
 

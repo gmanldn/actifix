@@ -22,6 +22,8 @@ ALLOWED_ROOT_FILES = {
     "README.md",
     "AGENTS.md",
     "CHANGELOG.md",
+    "start.py",
+    "test.py",
 }
 
 # Allowed directories in project root (non-hidden)
@@ -171,6 +173,21 @@ class TestRootFolderStructure:
                 pass
 
             pytest.fail("Old Arch/ directory exists - should be moved to docs/architecture/")
+
+    def test_root_symlinks_present(self):
+        """Root symlinks should exist for start/test helpers."""
+        symlinks = {
+            "start.py": ROOT / "scripts" / "start.py",
+            "test.py": ROOT / "test" / "test_runner.py",
+        }
+
+        for link_name, target_path in symlinks.items():
+            link_path = ROOT / link_name
+            assert link_path.exists(), f"{link_name} must exist in project root"
+            assert link_path.is_symlink(), f"{link_name} must be a symlink"
+            assert link_path.resolve() == target_path.resolve(), (
+                f"{link_name} must point to {target_path}"
+            )
 
 
 class TestFolderPurpose:

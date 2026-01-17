@@ -38,6 +38,7 @@ modules:
   - runtime.config
   - infra.logging
   - infra.health
+  - infra.persistence.database
 - id: runtime.api
   domain: runtime
   owner: runtime

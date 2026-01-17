@@ -54,6 +54,7 @@
     {"from": "bootstrap.main", "to": "runtime.config", "reason": "bootstrap.main depends on runtime.config"},
     {"from": "bootstrap.main", "to": "infra.logging", "reason": "bootstrap.main depends on infra.logging"},
     {"from": "bootstrap.main", "to": "infra.health", "reason": "bootstrap.main depends on infra.health"},
+    {"from": "bootstrap.main", "to": "infra.persistence.database", "reason": "bootstrap.main ensures the ticket database is initialized"},
     {"from": "runtime.api", "to": "core.raise_af", "reason": "runtime.api depends on core.raise_af"},
     {"from": "runtime.api", "to": "bootstrap.main", "reason": "runtime.api depends on bootstrap.main"},
     {"from": "runtime.api", "to": "runtime.state", "reason": "runtime.api depends on runtime.state"},
