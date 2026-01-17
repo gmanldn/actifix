@@ -130,7 +130,7 @@ class TestCmdRecord:
                 project_root=str(tmp_path),
                 error_type="TestError",
                 message="Test message",
-                source="test.py:10",
+                source="test/test_runner.py:10",
                 priority="P2",
             )
             
@@ -149,7 +149,7 @@ class TestCmdRecord:
                 project_root=str(tmp_path),
                 error_type="TestError",
                 message="Test message",
-                source="test.py:10",
+                source="test/test_runner.py:10",
                 priority="P2",
             )
             
@@ -170,7 +170,7 @@ class TestCmdRecord:
                     project_root=str(tmp_path),
                     error_type="TestError",
                     message="Test",
-                    source="test.py:1",
+                    source="test/test_runner.py:1",
                     priority=priority,
                 )
                 

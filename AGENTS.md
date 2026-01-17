@@ -5,7 +5,7 @@ All Changes Must Start via Raise_AF
 ## Mandatory Rules
 
 1. **Workflow**: Work directly on `develop` with regular pushes; no per-change branches required.
-2. **Tests required**: `python test.py --coverage` must pass with 95%+ coverage before commit
+2. **Tests required**: `python test/test_runner.py --coverage` must pass with 95%+ coverage before commit
 3. **Version bump**: Increment version in `pyproject.toml` after every commit
 4. **No plan docs**: Never create `*_PLAN.md`, `ROADMAP.md`, `DESIGN.md` files
 5. **All errors via raise_af**: Use `actifix.raise_af.record_error()` for all error capture

@@ -182,7 +182,7 @@ class TestActifixBasic:
         # Try to record error
         entry = actifix.record_error(
             message="This should not be recorded",
-            source="test.py",
+            source="test/test_runner.py",
             run_label="test",
             error_type="TestError"
         )

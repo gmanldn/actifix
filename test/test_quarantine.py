@@ -53,7 +53,7 @@ class TestQuarantineContent:
         init_actifix_files(paths)
         
         content = "Test content"
-        source = "test.py"
+        source = "test/test_runner.py"
         reason = "Test reason"
         
         entry = quarantine_content(content, source, reason, paths)

@@ -34,7 +34,7 @@ def test_record_error_creates_ticket():
     """Test that record_error creates a valid ticket."""
     entry = record_error(
         message="Test error",
-        source="test.py:10",
+        source="test/test_runner.py:10",
         priority=TicketPriority.P2
     )
     assert entry is not None
@@ -51,7 +51,7 @@ def test_record_error_creates_ticket():
 def test_error_flow_end_to_end():
     """Test complete error capture and processing flow."""
     # Capture error
-    entry = record_error(message="Integration test", source="test.py:20")
+    entry = record_error(message="Integration test", source="test/test_runner.py:20")
     
     # Process ticket
     tickets = get_open_tickets()
@@ -115,7 +115,7 @@ def test_startup_time():
 
 ```bash
 # Full test suite with coverage
-python test.py --coverage
+python test/test_runner.py --coverage
 
 # Quick tests (exclude slow integration tests)
 python -m pytest test/ -m "not slow"
@@ -324,7 +324,7 @@ test_logs/
 # .git/hooks/pre-commit
 
 # Run tests
-python test.py --coverage
+python test/test_runner.py --coverage
 if [ $? -ne 0 ]; then
     echo "❌ Tests failed. Commit aborted."
     exit 1
@@ -370,7 +370,7 @@ jobs:
         pip install -e ".[dev]"
     
     - name: Run tests with coverage
-      run: python test.py --coverage
+      run: python test/test_runner.py --coverage
     
     - name: Validate architecture
       run: python -m actifix.testing --validate-architecture
@@ -430,7 +430,7 @@ class TicketFactory:
     def create_ticket(**kwargs):
         defaults = {
             "message": "Test error",
-            "source": "test.py:10",
+            "source": "test/test_runner.py:10",
             "priority": TicketPriority.P2
         }
         defaults.update(kwargs)

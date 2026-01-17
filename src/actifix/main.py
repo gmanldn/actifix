@@ -125,7 +125,7 @@ def cmd_test(args: argparse.Namespace) -> int:
             assert paths.base_dir.exists()
         
         def test_record():
-            entry = record_error("TestError", "test", "test.py:1", "P3")
+            entry = record_error("TestError", "test", "test/test_runner.py:1", "P3")
             assert entry is not None
         
         result = run_tests(

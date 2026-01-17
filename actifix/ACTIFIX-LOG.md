@@ -2145,3 +2145,18 @@ Audit trail of all Actifix operations.
 2026-01-15T23:58:58.769173+00:00 | ACT-20260115-2CB32 | P2 | DevelopmentMilestone | Development milestone: Basic test suite created. Created comprehensive tests for core error capture functionality. Next: implement DoAF for ticket processing.
 2026-01-16T00:29:00.402381+00:00 | ACT-20260116-3A316 | P2 | PolicyUpdate | Simplify workflow docs to allow direct develop commits without per-change branches while keeping Raise_AF gate.
 2026-01-16T00:29:52.837149+00:00 | ACT-20260116-4CC84 | P2 | DatabaseSecurityError | query_open_tickets.py failed: actfix.db is world-readable; needs chmod 600 before ticket repo access.
+2026-01-17T13:39:09.643084+00:00 | ACT-20260117-3F30B | P1 | TestPerformance | Threading barrier tests cause test cycle slowness - 0.54s per test adds significant overhead
+2026-01-17T13:39:09.654773+00:00 | ACT-20260117-A9A68 | P1 | TestConfiguration | conftest.py sets global pytest timeout to 30s - tests may hang for 30s before failing
+2026-01-17T13:39:09.667556+00:00 | ACT-20260117-DF6BC | P2 | TestFixtureOverhead | isolate_actifix_db autouse fixture adds database setup/teardown overhead to every test
+2026-01-17T13:39:32.531811+00:00 | ACT-20260117-F258F | P0 | TestError | System test error: health_check
+2026-01-17T13:39:47.032448+00:00 | ACT-20260117-F2C77 | P2 | TestPerformance | Concurrent locking race condition tests spawn many threads causing slowness
+2026-01-17T13:39:47.046090+00:00 | ACT-20260117-826FB | P2 | TestNetworkDependency | AI client tests check external services (Ollama, Claude API) which may cause hangs
+2026-01-17T13:39:47.057371+00:00 | ACT-20260117-EE6AB | P3 | TestCollection | Pytest collection warnings for TestRunner/TestCycleReporter classes slow down collection
+2026-01-17T13:39:47.068817+00:00 | ACT-20260117-AD1D4 | P1 | TestSuiteOrganization | Test suite has 882 tests with no organization - need to split into unit/integration/slow
+2026-01-17T13:39:47.080365+00:00 | ACT-20260117-76E69 | P0 | TestHanging | Need to identify which specific tests are hanging beyond the 30s timeout
+2026-01-17T13:40:59.297324+00:00 | ACT-20260117-BF88F | P2 | TestPerformance | TEST: Flask API tests may hang due to app setup/teardown overhead
+2026-01-17T13:41:27.219555+00:00 | ACT-20260117-600E1 | P2 | TestPerformance | Flask API tests cause overhead - app setup/teardown per test, potential hanging
+2026-01-17T13:41:27.233657+00:00 | ACT-20260117-D87A1 | P1 | TestSubprocessHang | Tests using subprocess may hang without timeouts - check_output, run, Popen calls
+2026-01-17T13:41:27.245318+00:00 | ACT-20260117-1DC02 | P3 | TestBestPractices | Threading barrier tests return bool instead of assert - causes pytest warnings
+2026-01-17T13:41:27.256678+00:00 | ACT-20260117-83B47 | P2 | TestPerformance | File lock tests may cause test hangs - test_file_lock_timeout_retry.py
+2026-01-17T13:41:45.618234+00:00 | ACT-20260117-E9F71 | P0 | TestSuitePerformance | MASTER: Test suite performance optimization - 882 tests taking >30s, some hanging

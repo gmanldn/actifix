@@ -63,7 +63,7 @@ Focused instructions for AI agents and developers to build and ship Actifix add-
    - Avoid custom exception sinks; the ACTIFIX pipeline handles tickets and deduplication.
 
 6) **Test and validate**  
-   - Run `python test.py` and `python test.py --coverage` (target 95%+).  
+   - Run `python test/test_runner.py` and `python test/test_runner.py --coverage` (target 95%+).  
    - Verify architecture compliance tests still pass (entrypoints present, docs fresh).
 
 7) **Ship**  

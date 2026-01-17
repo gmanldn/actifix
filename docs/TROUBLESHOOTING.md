@@ -85,7 +85,7 @@ export ACTIFIX_CHANGE_ORIGIN=raise_af
 # Test ticket creation
 python -c "
 from actifix.raise_af import record_error
-entry = record_error('Test error', 'test.py:1')
+entry = record_error('Test error', 'test/test_runner.py:1')
 print(f'Created: {entry.entry_id if entry else None}')
 "
 ```
@@ -175,7 +175,7 @@ db.optimize()
 # Disable context capture for performance
 python -c "
 from actifix.raise_af import record_error
-record_error('Fast error', 'test.py:1', capture_context=False)
+record_error('Fast error', 'test/test_runner.py:1', capture_context=False)
 "
 
 # Optimize file operations
@@ -240,7 +240,7 @@ python -m actifix.recovery --rebuild-from-audit
 **Solution:**
 ```bash
 # Generate coverage report
-python test.py --coverage --html
+python test/test_runner.py --coverage --html
 
 # Identify missing coverage
 coverage report --show-missing

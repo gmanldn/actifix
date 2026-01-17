@@ -12,6 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Comprehensive task list with priority distribution
 - Initial ticket creation via raise_af workflow
 
+### Changed
+- Move the consolidated test runner into `test/test_runner.py` and align the docs/architecture references with the new path
+
 ## [2.7.0] - 2026-01-11
 
 ### Added

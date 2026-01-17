@@ -34,7 +34,7 @@ Welcome to the Actifix documentation! This index provides a comprehensive guide 
 
 ### Testing & Quality
 - **[TESTING.md](TESTING.md)** - Testing strategy and guidelines *(Coming Soon)*
-- **Test Coverage Reports** - Available after running `python test.py --coverage`
+- **Test Coverage Reports** - Available after running `python test/test_runner.py --coverage`
 
 ## Reference Documentation
 

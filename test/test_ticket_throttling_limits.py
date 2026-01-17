@@ -116,7 +116,7 @@ class TestTicket1MessageLength:
             priority=TicketPriority.P2,
             error_type="TestError",
             message=message,
-            source="test.py:42",
+            source="test/test_runner.py:42",
         )
         assert repo.create_ticket(entry) is True
     
@@ -128,7 +128,7 @@ class TestTicket1MessageLength:
             priority=TicketPriority.P2,
             error_type="TestError",
             message=message,
-            source="test.py:42",
+            source="test/test_runner.py:42",
         )
         assert repo.create_ticket(entry) is True
     
@@ -140,7 +140,7 @@ class TestTicket1MessageLength:
             priority=TicketPriority.P2,
             error_type="TestError",
             message=message,
-            source="test.py:42",
+            source="test/test_runner.py:42",
         )
         with pytest.raises(FieldLengthError) as excinfo:
             repo.create_ticket(entry)
@@ -154,7 +154,7 @@ class TestTicket1MessageLength:
             priority=TicketPriority.P2,
             error_type="TestError",
             message="Original message",
-            source="test.py:42",
+            source="test/test_runner.py:42",
         )
         repo.create_ticket(entry)
         
@@ -168,7 +168,7 @@ class TestTicket1MessageLength:
             priority=TicketPriority.P2,
             error_type="TestError",
             message="Original message",
-            source="test.py:42",
+            source="test/test_runner.py:42",
         )
         repo.create_ticket(entry)
         
@@ -214,7 +214,7 @@ class TestTicket2FileContextSize:
             priority=TicketPriority.P2,
             error_type="TestError",
             message="Test message",
-            source="test.py:42",
+            source="test/test_runner.py:42",
             file_context=None,
         )
         assert repo.create_ticket(entry) is True
@@ -228,7 +228,7 @@ class TestTicket2FileContextSize:
             priority=TicketPriority.P2,
             error_type="TestError",
             message="Test message",
-            source="test.py:42",
+            source="test/test_runner.py:42",
             file_context=file_context,
         )
         assert repo.create_ticket(entry) is True
@@ -250,7 +250,7 @@ class TestTicket2FileContextSize:
             priority=TicketPriority.P2,
             error_type="TestError",
             message="Test message",
-            source="test.py:42",
+            source="test/test_runner.py:42",
             file_context=file_context,
         )
         # This entry should either fail to create or be handled by raise_af
@@ -287,7 +287,7 @@ class TestTicket3OpenTicketsLimit:
                 priority=TicketPriority.P2,
                 error_type="TestError",
                 message=f"Test message {i}",
-                source="test.py:42",
+                source="test/test_runner.py:42",
             )
             assert repo.create_ticket(entry) is True
         
@@ -304,7 +304,7 @@ class TestTicket3OpenTicketsLimit:
                 priority=TicketPriority.P2,
                 error_type="TestError",
                 message=f"Test message {i}",
-                source="test.py:42",
+                source="test/test_runner.py:42",
             )
             repo.create_ticket(entry)
         
@@ -330,7 +330,7 @@ class TestTicket3OpenTicketsLimit:
                 priority=TicketPriority.P2,
                 error_type="TestError",
                 message=f"Test message {i}",
-                source="test.py:42",
+                source="test/test_runner.py:42",
             )
             repo.create_ticket(entry)
         
@@ -353,7 +353,7 @@ class TestLeaseBasedLocking:
             priority=TicketPriority.P1,
             error_type="TestError",
             message="Test message",
-            source="test.py:42",
+            source="test/test_runner.py:42",
         )
         repo.create_ticket(entry)
         
@@ -370,7 +370,7 @@ class TestLeaseBasedLocking:
             priority=TicketPriority.P1,
             error_type="TestError",
             message="Test message",
-            source="test.py:42",
+            source="test/test_runner.py:42",
         )
         repo.create_ticket(entry)
         
@@ -394,7 +394,7 @@ class TestLeaseBasedLocking:
             priority=TicketPriority.P1,
             error_type="TestError",
             message="Test message",
-            source="test.py:42",
+            source="test/test_runner.py:42",
         )
         repo.create_ticket(entry)
         
@@ -420,7 +420,7 @@ class TestLeaseBasedLocking:
             priority=TicketPriority.P1,
             error_type="TestError",
             message="Test message",
-            source="test.py:42",
+            source="test/test_runner.py:42",
         )
         repo.create_ticket(entry)
         
@@ -464,7 +464,7 @@ class TestIntegration:
                 priority=priority_obj,
                 error_type="TestError",
                 message=f"Test message P{priority_char}",
-                source="test.py:42",
+                source="test/test_runner.py:42",
             )
             assert repo.create_ticket(entry) is True
         
@@ -482,7 +482,7 @@ class TestIntegration:
                 priority=TicketPriority.P2,
                 error_type="TestError",
                 message=f"Test message {i}",
-                source="test.py:42",
+                source="test/test_runner.py:42",
             )
             repo.create_ticket(entry)
         

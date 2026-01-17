@@ -19,7 +19,9 @@ import sys
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 
-ROOT = Path(__file__).parent
+SCRIPT_DIR = Path(__file__).resolve().parent
+ROOT = SCRIPT_DIR.parent
+RUNNER_SOURCE = "test/test_runner.py"
 sys.path.insert(0, str(ROOT / "src"))
 
 from actifix.testing import TestRunner
@@ -43,7 +45,7 @@ def raise_tickets_for_system_failures(result, paths) -> int:
         try:
             record_error(
                 message=f"System test failed: {test_name}",
-                source="test.py::run_system_suite",
+                source=f"{RUNNER_SOURCE}::run_system_suite",
                 run_label="test-suite",
                 error_type="TestFailure",
                 priority=TicketPriority.P1,
@@ -60,7 +62,7 @@ def raise_tickets_for_system_failures(result, paths) -> int:
         try:
             record_error(
                 message=f"System test error: {test_name}",
-                source="test.py::run_system_suite",
+                source=f"{RUNNER_SOURCE}::run_system_suite",
                 run_label="test-suite",
                 error_type="TestError",
                 priority=TicketPriority.P0,

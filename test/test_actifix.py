@@ -66,15 +66,15 @@ class TestRaiseAF:
     def test_generate_duplicate_guard(self):
         from actifix.raise_af import generate_duplicate_guard
         
-        guard = generate_duplicate_guard("test.py:10", "error message")
+        guard = generate_duplicate_guard("test/test_runner.py:10", "error message")
         assert guard.startswith("ACTIFIX-")
         
         # Same input should give same guard
-        guard2 = generate_duplicate_guard("test.py:10", "error message")
+        guard2 = generate_duplicate_guard("test/test_runner.py:10", "error message")
         assert guard == guard2
         
         # Different input should give different guard
-        guard3 = generate_duplicate_guard("test.py:20", "different error")
+        guard3 = generate_duplicate_guard("test/test_runner.py:20", "different error")
         assert guard != guard3
     
     def test_record_error(self, monkeypatch):

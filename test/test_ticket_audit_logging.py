@@ -37,7 +37,7 @@ def create_test_entry(ticket_id=None):
     """Create a test ticket entry."""
     return ActifixEntry(
         message="Test ticket for audit logging",
-        source="test.py",
+        source="test/test_runner.py",
         run_label="test_run",
         entry_id=ticket_id or f"ACT-AUDIT-{datetime.now().timestamp()}",
         created_at=datetime.now(timezone.utc),
@@ -91,7 +91,7 @@ class TestTicketCreationAudit:
             assert new_values['id'] == "ACT-AUDIT-002"
             assert new_values['priority'] == "P2"
             assert new_values['status'] == "Open"
-            assert new_values['source'] == "test.py"
+            assert new_values['source'] == "test/test_runner.py"
 
     def test_create_ticket_audit_description(self, clean_db):
         """Verify creation audit includes description."""

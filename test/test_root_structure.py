@@ -22,7 +22,6 @@ ALLOWED_ROOT_FILES = {
     "README.md",
     "AGENTS.md",
     "CHANGELOG.md",
-    "test.py",
 }
 
 # Allowed directories in project root (non-hidden)

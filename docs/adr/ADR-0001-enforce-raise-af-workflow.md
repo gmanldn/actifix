@@ -41,7 +41,7 @@ python -c "from actifix.raise_af import record_error; record_error(...)"
 # ... development work ...
 
 # 4. Test and commit
-python test.py --coverage
+python test/test_runner.py --coverage
 git commit -m "feat(scope): description"
 
 git push

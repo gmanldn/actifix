@@ -86,7 +86,7 @@ Detailed logs for each test category:
 
 Logs are automatically generated when running:
 ```bash
-python test.py --coverage
+python test/test_runner.py --coverage
 ```
 
 To view recent test results:

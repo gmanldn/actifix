@@ -234,4 +234,4 @@ Open http://localhost:8080 to view the Actifix dashboard. No build step is requi
 
 ## Next Steps
 - Integrate into your app by calling `actifix.enable_actifix_capture()` early and `actifix.install_exception_handler()` during development to auto-capture uncaught exceptions.
-- Run the full suite when developing the framework itself: `python test.py` and `python test.py --coverage`.
+- Run the full suite when developing the framework itself: `python test/test_runner.py` and `python test/test_runner.py --coverage`.

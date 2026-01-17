@@ -310,7 +310,7 @@ modules:
   summary: Quality assurance and testing framework
   entrypoints:
   - src/actifix/testing/__init__.py
-  - test.py
+  - test/test_runner.py
   contracts:
   - enforce quality gates
   - maintain test coverage
