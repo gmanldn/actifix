@@ -372,16 +372,21 @@ class DatabasePool:
             # Row factory for dict-like access
             conn.row_factory = sqlite3.Row
 
-            self._local.connection = conn
-
             # Initialize schema if this is first connection
             # Acquire lock to prevent race condition where multiple threads
             # try to initialize schema simultaneously
+            # IMPORTANT: Do this BEFORE assigning connection to prevent other threads
+            # from getting an incompletely initialized connection
             with self._lock:
                 # Double-check pattern: check again inside lock
                 if not self._initialized:
                     self._initialize_schema(conn)
                     self._initialized = True
+
+            # Only assign connection AFTER schema is fully initialized
+            # This prevents race condition where fast path returns connection
+            # before schema initialization completes
+            self._local.connection = conn
 
         except sqlite3.Error as e:
             raise DatabaseConnectionError(f"Failed to connect to database: {e}") from e
