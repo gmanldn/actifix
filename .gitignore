@@ -19,3 +19,5 @@ logs/
 src/actifix/**/__pycache__/
 test/**/__pycache__/
 .vscode/
+scripts/data/
+scripts/actifix/

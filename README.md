@@ -93,6 +93,8 @@ tail -n 50 actifix/AFLog.txt  # lifecycle log (generated from the DB)
 
 See `src/actifix/` for implementation details: `raise_af.py` (capture engine), `bootstrap.py` (self-development), and `state_paths.py` (state management).
 
+- All logging should happen into the database never make new .md files.
+
 ## Raise_AF Ticketing Requirement
 
 All work must begin by logging the condition through `actifix.raise_af.record_error(...)` so a structured row lands in `data/actifix.db` with the proper priority and context. Legacy Markdown lists such as `TASK_LIST.md`, `Actifix-list.md`, or `ACTIFIX-LIST.md` have been removed—tickets are created, queried, and completed only through the database, DoAF, or the Actifix API. This keeps the RaiseAF pipeline as the single source of truth and ensures the AI/automation workflow stays honest. Enforcement is active: set `ACTIFIX_CHANGE_ORIGIN=raise_af` (default enforced) before running Actifix or changes fail fast.
