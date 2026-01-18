@@ -18,6 +18,23 @@ python3 -m pip install -e "[dev]"
 python3 scripts/start.py
 ```
 
+## Multi-Agent Development
+For collaborative AI agent workflows, use isolated environments to avoid conflicts:
+
+```bash
+# Setup new agent (creates isolated data/logs/state)
+scripts/setup-agent.sh
+
+# Source agent config
+source ~/actifix-agent-*/agent.env  # Path printed by script
+
+# Now process tickets in isolation
+python3 scripts/view_tickets.py
+python3 Do_AF.py 1
+```
+
+Each agent gets unique `ACTIFIX_DATA_DIR`, keeping `data/actifix.db` untracked in git.
+
 ## Start work with Raise_AF
 ```bash
 export ACTIFIX_CHANGE_ORIGIN=raise_af
