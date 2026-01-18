@@ -944,7 +944,23 @@ const App = () => {
   const handleFix = async () => {
     if (isFixing) return;
     setIsFixing(true);
-    setFixStatus('Checking tickets…');\n    try {\n      const statsResp = await fetch(`${API_BASE}/tickets?limit=1`);\n      const statsData = await statsResp.json();\n      if (!statsResp.ok || !statsData || (statsData.total_open || 0) <= 0) {\n        setFixStatus('No open tickets to fix');\n        setIsFixing(false);\n        return;\n      }\n    } catch (err) {\n      setFixStatus(`Error: ${err.message}`);\n      setIsFixing(false);\n      return;\n    }\n    setFixStatus('Fixing the highest priority ticket…');
+    setFixStatus('Checking tickets…');
+    
+    try {
+      const statsResp = await fetch(`${API_BASE}/tickets?limit=1`);
+      const statsData = await statsResp.json();
+      if (!statsResp.ok || !statsData || (statsData.total_open || 0) <= 0) {
+        setFixStatus('No open tickets to fix');
+        setIsFixing(false);
+        return;
+      }
+    } catch (err) {
+      setFixStatus(`Error: ${err.message}`);
+      setIsFixing(false);
+      return;
+    }
+    
+    setFixStatus('Fixing the highest priority ticket…');
     triggerLogFlash();
 
     try {
