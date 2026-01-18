@@ -244,7 +244,7 @@ const FixToolbar = ({ onFix, isFixing, status }) => {
 };
 
 // Header Component
-const Header = ({ onFix, isFixing, fixStatus }) => {
+const Header = ({ onFix, isFixing, fixStatus, theme, onToggleTheme }) => {
   const [connected, setConnected] = useState(false);
   const [time, setTime] = useState(new Date().toLocaleTimeString());
   const { data: health } = useFetch('/health', REFRESH_INTERVAL);
@@ -300,6 +300,20 @@ const Header = ({ onFix, isFixing, fixStatus }) => {
       ),
       h(FixToolbar, { onFix, isFixing, status: fixStatus }),
       h(VersionBadge),
+      h('button', {
+        onClick: onToggleTheme,
+        title: `Switch to ${theme === 'dark' ? 'Azure light' : 'Dark'} theme`,
+        className: 'theme-toggle-btn',
+        style: {
+          background: 'transparent',
+          border: '1px solid var(--border)',
+          borderRadius: '999px',
+          padding: '4px 8px',
+          fontSize: '16px',
+          cursor: 'pointer',
+          color: 'var(--text-primary)'
+        }
+      }, theme === 'dark' ? '☀️' : '🌙'),
       h('span', { className: 'header-time' }, time)
     )
   );
@@ -433,6 +447,27 @@ const OverviewView = () => {
 const TicketsView = () => {
   const { data, loading, error, lastUpdated } = useFetch(`/tickets?limit=${TICKET_LIMIT}`, TICKET_REFRESH_INTERVAL);
 
+  const [selectedTicket, setSelectedTicket] = useState(null);
+  const [modalLoading, setModalLoading] = useState(false);
+  const [modalError, setModalError] = useState('');
+
+  const fetchTicket = async (ticketId) => {
+    setModalLoading(true);
+    setModalError('');
+    try {
+      const response = await fetch(`${API_BASE}/ticket/${ticketId}`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const ticketData = await response.json();
+      setSelectedTicket(ticketData);
+    } catch (err) {
+      setModalError(err.message);
+    } finally {
+      setModalLoading(false);
+    }
+  };
+
+  const closeModal = () => setSelectedTicket(null);
+
   if (loading) return h(LoadingSpinner);
   if (error) return h(ErrorDisplay, { message: error });
 
@@ -444,7 +479,12 @@ const TicketsView = () => {
 
   const renderTicketCard = (ticket, index) => {
     const priority = normalizePriority(ticket.priority);
-    return h('article', { key: ticket.ticket_id || index, className: `ticket-card ${ticket.status}` },
+    return h('article', { 
+      key: ticket.ticket_id || index, 
+      className: `ticket-card ${ticket.status}`,
+      onClick: () => fetchTicket(ticket.ticket_id),
+      style: { cursor: 'pointer' }
+    },
       h('div', { className: 'ticket-card-header' },
         h('span', { className: `priority-badge ${priority.toLowerCase()}` }, priority),
         h('span', { className: `status-badge ${ticket.status}` }, ticket.status),
@@ -509,8 +549,162 @@ const TicketsView = () => {
           )
         );
       })
-    ) : h('div', { style: { padding: '24px', textAlign: 'center', color: 'var(--text-dim)' } }, 'No tickets found')
+    ) : h('div', { style: { padding: '24px', textAlign: 'center', color: 'var(--text-dim)' } }, 'No tickets found'),
+    renderModal()
   );
+    if (!selectedTicket && !modalLoading && !modalError) return null;
+
+    const backdropStyle = {
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      background: 'rgba(0,0,0,0.8)',
+      zIndex: 9999,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '20px'
+    };
+
+    const modalStyle = {
+      background: 'var(--bg-secondary)',
+      border: '1px solid var(--border)',
+      borderRadius: 'var(--radius-lg)',
+      maxWidth: '90vw',
+      maxHeight: '90vh',
+      overflow: 'auto',
+      color: 'var(--text-primary)',
+      padding: 'var(--spacing-xl)'
+    };
+
+    const sectionStyle = {
+      marginBottom: 'var(--spacing-xl)',
+      paddingBottom: 'var(--spacing-lg)',
+      borderBottom: '1px solid var(--border)'
+    };
+
+    const fieldStyle = { marginBottom: 'var(--spacing-md)', fontSize: '13px' };
+    const labelStyle = { fontWeight: '600', color: 'var(--text-muted)', fontSize: '12px', textTransform: 'uppercase' };
+
+    return h('div', { 
+      style: backdropStyle,
+      onClick: closeModal 
+    },
+      h('div', { 
+        style: { 
+          background: 'transparent', 
+          maxWidth: '800px', 
+          width: '100%', 
+          maxHeight: '90vh', 
+          overflow: 'auto' 
+        },
+        onClick: (e) => e.stopPropagation()
+      },
+        modalLoading ? h(LoadingSpinner) :
+        modalError ? h(ErrorDisplay, { message: modalError }) :
+        h('div', { style: modalStyle },
+          h('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-xl)' } },
+            h('h2', { style: { fontSize: '20px', fontWeight: '600' } }, `Ticket ${selectedTicket.id}`),
+            h('button', { 
+              onClick: closeModal, 
+              style: { 
+                background: 'transparent', 
+                border: '1px solid var(--border)', 
+                borderRadius: 'var(--radius-md)', 
+                padding: '8px 16px', 
+                color: 'var(--text-primary)',
+                cursor: 'pointer'
+              } 
+            }, 'Close')
+          ),
+          h('div', { style: sectionStyle },
+            h('div', { style: labelStyle }, 'Summary'),
+            h('div', { style: fieldStyle },
+              h('strong', null, 'Priority: '), selectedTicket.priority
+            ),
+            h('div', { style: fieldStyle },
+              h('strong', null, 'Status: '), selectedTicket.status
+            ),
+            h('div', { style: fieldStyle },
+              h('strong', null, 'Created: '), formatTime(selectedTicket.created_at)
+            ),
+            h('div', { style: fieldStyle },
+              h('strong', null, 'Updated: '), selectedTicket.updated_at ? formatTime(selectedTicket.updated_at) : 'N/A'
+            )
+          ),
+          h('div', { style: sectionStyle },
+            h('div', { style: labelStyle }, 'Error Details'),
+            h('div', { style: fieldStyle },
+              h('strong', null, 'Type: '), selectedTicket.error_type
+            ),
+            h('div', { style: fieldStyle },
+              h('strong', null, 'Message: '), selectedTicket.message
+            ),
+            h('div', { style: fieldStyle },
+              h('strong', null, 'Source: '), selectedTicket.source
+            )
+          ),
+          selectedTicket.stack_trace && h('div', { style: sectionStyle },
+            h('div', { style: labelStyle }, 'Stack Trace'),
+            h('pre', { 
+              style: { 
+                background: 'var(--bg-panel)', 
+                padding: 'var(--spacing-md)', 
+                borderRadius: 'var(--radius-md)', 
+                fontSize: '12px',
+                maxHeight: '200px',
+                overflow: 'auto',
+                whiteSpace: 'pre-wrap',
+                fontFamily: 'IBM Plex Mono, monospace'
+              } 
+            }, selectedTicket.stack_trace)
+          ),
+          (selectedTicket.ai_remediation_notes || selectedTicket.completion_summary || selectedTicket.completion_notes) && h('div', { style: sectionStyle },
+            h('div', { style: labelStyle }, 'Remediation & Completion'),
+            selectedTicket.ai_remediation_notes && h('div', { style: fieldStyle },
+              h('strong', null, 'AI Notes: '), selectedTicket.ai_remediation_notes
+            ),
+            selectedTicket.completion_summary && h('div', { style: fieldStyle },
+              h('strong', null, 'Summary: '), selectedTicket.completion_summary
+            ),
+            selectedTicket.completion_notes && h('div', { style: fieldStyle },
+              h('strong', null, 'Notes: '), selectedTicket.completion_notes
+            ),
+            selectedTicket.test_steps && h('div', { style: fieldStyle },
+              h('strong', null, 'Test Steps: '), selectedTicket.test_steps
+            ),
+            selectedTicket.test_results && h('div', { style: fieldStyle },
+              h('strong', null, 'Test Results: '), selectedTicket.test_results
+            )
+          ),
+          selectedTicket.file_context && Object.keys(selectedTicket.file_context).length > 0 && h('div', { style: sectionStyle },
+            h('div', { style: labelStyle }, 'File Context'),
+            Object.entries(selectedTicket.file_context).map(([file, content]) =>
+              h('div', { key: file, style: { marginBottom: 'var(--spacing-md)' } },
+                h('strong', { style: { fontSize: '12px' } }, file),
+                h('pre', { 
+                  style: { 
+                    background: 'var(--bg-panel)', 
+                    padding: 'var(--spacing-sm)', 
+                    borderRadius: 'var(--radius-sm)', 
+                    fontSize: '11px',
+                    maxHeight: '100px',
+                    overflow: 'auto',
+                    whiteSpace: 'pre-wrap',
+                    fontFamily: 'IBM Plex Mono, monospace'
+                  } 
+                }, content.substring(0, 500) + (content.length > 500 ? '...' : ''))
+              )
+            )
+          )
+        )
+      )
+    );
+  };
+
+  return h('div', { className: 'panel tickets-board' },
 };
 
 // Logs View Component
@@ -1104,7 +1298,21 @@ const App = () => {
   const [isFixing, setIsFixing] = useState(false);
   const [fixStatus, setFixStatus] = useState('Ready to fix the next ticket');
   const [logAlert, setLogAlert] = useState(false);
+  const [theme, setTheme] = useState('dark');
   const logFlashTimer = useRef(null);
+
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('actifix-theme') || 'dark';
+    setTheme(savedTheme);
+    document.documentElement.dataset.theme = savedTheme;
+  }, []);
+
+  const toggleTheme = () => {
+    const newTheme = theme === 'dark' ? 'azure' : 'dark';
+    setTheme(newTheme);
+    localStorage.setItem('actifix-theme', newTheme);
+    document.documentElement.dataset.theme = newTheme;
+  };
 
   useEffect(() => {
     return () => {
@@ -1185,7 +1393,7 @@ const App = () => {
 
   return h('div', { className: 'dashboard' },
     h(NavigationRail, { activeView, onViewChange: setActiveView, logAlert }),
-    h(Header, { onFix: handleFix, isFixing, fixStatus }),
+    h(Header, { onFix: handleFix, isFixing, fixStatus, theme, onToggleTheme: toggleTheme }),
     h('main', { className: 'dashboard-content' },
       renderView()
     ),

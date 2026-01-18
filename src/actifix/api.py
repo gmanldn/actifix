@@ -485,6 +485,17 @@ def create_app(project_root: Optional[Path] = None) -> "Flask":
             'total_completed': stats.get('completed', 0),
         })
 
+    @app.route('/api/ticket/<ticket_id>', methods=['GET'])
+    def api_ticket(ticket_id):
+        """Get full ticket details by ID."""
+        paths = get_actifix_paths(project_root=app.config['PROJECT_ROOT'])
+        from .persistence.ticket_repo import get_ticket_repository
+        repo = get_ticket_repository()
+        ticket = repo.get_ticket(ticket_id)
+        if not ticket:
+            return jsonify({'error': 'Ticket not found'}), 404
+        return jsonify(ticket)
+
     @app.route('/api/fix-ticket', methods=['POST'])
     def api_fix_ticket():
         """Fix the highest priority open ticket with detailed logging."""
@@ -597,24 +608,42 @@ def create_app(project_root: Optional[Path] = None) -> "Flask":
                 'file': 'data/actifix.db:event_log',
                 'error': str(e),
             })
-    
+
+    def _collect_recent_events(limit: int = 5) -> List[Dict[str, str]]:
+        """Helper to fetch recent events for dashboard summary sections."""
+        try:
+            repo = get_event_repository()
+            raw_events = repo.get_recent_events(limit=max(limit, 1))
+            recent = raw_events[-limit:][::-1]
+            entries = []
+            for event in recent:
+                message = event.get("message", "") or ""
+                entries.append({
+                    "timestamp": event.get("timestamp", ""),
+                    "event": event.get("event_type", "LOG"),
+                    "text": (message[:50] + "...") if len(message) > 50 else message,
+                })
+            return entries
+        except Exception:
+            return []
+
     @app.route('/api/system', methods=['GET'])
     def api_system():
         """Get system information."""
         uptime_seconds = time.time() - SERVER_START_TIME
-        
-        # Format uptime
         hours, remainder = divmod(int(uptime_seconds), 3600)
         minutes, seconds = divmod(remainder, 60)
         uptime_str = f"{hours}h {minutes}m {seconds}s"
-        
-        # Get memory info - psutil is preferred but not required here
+
+        paths = get_actifix_paths(project_root=app.config['PROJECT_ROOT'])
+        disk_info = None
         memory_info = {
             'total_gb': 0.0,
             'used_gb': 0.0,
             'percent': 0.0,
         }
         cpu_percent = 0.0
+
         try:
             import psutil
             mem = psutil.virtual_memory()
@@ -624,13 +653,30 @@ def create_app(project_root: Optional[Path] = None) -> "Flask":
                 'percent': round(mem.percent, 1),
             }
             cpu_percent = round(psutil.cpu_percent(interval=0.1), 1)
+
+            disk = psutil.disk_usage(str(paths.data_dir.parent))
+            disk_gb = lambda b: round(b / (1024**3), 1)
+            disk_info = {
+                'total_gb': disk_gb(disk.total),
+                'used_gb': disk_gb(disk.used),
+                'free_gb': disk_gb(disk.free),
+                'percent': round((disk.used / disk.total) * 100, 1),
+            }
         except ImportError:
             pass
         except Exception:
             cpu_percent = 0.0
-        
-        paths = get_actifix_paths(project_root=app.config['PROJECT_ROOT'])
-        
+
+        paths_dict = {
+            "base_dir": str(paths.base_dir),
+            "data_dir": str(paths.data_dir),
+            "logs_dir": str(paths.logs_dir),
+            "state_dir": str(paths.state_dir),
+        }
+        health = get_health(paths)
+        git_info = _gather_version_info(app.config['PROJECT_ROOT'])
+        recent_events = _collect_recent_events(limit=5)
+
         return jsonify({
             'platform': {
                 'system': platform.system(),
@@ -645,7 +691,9 @@ def create_app(project_root: Optional[Path] = None) -> "Flask":
             'server': {
                 'uptime': uptime_str,
                 'uptime_seconds': int(uptime_seconds),
-                'start_time': datetime.fromtimestamp(SERVER_START_TIME, tz=timezone.utc).isoformat(),
+                'start_time': datetime.fromtimestamp(
+                    SERVER_START_TIME, tz=timezone.utc
+                ).isoformat(),
             },
             'resources': {
                 'memory': memory_info if memory_info else None,
@@ -665,42 +713,42 @@ def create_app(project_root: Optional[Path] = None) -> "Flask":
             'timestamp': datetime.now(timezone.utc).isoformat(),
         })
 
-@app.route('/api/modules', methods=['GET'])
-def api_modules():
-    """List system/user modules from architecture catalog."""
-    modules = _load_modules(app.config['PROJECT_ROOT'])
-    return jsonify(modules)
+    @app.route('/api/modules', methods=['GET'])
+    def api_modules():
+        """List system/user modules from architecture catalog."""
+        modules = _load_modules(app.config['PROJECT_ROOT'])
+        return jsonify(modules)
 
+    @app.route('/api/modules/<module_id>', methods=['POST'])
+    def api_toggle_module(module_id):
+        """Toggle module status (enable/disable)."""
+        from actifix.log_utils import atomic_write
+        from actifix.state_paths import get_actifix_paths
 
-@app.route('/api/modules/<module_id>', methods=['POST'])
-def api_toggle_module(module_id):
-    """Toggle module status (enable/disable)."""
-    from actifix.log_utils import atomic_write
-    from actifix.state_paths import get_actifix_paths
-    paths = get_actifix_paths(project_root=app.config['PROJECT_ROOT'])
-    status_file = paths.state_dir / "module_statuses.json"
-    
-    try:
-        import json
-        statuses = {"active": [], "disabled": [], "error": []}
-        if status_file.exists():
-            with open(status_file, 'r') as f:
-                statuses = json.load(f)
-        
-        if module_id in statuses.get("disabled", []):
-            statuses["disabled"].remove(module_id)
-            statuses["active"].append(module_id)
-            action = "enabled"
-        else:
-            statuses["active"].remove(module_id) if module_id in statuses.get("active", []) else None
-            statuses["disabled"].append(module_id)
-            action = "disabled"
-        
-        atomic_write(status_file, json.dumps(statuses, indent=2))
-        return jsonify({"success": True, "module_id": module_id, "action": action})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-    
+        paths = get_actifix_paths(project_root=app.config['PROJECT_ROOT'])
+        status_file = paths.state_dir / "module_statuses.json"
+
+        try:
+            import json
+            statuses = {"active": [], "disabled": [], "error": []}
+            if status_file.exists():
+                with open(status_file, 'r') as f:
+                    statuses = json.load(f)
+
+            if module_id in statuses.get("disabled", []):
+                statuses["disabled"].remove(module_id)
+                statuses["active"].append(module_id)
+                action = "enabled"
+            else:
+                statuses["active"].remove(module_id) if module_id in statuses.get("active", []) else None
+                statuses["disabled"].append(module_id)
+                action = "disabled"
+
+            atomic_write(status_file, json.dumps(statuses, indent=2))
+            return jsonify({"success": True, "module_id": module_id, "action": action})
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
     @app.route('/api/ping', methods=['GET'])
     def api_ping():
         """Simple ping endpoint for connectivity check."""
@@ -733,13 +781,12 @@ def api_toggle_module(module_id):
                 "error": "Failed to load AI status",
                 "details": str(exc),
             }), 500
-    
+
     @app.route('/api/settings', methods=['GET'])
     def api_get_settings():
         """Get current AI settings (API key is masked for security)."""
         config = load_config(fail_fast=False)
-        
-        # Mask API key for security - only show first 4 and last 4 chars
+
         api_key = config.ai_api_key
         if api_key and len(api_key) > 8:
             masked_key = api_key[:4] + '*' * (len(api_key) - 8) + api_key[-4:]
@@ -747,27 +794,25 @@ def api_toggle_module(module_id):
             masked_key = '*' * len(api_key)
         else:
             masked_key = ''
-        
+
         return jsonify({
             'ai_provider': config.ai_provider,
             'ai_api_key': masked_key,
             'ai_model': config.ai_model,
             'ai_enabled': config.ai_enabled,
         })
-    
+
     @app.route('/api/settings', methods=['POST'])
     def api_update_settings():
         """Update AI settings."""
         try:
             data = request.get_json()
-            
+
             if not data:
                 return jsonify({'error': 'No data provided'}), 400
-            
-            # Get current config
+
             config = get_config()
-            
-            # Update AI settings
+
             if 'ai_provider' in data:
                 config.ai_provider = data['ai_provider']
             if 'ai_api_key' in data:
@@ -776,16 +821,14 @@ def api_toggle_module(module_id):
                 config.ai_model = data['ai_model']
             if 'ai_enabled' in data:
                 config.ai_enabled = bool(data['ai_enabled'])
-            
-            # Set the updated config
+
             set_config(config)
-            
-            # Also update environment variables so they persist for the session
+
             os.environ['ACTIFIX_AI_PROVIDER'] = config.ai_provider
             os.environ['ACTIFIX_AI_API_KEY'] = config.ai_api_key
             os.environ['ACTIFIX_AI_MODEL'] = config.ai_model
             os.environ['ACTIFIX_AI_ENABLED'] = '1' if config.ai_enabled else '0'
-            
+
             return jsonify({
                 'success': True,
                 'message': 'Settings updated successfully',
@@ -806,14 +849,12 @@ def api_toggle_module(module_id):
         try:
             data = request.get_json() or {}
 
-            # Get cleanup parameters from request or use defaults
             config = get_cleanup_config()
             retention_days = data.get('retention_days', config.retention_days)
             test_retention_days = data.get('test_retention_days', config.test_ticket_retention_days)
             auto_complete = data.get('auto_complete_test_tickets', config.auto_complete_test_tickets)
-            dry_run = data.get('dry_run', True)  # Default to dry run for safety
+            dry_run = data.get('dry_run', True)
 
-            # Run cleanup
             results = run_automatic_cleanup(
                 retention_days=retention_days,
                 test_ticket_retention_days=test_retention_days,

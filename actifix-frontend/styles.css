@@ -1325,4 +1325,30 @@ body {
   white-space: nowrap;
 }
 
-/* Azure theme temporarily disabled - dark theme primary */
+/* Azure Light Theme */
+[data-theme="azure"] {
+  --bg-primary: #f0f8ff;
+  --bg-secondary: #ffffff;
+  --bg-panel: rgba(240, 248, 255, 0.7);
+  --bg-panel-hover: rgba(240, 248, 255, 0.9);
+  --accent: #1e40af;
+  --accent-soft: rgba(30, 64, 175, 0.1);
+  --accent-muted: #3b82f6;
+  --text-primary: #1e293b;
+  --text-muted: #475569;
+  --text-dim: #64748b;
+  --border: rgba(30, 64, 175, 0.2);
+  --border-hover: rgba(30, 64, 175, 0.4);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1);
+  --shadow-md: 0 10px 25px rgba(0, 0, 0, 0.15);
+}
+
+[data-theme="azure"] .priority-badge.p0 { background: rgba(239, 68, 68, 0.15); color: #dc2626; }
+[data-theme="azure"] .priority-badge.p1 { background: rgba(245, 158, 11, 0.15); color: #d97706; }
+[data-theme="azure"] .priority-badge.p2 { background: rgba(234, 179, 8, 0.15); color: #ca8a04; }
+[data-theme="azure"] .priority-badge.p3 { background: rgba(16, 185, 129, 0.15); color: #059669; }
+[data-theme="azure"] .priority-badge.p4 { background: rgba(107, 114, 128, 0.15); color: #6b7280; }
+
+[data-theme="azure"] body {
+  background: linear-gradient(135deg, #f0f8ff 0%, #e0f2fe 50%, #f0f8ff 100%);
+}
