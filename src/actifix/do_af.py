@@ -437,9 +437,14 @@ def process_next_ticket(
     """
     if paths is None:
         paths = get_actifix_paths()
-    
+
     enforce_raise_af_only(paths)
-    
+
+    if os.getenv("ACTIFIX_NONINTERACTIVE") == "1":
+        use_ai = False
+    elif os.getenv("PYTEST_CURRENT_TEST") and os.getenv("ACTIFIX_ENABLE_AI_TESTS") != "1":
+        use_ai = False
+
     locked = _select_and_lock_ticket(paths)
     if not locked:
         log_event(

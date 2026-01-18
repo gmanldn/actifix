@@ -683,6 +683,14 @@ class AIClient:
         preferred_model: Optional[str] = None,
     ) -> AIResponse:
         """Prompt user to choose a free alternative."""
+        if os.getenv("ACTIFIX_NONINTERACTIVE") == "1" or not sys.stdin.isatty():
+            return AIResponse(
+                content="",
+                provider=AIProvider.FREE_ALTERNATIVE,
+                model=preferred_model or DEFAULT_FREE_MODEL,
+                success=False,
+                error="Non-interactive session: free alternative prompt disabled",
+            )
         default_model = preferred_model or DEFAULT_FREE_MODEL
         print("\n" + "="*60)
         print("🤖 AI ASSISTANCE NEEDED")
