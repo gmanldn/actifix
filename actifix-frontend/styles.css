@@ -577,44 +577,78 @@ body {
   color: var(--text-dim);
 }
 
-/* MODULES GRID */
-.module-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: var(--spacing-sm);
-}
-
-.module-card {
-  background: rgba(15, 15, 15, 0.9);
+/* MODULES COMPACT SORTABLE TABLES */
+.modules-table {
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  padding: 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  min-height: 90px;
+  overflow: hidden;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
 }
 
-.module-card-title {
+.table-header {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 3fr;
+  gap: 12px;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid var(--border);
   font-weight: 600;
-  font-size: 12px;
+  font-size: 11px;
+  color: var(--text-primary);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.table-header > div {
+  padding: 8px 10px;
+  cursor: pointer;
+  transition: var(--transition);
+  position: relative;
+  user-select: none;
+}
+
+.table-header > div:hover {
+  background: var(--bg-panel-hover);
+}
+
+.table-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 3fr;
+  gap: 12px;
+  align-items: center;
+  transition: var(--transition);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.table-row:hover {
+  background: var(--bg-panel-hover);
+}
+
+.table-cell {
+  padding: 6px 10px;
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.table-cell.name {
+  font-weight: 500;
   color: var(--text-primary);
 }
 
-.module-card-meta {
-  font-size: 10px;
-  color: var(--text-dim);
-  letter-spacing: 0.02em;
+.table-header .name::after {
+  content: '';
 }
 
-.module-card-summary {
-  font-size: 11px;
-  color: var(--text-muted);
-  line-height: 1.4;
+.table-row:last-child {
+  border-bottom: none;
 }
 
 .module-empty {
-  padding: 16px;
+  padding: 24px;
   text-align: center;
   color: var(--text-dim);
   border-radius: var(--radius-md);

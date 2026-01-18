@@ -872,6 +872,8 @@ const SettingsView = () => {
 // Modules View Component
 const ModulesView = () => {
   const { data, loading, error } = useFetch('/modules', 15000);
+  const [sortBy, setSortBy] = useState('name');
+  const [sortDir, setSortDir] = useState('asc');
 
   if (loading) return h(LoadingSpinner);
   if (error) return h(ErrorDisplay, { message: error });
@@ -879,32 +881,65 @@ const ModulesView = () => {
   const systemModules = data?.system || [];
   const userModules = data?.user || [];
 
-  const renderModuleGroup = (title, modules, icon) => (
-    h('div', { className: 'panel' },
+  const sortModules = (modules) => {
+    return [...modules].sort((a, b) => {
+      let aVal = (a[sortBy] || '').toString().toLowerCase();
+      let bVal = (b[sortBy] || '').toString().toLowerCase();
+      if (aVal < bVal) return sortDir === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortDir === 'asc' ? 1 : -1;
+      return 0;
+    });
+  };
+
+  const handleSort = (column) => {
+    if (sortBy === column) {
+      setSortDir(sortDir === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortBy(column);
+      setSortDir('asc');
+    }
+  };
+
+  const sortIndicator = (column) => {
+    if (sortBy !== column) return '';
+    return sortDir === 'asc' ? ' ↑' : ' ↓';
+  };
+
+  const renderModuleTable = (title, modules, icon) => {
+    const sortedModules = sortModules(modules);
+    return h('div', { className: 'panel' },
       h('div', { className: 'panel-header' },
         h('div', { className: 'panel-title' },
           h('span', { className: 'panel-title-icon' }, icon),
           title
         ),
-        h('span', { className: 'text-muted', style: { fontSize: '10px' } }, `${modules.length} modules`)
+        h('span', { className: 'text-muted', style: { fontSize: '10px' } }, `${sortedModules.length} modules`),
+        h('span', { className: 'text-dim', style: { fontSize: '9px' } }, `Sorted: ${sortBy} ${sortDir.toUpperCase()}`)
       ),
       modules.length === 0 ?
         h('div', { className: 'module-empty' }, 'No modules') :
-        h('div', { className: 'module-grid' },
-          modules.map((m, idx) =>
-            h('div', { key: `${title}-${idx}`, className: 'module-card' },
-              h('div', { className: 'module-card-title' }, m.name || 'unknown'),
-              h('div', { className: 'module-card-meta' }, `${m.domain || '—'} • ${m.owner || '—'}`),
-              m.summary && h('div', { className: 'module-card-summary' }, m.summary)
+        h('div', { className: 'modules-table' },
+          h('div', { className: 'table-header' },
+            h('div', { className: 'table-cell name', onClick: () => handleSort('name'), title: 'Click to sort' }, 'Name', sortIndicator('name')),
+            h('div', { className: 'table-cell domain', onClick: () => handleSort('domain'), title: 'Click to sort' }, 'Domain', sortIndicator('domain')),
+            h('div', { className: 'table-cell owner', onClick: () => handleSort('owner'), title: 'Click to sort' }, 'Owner', sortIndicator('owner')),
+            h('div', { className: 'table-cell summary', onClick: () => handleSort('summary'), title: 'Click to sort' }, 'Summary', sortIndicator('summary'))
+          ),
+          sortedModules.map((m, idx) =>
+            h('div', { key: `${title}-${idx}`, className: 'table-row' },
+              h('div', { className: 'table-cell name truncate' }, m.name || '—'),
+              h('div', { className: 'table-cell domain truncate' }, m.domain || '—'),
+              h('div', { className: 'table-cell owner truncate' }, m.owner || '—'),
+              h('div', { className: 'table-cell summary truncate' }, m.summary || '—')
             )
           )
         )
-    )
-  );
+    );
+  };
 
   return h('div', null,
-    renderModuleGroup('SYSTEM MODULES', systemModules, '⚙️'),
-    renderModuleGroup('USER MODULES', userModules, '👤')
+    renderModuleTable('SYSTEM MODULES', systemModules, '⚙️'),
+    renderModuleTable('USER MODULES', userModules, '👤')
   );
 };
 
