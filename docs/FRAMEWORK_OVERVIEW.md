@@ -24,23 +24,15 @@ Canonical architecture references:
 
 ## Multi-Agent Development Workflow
 
-Actifix is designed for collaborative multi-agent development on the `develop` branch:
+Actifix supports multiple AI agents working **directly on `develop`** simultaneously (no per-change branches required):
 
-- **Untracked Database**: `data/actifix.db` (and test/data/*.db) is excluded from git via .gitignore to avoid merge conflicts. Each agent maintains a local ticket database.
-- **Branch Strategy**:
-  - Small fixes: Work directly on `develop`.
-  - Larger features: Create branches named `agent/{agent-name}/{ticket-id}-{description}` (e.g., `agent/cline/ACT-12345-multi-agent-setup`).
-- **Quality Gates**:
-  - Pre-commit hook rejects binary files (databases, images, binaries).
-  - GitHub Actions on push/PR enforce no binaries in changes.
-  - Tests run automatically; version bumped per ticket.
-- **Merging**:
-  - Agents process highest-priority tickets first.
-  - Commit after each ticket with conventional messages.
-  - Push to `develop`; PRs for branches if needed.
-- **Coordination**: Tickets are the single source of truth. Use `python scripts/query_open_tickets.py` to see priorities.
+- **Isolated State**: Database (`data/actifix.db`), logs, state untracked in `.gitignore`. Use `scripts/setup-agent.sh` for unique `ACTIFIX_DATA_DIR` per agent.
+- **No Branches**: Work/push directly to `develop`. Sync via `git pull` before starting.
+- **Merge Strategy**: Conventional commits after each ticket. Pre-commit rejects binaries; GitHub Actions enforces tests.
+- **Naming**: Ticket-based commit messages: `type(scope): description (TICKET-ID)`.
+- **Coordination**: View shared priorities via `python3 scripts/view_tickets.py`. Process highest-P first.
 
-This ensures safe, concurrent development without state corruption.
+Agents stay in sync through git; local isolation prevents data conflicts.
 
 ## Ticket lifecycle (high-level)
 1. Exception raised or manual capture call.
@@ -53,7 +45,7 @@ See `CHANGELOG.md` for full history. Recent highlights:
 
 | Version | Highlights |
 |---------|------------|
-| **4.0.11** (2026-01-18) | Added the Yhatzee module with a localhost GUI for two-player scoring, rolling, and holds. |
+| **4.0.36** (2026-01-21) | Silenced Flask/Werkzeug access logging so the CLI remains free of repeated GET entries when the dashboard polls the API. |
 | **4.0.2** (2026-01-20) | Fixed API module parsing so `/api/modules` always returns system/user buckets, keeping the quick test cycle green after the dashboard refresh. |
 | **4.0.0** (2026-01-18) | Monochrome compact dashboard refresh, AI settings + status sync with Do_AF, default Mimo Flash v2 free fallback, faster test suite defaults. |
 | **3.3.11** (2026-01-18) | Documentation consolidation, quickstart refresh, and workflow accuracy cleanup. |
