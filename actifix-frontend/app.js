@@ -355,13 +355,6 @@ const OverviewView = () => {
         subvalue: `${metrics.completed_tickets ?? 0} completed`
       }),
       h(MetricTile, {
-        label: 'SLA BREACHES',
-        value: metrics.sla_breaches ?? 0,
-        icon: '⚡',
-        color: metrics.sla_breaches > 0 ? '#ef4444' : '#10b981',
-        subvalue: metrics.sla_breaches > 0 ? 'Action Required!' : 'All Good'
-      }),
-      h(MetricTile, {
         label: 'OLDEST TICKET',
         value: `${metrics.oldest_ticket_age_hours ?? 0}h`,
         icon: '⏱️',

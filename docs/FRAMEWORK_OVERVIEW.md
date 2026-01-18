@@ -22,6 +22,26 @@ Canonical architecture references:
 - `docs/architecture/DEPGRAPH.json`
 - `docs/architecture/MODULES.md`
 
+## Multi-Agent Development Workflow
+
+Actifix is designed for collaborative multi-agent development on the `develop` branch:
+
+- **Untracked Database**: `data/actifix.db` (and test/data/*.db) is excluded from git via .gitignore to avoid merge conflicts. Each agent maintains a local ticket database.
+- **Branch Strategy**:
+  - Small fixes: Work directly on `develop`.
+  - Larger features: Create branches named `agent/{agent-name}/{ticket-id}-{description}` (e.g., `agent/cline/ACT-12345-multi-agent-setup`).
+- **Quality Gates**:
+  - Pre-commit hook rejects binary files (databases, images, binaries).
+  - GitHub Actions on push/PR enforce no binaries in changes.
+  - Tests run automatically; version bumped per ticket.
+- **Merging**:
+  - Agents process highest-priority tickets first.
+  - Commit after each ticket with conventional messages.
+  - Push to `develop`; PRs for branches if needed.
+- **Coordination**: Tickets are the single source of truth. Use `python scripts/query_open_tickets.py` to see priorities.
+
+This ensures safe, concurrent development without state corruption.
+
 ## Ticket lifecycle (high-level)
 1. Exception raised or manual capture call.
 2. Raise_AF captures context, deduplicates, and classifies priority.
