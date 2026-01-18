@@ -93,6 +93,18 @@ This document summarizes the modules in the Actifix architecture. Use `MAP.yaml`
 - Depends on: `infra.logging`
 - Contracts: centralized path configuration; directory helpers
 
+### infra.persistence.cleanup_config
+- Summary: cleanup configuration for ticket retention policies
+- Entrypoints: `src/actifix/persistence/cleanup_config.py`
+- Depends on: none
+- Contracts: centralize cleanup settings; environment-driven defaults
+
+### infra.persistence.ticket_cleanup
+- Summary: ticket cleanup and retention policy execution
+- Entrypoints: `src/actifix/persistence/ticket_cleanup.py`
+- Depends on: `infra.persistence.ticket_repo`
+- Contracts: retention policy enforcement; auto-cleanup test tickets
+
 ### infra.persistence.event_repo
 - Summary: lightweight event repository for diagnostics and testing helpers
 - Entrypoints: `src/actifix/persistence/event_repo.py`

@@ -202,6 +202,27 @@ modules:
   - directory helpers
   depends_on:
   - infra.logging
+- id: infra.persistence.cleanup_config
+  domain: infra
+  owner: persistence
+  summary: Cleanup configuration for ticket retention policies
+  entrypoints:
+  - src/actifix/persistence/cleanup_config.py
+  contracts:
+  - centralize cleanup settings
+  - environment-driven defaults
+  depends_on: []
+- id: infra.persistence.ticket_cleanup
+  domain: infra
+  owner: persistence
+  summary: Ticket cleanup and retention policy execution
+  entrypoints:
+  - src/actifix/persistence/ticket_cleanup.py
+  contracts:
+  - retention policy enforcement
+  - auto-cleanup test tickets
+  depends_on:
+  - infra.persistence.ticket_repo
 - id: infra.persistence.event_repo
   domain: infra
   owner: persistence
