@@ -169,7 +169,22 @@ def main():
 
         # Summary
         print("=" * 100)
-        print("SUMMARY")
+        print("SUMMARY (OPEN ONLY)")
+        print("=" * 100)
+        print(f"Open:               {len(tickets)}")
+        print()
+        print("By Priority (Open):")
+        by_priority = {}
+        for ticket in tickets:
+            priority = ticket['priority']
+            by_priority[priority] = by_priority.get(priority, 0) + 1
+        for priority in ['P0', 'P1', 'P2', 'P3', 'P4']:
+            count = by_priority.get(priority, 0)
+            print(f"  {priority}: {count}")
+        print()
+
+        print("=" * 100)
+        print("SUMMARY (ALL STATUSES)")
         print("=" * 100)
         stats = repo.get_stats()
         print(f"Total Tickets:      {stats['total']}")
@@ -178,7 +193,7 @@ def main():
         print(f"Completed:          {stats['completed']}")
         print(f"Locked:             {stats['locked']}")
         print()
-        print(f"By Priority:")
+        print("By Priority (All):")
         for priority in ['P0', 'P1', 'P2', 'P3', 'P4']:
             count = stats['by_priority'].get(priority, 0)
             print(f"  {priority}: {count}")
