@@ -454,13 +454,14 @@ class AIClient:
     def _call_claude_local(self, prompt: str, ticket_info: Dict[str, Any]) -> AIResponse:
         """Call Claude using local CLI (if logged in)."""
         try:
+            timeout_seconds = 10 if os.getenv("PYTEST_CURRENT_TEST") else 300
             # Try to use Claude CLI
             result = subprocess.run(
                 ["claude", "--no-stream"],
                 input=prompt,
                 text=True,
                 capture_output=True,
-                timeout=300  # 5 minute timeout
+                timeout=timeout_seconds
             )
             
             if result.returncode == 0:
@@ -630,6 +631,7 @@ class AIClient:
         try:
             import requests
 
+            timeout_seconds = 10 if os.getenv("PYTEST_CURRENT_TEST") else 300
             # Try to connect to local Ollama
             response = requests.post(
                 "http://localhost:11434/api/generate",
@@ -638,7 +640,7 @@ class AIClient:
                     "prompt": prompt,
                     "stream": False
                 },
-                timeout=300
+                timeout=timeout_seconds
             )
 
             if response.status_code == 200:
