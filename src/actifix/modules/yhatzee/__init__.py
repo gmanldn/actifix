@@ -190,7 +190,7 @@ _HTML_PAGE = """<!doctype html>
       height: 72px;
       border-radius: 16px;
       border: 2px solid var(--border);
-      background: #fff;
+      background: linear-gradient(160deg, #ffffff, #efe7d6);
       font-size: 28px;
       font-weight: bold;
       color: var(--ink);
@@ -199,12 +199,17 @@ _HTML_PAGE = """<!doctype html>
       justify-content: center;
       cursor: pointer;
       position: relative;
-      transition: transform 0.2s ease;
+      box-shadow: 0 8px 14px rgba(44, 42, 36, 0.15);
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .die:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 18px rgba(44, 42, 36, 0.2);
     }
     .die.held {
       border-color: var(--accent-2);
-      background: #dff1ef;
-      transform: translateY(-4px);
+      background: linear-gradient(160deg, #e7f6f4, #cfe8e5);
+      transform: translateY(-4px) rotate(-1deg);
     }
     .die span {
       position: absolute;
