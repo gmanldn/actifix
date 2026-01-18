@@ -883,7 +883,9 @@ def record_error(
             from .persistence.ticket_repo import get_ticket_repository
             repo = get_ticket_repository()
             existing = repo.check_duplicate_guard(duplicate_guard)
-            if existing and existing['status'] in ('Open', 'In Progress'):
+            # Prevent duplicates for all statuses, including completed tickets
+            # This prevents the same issue from creating new tickets after being fixed
+            if existing:
                 return None
         except Exception:
             pass
