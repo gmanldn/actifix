@@ -28,6 +28,7 @@ from typing import Optional, Callable, Iterator, TYPE_CHECKING
 from .log_utils import atomic_write, log_event
 from .raise_af import enforce_raise_af_only
 from .state_paths import ActifixPaths, get_actifix_paths, init_actifix_files
+from .config import get_config
 
 if TYPE_CHECKING:
     from .persistence.ticket_repo import TicketRepository
@@ -461,9 +462,22 @@ def process_next_ticket(
     try:
         if use_ai and not ai_handler:
             try:
-                from .ai_client import get_ai_client
+                from .ai_client import get_ai_client, resolve_provider_selection
 
                 ai_client = get_ai_client()
+                config = get_config()
+                selection = resolve_provider_selection(config.ai_provider, config.ai_model)
+
+                log_event(
+                    "AI_PROVIDER_SELECTED",
+                    f"AI preference: {selection.label}",
+                    ticket_id=ticket.ticket_id,
+                    extra={
+                        "preferred_provider": selection.label,
+                        "preferred_model": selection.model,
+                        "strict_preferred": selection.strict_preferred,
+                    },
+                )
 
                 ticket_dict = {
                     'id': ticket.ticket_id,
@@ -481,7 +495,12 @@ def process_next_ticket(
                     ticket_id=ticket.ticket_id
                 )
 
-                ai_response = ai_client.generate_fix(ticket_dict)
+                ai_response = ai_client.generate_fix(
+                    ticket_dict,
+                    preferred_provider=selection.provider,
+                    preferred_model=selection.model,
+                    strict_preferred=selection.strict_preferred,
+                )
 
                 if ai_response.success:
                     summary = f"Fixed via {ai_response.provider.value} ({ai_response.model})"

@@ -67,10 +67,11 @@ from .do_af import (
     get_completed_tickets,
     fix_highest_priority_ticket,
 )
-from .raise_af import enforce_raise_af_only
+from .raise_af import enforce_raise_af_only, record_error, TicketPriority
 from .state_paths import get_actifix_paths
 from .persistence.event_repo import get_event_repository, EventFilter
 from .config import get_config, set_config, load_config
+from .ai_client import get_ai_client, resolve_provider_selection
 
 # Server start time for uptime calculation
 SERVER_START_TIME = time.time()
@@ -119,6 +120,33 @@ def _load_modules(project_root: Path) -> Dict[str, List[Dict[str, str]]]:
             })
     except Exception:
         return {"system": [], "user": []}
+
+
+def _collect_ai_feedback(limit: int = 40) -> List[str]:
+    """Collect recent AI-related feedback for the settings panel."""
+    try:
+        repo = get_event_repository()
+        raw_events = repo.get_recent_events(limit=max(limit * 4, 100))
+    except Exception as exc:
+        record_error(
+            message=f"Failed to read AI feedback events: {exc}",
+            source="api.py:_collect_ai_feedback",
+            priority=TicketPriority.P2,
+        )
+        return []
+
+    feedback = []
+    for event in reversed(raw_events):
+        event_type = (event.get("event_type") or "").upper()
+        message = event.get("message") or ""
+        if event_type.startswith("AI_") or "AI " in message or "AI_" in message:
+            timestamp = event.get("timestamp") or ""
+            entry = f"[{timestamp}] {event_type}: {message}"
+            feedback.append(entry)
+            if len(feedback) >= limit:
+                break
+
+    return list(reversed(feedback))
 
     system = [m for m in modules if (m.get("owner") or "").lower() in SYSTEM_OWNERS]
     user = [m for m in modules if m not in system]
@@ -567,6 +595,31 @@ def create_app(project_root: Optional[Path] = None) -> "Flask":
             'status': 'ok',
             'timestamp': datetime.now(timezone.utc).isoformat(),
         })
+
+    @app.route('/api/ai-status', methods=['GET'])
+    def api_ai_status():
+        """Return AI provider status, defaults, and recent feedback."""
+        try:
+            config = load_config(fail_fast=False)
+            selection = resolve_provider_selection(config.ai_provider, config.ai_model)
+            ai_client = get_ai_client()
+            status = ai_client.get_status(selection)
+            status.update({
+                "ai_enabled": config.ai_enabled,
+                "feedback_log": _collect_ai_feedback(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            })
+            return jsonify(status)
+        except Exception as exc:
+            record_error(
+                message=f"AI status endpoint failed: {exc}",
+                source="api.py:api_ai_status",
+                priority=TicketPriority.P2,
+            )
+            return jsonify({
+                "error": "Failed to load AI status",
+                "details": str(exc),
+            }), 500
     
     @app.route('/api/settings', methods=['GET'])
     def api_get_settings():
@@ -625,6 +678,11 @@ def create_app(project_root: Optional[Path] = None) -> "Flask":
                 'message': 'Settings updated successfully',
             })
         except Exception as e:
+            record_error(
+                message=f"Settings update failed: {e}",
+                source="api.py:api_update_settings",
+                priority=TicketPriority.P2,
+            )
             return jsonify({
                 'error': str(e)
             }), 500

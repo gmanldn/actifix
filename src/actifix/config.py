@@ -125,9 +125,9 @@ class ActifixConfig:
     stale_lock_timeout_seconds: float = 300.0
     
     # AI Integration
-    ai_provider: str = "openai"  # openai, anthropic, google, openrouter, ollama
+    ai_provider: str = "mimo-flash-v2-free"  # default free fallback
     ai_api_key: str = ""
-    ai_model: str = ""  # e.g., gpt-4, claude-3-sonnet, gemini-pro
+    ai_model: str = "mimo-flash-v2-free"  # e.g., gpt-4, claude-3-sonnet, gemini-pro
     ollama_model: str = "codellama:7b"  # Default Ollama model
     ai_enabled: bool = False
 
@@ -276,9 +276,9 @@ def load_config(
             _get_env_sanitized("ACTIFIX_STALE_LOCK_TIMEOUT", "", value_type="numeric"), 300.0
         ),
 
-        ai_provider=_get_env_sanitized("ACTIFIX_AI_PROVIDER", "openai", value_type="alphanumeric"),
+        ai_provider=_get_env_sanitized("ACTIFIX_AI_PROVIDER", "mimo-flash-v2-free", value_type="alphanumeric"),
         ai_api_key=_get_env_sanitized("ACTIFIX_AI_API_KEY", "", value_type="string"),
-        ai_model=_get_env_sanitized("ACTIFIX_AI_MODEL", "", value_type="alphanumeric"),
+        ai_model=_get_env_sanitized("ACTIFIX_AI_MODEL", "mimo-flash-v2-free", value_type="alphanumeric"),
         ollama_model=_get_env_sanitized("ACTIFIX_OLLAMA_MODEL", "codellama:7b", value_type="alphanumeric"),
         ai_enabled=_parse_bool(_get_env_sanitized("ACTIFIX_AI_ENABLED", "0", value_type="boolean")),
     )
