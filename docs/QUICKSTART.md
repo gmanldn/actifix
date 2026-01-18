@@ -1,43 +1,59 @@
 # Actifix Quickstart
 
-Actifix is a self-improving error management framework that captures prioritized tickets, feeds AI copilots, and keeps watching its own development.
-
-## Why it matters
-- **AI-ready capture** with stack, file, system context, and remediation notes tailored for Claude/GPT/Ollama.
-- **Self-development mode** that tickets regressions in the framework while you code.
-- **Production resilience** with atomic writes, fallback queues, and a database-first workflow.
+Actifix captures prioritized tickets with rich context and keeps a database-first audit trail. This guide gets you from clone to first ticket in minutes.
 
 ## Prerequisites
-- Python 3.10+ and Git
+- Python 3.10+
+- Git
 - Optional: `venv` or another virtualenv manager
-- `ACTIFIX_CHANGE_ORIGIN` must be set to `raise_af` before running scripts or editing code (see README)
 
-## Setup in minutes
-1. Clone and enter the repo
+## Fast setup
+1. Clone and enter the repo:
    ```bash
    git clone https://github.com/gmanldn/actifix.git
    cd actifix
    ```
-2. Create a virtual environment and install
+2. Create a virtual environment and install dependencies:
    ```bash
-   python -m venv .venv
+   python3 -m venv .venv
    source .venv/bin/activate
-   pip install -e .
-   pip install -e "[dev]"  # optional tooling
+   python3 -m pip install -e .
+   python3 -m pip install -e "[dev]"  # optional tooling
    ```
-3. Initialize Actifix and start the watcher
+3. Start the launcher (sets the Raise_AF guard automatically):
    ```bash
-   python scripts/start.py  # watches pyproject.toml and enforces raise_af guard
-   python -m actifix.main health
+   python3 scripts/start.py
    ```
+4. Verify the system health:
+   ```bash
+   python3 -m actifix.main health
+   ```
+
+## Launcher options
+```bash
+# Start everything (default)
+python3 scripts/start.py
+
+# Health check only
+python3 scripts/start.py --health-only
+
+# Setup only (no servers)
+python3 scripts/start.py --setup-only
+
+# Disable API server
+python3 scripts/start.py --no-api
+
+# Custom ports
+python3 scripts/start.py --frontend-port 8081 --api-port 5002
+```
 
 ## Capture your first error
 ```python
 import sys
-sys.path.insert(0, "src")
 import actifix
 
 actifix.enable_actifix_capture()
+
 try:
     risky_operation()
 except Exception as exc:
@@ -50,23 +66,35 @@ except Exception as exc:
     )
 ```
 
-## Self-development mode (Actifix watches itself)
-```python
-import actifix
-actifix.bootstrap_actifix_development()
-actifix.track_development_progress(
-    "Quickstart verified",
-    "Actifix captured its own startup path"
-)
+## Record a ticket from the CLI
+```bash
+python3 -m actifix.main record ManualProbe "Quickstart smoke test" "docs/QUICKSTART.md:1" --priority P2
 ```
 
 ## Inspect the ticket stream
-- `sqlite3 data/actifix.db "SELECT id, priority, status, message FROM tickets ORDER BY created_at DESC LIMIT 5;"`
-- `sqlite3 data/actifix.db "SELECT * FROM v_recent_tickets;"`
-- `python -m actifix.main stats`
-- `python -m actifix.main record P2 "test" "demo.py:10"`
+```bash
+sqlite3 data/actifix.db "SELECT id, priority, status, message FROM tickets ORDER BY created_at DESC LIMIT 5;"
+sqlite3 data/actifix.db "SELECT * FROM v_recent_tickets;"
+python3 -m actifix.main stats
+```
+
+## Self-development mode
+```python
+import actifix
+
+actifix.bootstrap_actifix_development()
+actifix.track_development_progress(
+    "Quickstart verified",
+    "Actifix captured its own startup path",
+)
+```
 
 ## Keep the workflow clean
-- Tickets live exclusively in `data/actifix.db`; legacy Markdown task lists were removed.
-- Use Raise_AF (`actifix.raise_af.record_error`), DoAF, or the CLI to create, inspect, process, and close tickets.
-- Read [`docs/FRAMEWORK_OVERVIEW.md`](FRAMEWORK_OVERVIEW.md) for architecture, release notes, and roadmap, and [`docs/DEVELOPMENT.md`](DEVELOPMENT.md) for workflow standards.
+- Tickets live in `data/actifix.db`; do not edit it manually.
+- Always use Raise_AF (`actifix.raise_af.record_error`), DoAF, the CLI, or SQL for ticket lifecycle work.
+- Set `ACTIFIX_CHANGE_ORIGIN=raise_af` before running Actifix or making edits (the launcher sets it for you).
+
+## Next steps
+- `docs/INSTALLATION.md` for configuration and dependencies
+- `docs/FRAMEWORK_OVERVIEW.md` for architecture and release notes
+- `docs/DEVELOPMENT.md` for workflow, testing, and quality gates

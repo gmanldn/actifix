@@ -1,78 +1,59 @@
 # Actifix Framework Overview
 
-Actifix is a self‑improving error management system that captures prioritized, AI‑ready tickets, enforces architectural quality, and can even monitor its own development lifecycle.
+Actifix is a self-improving error management system that captures prioritized tickets, preserves operational context, and keeps the development workflow auditable. It is stdlib-first, resilient under failure, and designed to feed AI copilots with consistent context.
 
-## Quick highlights
-- **Capture**: `enable_actifix_capture()` records stack traces, file snippets, system state, and remediation notes alongside automatic P0–P4 classification.
-- **Self-development**: `bootstrap_actifix_development()` makes the framework ticket its own regressions so the repo improves with every commit.
-- **Resilience**: Atomic writes, fallback queues, centralized logging, and `data/actifix.db` as the canonical ticket store keep the system recoverable.
-- **AI-native**: Tickets are normalized for Claude, GPT, Ollama, and other copilots with contextual payloads tuned for large windows.
-
-## Getting started
-```bash
-git clone https://github.com/gmanldn/actifix.git
-cd actifix
-python -m venv .venv && source .venv/bin/activate
-pip install -e .
-pip install -e "[dev]"  # optional
-python scripts/start.py            # enforces ACTIFIX_CHANGE_ORIGIN=raise_af while watching pyproject.toml
-python -m actifix.main health
-```
-
-Enable capture:
-```python
-import actifix
-actifix.enable_actifix_capture()
-```
-Record an error with context (stack, files, system state):
-```python
-actifix.record_error(
-    message=str(exc),
-    source=f"{__file__}:{sys._getframe().f_lineno}",
-    run_label="production-api",
-    error_type=type(exc).__name__,
-    capture_context=True,
-)
-```
-Track Actifix’s own development:
-```python
-import actifix
-actifix.bootstrap_actifix_development()
-actifix.track_development_progress("Feature complete", "AI telemetry integrated")
-```
+## What Actifix provides
+- Structured error capture with priority classification (P0-P4).
+- Deduplication via duplicate guards and ticket repository checks.
+- Context capture (stack traces, file snippets, system state) with configurable limits.
+- Durable persistence backed by `data/actifix.db`, with fallback queue support.
+- Self-development mode to keep regressions visible during work.
 
 ## Architecture primer
-- **RaiseAF (`src/actifix/raise_af.py`)** captures errors, prevents duplicates, and produces remediation notes.
-- **State paths (`src/actifix/state_paths.py`)** centralize data/state/log locations (respect `ACTIFIX_DATA_DIR`, `ACTIFIX_STATE_DIR`).
-- **Bootstrap (`src/actifix/bootstrap.py`)** wires self-development, installs exception handlers, and seeds the initial ticket state.
+Core modules and their roles:
+- **bootstrap**: system initialization and development tracking (`src/actifix/bootstrap.py`).
+- **raise_af**: error capture and ticket creation (`src/actifix/raise_af.py`).
+- **do_af**: ticket processing and remediation (`src/actifix/do_af.py`).
+- **persistence**: SQLite-backed ticket repository, atomic writes, queues.
+- **health**: system health checks and status reporting.
 
-Refer to `docs/architecture/MAP.yaml`, `architecture/MODULES.md`, and `architecture/DEPGRAPH.json` for the canonical module graph; all changes must be reflected there.
+Canonical architecture references:
+- `docs/architecture/MAP.yaml`
+- `docs/architecture/DEPGRAPH.json`
+- `docs/architecture/MODULES.md`
 
-## Release notes snapshot
+## Ticket lifecycle (high-level)
+1. Exception raised or manual capture call.
+2. Raise_AF captures context, deduplicates, and classifies priority.
+3. Ticket stored in `data/actifix.db`.
+4. DoAF or CLI processes tickets, records completion evidence, and updates status.
+
+## Release notes and version history
+See `CHANGELOG.md` for full history. Recent highlights:
+
 | Version | Highlights |
 |---------|------------|
-| **3.3.4** (2026-01-18) | Security stabilisation: automatically tighten `data/actifix.db` permissions before validation so the world-readable guard rails no longer block legitimate database creation. |
-| **3.3.3** (2026-01-17) | Automated hang detection: pytest slow-test tracker now raises Actifix P0 `TestHang` tickets for tests exceeding the 30s timeout, making the problematic nodeids visible through `data/actifix.db` and closing the relevant P0 tickets. |
-| **3.3.2** (2026-01-17) | Stability release—10s pytest timeout, `--runslow` guard, slow-test tracker, developer loop reliability improvements.<br>Documented validations in `docs/DEVELOPMENT.md`. |
-| **2.7.0** (2026-01-11) | Production-ready AI stack: multi-provider AI client, database persistence with ticket repository, migrations, health monitoring, quarantine, architecture compliance tooling. |
-| **2.6.0** (2026-01-10) | Self-improving framework launch: AI-native tickets, self-development bootstrapping, CLI, transparent docs, environment tuning, web dashboard. |
-| **2.5.0** and earlier | Foundation: basic capture, persistence, CLI, and tests. |
+| **3.3.10** (2026-01-18) | Documentation consolidation, quickstart refresh, and workflow accuracy cleanup. |
+| **3.3.x** | Ongoing reliability improvements: test runner performance, database hardening, and workflow safeguards. |
+| **2.7.0** (2026-01-11) | Multi-provider AI integration, database persistence, health monitoring, quarantine, architecture compliance tooling. |
+| **2.6.0** (2026-01-10) | Self-improving framework launch, AI-native tickets, CLI, web dashboard, configuration. |
+| **2.5.0** (2026-01-09) | Initial framework foundations and persistence scaffolding. |
 
 ## Migration notes
-- Tickets live exclusively in `data/actifix.db`; legacy Markdown task files were retired some time ago.
-- Upgrading to 2.7.x requires ensuring AI provider configs and new environment variables are tuned (see README for env var references).
+- Tickets live exclusively in `data/actifix.db`; legacy Markdown task lists are retired.
+- Use Raise_AF, DoAF, or the CLI for ticket lifecycle operations.
+- Configuration is environment-first; see `docs/INSTALLATION.md`.
 
 ## Roadmap
-1. **Ticket processing** – DoAF engine, validation framework, AI context builders.
-2. **Advanced ops** – Monitoring, circuit breakers, retries, notifications, telemetry.
-3. **AI integrations** – Claude/OpenAI/Ollama support, custom provider interfaces, automatic fix suggestions.
+1. **Ticket processing**: DoAF reliability and remediation automation.
+2. **Operational tooling**: dashboards, health automation, and alerting.
+3. **AI integration**: provider robustness and prompt compression workflows.
 
 ## Contribution checklist
-1. Enable self-development mode so Actifix tickets its own regressions.
-2. Run Raise_AF gates (`ACTIFIX_CHANGE_ORIGIN=raise_af`, `actifix.raise_af.record_error(...)`) before code changes.
-3. Capture issues via Raise_AF/DoAF/CLI and mark them complete in `data/actifix.db`.
-4. Update this document (release notes, architecture summary) and `docs/INDEX.md` for every change.
-5. Maintain the architecture map (`docs/architecture/MAP.yaml` + `DEPGRAPH.json`).
+1. Set `ACTIFIX_CHANGE_ORIGIN=raise_af` before running Actifix or editing files.
+2. Record work via `actifix.raise_af.record_error(...)`.
+3. Run quality gates (tests, architecture validation) before committing.
+4. Update docs and architecture artifacts with structural changes.
 
-## License & credits
-Actifix is inspired by the Pokertool system and generalized for universal use. See `LICENSE` for terms.
+## License
+Actifix is licensed under the terms in `docs/legal/LICENSE.md`.

@@ -1,68 +1,86 @@
 # Actifix Development Guide
 
-Actifix follows a quality-first workflow: architecture compliance, deterministic tests, and traceable errors. Every change must honor the Raise_AF gate, keep documentation current, and leave a clear audit trail.
+Actifix follows a quality-first workflow: architecture compliance, deterministic testing, and traceable tickets. Every change must honor the Raise_AF gate and keep documentation accurate.
 
-## Core principles
-1. **Architecture compliance** – Respect `docs/architecture/MAP.yaml` + `DEPGRAPH.json` before importing across modules.
-2. **Quality gates** – Run testing, formatting, linting, type checking, and architecture validation before committing.
-3. **Documentation-first** – Update `docs/FRAMEWORK_OVERVIEW.md`, `docs/INDEX.md`, and affected architecture files together with code changes.
-4. **Fail-fast & traceable** – Capture every exception through `actifix.raise_af` with correlation-aware logging.
+## Core rules
+1. **Raise_AF gate**: set `ACTIFIX_CHANGE_ORIGIN=raise_af` before running Actifix or editing files.
+2. **Architecture awareness**: review `docs/architecture/MAP.yaml` and `docs/architecture/DEPGRAPH.json` before structural changes.
+3. **Documentation discipline**: update `docs/INDEX.md` and relevant guides alongside changes.
+4. **Error capture**: log errors with `actifix.raise_af.record_error(...)` and re-raise when appropriate.
+5. **Commit hygiene**: bump `pyproject.toml` version after every commit.
 
-## Setup & workflow
+## Setup and start
 ```bash
-git clone https://github.com/gmanldn/actifix.git
-cd actifix
-python -m venv .venv && source .venv/bin/activate
-pip install -e .
-pip install -e "[dev]"  # optional tooling
-python scripts/start.py  # enforces ACTIFIX_CHANGE_ORIGIN=raise_af
+python3 -m venv .venv
+source .venv/bin/activate
+python3 -m pip install -e .
+python3 -m pip install -e "[dev]"
+python3 scripts/start.py
 ```
-Run Raise_AF before edits:
+
+## Start work with Raise_AF
 ```bash
 export ACTIFIX_CHANGE_ORIGIN=raise_af
-python -m actifix.main record P3 "starting work" "your_module.py:10"
+python3 -m actifix.main record DocChange "starting work" "docs/DEVELOPMENT.md:1" --priority P3
 ```
 
-## Quality gates checklist
-- `python -m pytest test/ --cov=src/actifix --cov-report=term-missing`
-- `black --check src/ test/`
-- `isort --check-only src/ test/`
-- `mypy src/actifix/`
-- `python -m actifix.testing --validate-architecture`
-- `python -m actifix.health --comprehensive`
+## Ticket completion quality gate
+Tickets cannot be marked complete without evidence. Required fields:
+- `completion_notes`: min 20 characters (what was done)
+- `test_steps`: min 10 characters (how it was tested)
+- `test_results`: min 10 characters (test evidence)
 
-Slow tests default to a 10s timeout; use `--runslow` to include hanging suites and review the slow-test tracker for regressions.
+Recommended workflow:
+```bash
+ACTIFIX_CHANGE_ORIGIN=raise_af python3 scripts/interactive_ticket_review.py
+```
 
-## Testing & architecture
-- Tests must be deterministic, clean up after themselves, and include both positive and negative paths.
-- Groupings: `test/unit/`, `test/integration/`, `test/architecture/`, fixtures in `test/fixtures/`.
-- Use `tooling.testing` rules to keep QA aligned with architecture contracts.
+Programmatic completion:
+```python
+from actifix.do_af import mark_ticket_complete
 
-## Coding standards
-- Always use typed signatures with docstrings.
-- Log through `actifix.log_utils` with correlation IDs; wrap logical operations inside correlation contexts.
-- Errors must flow through `actifix.raise_af.record_error(...)` and be re-raised if the caller needs to fail.
+mark_ticket_complete(
+    ticket_id="ACT-20260118-XXXXX",
+    completion_notes="Added guard in raise_af to clamp payload size.",
+    test_steps="Ran python3 test.py --coverage and manual CLI smoke test.",
+    test_results="All tests passed; CLI record/health commands succeed.",
+)
+```
+
+## Testing and quality gates
+Common commands:
+```bash
+# Full test cycle with Actifix system tests + pytest
+python3 test.py --coverage
+
+# Fast coverage (skip slow tests)
+python3 test.py --fast-coverage
+
+# Quick pytest run
+python3 -m pytest test/ -m "not slow"
+```
+
+Other checks:
+```bash
+python3 -m actifix.main test
+python3 -m actifix.main health
+python3 -m pytest test/test_architecture_validation.py -v
+```
+
+## Architecture updates
+If you add or move modules:
+1. Update `docs/architecture/MAP.yaml` and `docs/architecture/DEPGRAPH.json`.
+2. Sync `docs/architecture/MODULES.md`.
+3. Update `docs/INDEX.md` references.
 
 ## Documentation workflow
-1. Plan new sections inside `docs/FRAMEWORK_OVERVIEW.md` (release notes, new features, migration notes).
-2. Update `docs/INDEX.md` with any new entries or references.
-3. Reflect architecture changes in `docs/architecture/MAP.yaml`, `DEPGRAPH.json`, and `MODULES.md`.
-4. Document examples in relevant guides (Quickstart for setup, README for overview, Monitoring/Troubleshooting for operations).
+- Use `docs/FRAMEWORK_OVERVIEW.md` for release notes and feature narratives.
+- Update `docs/INDEX.md` any time sections move.
+- Avoid new standalone documentation files; merge into existing guides.
 
-## Release and delivery
-1. Increment `pyproject.toml` version for every release.
-2. Document releases in `docs/FRAMEWORK_OVERVIEW.md` (Release Notes & Version History section).
-3. Keep `CHANGELOG.md` for historical references.
-4. Commit with conventional format (e.g., `feat(core): ...`) and push after every ticket.
-5. Tag releases after all quality gates pass.
-
-## Monitoring & security
-- Capture sensitive data with secret redaction and never log raw credentials.
-- Keep bootstrap latency under 5 seconds; error capture should stay <100ms.
-- Track health via `python -m actifix.health --status` and component checks for logging/quarantine/state.
-
-## Documentation standards reminder
-- No new standalone `.md` tasks—blend content into existing docs.
-- Use `docs/FRAMEWORK_OVERVIEW.md` for roadmap, release notes, and feature narratives.
-- Update architecture maps and cross references whenever structure changes.
-- Maintain the Raise_AF requirement: log any blockers through `actifix.raise_af.record_error(...)` before skipping rules.
+## Commit and push
+Commit format:
+```bash
+git commit -m "docs(workflow): refresh development and testing guides"
+```
+Always push after each ticket is complete.

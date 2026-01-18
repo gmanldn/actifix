@@ -1,108 +1,70 @@
 # Actifix Monitoring Guide
 
-## Overview
+This guide covers health checks, operational visibility, and recommended monitoring queries for Actifix deployments.
 
-This guide covers operational monitoring, health checks, and observability for Actifix in production environments.
-
-## Health Monitoring
-
-### Health Check Endpoint
+## Health checks
 ```bash
-# Check system health
-python -m actifix.health --check
-
-# Comprehensive health report
-python -m actifix.health --comprehensive
+python3 -m actifix.main health
 ```
 
-### Health Status Levels
-- **OK**: All systems operational
-- **WARNING**: Minor issues detected
-- **ERROR**: Significant problems
-- **SLA_BREACH**: Critical SLA violations
+Health checks summarize:
+- Ticket backlog
+- SLA breaches
+- Storage state and quarantine
+- Recent errors in the event log
 
-## Key Metrics
-
-### System Metrics
-- Startup time (target: < 5 seconds)
-- Memory usage
+## Key metrics to monitor
+- Startup time (target: < 5s)
 - Error capture latency (target: < 100ms)
-- Ticket processing throughput
-
-### Business Metrics
 - Open tickets by priority
 - SLA breach count
-- Error classification accuracy
-- AI remediation success rate
+- DoAF processing throughput
+- Database file size and WAL growth
 
-## Alerting
+## Query the database
+Actifix stores operational signals in `data/actifix.db`.
 
-### Critical Alerts (P0)
-- System startup failures
-- Database corruption
-- Health check failures
-- SLA breaches
-
-### Warning Alerts (P1-P2)
-- High error rates
-- Performance degradation
-- Storage capacity issues
-- AI provider failures
-
-## Log Monitoring
-
-### Log Locations
-- Database event log: `data/actifix.db` (`event_log` table)
-- Ticket rollups: `v_recent_tickets`, `v_ticket_history` views
-- Optional process logs: `logs/` (if configured by deployment)
-
-### Log Patterns to Monitor
 ```bash
-# Critical errors from event log
-sqlite3 data/actifix.db "SELECT timestamp, event_type, message FROM event_log WHERE level IN ('CRITICAL','ERROR') ORDER BY timestamp DESC LIMIT 50;"
+# Recent tickets
+sqlite3 data/actifix.db "SELECT id, priority, status, message FROM tickets ORDER BY created_at DESC LIMIT 20;"
 
-# SLA breaches
-sqlite3 data/actifix.db "SELECT id, priority, created_at FROM tickets WHERE status != 'Completed' ORDER BY created_at DESC LIMIT 20;"
+# SLA breaches (Open tickets past SLA)
+sqlite3 data/actifix.db "SELECT id, priority, created_at FROM tickets WHERE status != 'Completed' ORDER BY created_at DESC LIMIT 50;"
 
-# Database issues (event log)
-sqlite3 data/actifix.db "SELECT timestamp, event_type, message FROM event_log WHERE message LIKE '%sqlite%' ORDER BY timestamp DESC LIMIT 50;"
+# Recent events
+sqlite3 data/actifix.db "SELECT timestamp, level, event_type, message FROM event_log ORDER BY timestamp DESC LIMIT 50;"
 ```
 
-## Performance Monitoring
+## Log locations
+- Event log: `data/actifix.db` (`event_log` table)
+- Optional runtime logs: `logs/` (if configured)
+- Actifix state: `.actifix/`
 
-### Startup Performance
+## Alerting guidance
+Critical alerts (P0):
+- Database corruption or inaccessible `data/actifix.db`
+- Health checks failing consistently
+- DoAF processing stuck with growing backlog
+
+Warning alerts (P1-P2):
+- Rapid growth of open tickets
+- Repeated throttling events for P2/P3/P4
+- Slow capture latency or startup time regressions
+
+## Performance monitoring
 ```bash
-# Monitor startup time
-time python -m actifix.bootstrap --init
+# Measure startup time
+(time python3 -m actifix.main health) 2>/dev/null
+
+# Check disk usage
+du -sh data/ .actifix/ logs/
 ```
 
-### Memory Monitoring
+## Operational checks
 ```bash
-# Check memory usage
-ps aux | grep actifix
+# Quarantined entries
+python3 -m actifix.main quarantine list
+
+# Ticket stats summary
+python3 -m actifix.main stats
 ```
-
-### Disk Usage
-```bash
-# Monitor storage usage
-du -sh actifix/ .actifix/ logs/
-```
-
-## Troubleshooting
-
-### Common Issues
-1. **High memory usage**: Check for memory leaks
-2. **Slow startup**: Review initialization sequence
-3. **Database locks**: Check for concurrent access
-4. **Storage full**: Implement log rotation
-
-### Debug Commands
-```bash
-# Enable debug logging
-export ACTIFIX_LOG_LEVEL=DEBUG
-
-# Check quarantine status
-python -m actifix.quarantine --status
-
-# Validate architecture
-python -m actifix.testing --validate-architecture

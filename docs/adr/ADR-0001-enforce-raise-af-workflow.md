@@ -35,13 +35,13 @@ The workflow steps are:
 export ACTIFIX_CHANGE_ORIGIN=raise_af
 
 # 2. Create ticket via raise_af
-python -c "from actifix.raise_af import record_error; record_error(...)"
+python3 -c "from actifix.raise_af import record_error; record_error(...)"
 
 # 3. Implement changes directly on develop
 # ... development work ...
 
 # 4. Test and commit
-python test/test_runner.py --coverage
+python3 test.py --coverage
 git commit -m "feat(scope): description"
 
 git push

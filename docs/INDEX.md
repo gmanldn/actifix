@@ -1,52 +1,50 @@
 # Actifix Documentation Index
 
-This index keeps all documentation concise, cross-referenced, and aligned with the Actifix workflow. Start here, then follow the links that fit your role.
+This index keeps documentation discoverable and aligned with the Actifix workflow. Start here, then follow the guides that match your role.
 
-## Quick access
-- **README** [../README.md](../README.md) – Project overview (capture, self-improvement, commands).
-- **QUICKSTART** [QUICKSTART.md](QUICKSTART.md) – Hands-on setup plus capture + ticket inspection snippets.
-- **INSTALLATION** [INSTALLATION.md](INSTALLATION.md) – Platform-specific install and environment variables.
-- **FRAMEWORK OVERVIEW** [FRAMEWORK_OVERVIEW.md](FRAMEWORK_OVERVIEW.md) – Purpose, architecture, release notes, and roadmap.
+## Start here
+- **README** `../README.md` - project overview, core commands, guardrails
+- **QUICKSTART** `QUICKSTART.md` - fastest path to running Actifix
+- **INSTALLATION** `INSTALLATION.md` - installation and configuration details
+- **FRAMEWORK OVERVIEW** `FRAMEWORK_OVERVIEW.md` - architecture, release notes, roadmap
 
-## User & operator guides
-- **MONITORING** [MONITORING.md](MONITORING.md) – Operational metrics, health checks, alerting patterns.
-- **TROUBLESHOOTING** [TROUBLESHOOTING.md](TROUBLESHOOTING.md) – Frequently seen issues with rapid remedies.
-- **TESTING** [TESTING.md](TESTING.md) – Testing philosophy and quality gate descriptions.
-- **TEST PERFORMANCE** [TEST_PERFORMANCE_OPTIMIZATION.md](TEST_PERFORMANCE_OPTIMIZATION.md) – Running fast, stable test suites.
-- **TEST MARKERS** [TEST_MARKERS_GUIDE.md](TEST_MARKERS_GUIDE.md) – Marker-based test selection guidelines.
-- **COVERAGE OPTIMIZATION** [COVERAGE_OPTIMIZATION.md](COVERAGE_OPTIMIZATION.md) and [notes/COVERAGE_OPTIMIZATION_SUMMARY.md](notes/COVERAGE_OPTIMIZATION_SUMMARY.md) – Improving coverage while keeping runs fast.
+## Operators and support
+- **MONITORING** `MONITORING.md` - health checks, metrics, and alerting
+- **TROUBLESHOOTING** `TROUBLESHOOTING.md` - common issues and fixes
 
-## Developer & architecture resources
-- **DEVELOPMENT GUIDE** [DEVELOPMENT.md](DEVELOPMENT.md) – Workflow, QA gates, architecture validation, and doc standards.
-- **QUICKDEV** [QUICKDEV.md](QUICKDEV.md) – Focused workflows for agent-powered development sprints.
-- **ADR directory** [adr/](adr/) – Raised AF workflow and future architecture decisions.
-- **Architecture docs** – [ARCHITECTURE_CORE.md](architecture/ARCHITECTURE_CORE.md), [MODULES.md](architecture/MODULES.md), [MAP.yaml](architecture/MAP.yaml), [DEPGRAPH.json](architecture/DEPGRAPH.json) describe the canonical topology. Update everything when the module map changes.
-- **Notes** [notes/](notes/) – Summaries, debugging reports, and documentation planning (use only for reference).
+## Development and testing
+- **DEVELOPMENT GUIDE** `DEVELOPMENT.md` - workflow, quality gates, ticket completion
+- **QUICKDEV** `QUICKDEV.md` - fast module-building workflow
+- **TESTING** `TESTING.md` - test runner, quality gates, and coverage
+- **TEST PERFORMANCE** `TEST_PERFORMANCE_OPTIMIZATION.md` - speed, timeouts, and profiling
+- **TEST MARKERS** `TEST_MARKERS_GUIDE.md` - marker taxonomy and usage
+- **COVERAGE OPTIMIZATION** `COVERAGE_OPTIMIZATION.md` - fast coverage workflow
+- **ADR directory** `adr/` - architecture decisions (Raise_AF workflow)
 
-## Self-improvement & automation
-- **Token robustness campaign** [token_robustness_campaign.md](token_robustness_campaign.md) – Ongoing AI/robustness experiments.
-- **Ultrathink ticket summaries** [ultrathink_tickets_summary.md](ultrathink_tickets_summary.md) – Elevator notes from the most complex ticket bursts.
-- **Automation folder** [automation/](automation/) – Scripts that spawn mass-ticket workflows and diagnostics.
+## Architecture references
+- **ARCHITECTURE CORE** `architecture/ARCHITECTURE_CORE.md`
+- **MODULES** `architecture/MODULES.md`
+- **MAP** `architecture/MAP.yaml`
+- **DEPGRAPH** `architecture/DEPGRAPH.json`
 
-## Legal & compliance
-- **LICENSE** [legal/LICENSE.md](legal/LICENSE.md)
+## Campaigns and initiatives
+- **TOKEN ROBUSTNESS CAMPAIGN** `token_robustness_campaign.md`
+- **ULTRATHINK TICKETS SUMMARY** `ultrathink_tickets_summary.md`
+
+## Legal
+- **LICENSE** `legal/LICENSE.md`
 
 ## Document status
 | Document | Status | Notes |
 |----------|--------|-------|
-| README | ✅ Updated 2026-01-17 | Landing overview for all audiences.
-| QUICKSTART | ✅ Updated 2026-01-17 | Hands-on install + capture.
-| FRAMEWORK_OVERVIEW | ✅ Updated 2026-01-17 | Architecture, release notes, roadmap.
-| DEVELOPMENT | ✅ Updated 2026-01-17 | Workflow, QA gates, architecture, docs.
-| ARCHITECTURE MAP/GRAPH | ✅ Auto-generated weekly | Source of truth for module graph.
-| TROUBLESHOOTING | 🚧 Conditional updates | Scoped fixes referenced in releases.
-| MONITORING | 🚧 Conditional updates | Refer to release notes for telemetry.
-| TESTING & OPTIMIZATION | ✅ Coverage guidelines in place | Balanced tests and performance tips.
+| README | Updated | Overview and commands aligned to current CLI. |
+| QUICKSTART | Updated | Hands-on setup and first ticket. |
+| INSTALLATION | Updated | Environment and dependency setup. |
+| FRAMEWORK_OVERVIEW | Updated | Architecture and release notes. |
+| DEVELOPMENT | Updated | Raise_AF workflow and quality gates. |
+| ARCHITECTURE MAP/GRAPH | Auto-generated | Source of truth for module graph. |
+| TESTING | Updated | Test runner and markers aligned to repo. |
+| MONITORING | Updated | Operational guidance and queries. |
+| TROUBLESHOOTING | Updated | Common issues aligned to actual commands. |
 
-## How to contribute docs
-1. Update the relevant document directly in the `docs/` folder.
-2. Sync `docs/INDEX.md` to include any new section.
-3. Link to architecture artifacts when structural changes occur.
-4. Release notes always live in the “Release Notes & Version History” section of `docs/FRAMEWORK_OVERVIEW.md`.
-
-_Last updated: 2026-01-17_
+_Last updated: 2026-01-18_

@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Refresh the dashboard ticket feed more frequently and group tickets by priority lanes in the UI
 - Stop tracking local `data/actifix.db` artifacts in git and ignore the runtime SQLite WAL files
 - Ensure bootstrap initializes the ticket database and add root symlink guards for start/test helpers
+- Consolidate and refresh documentation across quickstart, installation, development, and testing guides
 
 ### Fixed
 - Automatically tighten `data/actifix.db` permissions to `chmod 600` before validation so the world-readable guard rails only flag intentionally insecure paths.
