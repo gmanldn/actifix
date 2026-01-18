@@ -21,3 +21,9 @@ test/**/__pycache__/
 .vscode/
 scripts/data/
 scripts/actifix/
+
+# Databases to prevent merge conflicts in multi-agent workflows
+test/data/actifix.*
+test/data/*.db
+test/data/*.db-shm
+test/data/*.db-wal
