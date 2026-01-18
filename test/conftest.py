@@ -59,6 +59,13 @@ def pytest_configure(config):
     logging.getLogger("requests").setLevel(logging.WARNING)
     logging.getLogger("sqlite3").setLevel(logging.WARNING)
 
+    # Enable pytest-xdist auto-parallelism when available
+    if config.pluginmanager.hasplugin("xdist"):
+        if getattr(config.option, "numprocesses", None) in (None, 0):
+            config.option.numprocesses = "auto"
+        if getattr(config.option, "dist", None) is None:
+            config.option.dist = "loadfile"
+
 
 def pytest_addoption(parser):
     """Add custom pytest options for slow tests."""
