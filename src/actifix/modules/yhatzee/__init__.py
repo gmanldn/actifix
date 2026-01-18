@@ -101,15 +101,15 @@ _HTML_PAGE = """<!doctype html>
       color: var(--ink);
     }
     .app {
-      max-width: 1100px;
+      max-width: 1120px;
       margin: 0 auto;
-      padding: 32px 20px 48px;
+      padding: 40px 24px 56px;
     }
     header {
       display: flex;
       align-items: flex-end;
       justify-content: space-between;
-      gap: 16px;
+      gap: 20px;
     }
     h1 {
       font-family: "Copperplate", "Palatino Linotype", "Book Antiqua", "Palatino", serif;
@@ -133,15 +133,15 @@ _HTML_PAGE = """<!doctype html>
     .grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-      gap: 16px;
-      margin-top: 24px;
+      gap: 22px;
+      margin-top: 28px;
     }
     .card {
       background: var(--panel);
       border: 1px solid var(--border);
-      border-radius: 18px;
-      padding: 18px 20px;
-      box-shadow: 0 8px 24px rgba(63, 52, 32, 0.08);
+      border-radius: 22px;
+      padding: 22px 24px;
+      box-shadow: 0 12px 28px rgba(63, 52, 32, 0.1);
     }
     .setup input {
       width: 100%;
