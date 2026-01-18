@@ -45,6 +45,7 @@ actifix.track_development_progress("Feature complete", "AI telemetry integrated"
 - `python -m actifix.main process --max-tickets 5`
 - `python -m actifix.main quarantine list`
 - `python -m actifix.main test`
+- `ACTIFIX_CHANGE_ORIGIN=raise_af python Do_AF.py [batch_size]` - Batch ticket processing with AI
 
 ## Database-first workflow
 - `data/actifix.db` is the only writable registry. All tickets, priority tiers, and remediation notes live here.
