@@ -78,6 +78,19 @@ SERVER_START_TIME = time.time()
 SYSTEM_OWNERS = {"runtime", "infra", "core", "persistence", "testing", "tooling"}
 
 
+def _is_system_domain(domain: str) -> bool:
+    """Decide whether a module belongs to the system catalog."""
+    return domain.strip().lower() in {
+        "runtime",
+        "infra",
+        "core",
+        "tooling",
+        "security",
+        "plugins",
+        "persistence",
+    }
+
+
 def _load_modules(project_root: Path) -> Dict[str, List[Dict[str, str]]]:
     """Parse docs/architecture/MODULES.md into system/user buckets."""
     modules_md = project_root / "docs" / "architecture" / "MODULES.md"
@@ -93,7 +106,6 @@ def _load_modules(project_root: Path) -> Dict[str, List[Dict[str, str]]]:
     try:
         for line in modules_md.read_text(encoding="utf-8").splitlines():
             if line.startswith("## "):
-                # flush previous
                 if name:
                     modules.append({
                         "name": name,
@@ -120,6 +132,10 @@ def _load_modules(project_root: Path) -> Dict[str, List[Dict[str, str]]]:
             })
     except Exception:
         return {"system": [], "user": []}
+
+    system_modules = [m for m in modules if _is_system_domain(m["domain"])]
+    user_modules = [m for m in modules if not _is_system_domain(m["domain"])]
+    return {"system": system_modules, "user": user_modules}
 
 
 def _collect_ai_feedback(limit: int = 40) -> List[str]:

@@ -40,11 +40,11 @@ This index keeps documentation discoverable and aligned with the Actifix workflo
 | README | Updated | Overview and commands aligned to current CLI. |
 | QUICKSTART | Updated | Hands-on setup and first ticket. |
 | INSTALLATION | Updated | Environment and dependency setup. |
-| FRAMEWORK_OVERVIEW | Updated | Architecture and 4.0.0 release notes. |
+| FRAMEWORK_OVERVIEW | Updated | Architecture and 4.0.x release notes. |
 | DEVELOPMENT | Updated | Raise_AF workflow and quality gates. |
 | ARCHITECTURE MAP/GRAPH | Auto-generated | Source of truth for module graph. |
 | TESTING | Updated | Test runner and markers aligned to repo. |
 | MONITORING | Updated | Operational guidance and queries. |
 | TROUBLESHOOTING | Updated | Common issues aligned to actual commands. |
 
-_Last updated: 2026-01-19_
+_Last updated: 2026-01-20_
