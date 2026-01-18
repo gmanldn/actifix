@@ -19,15 +19,12 @@ sys.path.insert(0, str(ROOT / "src"))
 ALLOWED_ROOT_FILES = {
     # Core project files
     "pyproject.toml",
+    "pytest.ini",
     "README.md",
     "AGENTS.md",
-    "LICENSE",
     "CHANGELOG.md",
-    # User-requested root scripts
     "start.py",
-    "start_50_tasks.py",
     "test.py",
-    "bounce.py",
 }
 
 # Allowed directories in project root (non-hidden)
@@ -40,6 +37,7 @@ ALLOWED_ROOT_DIRS = {
     "logs",          # Log files
     "data",          # Data files
     "test_logs",     # Structured test logs
+    "scripts",       # Helper scripts moved from root
 }
 
 # Hidden items are always allowed (e.g., .git, .venv, .actifix)
@@ -62,6 +60,10 @@ class TestRootFolderStructure:
 
             # Skip hidden files/dirs
             if name.startswith("."):
+                continue
+
+            # Skip symlinks (convenience links to scripts/ are allowed)
+            if item.is_symlink():
                 continue
 
             # Check files
@@ -177,25 +179,30 @@ class TestRootFolderStructure:
 
             pytest.fail("Old Arch/ directory exists - should be moved to docs/architecture/")
 
+    def test_root_symlinks_present(self):
+        """Root symlinks should exist for start/test helpers."""
+        symlinks = {
+            "start.py": ROOT / "scripts" / "start.py",
+            "test.py": ROOT / "test" / "test_runner.py",
+        }
+
+        for link_name, target_path in symlinks.items():
+            link_path = ROOT / link_name
+            assert link_path.exists(), f"{link_name} must exist in project root"
+            assert link_path.is_symlink(), f"{link_name} must be a symlink"
+            assert link_path.resolve() == target_path.resolve(), (
+                f"{link_name} must point to {target_path}"
+            )
+
 
 class TestFolderPurpose:
     """Validate each folder contains appropriate content."""
 
-    def test_scripts_directory_absent(self):
-        """Legacy scripts/ directory should not return."""
+    def test_scripts_directory_present(self):
+        """Ensure scripts/ hosts helper utilities moved from root."""
         scripts_dir = ROOT / "scripts"
-        if scripts_dir.exists():
-            try:
-                from actifix.raise_af import record_error
-                record_error(
-                    message="Legacy scripts/ directory exists but should be removed",
-                    source="test/test_root_structure.py",
-                    error_type="StructureViolation",
-                )
-            except ImportError:
-                pass
-
-            pytest.fail("Legacy scripts/ directory detected; remove deprecated scripts")
+        assert scripts_dir.exists(), "scripts/ directory must exist to house helper scripts"
+        assert any(item.suffix == ".py" for item in scripts_dir.iterdir()), "scripts/ should contain at least one script"
 
     def test_docs_contains_markdown(self):
         """docs/ should primarily contain markdown and related files."""

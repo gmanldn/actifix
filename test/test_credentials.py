@@ -27,6 +27,8 @@ from actifix.security.credentials import (
     reset_credential_manager,
 )
 
+pytestmark = [pytest.mark.integration]
+
 
 class TestCredentialType:
     """Test credential type definitions."""
@@ -184,7 +186,7 @@ class TestFileSystemCredentialStore:
                 (CredentialType.API_KEY, "sk-123abc"),
                 (CredentialType.PASSWORD, "mypassword"),
                 (CredentialType.TOKEN, "token_xyz"),
-                (CredentialType.SSH_KEY, "-----BEGIN RSA PRIVATE KEY-----"),
+                (CredentialType.SSH_KEY, "ssh-key-placeholder"),
             ]
 
             for cred_type, value in types_and_values:

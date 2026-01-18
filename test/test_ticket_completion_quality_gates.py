@@ -22,6 +22,8 @@ from actifix.persistence.ticket_repo import get_ticket_repository, reset_ticket_
 from actifix.raise_af import ActifixEntry, TicketPriority
 from actifix.state_paths import get_actifix_paths
 
+pytestmark = [pytest.mark.db, pytest.mark.integration]
+
 
 @pytest.fixture
 def clean_db(tmp_path, monkeypatch):

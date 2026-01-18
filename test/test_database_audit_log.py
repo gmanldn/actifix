@@ -24,6 +24,8 @@ from actifix.persistence.database import (
     deserialize_json_field,
 )
 
+pytestmark = [pytest.mark.db, pytest.mark.integration]
+
 
 @pytest.fixture
 def clean_db(tmp_path, monkeypatch):

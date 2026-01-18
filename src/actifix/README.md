@@ -59,12 +59,9 @@ cp -r src/actifix /your/project/
 your-project/
 ├── data/                       # Runtime storage
 │   └── actifix.db              # Tickets table (canonical source of truth)
-├── actifix/                    # Generated artifacts
-│   ├── ACTIFIX.md             # Error rollup (last 20)
-│   ├── ACTIFIX-LOG.md         # Audit trail
-│   ├── AFLog.txt              # Machine-readable log
-│   ├── backups/               # Backup storage
-│   └── quarantine/            # Malformed tickets
+├── actifix/                    # Data directory for derived artifacts
+├── .actifix/                   # State directory (fallback queue, quarantine)
+├── logs/                       # Optional runtime logs
 └── src/
     └── actifix/               # Python package
 ```
@@ -75,7 +72,7 @@ your-project/
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `ACTIFIX_BASE_DIR` | Base directory for files | `./actifix/` |
+| `ACTIFIX_DATA_DIR` | Base directory for files | `./actifix/` |
 | `ACTIFIX_PROJECT_ROOT` | Project root path | Current directory |
 | `ACTIFIX_CAPTURE_ENABLED` | Enable/disable capture | `1` (enabled) |
 
@@ -253,7 +250,7 @@ Actifix uses duplicate guards based on source+message hash. Same error won't cre
 
 ### Files not being created
 
-Check `ACTIFIX_BASE_DIR` and ensure directory is writable.
+Check `ACTIFIX_DATA_DIR` and ensure directory is writable.
 
 ### SLA breaches showing incorrectly
 

@@ -1,7 +1,7 @@
 {
   "schema_version": "arch-depgraph.v1",
   "meta": {
-    "generated_at": "2026-01-10T20:35:39.694130+00:00",
+    "generated_at": "2026-01-16T04:05:00.000000+00:00",
     "generator": "update_architecture_docs.py",
     "generator_version": "2.0.0",
     "source_commit": "current_development"
@@ -21,6 +21,8 @@
     {"id": "infra.persistence.manager", "domain": "infra", "owner": "persistence", "label": "manager"},
     {"id": "infra.persistence.health", "domain": "infra", "owner": "persistence", "label": "health"},
     {"id": "infra.persistence.paths", "domain": "infra", "owner": "persistence", "label": "paths"},
+    {"id": "infra.persistence.cleanup_config", "domain": "infra", "owner": "persistence", "label": "cleanup_config"},
+    {"id": "infra.persistence.ticket_cleanup", "domain": "infra", "owner": "persistence", "label": "ticket_cleanup"},
     {"id": "infra.persistence.event_repo", "domain": "infra", "owner": "persistence", "label": "event_repo"},
     {"id": "infra.persistence.database", "domain": "infra", "owner": "persistence", "label": "database"},
     {"id": "infra.persistence.ticket_repo", "domain": "infra", "owner": "persistence", "label": "ticket_repo"},
@@ -35,11 +37,13 @@
     {"id": "core.ai_client", "domain": "core", "owner": "core", "label": "ai_client"},
     {"id": "core.error_taxonomy", "domain": "core", "owner": "core", "label": "error_taxonomy"},
     {"id": "core.recovery", "domain": "core", "owner": "core", "label": "recovery"},
+    {"id": "core.self_repair", "domain": "core", "owner": "core", "label": "self_repair"},
     {"id": "security.api", "domain": "security", "owner": "security", "label": "api"},
     {"id": "security.auth", "domain": "security", "owner": "security", "label": "auth"},
     {"id": "security.credentials", "domain": "security", "owner": "security", "label": "credentials"},
     {"id": "security.rate_limiter", "domain": "security", "owner": "security", "label": "rate_limiter"},
     {"id": "security.secrets_scanner", "domain": "security", "owner": "security", "label": "secrets_scanner"},
+    {"id": "security.ticket_throttler", "domain": "security", "owner": "security", "label": "ticket_throttler"},
     {"id": "plugins.permissions", "domain": "plugins", "owner": "plugins", "label": "permissions"},
     {"id": "plugins.protocol", "domain": "plugins", "owner": "plugins", "label": "protocol"},
     {"id": "plugins.registry", "domain": "plugins", "owner": "plugins", "label": "registry"},
@@ -47,12 +51,14 @@
     {"id": "plugins.sandbox", "domain": "plugins", "owner": "plugins", "label": "sandbox"},
     {"id": "plugins.loader", "domain": "plugins", "owner": "plugins", "label": "loader"},
     {"id": "plugins.api", "domain": "plugins", "owner": "plugins", "label": "api"},
-    {"id": "plugins.builtin", "domain": "plugins", "owner": "plugins", "label": "builtin"}
+    {"id": "plugins.builtin", "domain": "plugins", "owner": "plugins", "label": "builtin"},
+    {"id": "modules.yhatzee", "domain": "modules", "owner": "modules", "label": "yhatzee"}
   ],
   "edges": [
     {"from": "bootstrap.main", "to": "runtime.config", "reason": "bootstrap.main depends on runtime.config"},
     {"from": "bootstrap.main", "to": "infra.logging", "reason": "bootstrap.main depends on infra.logging"},
     {"from": "bootstrap.main", "to": "infra.health", "reason": "bootstrap.main depends on infra.health"},
+    {"from": "bootstrap.main", "to": "infra.persistence.database", "reason": "bootstrap.main ensures the ticket database is initialized"},
     {"from": "runtime.api", "to": "core.raise_af", "reason": "runtime.api depends on core.raise_af"},
     {"from": "runtime.api", "to": "bootstrap.main", "reason": "runtime.api depends on bootstrap.main"},
     {"from": "runtime.api", "to": "runtime.state", "reason": "runtime.api depends on runtime.state"},
@@ -77,6 +83,7 @@
     {"from": "infra.persistence.health", "to": "infra.logging", "reason": "infra.persistence.health depends on infra.logging"},
     {"from": "infra.persistence.health", "to": "infra.persistence.storage", "reason": "infra.persistence.health depends on infra.persistence.storage"},
     {"from": "infra.persistence.paths", "to": "infra.logging", "reason": "infra.persistence.paths depends on infra.logging"},
+    {"from": "infra.persistence.ticket_cleanup", "to": "infra.persistence.ticket_repo", "reason": "infra.persistence.ticket_cleanup depends on infra.persistence.ticket_repo"},
     {"from": "infra.persistence.database", "to": "infra.logging", "reason": "infra.persistence.database depends on infra.logging"},
     {"from": "infra.persistence.ticket_repo", "to": "infra.logging", "reason": "infra.persistence.ticket_repo depends on infra.logging"},
     {"from": "infra.persistence.ticket_repo", "to": "infra.persistence.database", "reason": "infra.persistence.ticket_repo depends on infra.persistence.database"},
@@ -103,6 +110,7 @@
     {"from": "tooling.testing.reporting", "to": "tooling.testing.system", "reason": "tooling.testing.reporting depends on tooling.testing.system"},
     {"from": "tooling.testing", "to": "bootstrap.main", "reason": "tooling.testing depends on bootstrap.main"},
     {"from": "tooling.testing", "to": "infra.logging", "reason": "tooling.testing depends on infra.logging"},
+    {"from": "tooling.testing", "to": "core.raise_af", "reason": "tooling.testing uses raise_af to record hang tickets"},
     {"from": "tooling.testing", "to": "tooling.testing.system", "reason": "tooling.testing depends on tooling.testing.system"},
     {"from": "tooling.testing", "to": "tooling.testing.reporting", "reason": "tooling.testing depends on tooling.testing.reporting"},
     {"from": "plugins.registry", "to": "infra.logging", "reason": "plugins.registry depends on infra.logging"},
@@ -124,6 +132,7 @@
     {"from": "plugins.builtin", "to": "plugins.registry", "reason": "plugins.builtin depends on plugins.registry"},
     {"from": "core.recovery", "to": "infra.logging", "reason": "core.recovery depends on infra.logging"},
     {"from": "core.recovery", "to": "infra.persistence.manager", "reason": "core.recovery depends on infra.persistence.manager"},
+    {"from": "core.self_repair", "to": "infra.logging", "reason": "core.self_repair logs blueprints via infra.logging"},
     {"from": "security.api", "to": "security.auth", "reason": "security.api depends on security.auth"},
     {"from": "security.api", "to": "security.credentials", "reason": "security.api depends on security.credentials"},
     {"from": "security.api", "to": "security.rate_limiter", "reason": "security.api depends on security.rate_limiter"},
@@ -134,7 +143,13 @@
     {"from": "security.rate_limiter", "to": "infra.logging", "reason": "security.rate_limiter depends on infra.logging"},
     {"from": "security.rate_limiter", "to": "runtime.config", "reason": "security.rate_limiter depends on runtime.config"},
     {"from": "security.secrets_scanner", "to": "infra.logging", "reason": "security.secrets_scanner depends on infra.logging"},
+    {"from": "core.raise_af", "to": "security.ticket_throttler", "reason": "core.raise_af depends on security.ticket_throttler"},
+    {"from": "security.ticket_throttler", "to": "core.raise_af", "reason": "security.ticket_throttler imports TicketPriority from core.raise_af"},
+    {"from": "security.ticket_throttler", "to": "runtime.state", "reason": "security.ticket_throttler uses Actifix paths for throttle storage"},
     {"from": "plugins.permissions", "to": "plugins.protocol", "reason": "plugins.permissions depends on plugins.protocol"},
-    {"from": "plugins.permissions", "to": "security.auth", "reason": "plugins.permissions depends on security.auth"}
+    {"from": "plugins.permissions", "to": "security.auth", "reason": "plugins.permissions depends on security.auth"},
+    {"from": "modules.yhatzee", "to": "runtime.state", "reason": "modules.yhatzee uses Actifix state paths"},
+    {"from": "modules.yhatzee", "to": "infra.logging", "reason": "modules.yhatzee logs events via infra.logging"},
+    {"from": "modules.yhatzee", "to": "core.raise_af", "reason": "modules.yhatzee records errors via core.raise_af"}
   ]
 }

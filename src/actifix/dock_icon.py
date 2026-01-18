@@ -20,7 +20,7 @@ def _is_macos() -> bool:
     return sys.platform == "darwin"
 
 
-def _try_import_appkit():
+def _try_import_appkit() -> Optional[Any]:
     """Import AppKit and return the module or None."""
     try:
         import AppKit  # type: ignore

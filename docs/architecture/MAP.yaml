@@ -1,6 +1,6 @@
 schema_version: arch-map.v1
 meta:
-  generated_at: "2026-01-10T20:35:39.679770+00:00"
+  generated_at: "2026-01-16T04:05:00.000000+00:00"
   generator: update_architecture_docs.py
   generator_version: 2.0.0
   source_commit: current_development
@@ -9,6 +9,7 @@ meta:
   - Single source of truth for actifix architecture contexts
   - Keep aligned with quality gates and architecture compliance
   - Auto-generated - includes persistence and testing subsystems
+  - Run record-error simple ticket attack to generate 500 tickets
 domains:
 - id: runtime
   summary: Bootstrap, configuration, state management, lifecycle
@@ -22,6 +23,8 @@ domains:
   summary: Testing, quality assurance, architecture validation
 - id: plugins
   summary: Plugin discovery, validation, and lifecycle orchestration
+- id: modules
+  summary: User-facing modules and local experiences
 modules:
 - id: bootstrap.main
   domain: runtime
@@ -37,6 +40,7 @@ modules:
   - runtime.config
   - infra.logging
   - infra.health
+  - infra.persistence.database
 - id: runtime.api
   domain: runtime
   owner: runtime
@@ -200,6 +204,27 @@ modules:
   - directory helpers
   depends_on:
   - infra.logging
+- id: infra.persistence.cleanup_config
+  domain: infra
+  owner: persistence
+  summary: Cleanup configuration for ticket retention policies
+  entrypoints:
+  - src/actifix/persistence/cleanup_config.py
+  contracts:
+  - centralize cleanup settings
+  - environment-driven defaults
+  depends_on: []
+- id: infra.persistence.ticket_cleanup
+  domain: infra
+  owner: persistence
+  summary: Ticket cleanup and retention policy execution
+  entrypoints:
+  - src/actifix/persistence/ticket_cleanup.py
+  contracts:
+  - retention policy enforcement
+  - auto-cleanup test tickets
+  depends_on:
+  - infra.persistence.ticket_repo
 - id: infra.persistence.event_repo
   domain: infra
   owner: persistence
@@ -250,6 +275,7 @@ modules:
   - infra.logging
   - core.quarantine
   - infra.persistence.ticket_repo
+  - security.ticket_throttler
 - id: core.do_af
   domain: core
   owner: core
@@ -309,14 +335,16 @@ modules:
   summary: Quality assurance and testing framework
   entrypoints:
   - src/actifix/testing/__init__.py
-  - test.py
+  - test/test_runner.py
   contracts:
   - enforce quality gates
   - maintain test coverage
+  - accelerate coverage cycles by enabling parallel pytest-xdist runs when available
   - validate architecture
   depends_on:
   - bootstrap.main
   - infra.logging
+  - core.raise_af
   - tooling.testing.system
   - tooling.testing.reporting
 - id: tooling.simple_ticket_attack
@@ -337,10 +365,10 @@ modules:
   owner: tooling
   summary: Script to stop and restart Actifix processes
   entrypoints:
-  - bounce.py
+  - scripts/bounce.py
   contracts:
   - stop existing frontend and API processes
-  - relaunch application via start.py with Raise_AF gate
+  - relaunch application via scripts/start.py with Raise_AF gate
   depends_on:
   - bootstrap.main
 - id: core.ai_client
@@ -387,6 +415,17 @@ modules:
   depends_on:
   - infra.logging
   - infra.persistence.manager
+- id: core.self_repair
+  domain: core
+  owner: core
+  summary: Discoverable self-repair blueprints and verification workflows
+  entrypoints:
+  - src/actifix/self_repair.py
+  contracts:
+  - document automated repair blueprints
+  - log verification hints via log_utils events
+  depends_on:
+  - infra.logging
 - id: security.api
   domain: security
   owner: security
@@ -452,6 +491,19 @@ modules:
   - sanitize sensitive data
   depends_on:
   - infra.logging
+- id: security.ticket_throttler
+  domain: security
+  owner: security
+  summary: Ticket flood protection with priority-aware throttling and emergency braking
+  entrypoints:
+  - src/actifix/security/ticket_throttler.py
+  contracts:
+  - enforce per-priority ticket rate limits for P2/P3/P4
+  - activate an emergency brake when floods exceed configured thresholds
+  - persist throttle history for durability and observability
+  depends_on:
+  - runtime.state
+  - core.raise_af
 - id: plugins.permissions
   domain: plugins
   owner: plugins
@@ -555,6 +607,19 @@ modules:
   depends_on:
   - plugins.registry
   - plugins.protocol
+- id: modules.yhatzee
+  domain: modules
+  owner: modules
+  summary: Two-player Yhatzee game module with local GUI
+  entrypoints:
+  - src/actifix/modules/yhatzee/__init__.py
+  contracts:
+  - serve a local Yhatzee GUI on localhost:8090
+  - use Actifix logging and error capture interfaces
+  depends_on:
+  - runtime.state
+  - infra.logging
+  - core.raise_af
 contracts:
 - id: contract.logging
   summary: All modules must log via centralized logging system with correlation IDs

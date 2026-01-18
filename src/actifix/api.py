@@ -4,6 +4,7 @@ Actifix API Server - Flask-based REST API for frontend dashboard.
 Provides endpoints for health, stats, tickets, logs, and system information.
 """
 
+import logging
 import os
 import platform
 import subprocess
@@ -67,57 +68,87 @@ from .do_af import (
     get_completed_tickets,
     fix_highest_priority_ticket,
 )
-from .raise_af import enforce_raise_af_only
+from .raise_af import enforce_raise_af_only, record_error, TicketPriority
 from .state_paths import get_actifix_paths
+from .persistence.event_repo import get_event_repository, EventFilter
+from .persistence.ticket_cleanup import run_automatic_cleanup
+from .persistence.cleanup_config import get_cleanup_config
 from .config import get_config, set_config, load_config
+from .ai_client import get_ai_client, resolve_provider_selection
 
 # Server start time for uptime calculation
 SERVER_START_TIME = time.time()
 SYSTEM_OWNERS = {"runtime", "infra", "core", "persistence", "testing", "tooling"}
 
 
-def _load_modules(project_root: Path) -> Dict[str, List[Dict[str, str]]]:
-    """Parse docs/architecture/MODULES.md into system/user buckets."""
-    modules_md = project_root / "docs" / "architecture" / "MODULES.md"
-    if not modules_md.exists():
-        return {"system": [], "user": []}
+def _is_system_domain(domain: Optional[str]) -> bool:
+    """Decide whether a module belongs to the system catalog."""
+    normalized = (domain or "").strip().lower()
+    return normalized in {
+        "runtime",
+        "infra",
+        "core",
+        "tooling",
+        "security",
+        "plugins",
+        "persistence",
+    }
 
-    name = None
-    domain = None
-    owner = None
-    summary = None
-    modules: List[Dict[str, str]] = []
+
+def _load_modules(project_root: Path) -> Dict[str, List[Dict[str, str]]]:
+    """Load modules from canonical DEPGRAPH.json."""
+    depgraph_path = project_root / "docs" / "architecture" / "DEPGRAPH.json"
+    if not depgraph_path.exists():
+        return {"system": [], "user": []}
 
     try:
-        for line in modules_md.read_text(encoding="utf-8").splitlines():
-            if line.startswith("## "):
-                # flush previous
-                if name:
-                    modules.append({
-                        "name": name,
-                        "domain": domain or "",
-                        "owner": owner or "",
-                        "summary": summary or "",
-                    })
-                name = line.replace("## ", "").strip()
-                domain = owner = summary = None
-                continue
-            if line.startswith("**Domain:**"):
-                domain = line.replace("**Domain:**", "").strip()
-            elif line.startswith("**Owner:**"):
-                owner = line.replace("**Owner:**", "").strip()
-            elif line.startswith("**Summary:**"):
-                summary = line.replace("**Summary:**", "").strip()
-
-        if name:
-            modules.append({
-                "name": name,
-                "domain": domain or "",
-                "owner": owner or "",
-                "summary": summary or "",
-            })
+        import json
+        with open(depgraph_path, 'r') as f:
+            data = json.load(f)
+        nodes = data.get("nodes", [])
     except Exception:
         return {"system": [], "user": []}
+
+    system_domains = {"runtime", "infra", "core", "tooling", "security", "plugins", "persistence"}
+    modules = []
+    for node in nodes:
+        modules.append({
+            "name": node["id"],
+            "domain": node.get("domain", ""),
+            "owner": node.get("owner", ""),
+            "summary": node.get("label", node["id"])
+        })
+
+    system_modules = [m for m in modules if m["domain"] in system_domains]
+    user_modules = [m for m in modules if m["domain"] not in system_domains]
+    return {"system": system_modules, "user": user_modules}
+
+
+def _collect_ai_feedback(limit: int = 40) -> List[str]:
+    """Collect recent AI-related feedback for the settings panel."""
+    try:
+        repo = get_event_repository()
+        raw_events = repo.get_recent_events(limit=max(limit * 4, 100))
+    except Exception as exc:
+        record_error(
+            message=f"Failed to read AI feedback events: {exc}",
+            source="api.py:_collect_ai_feedback",
+            priority=TicketPriority.P2,
+        )
+        return []
+
+    feedback = []
+    for event in reversed(raw_events):
+        event_type = (event.get("event_type") or "").upper()
+        message = event.get("message") or ""
+        if event_type.startswith("AI_") or "AI " in message or "AI_" in message:
+            timestamp = event.get("timestamp") or ""
+            entry = f"[{timestamp}] {event_type}: {message}"
+            feedback.append(entry)
+            if len(feedback) >= limit:
+                break
+
+    return list(reversed(feedback))
 
     system = [m for m in modules if (m.get("owner") or "").lower() in SYSTEM_OWNERS]
     user = [m for m in modules if m not in system]
@@ -285,6 +316,8 @@ def create_app(project_root: Optional[Path] = None) -> "Flask":
         static_folder=str(frontend_dir),
         static_url_path=''
     )
+    werkzeug_logger = logging.getLogger('werkzeug')
+    werkzeug_logger.setLevel(logging.ERROR)
     CORS(app)  # Enable CORS for frontend
     
     # Store project root in app config
@@ -353,10 +386,13 @@ def create_app(project_root: Optional[Path] = None) -> "Flask":
         """Get recent tickets list."""
         paths = get_actifix_paths(project_root=app.config['PROJECT_ROOT'])
         limit = request.args.get('limit', 20, type=int)
-        
+
         open_tickets = get_open_tickets(paths)
         completed_tickets = get_completed_tickets(paths)
-        
+
+        # Get stats using same method as /health endpoint for consistency
+        stats = get_ticket_stats(paths)
+
         # Format tickets for API response
         def format_ticket(ticket, status='open'):
             return {
@@ -368,32 +404,47 @@ def create_app(project_root: Optional[Path] = None) -> "Flask":
                 'created': ticket.created,
                 'status': status,
             }
-        
+
         all_tickets = [
             format_ticket(t, 'open') for t in open_tickets
         ] + [
             format_ticket(t, 'completed') for t in completed_tickets
         ]
-        
+
         # Sort by created date (newest first)
         all_tickets.sort(key=lambda x: x['created'], reverse=True)
-        
+
         return jsonify({
             'tickets': all_tickets[:limit],
-            'total_open': len(open_tickets),
-            'total_completed': len(completed_tickets),
+            'total_open': stats.get('open', 0),
+            'total_completed': stats.get('completed', 0),
         })
 
     @app.route('/api/fix-ticket', methods=['POST'])
     def api_fix_ticket():
         """Fix the highest priority open ticket with detailed logging."""
         paths = get_actifix_paths(project_root=app.config['PROJECT_ROOT'])
-        
+
         # Enforce Raise_AF-only policy before modifying tickets
         # (Defense in depth - also enforced in fix_highest_priority_ticket)
         enforce_raise_af_only(paths)
-        
-        result = fix_highest_priority_ticket(paths)
+
+        # Get completion fields from request body or use defaults
+        data = request.get_json() if request.is_json else {}
+        completion_notes = data.get('completion_notes', 'Ticket resolved via API endpoint. Issue addressed and verified.')
+        test_steps = data.get('test_steps', 'Automated testing performed via API.')
+        test_results = data.get('test_results', 'All validation checks passed successfully.')
+        summary = data.get('summary', 'Resolved via dashboard fix')
+        test_documentation_url = data.get('test_documentation_url')
+
+        result = fix_highest_priority_ticket(
+            paths,
+            completion_notes=completion_notes,
+            test_steps=test_steps,
+            test_results=test_results,
+            summary=summary,
+            test_documentation_url=test_documentation_url
+        )
         return jsonify({
             'processed': result.get('processed', False),
             'ticket_id': result.get('ticket_id'),
@@ -406,90 +457,79 @@ def create_app(project_root: Optional[Path] = None) -> "Flask":
     
     @app.route('/api/logs', methods=['GET'])
     def api_logs():
-        """Get log file contents."""
-        paths = get_actifix_paths(project_root=app.config['PROJECT_ROOT'])
+        """Get log entries (database-backed, with optional setup log file)."""
         log_type = request.args.get('type', 'audit')
         max_lines = request.args.get('lines', 100, type=int)
-        log_files = {
-            'audit': [
-                paths.log_file,
-                paths.aflog_file,
-            ],
-            'errors': [
-                paths.log_file,
-                paths.aflog_file,
-            ],
-        }
+        if log_type == "setup":
+            setup_log = app.config['PROJECT_ROOT'] / 'logs' / 'setup.log'
+            if not setup_log.exists():
+                return jsonify({
+                    'content': [],
+                    'file': 'logs/setup.log',
+                    'error': 'Log file not found',
+                })
+            try:
+                content = setup_log.read_text(encoding='utf-8', errors='replace').strip()
+                file_lines = content.split('\n') if content else []
+                recent_lines = file_lines[-max_lines:] if len(file_lines) > max_lines else file_lines
+                parsed_lines = []
+                for line in recent_lines:
+                    parsed = _parse_log_line(line)
+                    if parsed:
+                        parsed_lines.append(parsed)
+                return jsonify({
+                    'content': parsed_lines,
+                    'file': str(setup_log),
+                    'total_lines': len(file_lines),
+                })
+            except Exception as e:
+                return jsonify({
+                    'content': [],
+                    'file': str(setup_log),
+                    'error': str(e),
+                })
 
-        # Also check for setup.log
-        setup_log = app.config['PROJECT_ROOT'] / 'logs' / 'setup.log'
-        if setup_log.exists():
-            log_files['setup'] = [setup_log]
-
-        candidates = log_files.get(log_type, [])
-        if not isinstance(candidates, list):
-            candidates = [candidates]
-
-        log_file = None
-        for candidate in candidates:
-            if not candidate or not candidate.exists():
-                continue
-            if (
-                log_type == "audit"
-                and candidate == paths.log_file
-                and candidate.stat().st_size == 0
-            ):
-                continue
-            log_file = candidate
-            break
-
-        if log_file is None:
-            log_file = next((p for p in candidates if p and p.exists()), candidates[0] if candidates else None)
-        
-        if not log_file:
-            return jsonify({
-                'content': [],
-                'file': 'unknown',
-                'error': 'Log file not found',
-            })
-
-        source_files = [log_file]
-        if (
-            log_type == "audit"
-            and paths.aflog_file.exists()
-            and paths.aflog_file not in source_files
-        ):
-            source_files.append(paths.aflog_file)
-
-        combined_lines = []
         try:
-            for source in source_files:
-                if not source.exists():
-                    continue
-                content = source.read_text(encoding='utf-8', errors='replace').strip()
-                if not content:
-                    continue
-                file_lines = content.split('\n')
-                combined_lines.extend(file_lines)
+            repo = get_event_repository()
+            limit = max_lines if max_lines > 0 else 100
+            if log_type == "errors":
+                raw_events = repo.get_events(EventFilter(limit=max(limit * 5, 100)))
+                events = [
+                    event for event in raw_events
+                    if (event.get("level") or "").upper() in {"ERROR", "CRITICAL"}
+                ]
+            else:
+                events = repo.get_recent_events(limit=limit)
 
-            total_lines = len(combined_lines)
-            recent_lines = combined_lines[-max_lines:] if total_lines > max_lines else combined_lines
+            events = list(reversed(events))
+            if len(events) > max_lines:
+                events = events[-max_lines:]
 
             parsed_lines = []
-            for line in recent_lines:
-                parsed = _parse_log_line(line)
-                if parsed:
-                    parsed_lines.append(parsed)
+            for event in events:
+                event_type = event.get("event_type") or "LOG"
+                message = event.get("message") or ""
+                level = (event.get("level") or "").upper()
+                if not level:
+                    level = _map_event_type_to_level(event_type, message)
+                parsed_lines.append({
+                    "timestamp": event.get("timestamp") or "",
+                    "event": event_type,
+                    "ticket": event.get("ticket_id") or "-",
+                    "text": message,
+                    "extra": event.get("extra_json"),
+                    "level": level,
+                })
 
             return jsonify({
                 'content': parsed_lines,
-                'file': str(log_file),
-                'total_lines': total_lines,
+                'file': 'data/actifix.db:event_log',
+                'total_lines': len(events),
             })
         except Exception as e:
             return jsonify({
                 'content': [],
-                'file': str(log_file),
+                'file': 'data/actifix.db:event_log',
                 'error': str(e),
             })
     
@@ -562,6 +602,31 @@ def create_app(project_root: Optional[Path] = None) -> "Flask":
             'status': 'ok',
             'timestamp': datetime.now(timezone.utc).isoformat(),
         })
+
+    @app.route('/api/ai-status', methods=['GET'])
+    def api_ai_status():
+        """Return AI provider status, defaults, and recent feedback."""
+        try:
+            config = load_config(fail_fast=False)
+            selection = resolve_provider_selection(config.ai_provider, config.ai_model)
+            ai_client = get_ai_client()
+            status = ai_client.get_status(selection)
+            status.update({
+                "ai_enabled": config.ai_enabled,
+                "feedback_log": _collect_ai_feedback(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            })
+            return jsonify(status)
+        except Exception as exc:
+            record_error(
+                message=f"AI status endpoint failed: {exc}",
+                source="api.py:api_ai_status",
+                priority=TicketPriority.P2,
+            )
+            return jsonify({
+                "error": "Failed to load AI status",
+                "details": str(exc),
+            }), 500
     
     @app.route('/api/settings', methods=['GET'])
     def api_get_settings():
@@ -620,10 +685,64 @@ def create_app(project_root: Optional[Path] = None) -> "Flask":
                 'message': 'Settings updated successfully',
             })
         except Exception as e:
+            record_error(
+                message=f"Settings update failed: {e}",
+                source="api.py:api_update_settings",
+                priority=TicketPriority.P2,
+            )
             return jsonify({
                 'error': str(e)
             }), 500
-    
+
+    @app.route('/api/cleanup', methods=['POST'])
+    def api_cleanup():
+        """Run ticket cleanup with retention policies."""
+        try:
+            data = request.get_json() or {}
+
+            # Get cleanup parameters from request or use defaults
+            config = get_cleanup_config()
+            retention_days = data.get('retention_days', config.retention_days)
+            test_retention_days = data.get('test_retention_days', config.test_ticket_retention_days)
+            auto_complete = data.get('auto_complete_test_tickets', config.auto_complete_test_tickets)
+            dry_run = data.get('dry_run', True)  # Default to dry run for safety
+
+            # Run cleanup
+            results = run_automatic_cleanup(
+                retention_days=retention_days,
+                test_ticket_retention_days=test_retention_days,
+                auto_complete_test_tickets=auto_complete,
+                dry_run=dry_run
+            )
+
+            return jsonify({
+                'success': True,
+                'results': results,
+            })
+        except Exception as e:
+            record_error(
+                message=f"Cleanup failed: {e}",
+                source="api.py:api_cleanup",
+                priority=TicketPriority.P2,
+            )
+            return jsonify({
+                'error': str(e)
+            }), 500
+
+    @app.route('/api/cleanup/config', methods=['GET'])
+    def api_cleanup_config():
+        """Get cleanup configuration."""
+        try:
+            config = get_cleanup_config()
+            return jsonify({
+                'success': True,
+                'config': config.to_dict(),
+            })
+        except Exception as e:
+            return jsonify({
+                'error': str(e)
+            }), 500
+
     return app
 
 

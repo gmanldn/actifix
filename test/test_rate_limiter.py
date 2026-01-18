@@ -29,6 +29,8 @@ from actifix.security.rate_limiter import (
     reset_rate_limiter,
 )
 
+pytestmark = [pytest.mark.db, pytest.mark.integration]
+
 
 class TestRateLimiterConfiguration:
     """Test rate limiter configuration."""

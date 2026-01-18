@@ -88,8 +88,13 @@ class TestCmdInit:
         
         assert result == 0
         actifix_dir = tmp_path / "actifix"
-        assert (actifix_dir / "ACTIFIX.md").exists()
-        assert (actifix_dir / "AFLog.txt").exists()
+        logs_dir = tmp_path / "logs"
+        state_dir = tmp_path / ".actifix"
+        assert actifix_dir.exists()
+        assert logs_dir.exists()
+        assert (logs_dir / "actifix.log").exists()
+        assert (state_dir / "actifix_fallback_queue.json").exists()
+        assert (state_dir / "RAISE_AF_ONLY").exists()
 
 
 class TestCmdHealth:
@@ -130,7 +135,7 @@ class TestCmdRecord:
                 project_root=str(tmp_path),
                 error_type="TestError",
                 message="Test message",
-                source="test.py:10",
+                source="test/test_runner.py:10",
                 priority="P2",
             )
             
@@ -149,7 +154,7 @@ class TestCmdRecord:
                 project_root=str(tmp_path),
                 error_type="TestError",
                 message="Test message",
-                source="test.py:10",
+                source="test/test_runner.py:10",
                 priority="P2",
             )
             
@@ -170,7 +175,7 @@ class TestCmdRecord:
                     project_root=str(tmp_path),
                     error_type="TestError",
                     message="Test",
-                    source="test.py:1",
+                    source="test/test_runner.py:1",
                     priority=priority,
                 )
                 

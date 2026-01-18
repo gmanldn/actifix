@@ -64,8 +64,8 @@ def prompt_for_completion_notes() -> str | None:
     print("\n" + "-" * 70)
     print("COMPLETION NOTES (What work was done to fix this ticket?)")
     print(f"Requirements: Must describe implementation (min 20 characters)")
-    print(f"Example: 'Fixed null pointer exception in database query by adding')
-    print(f"         'null checks at lines 42-45. Added defensive validation.'")
+    print("Example: 'Fixed null pointer exception in database query by adding")
+    print("         'null checks at lines 42-45. Added defensive validation.'")
     print("-" * 70)
 
     while True:
@@ -86,8 +86,8 @@ def prompt_for_test_steps() -> str | None:
     print("\n" + "-" * 70)
     print("TEST STEPS (How was this ticket tested?)")
     print(f"Requirements: Must describe testing method (min 10 characters)")
-    print(f"Example: 'Ran pytest test_null_checks.py. Verified with gdb')
-    print(f"         'debugger. Added 15 new test cases.'")
+    print("Example: 'Ran pytest test_null_checks.py. Verified with gdb")
+    print("         'debugger. Added 15 new test cases.'")
     print("-" * 70)
 
     while True:
@@ -108,8 +108,8 @@ def prompt_for_test_results() -> str | None:
     print("\n" + "-" * 70)
     print("TEST RESULTS (What were the outcomes? What passed?)")
     print(f"Requirements: Must provide evidence of testing (min 10 characters)")
-    print(f"Example: 'All 47 tests passed. Coverage increased to 98%.')
-    print(f"         'No null pointer exceptions. Regression tests green.'")
+    print("Example: 'All 47 tests passed. Coverage increased to 98%.")
+    print("         'No null pointer exceptions. Regression tests green.'")
     print("-" * 70)
 
     while True:

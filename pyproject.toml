@@ -4,10 +4,25 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "actifix"
-version = "3.0.0"
+version = "4.0.41"
 
 [project.optional-dependencies]
 web = ["flask", "flask-cors"]
 
 [project.entry-points."actifix.plugins"]
 core = "actifix.plugins.builtin:CorePlugin"
+
+[tool.coverage.run]
+source = ["src/actifix"]
+omit = [
+    "*/tests/*",
+    "*/test_*",
+    "*/conftest.py",
+    "*/__main__.py",
+]
+
+[tool.coverage.report]
+fail_under = 95
+show_missing = true
+skip_covered = false
+precision = 2

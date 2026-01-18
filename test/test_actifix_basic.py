@@ -83,9 +83,8 @@ class TestActifixBasic:
         assert entry.message == "Test error for actifix development"
         assert entry.priority == actifix.TicketPriority.P2  # Default priority
         
-        # Check files and database were created
+        # Check database was created
         db_path = temp_actifix_dir.parent / "data" / "actifix.db"
-        assert (temp_actifix_dir / "ACTIFIX.md").exists()
         assert db_path.exists(), "Database file should exist for ticket storage"
 
         # Check database content
@@ -95,8 +94,11 @@ class TestActifixBasic:
         assert stored is not None
         assert stored["message"] == "Test error for actifix development"
         
-        rollup_content = (temp_actifix_dir / "ACTIFIX.md").read_text()
-        assert entry.entry_id in rollup_content
+        import sqlite3
+        with sqlite3.connect(db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute("SELECT id FROM v_recent_tickets").fetchall()
+        assert any(row["id"] == entry.entry_id for row in rows)
     
     def test_duplicate_prevention(self, temp_actifix_dir, monkeypatch):
         """Test that duplicate errors are prevented."""
@@ -182,34 +184,41 @@ class TestActifixBasic:
         # Try to record error
         entry = actifix.record_error(
             message="This should not be recorded",
-            source="test.py",
+            source="test/test_runner.py",
             run_label="test",
             error_type="TestError"
         )
         
         assert entry is None  # Should not be recorded
         
-        # Files should not be created
-        assert not (temp_actifix_dir / "ACTIFIX.md").exists()
+        # Database should not contain tickets
+        db_path = temp_actifix_dir.parent / "data" / "actifix.db"
+        if db_path.exists():
+            import sqlite3
+            with sqlite3.connect(db_path) as conn:
+                cursor = conn.execute("SELECT COUNT(*) FROM tickets")
+                assert cursor.fetchone()[0] == 0
     
     def test_ensure_scaffold_creates_all_files(self, temp_actifix_dir):
         """Test that scaffold creates all required files."""
         actifix.ensure_scaffold(temp_actifix_dir)
         
-        required_files = [
-            "ACTIFIX.md",
-            "ACTIFIX-LOG.md",
-            "AFLog.txt"
-        ]
-        
-        for filename in required_files:
-            assert (temp_actifix_dir / filename).exists(), f"Missing: {filename}"
+        state_dir = temp_actifix_dir.parent / ".actifix"
+        logs_dir = temp_actifix_dir.parent / "logs"
+        assert (state_dir / "RAISE_AF_ONLY").exists()
+        assert (state_dir / "actifix_fallback_queue.json").exists()
+        assert (logs_dir / "actifix.log").exists()
     
     def test_fallback_queue_when_db_unavailable(self, temp_actifix_dir, monkeypatch):
         """Test fallback queue when database writes fail."""
         from actifix.raise_af import record_error
         from actifix.persistence import ticket_repo
-        
+        from actifix import raise_af
+
+        # Reset global repository and clear path cache to ensure clean state
+        ticket_repo.reset_ticket_repository()
+        raise_af._PATH_CACHE.clear()
+
         state_dir = temp_actifix_dir / ".actifix_state"
         monkeypatch.setenv("ACTIFIX_STATE_DIR", str(state_dir))
 
@@ -241,13 +250,16 @@ class TestActifixSelfDevelopment:
     def test_track_development_progress(self, temp_actifix_dir, monkeypatch):
         """Test tracking development milestones."""
         actifix.enable_actifix_capture()
-        
+
+        # Enable milestone tracking as tickets (required by design)
+        monkeypatch.setenv("ACTIFIX_TRACK_MILESTONES_AS_TICKETS", "1")
+
         # Track a development milestone
         actifix.track_development_progress(
             "Core error capture implemented",
             "RaiseAF.py completed with full context capture"
         )
-        
+
         # Check that milestone was recorded
         from actifix.persistence.ticket_repo import get_ticket_repository
         repo = get_ticket_repository()

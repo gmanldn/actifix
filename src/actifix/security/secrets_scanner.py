@@ -163,6 +163,12 @@ class SecretsScanner:
         '.idea', '.vscode', '.env', '.bundle', '.cargo', '.cocoapods',
     }
 
+    # Files to skip (e.g., intentional test fixtures containing sample secrets)
+    SKIP_FILES = {
+        'test/test_secrets_scanner.py',
+        'test/test_actifix_basic.py',
+    }
+
     # Common false positives to skip
     FALSE_POSITIVE_PATTERNS = {
         # Documentation and comments
@@ -213,6 +219,10 @@ class SecretsScanner:
             if skip_dir in path.parts:
                 return True
 
+        # Skip known test fixtures that intentionally include sample secrets
+        if file_path in self.SKIP_FILES:
+            return True
+
         # Only scan known scannable extensions
         if path.suffix and path.suffix not in self.SCANNABLE_EXTENSIONS:
             # But always scan files without extensions if they're executable
@@ -234,6 +244,10 @@ class SecretsScanner:
 
         # Check if it's in a string literal with obvious test/sample markers
         if any(marker in line for marker in ['SAMPLE', 'EXAMPLE', 'TEST', 'MOCK', 'DUMMY']):
+            return True
+
+        # Skip our own pattern definitions (e.g., private key markers)
+        if "pattern': r'-----BEGIN" in line or '"pattern": r"-----BEGIN' in line:
             return True
 
         return False

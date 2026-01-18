@@ -5,8 +5,8 @@
 State paths management for Actifix.
 
 Provides a single, deterministic source of truth for all Actifix file and
-directory locations. Ensures rollups, audit logs, and test logs are created
-alongside database-backed ticket storage.
+directory locations. Ensures state directories exist for database-backed
+ticket storage and diagnostics.
 
 Version: 2.1.0 (Generic)
 """
@@ -45,19 +45,18 @@ class ActifixPaths:
     
     quarantine_dir: Path
     test_logs_dir: Path
-    aflog_file: Path
-    rollup_file: Path
     log_file: Path
-    history_file: Path
+
+    @property
+    def data_dir(self) -> Path:
+        """Alias for the Actifix data directory (base_dir)."""
+        return self.base_dir
     
     @property
     def all_artifacts(self) -> List[Path]:
         """Return all core artifacts that must exist for health checks."""
         sentinel = self.state_dir / RAISE_AF_SENTINEL_FILENAME
         return [
-            self.rollup_file,
-            self.history_file,
-            self.aflog_file,
             self.log_file,
             self.fallback_queue_file,
             sentinel,
@@ -107,10 +106,7 @@ def _build_paths(
         fallback_queue_file=resolved_state / "actifix_fallback_queue.json",
         quarantine_dir=resolved_state / "quarantine",
         test_logs_dir=resolved_state / "test_logs",
-        aflog_file=resolved_logs / "AFLog.txt",
-        rollup_file=resolved_base / "ACTIFIX.md",
         log_file=resolved_logs / "actifix.log",
-        history_file=resolved_base / "ACTIFIX-LOG.md",
     )
 
 
@@ -136,18 +132,11 @@ def init_actifix_files(paths: Optional[ActifixPaths] = None) -> ActifixPaths:
     ensure_actifix_dirs(paths)
 
     for artifact in (
-        paths.rollup_file,
-        paths.history_file,
         paths.log_file,
-        paths.aflog_file,
         paths.fallback_queue_file,
     ):
         artifact.parent.mkdir(parents=True, exist_ok=True)
         artifact.touch(exist_ok=True)
-
-    base_aflog = paths.base_dir / "AFLog.txt"
-    base_aflog.parent.mkdir(parents=True, exist_ok=True)
-    base_aflog.touch(exist_ok=True)
 
     # Write sentinel to enforce Raise_AF-only change policy
     sentinel = paths.state_dir / RAISE_AF_SENTINEL_FILENAME

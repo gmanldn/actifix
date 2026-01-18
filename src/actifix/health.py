@@ -274,8 +274,8 @@ def run_health_check(
         ActifixHealthCheck result.
     """
     health = get_health(paths)
-    
+
     if print_report:
         print(format_health_report(health))
-    
+
     return health

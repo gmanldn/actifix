@@ -29,6 +29,8 @@ from actifix.persistence.ticket_repo import (
 from actifix.persistence.database import get_database_pool, reset_database_pool
 from actifix.raise_af import ActifixEntry, TicketPriority
 
+pytestmark = [pytest.mark.db, pytest.mark.integration]
+
 
 @pytest.fixture
 def clean_db(tmp_path, monkeypatch):
@@ -50,7 +52,7 @@ class TestMessageFieldLimits:
 
         entry = ActifixEntry(
             message="This is a normal error message",
-            source="test.py",
+            source="test/test_runner.py",
             run_label="test",
             entry_id="ACT-TEST-001",
             created_at=datetime.now(timezone.utc),
@@ -69,7 +71,7 @@ class TestMessageFieldLimits:
 
         entry = ActifixEntry(
             message="x" * (MAX_MESSAGE_LENGTH + 1),
-            source="test.py",
+            source="test/test_runner.py",
             run_label="test",
             entry_id="ACT-TEST-002",
             created_at=datetime.now(timezone.utc),
@@ -88,7 +90,7 @@ class TestMessageFieldLimits:
 
         entry = ActifixEntry(
             message="x" * MAX_MESSAGE_LENGTH,
-            source="test.py",
+            source="test/test_runner.py",
             run_label="test",
             entry_id="ACT-TEST-003",
             created_at=datetime.now(timezone.utc),
@@ -108,7 +110,7 @@ class TestMessageFieldLimits:
         # Create initial ticket
         entry = ActifixEntry(
             message="Initial message",
-            source="test.py",
+            source="test/test_runner.py",
             run_label="test",
             entry_id="ACT-TEST-004",
             created_at=datetime.now(timezone.utc),
@@ -194,7 +196,7 @@ class TestErrorTypeFieldLimits:
 
         entry = ActifixEntry(
             message="Error message",
-            source="test.py",
+            source="test/test_runner.py",
             run_label="test",
             entry_id="ACT-TEST-008",
             created_at=datetime.now(timezone.utc),
@@ -213,7 +215,7 @@ class TestErrorTypeFieldLimits:
 
         entry = ActifixEntry(
             message="Error message",
-            source="test.py",
+            source="test/test_runner.py",
             run_label="test",
             entry_id="ACT-TEST-009",
             created_at=datetime.now(timezone.utc),
@@ -234,11 +236,11 @@ class TestStackTraceFieldLimits:
         """Verify tickets with normal stack trace are accepted."""
         repo = get_ticket_repository()
 
-        stack_trace = "\n".join([f"  File 'test.py', line {i}" for i in range(100)])
+        stack_trace = "\n".join([f"  File 'test/test_runner.py', line {i}" for i in range(100)])
 
         entry = ActifixEntry(
             message="Error message",
-            source="test.py",
+            source="test/test_runner.py",
             run_label="test",
             entry_id="ACT-TEST-010",
             created_at=datetime.now(timezone.utc),
@@ -257,7 +259,7 @@ class TestStackTraceFieldLimits:
 
         entry = ActifixEntry(
             message="Error message",
-            source="test.py",
+            source="test/test_runner.py",
             run_label="test",
             entry_id="ACT-TEST-011",
             created_at=datetime.now(timezone.utc),
@@ -276,7 +278,7 @@ class TestStackTraceFieldLimits:
 
         entry = ActifixEntry(
             message="Error message",
-            source="test.py",
+            source="test/test_runner.py",
             run_label="test",
             entry_id="ACT-TEST-012",
             created_at=datetime.now(timezone.utc),
@@ -300,7 +302,7 @@ class TestUpdateFieldLimits:
         # Create initial ticket
         entry = ActifixEntry(
             message="Error message",
-            source="test.py",
+            source="test/test_runner.py",
             run_label="test",
             entry_id="ACT-TEST-013",
             created_at=datetime.now(timezone.utc),
@@ -322,7 +324,7 @@ class TestUpdateFieldLimits:
         # Create initial ticket
         entry = ActifixEntry(
             message="Error message",
-            source="test.py",
+            source="test/test_runner.py",
             run_label="test",
             entry_id="ACT-TEST-014",
             created_at=datetime.now(timezone.utc),
@@ -347,7 +349,7 @@ class TestUpdateFieldLimits:
         # Create initial ticket
         entry = ActifixEntry(
             message="Error message",
-            source="test.py",
+            source="test/test_runner.py",
             run_label="test",
             entry_id="ACT-TEST-015",
             created_at=datetime.now(timezone.utc),

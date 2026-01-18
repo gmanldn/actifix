@@ -28,6 +28,8 @@ from actifix.recovery import (
     reset_recovery_manager,
 )
 
+pytestmark = [pytest.mark.integration]
+
 
 class TestCrashRecoveryState:
     """Test crash recovery state enum."""

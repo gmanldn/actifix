@@ -36,20 +36,30 @@ def temp_project(tmp_path):
 
 
 @pytest.fixture
-def test_client(temp_project):
-    """Create a Flask test client."""
+def test_client(temp_project, flask_app_session):
+    """Create a Flask test client using session-scoped app."""
     if not FLASK_AVAILABLE:
         pytest.skip("Flask not available")
     
-    from actifix.api import create_app
-    app = create_app(temp_project)
-    app.config['TESTING'] = True
-    with app.test_client() as client:
+    # Use the session-scoped Flask app
+    with flask_app_session.test_client() as client:
         yield client
 
 
+@pytest.mark.api
+@pytest.mark.no_db_isolation
 @pytest.mark.skipif(not FLASK_AVAILABLE, reason="Flask not available")
 class TestAPIEndpoints:
+    """Test API endpoints."""
+
+    @pytest.fixture(autouse=True)
+    def disable_db_isolation(self, monkeypatch):
+        """
+        Disable per-test database isolation for endpoint tests.
+        These tests use a shared session-scoped app to minimize overhead.
+        """
+        # Do nothing - override the autouse isolate_actifix_db from conftest
+        pass
     """Test API endpoints."""
     
     def test_ping_endpoint(self, test_client):
@@ -157,6 +167,7 @@ class TestAPIEndpoints:
         assert 'start_time' in server
 
 
+@pytest.mark.api
 @pytest.mark.skipif(not FLASK_AVAILABLE, reason="Flask not available")
 class TestAPIWithData:
     """Test API with actual ticket data."""
@@ -220,6 +231,7 @@ class TestAPIWithData:
             assert 'error_type' in ticket
 
 
+@pytest.mark.api
 @pytest.mark.skipif(not FLASK_AVAILABLE, reason="Flask not available")
 class TestAPIAppCreation:
     """Test API app creation and configuration."""
@@ -267,15 +279,11 @@ class TestLogParsing:
         if not FLASK_AVAILABLE:
             pytest.skip("Flask not available")
         
-        # Write test log content
-        paths = get_actifix_paths(project_root=temp_project)
-        paths.log_file.write_text("""INFO: Normal log line
-ERROR: Something went wrong
-WARNING: Be careful
-✓ Success operation
-✗ Failed operation
-⚠ Warning indicator
-""")
+        from actifix.log_utils import log_event
+        log_event("LOG", "Normal log line", level="INFO")
+        log_event("LOG", "Something went wrong", level="ERROR")
+        log_event("LOG", "Be careful", level="WARNING")
+        log_event("LOG", "Success operation", level="SUCCESS")
         
         from actifix.api import create_app
         app = create_app(temp_project)

@@ -102,7 +102,15 @@ class ActifixConfig:
     max_ticket_message_length: int = 5000  # Characters
     max_file_context_size_bytes: int = 1 * 1024 * 1024  # 1MB
     max_open_tickets: int = 10000
-    
+
+    # Ticket throttling
+    ticket_throttling_enabled: bool = True
+    max_p2_tickets_per_hour: int = 15
+    max_p3_tickets_per_4h: int = 5
+    max_p4_tickets_per_day: int = 2
+    emergency_ticket_threshold: int = 200
+    emergency_window_minutes: int = 1
+
     # Testing
     min_coverage_percent: float = 80.0
     test_timeout_seconds: float = 300.0
@@ -117,10 +125,11 @@ class ActifixConfig:
     stale_lock_timeout_seconds: float = 300.0
     
     # AI Integration
-    ai_provider: str = "openai"  # openai, anthropic, google, openrouter, ollama
-    ai_api_key: str = ""
-    ai_model: str = ""  # e.g., gpt-4, claude-3-sonnet, gemini-pro
-    ai_enabled: bool = False
+    ai_provider: str = "openrouter"  # OpenRouter for Mimo 2 with thinking
+    ai_api_key: str = ""  # Set your OPENROUTER_API_KEY environment variable
+    ai_model: str = "xiaomi/mimo-v2-flash"  # Mimo 2 via OpenRouter with thinking support
+    ollama_model: str = "codellama:7b"  # Default Ollama model
+    ai_enabled: bool = True  # AI dispatch enabled by default
 
 
 def _parse_bool(value: str) -> bool:
@@ -224,6 +233,24 @@ def load_config(
         max_open_tickets=_parse_int(
             _get_env_sanitized("ACTIFIX_MAX_OPEN_TICKETS", "", value_type="numeric"), 10000
         ),
+        ticket_throttling_enabled=_parse_bool(
+            _get_env_sanitized("ACTIFIX_TICKET_THROTTLING_ENABLED", "1", value_type="boolean")
+        ),
+        max_p2_tickets_per_hour=_parse_int(
+            _get_env_sanitized("ACTIFIX_MAX_P2_TICKETS_PER_HOUR", "", value_type="numeric"), 15
+        ),
+        max_p3_tickets_per_4h=_parse_int(
+            _get_env_sanitized("ACTIFIX_MAX_P3_TICKETS_PER_4H", "", value_type="numeric"), 5
+        ),
+        max_p4_tickets_per_day=_parse_int(
+            _get_env_sanitized("ACTIFIX_MAX_P4_TICKETS_PER_DAY", "", value_type="numeric"), 2
+        ),
+        emergency_ticket_threshold=_parse_int(
+            _get_env_sanitized("ACTIFIX_EMERGENCY_TICKET_THRESHOLD", "", value_type="numeric"), 200
+        ),
+        emergency_window_minutes=_parse_int(
+            _get_env_sanitized("ACTIFIX_EMERGENCY_WINDOW_MINUTES", "", value_type="numeric"), 1
+        ),
 
         min_coverage_percent=_parse_float(
             _get_env_sanitized("ACTIFIX_MIN_COVERAGE", "", value_type="numeric"), 80.0
@@ -249,9 +276,10 @@ def load_config(
             _get_env_sanitized("ACTIFIX_STALE_LOCK_TIMEOUT", "", value_type="numeric"), 300.0
         ),
 
-        ai_provider=_get_env_sanitized("ACTIFIX_AI_PROVIDER", "openai", value_type="alphanumeric"),
+        ai_provider=_get_env_sanitized("ACTIFIX_AI_PROVIDER", "mimo-flash-v2-free", value_type="alphanumeric"),
         ai_api_key=_get_env_sanitized("ACTIFIX_AI_API_KEY", "", value_type="string"),
-        ai_model=_get_env_sanitized("ACTIFIX_AI_MODEL", "", value_type="alphanumeric"),
+        ai_model=_get_env_sanitized("ACTIFIX_AI_MODEL", "mimo-flash-v2-free", value_type="alphanumeric"),
+        ollama_model=_get_env_sanitized("ACTIFIX_OLLAMA_MODEL", "codellama:7b", value_type="alphanumeric"),
         ai_enabled=_parse_bool(_get_env_sanitized("ACTIFIX_AI_ENABLED", "0", value_type="boolean")),
     )
     
@@ -317,7 +345,17 @@ def validate_config(config: ActifixConfig) -> list[str]:
         errors.append("Max file context size must be <= 100MB")
     if config.max_open_tickets <= 0:
         errors.append("Max open tickets must be positive")
-    
+    if config.max_p2_tickets_per_hour <= 0:
+        errors.append("Max P2 tickets per hour must be positive")
+    if config.max_p3_tickets_per_4h <= 0:
+        errors.append("Max P3 tickets per 4 hours must be positive")
+    if config.max_p4_tickets_per_day <= 0:
+        errors.append("Max P4 tickets per day must be positive")
+    if config.emergency_ticket_threshold <= 0:
+        errors.append("Emergency ticket threshold must be positive")
+    if config.emergency_window_minutes <= 0:
+        errors.append("Emergency window minutes must be positive")
+
     # Check timeouts are positive
     if config.test_timeout_seconds <= 0:
         errors.append("Test timeout must be positive")

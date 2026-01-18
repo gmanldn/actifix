@@ -21,11 +21,28 @@ from actifix.raise_af import TicketPriority, record_error
 os.environ.setdefault("ACTIFIX_CHANGE_ORIGIN", "raise_af")
 os.environ.setdefault("ACTIFIX_CAPTURE_ENABLED", "1")
 
+WEAKNESS_TICKET_LEVEL = os.getenv("ACTIFIX_WEAKNESS_TICKET_LEVEL", "critical").lower()
+WEAKNESS_TICKET_LIMIT = int(os.getenv("ACTIFIX_WEAKNESS_TICKET_LIMIT", "30"))
+LEVEL_PRIORITY_MAP = {
+    "critical": {TicketPriority.P0},
+    "standard": {TicketPriority.P0, TicketPriority.P1},
+    "full": {TicketPriority.P0, TicketPriority.P1, TicketPriority.P2, TicketPriority.P3},
+    "none": set(),
+}
+ALLOWED_PRIORITIES = LEVEL_PRIORITY_MAP.get(WEAKNESS_TICKET_LEVEL, LEVEL_PRIORITY_MAP["critical"])
+
 
 def generate_weakness_tickets():
     """Generate 300 tickets addressing specific code weaknesses."""
 
+    if not ALLOWED_PRIORITIES:
+        print(
+            "Weakness ticket generation disabled (ACTIFIX_WEAKNESS_TICKET_LEVEL=none)."
+        )
+        return
+
     tasks = []
+
 
     # ============================================================================
     # CATEGORY 1: DATABASE & PERSISTENCE CRITICAL FIXES (35 tickets)

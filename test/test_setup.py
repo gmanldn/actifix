@@ -33,3 +33,19 @@ def test_no_setup_scripts_present():
             pass
 
         pytest.fail(f"Legacy setup scripts detected: {present}")
+
+
+def test_bootstrap_creates_ticket_db(tmp_path, monkeypatch):
+    """Bootstrap should initialize the ticket database for new users."""
+    db_path = tmp_path / "data" / "actifix.db"
+    monkeypatch.setenv("ACTIFIX_DB_PATH", str(db_path))
+    monkeypatch.setenv("ACTIFIX_CHANGE_ORIGIN", "raise_af")
+
+    from actifix.bootstrap import bootstrap
+    from actifix.persistence.database import reset_database_pool
+
+    try:
+        bootstrap(project_root=tmp_path)
+        assert db_path.exists()
+    finally:
+        reset_database_pool()

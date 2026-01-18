@@ -52,11 +52,30 @@ def discover_plugins(group: str = PLUGIN_ENTRY_POINT_GROUP) -> List[metadata.Ent
     return list(_select_entrypoints(group))
 
 
-def load_plugins(registry: PluginRegistry, app: Any = None, *, group: str = PLUGIN_ENTRY_POINT_GROUP) -> PluginLoadResult:
-    """Discover and register plugins using entry points."""
+def load_plugins(
+    registry: PluginRegistry,
+    app: Any = None,
+    *,
+    group: str = PLUGIN_ENTRY_POINT_GROUP,
+    user_context: str = "system"
+) -> PluginLoadResult:
+    """
+    Discover and register plugins using entry points.
+
+    Args:
+        registry: Plugin registry to register plugins with.
+        app: Optional application instance to pass to plugins.
+        group: Entry point group to discover plugins from.
+        user_context: User or system context initiating plugin load (for audit logging).
+
+    Returns:
+        PluginLoadResult with loaded plugin names and any errors.
+    """
     loaded: List[str] = []
     errors: List[str] = []
     entry_points = discover_plugins(group)
+
+    logger.info("Plugin load initiated by user_context='%s'", user_context)
 
     for entry in entry_points:
         sandbox = PluginSandbox(entry.name)
@@ -65,14 +84,16 @@ def load_plugins(registry: PluginRegistry, app: Any = None, *, group: str = PLUG
             validate_plugin(plugin)
             sandbox.safe_register(plugin, app, registry)
             loaded.append(entry.name)
+            logger.info("Plugin '%s' loaded successfully (user_context='%s')", entry.name, user_context)
         except Exception as exc:
             message = f"Failed to load plugin '{entry.name}': {exc}"
             errors.append(message)
             sandbox.record_error(message, exc)
+            logger.error("Plugin '%s' failed to load (user_context='%s'): %s", entry.name, user_context, exc)
 
     if errors:
-        logger.warning("Plugin load completed with failures: %s", errors)
+        logger.warning("Plugin load completed with failures (user_context='%s'): %s", user_context, errors)
     else:
-        logger.info("Plugin load completed successfully (%d plugins)", len(loaded))
+        logger.info("Plugin load completed successfully (%d plugins, user_context='%s')", len(loaded), user_context)
 
     return PluginLoadResult(loaded=loaded, errors=errors)

@@ -14,6 +14,8 @@ from actifix.raise_af import record_error, ACTIFIX_CAPTURE_ENV_VAR
 from actifix.do_af import process_next_ticket, get_ticket_stats
 from actifix.state_paths import get_actifix_paths, reset_actifix_paths
 
+pytestmark = [pytest.mark.concurrent, pytest.mark.integration]
+
 
 def test_process_next_ticket_thread_safe(tmp_path, monkeypatch):
     """Multiple threads should not dispatch the same ticket."""

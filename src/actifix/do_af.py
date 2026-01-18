@@ -23,11 +23,15 @@ import time
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Optional, Callable, Iterator
+from typing import Optional, Callable, Iterator, TYPE_CHECKING
 
 from .log_utils import atomic_write, log_event
 from .raise_af import enforce_raise_af_only
 from .state_paths import ActifixPaths, get_actifix_paths, init_actifix_files
+from .config import get_config, load_config
+
+if TYPE_CHECKING:
+    from .persistence.ticket_repo import TicketRepository
 
 
 # --- Token-Efficient State Cache ---
@@ -56,7 +60,7 @@ class StatefulTicketManager:
     Token-efficient ticket manager with a lightweight repository cache.
     """
     
-    def __init__(self, paths: Optional[ActifixPaths] = None, cache_ttl: int = 60):
+    def __init__(self, paths: Optional[ActifixPaths] = None, cache_ttl: int = 60) -> None:
         self.paths = paths or get_actifix_paths()
         self.cache = TicketCacheState(cache_ttl_seconds=cache_ttl)
         self._lock = threading.Lock()
@@ -65,7 +69,7 @@ class StatefulTicketManager:
         """Refresh cache from the ticket repository."""
         from .persistence.ticket_repo import TicketFilter
 
-        repo = _get_ticket_repository()
+        repo = _get_ticket_repository(self.paths)
         open_records = repo.get_tickets(TicketFilter(status="Open"))
         completed_records = repo.get_tickets(TicketFilter(status="Completed"))
 
@@ -171,15 +175,20 @@ def _ticket_info_from_record(record: dict) -> TicketInfo:
     )
 
 
-def _get_ticket_repository():
+def _get_ticket_repository(paths: Optional[ActifixPaths] = None) -> 'TicketRepository':
     from .persistence.ticket_repo import get_ticket_repository
-    return get_ticket_repository()
+    from .persistence.database import get_database_pool
+    if paths is None or os.environ.get("ACTIFIX_DB_PATH"):
+        return get_ticket_repository()
+    config = load_config(project_root=paths.project_root, fail_fast=False)
+    pool = get_database_pool(db_path=paths.project_root / "data" / "actifix.db")
+    return get_ticket_repository(pool=pool, config=config)
 
 
 def _select_and_lock_ticket(paths: ActifixPaths) -> Optional[tuple[dict, str]]:
     from .persistence.ticket_repo import TicketFilter
 
-    repo = _get_ticket_repository()
+    repo = _get_ticket_repository(paths)
     lock_owner = f"do_af:{os.getpid()}"
     candidates = repo.get_tickets(TicketFilter(status="Open"))
     for ticket in candidates:
@@ -204,9 +213,10 @@ def get_open_tickets(paths: Optional[ActifixPaths] = None, use_cache: bool = Tru
         manager = StatefulTicketManager(paths=paths)
         return manager.get_open_tickets()
 
+    release_lock = True
     try:
-        from .persistence.ticket_repo import get_ticket_repository, TicketFilter
-        repo = get_ticket_repository()
+        from .persistence.ticket_repo import TicketFilter
+        repo = _get_ticket_repository(paths)
         db_tickets = repo.get_tickets(TicketFilter(status="Open"))
         return [_ticket_info_from_record(ticket) for ticket in db_tickets]
     except Exception:
@@ -245,11 +255,10 @@ def mark_ticket_complete(
 
     enforce_raise_af_only(paths)
 
-    repo = _get_ticket_repository()
+    repo = _get_ticket_repository(paths)
     existing = repo.get_ticket(ticket_id)
     if not existing:
         log_event(
-            paths.aflog_file,
             "TICKET_NOT_FOUND",
             f"Cannot complete non-existent ticket: {ticket_id}",
             ticket_id=ticket_id,
@@ -258,7 +267,6 @@ def mark_ticket_complete(
 
     if existing.get("status") == "Completed" or existing.get("completed"):
         log_event(
-            paths.aflog_file,
             "TICKET_ALREADY_COMPLETED",
             f"Skipped already-completed ticket: {ticket_id}",
             ticket_id=ticket_id,
@@ -281,7 +289,6 @@ def mark_ticket_complete(
 
         if success:
             log_event(
-                paths.aflog_file,
                 "TICKET_COMPLETED",
                 f"Marked ticket complete with validation: {ticket_id}",
                 ticket_id=ticket_id,
@@ -296,7 +303,6 @@ def mark_ticket_complete(
 
     except ValueError as e:
         log_event(
-            paths.aflog_file,
             "COMPLETION_VALIDATION_FAILED",
             f"Failed to complete ticket {ticket_id}: {e}",
             ticket_id=ticket_id,
@@ -345,7 +351,7 @@ def fix_highest_priority_ticket(
     ticket_record, lock_owner = locked
     ticket = _ticket_info_from_record(ticket_record)
 
-    repo = _get_ticket_repository()
+    repo = _get_ticket_repository(paths)
 
     # Prepare ultrathink narrative for auditing
     thought_text = (
@@ -377,7 +383,6 @@ def fix_highest_priority_ticket(
 
     if not success:
         log_event(
-            paths.aflog_file,
             "DISPATCH_FAILED",
             f"Unable to close ticket {ticket.ticket_id} via dashboard fix",
             ticket_id=ticket.ticket_id,
@@ -390,7 +395,6 @@ def fix_highest_priority_ticket(
 
     closure_text = f"Ticket {ticket.ticket_id} closed after dashboard fix."
     log_event(
-        paths.aflog_file,
         "TICKET_CLOSED",
         closure_text,
         ticket_id=ticket.ticket_id,
@@ -404,7 +408,6 @@ def fix_highest_priority_ticket(
     ]
     for idx, line in enumerate(banner_lines):
         log_event(
-            paths.aflog_file,
             "ASCII_BANNER",
             line,
             ticket_id=ticket.ticket_id,
@@ -440,13 +443,17 @@ def process_next_ticket(
     """
     if paths is None:
         paths = get_actifix_paths()
-    
+
     enforce_raise_af_only(paths)
-    
+
+    if os.getenv("ACTIFIX_NONINTERACTIVE") == "1":
+        use_ai = False
+    elif os.getenv("PYTEST_CURRENT_TEST") and os.getenv("ACTIFIX_ENABLE_AI_TESTS") != "1":
+        use_ai = False
+
     locked = _select_and_lock_ticket(paths)
     if not locked:
         log_event(
-            paths.aflog_file,
             "NO_TICKETS",
             "No open tickets to process"
         )
@@ -454,10 +461,9 @@ def process_next_ticket(
 
     ticket_record, lock_owner = locked
     ticket = _ticket_info_from_record(ticket_record)
-    repo = _get_ticket_repository()
+    repo = _get_ticket_repository(paths)
 
     log_event(
-        paths.aflog_file,
         "DISPATCH_STARTED",
         f"Processing ticket: {ticket.ticket_id}",
         ticket_id=ticket.ticket_id,
@@ -467,9 +473,22 @@ def process_next_ticket(
     try:
         if use_ai and not ai_handler:
             try:
-                from .ai_client import get_ai_client
+                from .ai_client import get_ai_client, resolve_provider_selection
 
                 ai_client = get_ai_client()
+                config = get_config()
+                selection = resolve_provider_selection(config.ai_provider, config.ai_model)
+
+                log_event(
+                    "AI_PROVIDER_SELECTED",
+                    f"AI preference: {selection.label}",
+                    ticket_id=ticket.ticket_id,
+                    extra={
+                        "preferred_provider": selection.label,
+                        "preferred_model": selection.model,
+                        "strict_preferred": selection.strict_preferred,
+                    },
+                )
 
                 ticket_dict = {
                     'id': ticket.ticket_id,
@@ -482,20 +501,24 @@ def process_next_ticket(
                 }
 
                 log_event(
-                    paths.aflog_file,
                     "AI_PROCESSING",
                     f"Requesting AI fix for ticket: {ticket.ticket_id}",
                     ticket_id=ticket.ticket_id
                 )
 
-                ai_response = ai_client.generate_fix(ticket_dict)
+                ai_response = ai_client.generate_fix(
+                    ticket_dict,
+                    preferred_provider=selection.provider,
+                    preferred_model=selection.model,
+                    strict_preferred=selection.strict_preferred,
+                )
 
                 if ai_response.success:
                     summary = f"Fixed via {ai_response.provider.value} ({ai_response.model})"
                     if ai_response.cost_usd:
                         summary += f" - Cost: ${ai_response.cost_usd:.4f}"
 
-                    mark_ticket_complete(
+                    if mark_ticket_complete(
                         ticket.ticket_id,
                         completion_notes=f"Fixed by {ai_response.provider.value} using {ai_response.model}: {ai_response.content[:200]}",
                         test_steps=f"AI validation performed by {ai_response.provider.value}",
@@ -503,10 +526,10 @@ def process_next_ticket(
                         summary=summary,
                         paths=paths,
                         use_lock=False,
-                    )
+                    ):
+                        release_lock = False
 
                     log_event(
-                        paths.aflog_file,
                         "AI_DISPATCH_SUCCESS",
                         f"AI successfully fixed ticket: {ticket.ticket_id}",
                         ticket_id=ticket.ticket_id,
@@ -521,7 +544,6 @@ def process_next_ticket(
                     return ticket
                 else:
                     log_event(
-                        paths.aflog_file,
                         "AI_DISPATCH_FAILED",
                         f"AI failed to fix ticket: {ai_response.error}",
                         ticket_id=ticket.ticket_id,
@@ -530,7 +552,6 @@ def process_next_ticket(
 
             except Exception as e:
                 log_event(
-                    paths.aflog_file,
                     "AI_DISPATCH_EXCEPTION",
                     f"AI processing exception: {e}",
                     ticket_id=ticket.ticket_id,
@@ -540,7 +561,7 @@ def process_next_ticket(
             try:
                 success = ai_handler(ticket)
                 if success:
-                    mark_ticket_complete(
+                    if mark_ticket_complete(
                         ticket.ticket_id,
                         completion_notes=f"Fixed via custom AI handler for {ticket.ticket_id}",
                         test_steps="Custom AI handler validation performed",
@@ -548,9 +569,9 @@ def process_next_ticket(
                         summary="Fixed via custom AI handler",
                         paths=paths,
                         use_lock=False,
-                    )
+                    ):
+                        release_lock = False
                     log_event(
-                        paths.aflog_file,
                         "CUSTOM_DISPATCH_SUCCESS",
                         f"Custom AI handler completed: {ticket.ticket_id}",
                         ticket_id=ticket.ticket_id
@@ -558,7 +579,6 @@ def process_next_ticket(
                     return ticket
             except Exception as e:
                 log_event(
-                    paths.aflog_file,
                     "CUSTOM_DISPATCH_FAILED",
                     f"Custom AI handler failed: {e}",
                     ticket_id=ticket.ticket_id,
@@ -567,7 +587,8 @@ def process_next_ticket(
 
         return ticket
     finally:
-        repo.release_lock(ticket.ticket_id, lock_owner)
+        if release_lock:
+            repo.release_lock(ticket.ticket_id, lock_owner)
 
 
 def process_tickets(
@@ -617,8 +638,8 @@ def get_completed_tickets(paths: Optional[ActifixPaths] = None, use_cache: bool 
         return manager.get_completed_tickets()
 
     try:
-        from .persistence.ticket_repo import get_ticket_repository, TicketFilter
-        repo = get_ticket_repository()
+        from .persistence.ticket_repo import TicketFilter
+        repo = _get_ticket_repository(paths)
         db_tickets = repo.get_tickets(TicketFilter(status="Completed"))
         return [_ticket_info_from_record(ticket) for ticket in db_tickets]
     except Exception:
@@ -642,8 +663,7 @@ def get_ticket_stats(paths: Optional[ActifixPaths] = None, use_cache: bool = Tru
         return manager.get_stats()
 
     try:
-        from .persistence.ticket_repo import get_ticket_repository
-        repo = get_ticket_repository()
+        repo = _get_ticket_repository(paths)
         return repo.get_stats()
     except Exception:
         manager = get_ticket_manager(paths=paths)

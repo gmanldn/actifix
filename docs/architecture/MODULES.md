@@ -1,239 +1,296 @@
 # Actifix Architecture Modules
 
-Generated: 2026-01-10T20:35:39.679117+00:00
-Source Commit: Current Development
+Last updated: 2026-01-18
+Source of truth: `docs/architecture/MAP.yaml`
 
-This file catalogs the architectural modules of the Actifix system. It provides a domain-driven breakdown of functionality, ownership, and dependencies.
+This document summarizes the modules in the Actifix architecture. Use `MAP.yaml` and `DEPGRAPH.json` for canonical topology and dependency validation.
 
-## bootstrap.main
+## Runtime
 
-**Domain:** runtime  
-**Owner:** runtime  
-**Summary:** Main entrypoint orchestrating system initialization and process management  
-**Entrypoints:** src/actifix/main.py, src/actifix/bootstrap.py  
-**Contracts:** ensures environment setup; launches core services in correct order  
-**Depends on:** runtime.config, infra.logging, infra.health  
+### bootstrap.main
+- Summary: system initialization and process orchestration
+- Entrypoints: `src/actifix/main.py`, `src/actifix/bootstrap.py`
+- Depends on: `runtime.config`, `infra.logging`, `infra.health`, `infra.persistence.database`
+- Contracts: ensures environment setup; launches core services in order
 
-## runtime.api
+### runtime.api
+- Summary: public API surface and package exports
+- Entrypoints: `src/actifix/__init__.py`, `src/actifix/api.py`
+- Depends on: `core.raise_af`, `bootstrap.main`, `runtime.state`, `infra.health`
+- Contracts: expose stable API; centralize package exports
 
-**Domain:** runtime  
-**Owner:** runtime  
-**Summary:** Public API surface and package exports  
-**Entrypoints:** src/actifix/__init__.py, src/actifix/api.py  
-**Contracts:** expose stable API; centralize package exports  
-**Depends on:** core.raise_af, bootstrap.main, runtime.state, infra.health  
+### runtime.config
+- Summary: configuration management and environment normalization
+- Entrypoints: `src/actifix/config.py`
+- Depends on: `infra.logging`
+- Contracts: centralize configuration; validate environment state; fail fast on invalid config
 
-## runtime.config
+### runtime.state
+- Summary: state management and persistence paths
+- Entrypoints: `src/actifix/state_paths.py`
+- Depends on: `infra.logging`
+- Contracts: atomic state operations; recoverable state management
 
-**Domain:** runtime  
-**Owner:** runtime  
-**Summary:** Configuration management and environment normalization  
-**Entrypoints:** src/actifix/config.py  
-**Contracts:** centralize configuration; validate environment state; fail fast on invalid config  
-**Depends on:** infra.logging  
+### runtime.dock_icon
+- Summary: macOS dock icon helper utilities
+- Entrypoints: `src/actifix/dock_icon.py`
+- Depends on: none
+- Contracts: safe no-op on non-macOS; avoid side effects on import
 
-## runtime.state
+## Infrastructure
 
-**Domain:** runtime  
-**Owner:** runtime  
-**Summary:** State management and persistence paths  
-**Entrypoints:** src/actifix/state_paths.py  
-**Contracts:** atomic state operations; recoverable state management  
-**Depends on:** infra.logging  
+### infra.logging
+- Summary: centralized logging system with correlation tracking
+- Entrypoints: `src/actifix/log_utils.py`
+- Depends on: none
+- Contracts: single logging sink; structured error logging; correlation IDs
 
-## runtime.dock_icon
+### infra.health
+- Summary: health monitoring and system status tracking
+- Entrypoints: `src/actifix/health.py`
+- Depends on: `infra.logging`
+- Contracts: detect degraded states; surface system health; continuous monitoring
 
-**Domain:** runtime  
-**Owner:** runtime  
-**Summary:** macOS dock icon helper utilities  
-**Entrypoints:** src/actifix/dock_icon.py  
-**Contracts:** safe no-op on non-macOS; avoid side effects on import  
-**Depends on:** None  
+### infra.persistence.atomic
+- Summary: atomic file operations for durability and safety
+- Entrypoints: `src/actifix/persistence/atomic.py`
+- Depends on: `infra.logging`
+- Contracts: atomic writes; append with size limits; idempotent operations
 
-## infra.logging
+### infra.persistence.api
+- Summary: persistence package public API and exports
+- Entrypoints: `src/actifix/persistence/__init__.py`
+- Depends on: `infra.persistence.atomic`, `infra.persistence.storage`, `infra.persistence.queue`, `infra.persistence.manager`, `infra.persistence.health`, `infra.persistence.paths`
+- Contracts: re-export persistence interfaces; keep API stable
 
-**Domain:** infra  
-**Owner:** infra  
-**Summary:** Centralized logging system with correlation tracking  
-**Entrypoints:** src/actifix/log_utils.py  
-**Contracts:** single logging sink; structured error logging; correlation IDs  
+### infra.persistence.storage
+- Summary: storage backend abstraction (file, memory, JSON)
+- Entrypoints: `src/actifix/persistence/storage.py`
+- Depends on: `infra.logging`, `infra.persistence.atomic`
+- Contracts: pluggable storage backends; consistent interface; error handling
 
-## infra.health
+### infra.persistence.queue
+- Summary: persistence queue for asynchronous operations
+- Entrypoints: `src/actifix/persistence/queue.py`
+- Depends on: `infra.logging`, `infra.persistence.storage`
+- Contracts: durable operation queue; replay capability; entry pruning
 
-**Domain:** infra  
-**Owner:** infra  
-**Summary:** Health monitoring and system status tracking  
-**Entrypoints:** src/actifix/health.py  
-**Contracts:** detect degraded states; surface system health; continuous monitoring  
-**Depends on:** infra.logging  
+### infra.persistence.manager
+- Summary: high-level persistence management with transactions
+- Entrypoints: `src/actifix/persistence/manager.py`
+- Depends on: `infra.logging`, `infra.persistence.storage`, `infra.persistence.queue`
+- Contracts: transactional operations; document management; queue integration
 
-## infra.persistence.api
+### infra.persistence.health
+- Summary: storage health checks and corruption detection
+- Entrypoints: `src/actifix/persistence/health.py`
+- Depends on: `infra.logging`, `infra.persistence.storage`
+- Contracts: storage validation; integrity verification; corruption detection
 
-**Domain:** infra  
-**Owner:** persistence  
-**Summary:** Persistence package public API and exports  
-**Entrypoints:** src/actifix/persistence/__init__.py  
-**Contracts:** re-export persistence interfaces; keep API stable  
-**Depends on:** infra.persistence.atomic, infra.persistence.storage, infra.persistence.queue, infra.persistence.manager, infra.persistence.health, infra.persistence.paths  
+### infra.persistence.paths
+- Summary: storage path configuration and management
+- Entrypoints: `src/actifix/persistence/paths.py`
+- Depends on: `infra.logging`
+- Contracts: centralized path configuration; directory helpers
 
-## infra.persistence.atomic
+### infra.persistence.cleanup_config
+- Summary: cleanup configuration for ticket retention policies
+- Entrypoints: `src/actifix/persistence/cleanup_config.py`
+- Depends on: none
+- Contracts: centralize cleanup settings; environment-driven defaults
 
-**Domain:** infra  
-**Owner:** persistence  
-**Summary:** Atomic file operations for durability and safety  
-**Entrypoints:** src/actifix/persistence/atomic.py  
-**Contracts:** atomic writes; append with size limits; idempotent operations  
-**Depends on:** infra.logging  
+### infra.persistence.ticket_cleanup
+- Summary: ticket cleanup and retention policy execution
+- Entrypoints: `src/actifix/persistence/ticket_cleanup.py`
+- Depends on: `infra.persistence.ticket_repo`
+- Contracts: retention policy enforcement; auto-cleanup test tickets
 
-## infra.persistence.storage
+### infra.persistence.event_repo
+- Summary: lightweight event repository for diagnostics and testing helpers
+- Entrypoints: `src/actifix/persistence/event_repo.py`
+- Depends on: none
+- Contracts: store simple events for instrumentation; provide resettable hooks for tests
 
-**Domain:** infra  
-**Owner:** persistence  
-**Summary:** Storage backend abstraction (file, memory, JSON)  
-**Entrypoints:** src/actifix/persistence/storage.py  
-**Contracts:** pluggable storage backends; consistent interface; error handling  
-**Depends on:** infra.logging, infra.persistence.atomic  
+### infra.persistence.database
+- Summary: SQLite database backend with connection pooling and schema management
+- Entrypoints: `src/actifix/persistence/database.py`
+- Depends on: `infra.logging`
+- Contracts: thread-safe connection pooling; schema migrations; WAL mode for concurrency
 
-## infra.persistence.queue
+### infra.persistence.ticket_repo
+- Summary: ticket repository with CRUD operations and locking
+- Entrypoints: `src/actifix/persistence/ticket_repo.py`
+- Depends on: `infra.logging`, `infra.persistence.database`, `core.raise_af`
+- Contracts: database CRUD for tickets; lease-based locking; duplicate prevention
 
-**Domain:** infra  
-**Owner:** persistence  
-**Summary:** Persistence queue for asynchronous operations  
-**Entrypoints:** src/actifix/persistence/queue.py  
-**Contracts:** durable operation queue; replay capability; entry pruning  
-**Depends on:** infra.logging, infra.persistence.storage  
+## Core
 
-## infra.persistence.manager
+### core.raise_af
+- Summary: error capture and ticket creation system
+- Entrypoints: `src/actifix/raise_af.py`
+- Depends on: `infra.logging`, `core.quarantine`, `infra.persistence.ticket_repo`, `security.ticket_throttler`
+- Contracts: capture all errors; create structured tickets; prevent duplication
 
-**Domain:** infra  
-**Owner:** persistence  
-**Summary:** High-level persistence management with transactions  
-**Entrypoints:** src/actifix/persistence/manager.py  
-**Contracts:** transactional operations; document management; queue integration  
-**Depends on:** infra.logging, infra.persistence.storage, infra.persistence.queue  
+### core.do_af
+- Summary: ticket processing and automated remediation
+- Entrypoints: `src/actifix/do_af.py`
+- Depends on: `infra.logging`, `core.raise_af`, `core.ai_client`, `infra.persistence.ticket_repo`
+- Contracts: process tickets systematically; integrate with AI systems; validate fixes
 
-## infra.persistence.health
+### core.quarantine
+- Summary: error isolation and safe failure handling
+- Entrypoints: `src/actifix/quarantine.py`
+- Depends on: `infra.logging`, `runtime.state`
+- Contracts: isolate corrupted state; prevent system-wide failures
 
-**Domain:** infra  
-**Owner:** persistence  
-**Summary:** Storage health checks and corruption detection  
-**Entrypoints:** src/actifix/persistence/health.py  
-**Contracts:** storage validation; integrity verification; corruption detection  
-**Depends on:** infra.logging, infra.persistence.storage  
+### core.ai_client
+- Summary: multi-provider AI integration with fallback chain
+- Entrypoints: `src/actifix/ai_client.py`
+- Depends on: `runtime.config`, `infra.logging`, `runtime.state`
+- Contracts: provider integration; fallback; cost tracking
 
-## infra.persistence.paths
+### core.error_taxonomy
+- Summary: error classification and taxonomy
+- Entrypoints: `src/actifix/error_taxonomy.py`
+- Depends on: `core.raise_af`
+- Contracts: pattern matching; priority classification; remediation hints
 
-**Domain:** infra  
-**Owner:** persistence  
-**Summary:** Storage path configuration and management  
-**Entrypoints:** src/actifix/persistence/paths.py  
-**Contracts:** centralized path configuration; directory helpers  
-**Depends on:** infra.logging  
+### core.recovery
+- Summary: state recovery and transaction rollback
+- Entrypoints: `src/actifix/recovery.py`
+- Depends on: `infra.logging`, `infra.persistence.manager`
+- Contracts: recover from incomplete operations; rollback failed transactions
 
-## infra.persistence.database
+### core.self_repair
+- Summary: self-repair blueprints and logging orchestration
+- Entrypoints: `src/actifix/self_repair.py`
+- Depends on: `infra.logging`
+- Contracts: publish recoverability blueprints and record verification hints via log events
 
-**Domain:** infra  
-**Owner:** persistence  
-**Summary:** SQLite database backend with connection pooling and schema management  
-**Entrypoints:** src/actifix/persistence/database.py  
-**Contracts:** thread-safe connection pooling; automatic schema migrations; WAL mode for concurrency  
-**Depends on:** infra.logging  
+## Tooling
 
-## infra.persistence.event_repo
+### tooling.testing.system
+- Summary: system-level test framework and test builder
+- Entrypoints: `src/actifix/testing/system.py`
+- Depends on: `infra.logging`, `runtime.state`
+- Contracts: build system tests; validate dependencies; enforce architecture
 
-**Domain:** infra  
-**Owner:** persistence  
-**Summary:** Lightweight in-memory event repository for diagnostics and testing  
-**Entrypoints:** src/actifix/persistence/event_repo.py  
-**Contracts:** store instrumentation events; expose a resettable cache for tests  
-**Depends on:** infra.logging  
+### tooling.testing.reporting
+- Summary: test cycle reporting and progress tracking
+- Entrypoints: `src/actifix/testing/reporting.py`
+- Depends on: `infra.logging`, `tooling.testing.system`
+- Contracts: test inventory; numbered progress; cycle logs
 
-## infra.persistence.ticket_repo
+### tooling.testing
+- Summary: quality assurance and testing framework
+- Entrypoints: `src/actifix/testing/__init__.py`, `test/test_runner.py`
+- Depends on: `bootstrap.main`, `infra.logging`, `core.raise_af`, `tooling.testing.system`, `tooling.testing.reporting`
+- Contracts: enforce quality gates; maintain test coverage; validate architecture
 
-**Domain:** infra  
-**Owner:** persistence  
-**Summary:** Ticket repository with CRUD operations, locking, and duplicate prevention  
-**Entrypoints:** src/actifix/persistence/ticket_repo.py  
-**Contracts:** database CRUD for tickets; lease-based locking for DoAF agents; duplicate guard enforcement  
-**Depends on:** infra.logging, infra.persistence.database, core.raise_af  
+### tooling.simple_ticket_attack
+- Summary: batch creation of lightweight tickets
+- Entrypoints: `src/actifix/simple_ticket_attack.py`
+- Depends on: `core.raise_af`, `runtime.state`
+- Contracts: generate ticket sequences; keep `data/actifix.db` untouched by manual edits
 
-## core.raise_af
+### tooling.bounce
+- Summary: script to stop and restart Actifix processes
+- Entrypoints: `scripts/bounce.py`
+- Depends on: `bootstrap.main`
+- Contracts: stop frontend/API processes; relaunch via `scripts/start.py`
 
-**Domain:** core  
-**Owner:** core  
-**Summary:** Error capture and ticket creation system  
-**Entrypoints:** src/actifix/raise_af.py  
-**Contracts:** capture all errors; create structured tickets; prevent duplication  
-**Depends on:** infra.logging, core.quarantine  
+## Security
 
-## core.do_af
+### security.api
+- Summary: security module public API and exports
+- Entrypoints: `src/actifix/security/__init__.py`
+- Depends on: `security.auth`, `security.credentials`, `security.rate_limiter`, `security.secrets_scanner`
+- Contracts: re-export security interfaces; centralize security exports
 
-**Domain:** core  
-**Owner:** core  
-**Summary:** Ticket processing and automated remediation  
-**Entrypoints:** src/actifix/do_af.py  
-**Contracts:** process tickets systematically; integrate with AI systems; validate fixes  
-**Depends on:** infra.logging, core.raise_af  
+### security.auth
+- Summary: authentication and authorization
+- Entrypoints: `src/actifix/security/auth.py`
+- Depends on: `infra.logging`, `security.credentials`
+- Contracts: JWT validation; RBAC enforcement; session management
 
-## core.ai_client
+### security.credentials
+- Summary: credential management and password hashing
+- Entrypoints: `src/actifix/security/credentials.py`
+- Depends on: `infra.logging`
+- Contracts: PBKDF2 hashing; secure comparison; credential storage
 
-**Domain:** core  
-**Owner:** core  
-**Summary:** Multi-provider AI integration with automatic fallback chain  
-**Entrypoints:** src/actifix/ai_client.py  
-**Contracts:** Claude local auth detection; Claude API integration; OpenAI GPT-4 Turbo support; Ollama local model support; free alternative prompts; automatic provider fallback; cost tracking and logging  
-**Depends on:** runtime.config, infra.logging, runtime.state  
+### security.rate_limiter
+- Summary: token bucket rate limiting
+- Entrypoints: `src/actifix/security/rate_limiter.py`
+- Depends on: `infra.logging`, `runtime.config`
+- Contracts: enforce per-minute/hour/day limits; track request metrics
 
-## core.error_taxonomy
+### security.secrets_scanner
+- Summary: secrets and sensitive data detection
+- Entrypoints: `src/actifix/security/secrets_scanner.py`
+- Depends on: `infra.logging`
+- Contracts: detect API keys; sanitize sensitive output
 
-**Domain:** core  
-**Owner:** core  
-**Summary:** Enhanced error classification and taxonomy system  
-**Entrypoints:** src/actifix/error_taxonomy.py  
-**Contracts:** sophisticated error pattern matching; priority classification; remediation hints generation; extensible pattern system  
-**Depends on:** core.raise_af  
+### security.ticket_throttler
+- Summary: ticket flood protection with throttling
+- Entrypoints: `src/actifix/security/ticket_throttler.py`
+- Depends on: `runtime.state`, `core.raise_af`
+- Contracts: enforce per-priority limits; emergency brake
 
-## core.quarantine
+## Plugins
 
-**Domain:** core  
-**Owner:** core  
-**Summary:** Error isolation and safe failure handling  
-**Entrypoints:** src/actifix/quarantine.py  
-**Contracts:** isolate corrupted state; prevent system-wide failures  
-**Depends on:** infra.logging, runtime.state  
+### plugins.permissions
+- Summary: plugin permission and capability management
+- Entrypoints: `src/actifix/plugins/permissions.py`
+- Depends on: `plugins.protocol`, `security.auth`
+- Contracts: define permissions; enforce capability-based security
 
-## tooling.simple_ticket_attack
+### plugins.protocol
+- Summary: standard metadata and health contracts for plugins
+- Entrypoints: `src/actifix/plugins/protocol.py`
+- Depends on: none
+- Contracts: define plugin metadata; health contracts
 
-**Domain:** tooling  
-**Owner:** tooling  
-**Summary:** Batch creation of lightweight tickets through the Actifix pipeline  
-**Entrypoints:** src/actifix/simple_ticket_attack.py  
-**Contracts:** generate sequences of simple tickets via `record_error`; keep `data/actifix.db` intact (use API/DoAF for access); reuse core ticketing flow for experimentation  
-**Depends on:** core.raise_af, runtime.state  
+### plugins.registry
+- Summary: registry managing plugin lifecycle and observability
+- Entrypoints: `src/actifix/plugins/registry.py`
+- Depends on: `infra.logging`, `plugins.protocol`
+- Contracts: one-time registration; lifecycle logging
 
-## tooling.testing.system
+### plugins.validation
+- Summary: metadata validation and capability enforcement
+- Entrypoints: `src/actifix/plugins/validation.py`
+- Depends on: `infra.logging`, `plugins.protocol`
+- Contracts: validate metadata; enforce semantic versioning
 
-**Domain:** tooling  
-**Owner:** testing  
-**Summary:** System-level test framework and test builder  
-**Entrypoints:** src/actifix/testing/system.py  
-**Contracts:** build system tests; validate dependencies; enforce architecture  
-**Depends on:** infra.logging, runtime.state  
+### plugins.sandbox
+- Summary: isolation layer and safe registration wrapper
+- Entrypoints: `src/actifix/plugins/sandbox.py`
+- Depends on: `core.raise_af`, `infra.logging`, `plugins.registry`, `plugins.validation`
+- Contracts: contain plugin failures; report load failures
 
-## tooling.testing.reporting
+### plugins.loader
+- Summary: entry-point discovery and registration
+- Entrypoints: `src/actifix/plugins/loader.py`
+- Depends on: `core.raise_af`, `infra.logging`, `plugins.registry`, `plugins.validation`, `plugins.sandbox`
+- Contracts: discover plugins; validate and sandbox
 
-**Domain:** tooling  
-**Owner:** testing  
-**Summary:** Test cycle reporting and progress tracking  
-**Entrypoints:** src/actifix/testing/reporting.py  
-**Contracts:** test inventory; numbered progress; cycle logs  
-**Depends on:** infra.logging, tooling.testing.system  
+### plugins.api
+- Summary: public API exports for plugin authors
+- Entrypoints: `src/actifix/plugins/__init__.py`
+- Depends on: `plugins.protocol`, `plugins.registry`
+- Contracts: re-export plugin helpers; document activation steps
 
-## tooling.testing
+### plugins.builtin
+- Summary: built-in self-testing plugin
+- Entrypoints: `src/actifix/plugins/builtin.py`
+- Depends on: `plugins.registry`, `plugins.protocol`
+- Contracts: exercise registry sandboxing and health checks
 
-**Domain:** tooling  
-**Owner:** tooling  
-**Summary:** Quality assurance and testing framework  
-**Entrypoints:** src/actifix/testing/__init__.py, test.py  
-**Contracts:** enforce quality gates; maintain test coverage; validate architecture  
-**Depends on:** bootstrap.main, infra.logging, tooling.testing.system, tooling.testing.reporting
+## Modules
+
+### modules.yhatzee
+- Summary: two-player Yhatzee game module with local GUI
+- Entrypoints: `src/actifix/modules/yhatzee/__init__.py`
+- Depends on: `runtime.state`, `infra.logging`, `core.raise_af`
+- Contracts: serve a local Yhatzee GUI on localhost:8090; use Actifix logging and error capture

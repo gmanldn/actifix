@@ -40,7 +40,10 @@ from actifix.state_paths import get_actifix_paths, init_actifix_files
 from actifix.testing import TestRunner
 from actifix.testing.system import build_system_tests
 from actifix.persistence.ticket_repo import get_ticket_repository
+from actifix.persistence.event_repo import get_event_repository, EventFilter
 from actifix.raise_af import ActifixEntry, TicketPriority
+
+pytestmark = [pytest.mark.integration]
 
 
 def _create_ticket(ticket_id: str, priority: TicketPriority, message: str = "Test issue") -> ActifixEntry:
@@ -149,9 +152,10 @@ def test_mark_ticket_complete_idempotent_guard(tmp_path):
     assert mark_ticket_complete(ticket_id, completion_notes="Fixed critical test ticket successfully validated", test_steps="Test validation", test_results="Test passed", summary="First pass", paths=paths)
 
     assert mark_ticket_complete(ticket_id, completion_notes="Fixed critical test ticket successfully validated", test_steps="Test validation", test_results="Test passed", summary="Ignored", paths=paths) is False
-    aflog_content = paths.aflog_file.read_text()
-    assert "TICKET_ALREADY_COMPLETED" in aflog_content
-    assert "idempotency_guard" in aflog_content
+    repo = get_event_repository()
+    events = repo.get_events(EventFilter(event_type="TICKET_ALREADY_COMPLETED", limit=10))
+    assert any(event.get("event_type") == "TICKET_ALREADY_COMPLETED" for event in events)
+    assert any("idempotency_guard" in (event.get("extra_json") or "") for event in events)
 
 
 def test_fix_highest_priority_ticket_paths(tmp_path):
@@ -163,7 +167,13 @@ def test_fix_highest_priority_ticket_paths(tmp_path):
 
     low_ticket = _create_ticket("ACT-20260111-ABCD1", TicketPriority.P1)
     high_ticket = _create_ticket("ACT-20260111-ABCD2", TicketPriority.P0)
-    result = fix_highest_priority_ticket(paths=paths, summary="Handled")
+    result = fix_highest_priority_ticket(
+        paths=paths,
+        completion_notes="Fixed highest priority ticket with validated changes",
+        test_steps="Ran ticket completion path validation",
+        test_results="Completion flow passed",
+        summary="Handled",
+    )
     assert result["processed"] is True
     assert result["ticket_id"] == high_ticket.ticket_id
 

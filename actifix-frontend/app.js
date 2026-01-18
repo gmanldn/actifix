@@ -10,6 +10,21 @@ const { useState, useEffect, useRef, createElement: h } = React;
 const API_BASE = 'http://localhost:5001/api';
 const REFRESH_INTERVAL = 5000;
 const LOG_REFRESH_INTERVAL = 3000;
+const TICKET_REFRESH_INTERVAL = 4000;
+const TICKET_LIMIT = 250;
+
+const applyAssetVersion = () => {
+  const version = window.ACTIFIX_ASSET_VERSION || '4';
+  const link = document.querySelector('link[rel="stylesheet"]');
+  if (!link) return;
+  const href = link.getAttribute('href') || '';
+  if (!href.includes(`v=${version}`)) {
+    const nextHref = href.split('?')[0] + `?v=${version}`;
+    link.setAttribute('href', nextHref);
+  }
+};
+
+applyAssetVersion();
 
 // ============================================================================
 // Utility Functions
@@ -58,6 +73,34 @@ const getStatusColor = (status) => {
   return colors[status] || '#6b7280';
 };
 
+const PRIORITY_ORDER = ['P0', 'P1', 'P2', 'P3', 'P4'];
+const PRIORITY_LABELS = {
+  P0: 'Critical',
+  P1: 'High',
+  P2: 'Medium',
+  P3: 'Low',
+  P4: 'Deferred',
+};
+
+const normalizePriority = (priority) => (
+  PRIORITY_ORDER.includes(priority) ? priority : 'P4'
+);
+
+const groupTicketsByPriority = (tickets) => {
+  const grouped = {};
+  PRIORITY_ORDER.forEach((priority) => {
+    grouped[priority] = { open: [], completed: [] };
+  });
+
+  tickets.forEach((ticket) => {
+    const priority = normalizePriority(ticket.priority);
+    const bucket = ticket.status === 'completed' ? 'completed' : 'open';
+    grouped[priority][bucket].push(ticket);
+  });
+
+  return grouped;
+};
+
 // ============================================================================
 // Custom Hooks
 // ============================================================================
@@ -66,15 +109,17 @@ const useFetch = (endpoint, interval = REFRESH_INTERVAL) => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [lastUpdated, setLastUpdated] = useState(null);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await fetch(`${API_BASE}${endpoint}`);
+        const response = await fetch(`${API_BASE}${endpoint}`, { cache: 'no-store' });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const json = await response.json();
         setData(json);
         setError(null);
+        setLastUpdated(new Date());
       } catch (err) {
         setError(err.message);
       } finally {
@@ -87,7 +132,7 @@ const useFetch = (endpoint, interval = REFRESH_INTERVAL) => {
     return () => clearInterval(timer);
   }, [endpoint, interval]);
 
-  return { data, loading, error };
+  return { data, loading, error, lastUpdated };
 };
 
 // ============================================================================
@@ -172,8 +217,8 @@ const { data, loading } = useFetch('/version', REFRESH_INTERVAL);
   return h('span', {
     className: 'version-indicator',
     style: {
-      borderColor: accentColor,
-      color: accentColor,
+      borderColor: '#000',
+      color: '#000',
     }
   },
     h('span', { className: 'version-label' }, `v${version}`),
@@ -201,7 +246,10 @@ const FixToolbar = ({ onFix, isFixing, status }) => {
 const Header = ({ onFix, isFixing, fixStatus }) => {
   const [connected, setConnected] = useState(false);
   const [time, setTime] = useState(new Date().toLocaleTimeString());
-  const { data: health } = useFetch('/health', 10000);
+  const { data: health } = useFetch('/health', REFRESH_INTERVAL);
+  // Search query for the dashboard.
+  const [search, setSearch] = useState('');
+  const handleSearchChange = (e) => setSearch(e.target.value);
 
   useEffect(() => {
     const checkConnection = async () => {
@@ -234,6 +282,7 @@ const Header = ({ onFix, isFixing, fixStatus }) => {
       )
     ),
     h('div', { className: 'header-right' },
+      h('input', { type: 'text', className: 'header-search', placeholder: 'Search…', value: search, onChange: handleSearchChange }),
       h('div', { className: 'header-stats' },
         h('div', { className: 'stat-card', style: { padding: '6px 14px', minWidth: '70px' } },
           h('div', { className: 'stat-value', style: { fontSize: '18px', fontWeight: '700' } }, health?.metrics?.open_tickets ?? '—'),
@@ -306,13 +355,6 @@ const OverviewView = () => {
         subvalue: `${metrics.completed_tickets ?? 0} completed`
       }),
       h(MetricTile, {
-        label: 'SLA BREACHES',
-        value: metrics.sla_breaches ?? 0,
-        icon: '⚡',
-        color: metrics.sla_breaches > 0 ? '#ef4444' : '#10b981',
-        subvalue: metrics.sla_breaches > 0 ? 'Action Required!' : 'All Good'
-      }),
-      h(MetricTile, {
         label: 'OLDEST TICKET',
         value: `${metrics.oldest_ticket_age_hours ?? 0}h`,
         icon: '⏱️',
@@ -354,17 +396,18 @@ const OverviewView = () => {
         ),
         h('div', { className: 'panel-actions' },
           h('span', { className: 'text-muted', style: { fontSize: '11px' } },
-            `${tickets?.total_open ?? 0} open • ${tickets?.total_completed ?? 0} done`
+            `${metrics.open_tickets ?? 0} open • ${metrics.completed_tickets ?? 0} done`
           )
         )
       ),
       tickets?.tickets && tickets.tickets.length > 0 ? h('div', { className: 'ticket-list' },
-        tickets.tickets.slice(0, 15).map((ticket, i) =>
-          h('div', { key: ticket.ticket_id || i, className: 'ticket-item' },
+        tickets.tickets.slice(0, 15).map((ticket, i) => {
+          const priority = normalizePriority(ticket.priority);
+          return h('div', { key: ticket.ticket_id || i, className: 'ticket-item' },
             h('div', { className: 'ticket-item-header' },
               h('span', {
-                className: `priority-badge ${ticket.priority.toLowerCase()}`
-              }, ticket.priority),
+                className: `priority-badge ${priority.toLowerCase()}`
+              }, priority),
               h('span', {
                 className: `status-badge ${ticket.status}`
               }, ticket.status),
@@ -378,8 +421,8 @@ const OverviewView = () => {
             h('div', { className: 'ticket-meta' },
               h('span', null, '📁 ', ticket.source || 'unknown')
             )
-          )
-        )
+          );
+        })
       ) : h('div', { style: { padding: '24px', textAlign: 'center', color: 'var(--text-dim)' } }, 'No tickets found')
     )
   );
@@ -387,48 +430,84 @@ const OverviewView = () => {
 
 // Tickets View Component
 const TicketsView = () => {
-  const { data, loading, error } = useFetch('/tickets');
+  const { data, loading, error, lastUpdated } = useFetch(`/tickets?limit=${TICKET_LIMIT}`, TICKET_REFRESH_INTERVAL);
 
   if (loading) return h(LoadingSpinner);
   if (error) return h(ErrorDisplay, { message: error });
 
   const tickets = data?.tickets || [];
+  const groupedTickets = groupTicketsByPriority(tickets);
+  const updatedLabel = lastUpdated
+    ? lastUpdated.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+    : '—';
 
-  return h('div', { className: 'panel' },
+  const renderTicketCard = (ticket, index) => {
+    const priority = normalizePriority(ticket.priority);
+    return h('article', { key: ticket.ticket_id || index, className: `ticket-card ${ticket.status}` },
+      h('div', { className: 'ticket-card-header' },
+        h('span', { className: `priority-badge ${priority.toLowerCase()}` }, priority),
+        h('span', { className: `status-badge ${ticket.status}` }, ticket.status),
+        h('span', { className: 'ticket-id' }, ticket.ticket_id?.slice(0, 10) || 'N/A')
+      ),
+      h('div', { className: 'ticket-card-title' }, ticket.error_type || 'Unknown'),
+      h('div', { className: 'ticket-card-message' }, ticket.message || ''),
+      h('div', { className: 'ticket-card-meta' },
+        h('span', null, '📁 ', ticket.source || 'unknown'),
+        h('span', null, '⏱ ', formatRelativeTime(ticket.created))
+      )
+    );
+  };
+
+  return h('div', { className: 'panel tickets-board' },
     h('div', { className: 'panel-header' },
       h('div', { className: 'panel-title' },
         h('span', { className: 'panel-title-icon' }, '🎫'),
         'ALL TICKETS'
       ),
       h('div', { className: 'panel-actions' },
+        h('span', { className: 'tickets-live' },
+          h('span', { className: 'tickets-live-dot' }),
+          'Live',
+          h('span', { className: 'tickets-live-time' }, `Updated ${updatedLabel}`)
+        ),
         h('span', { className: 'text-muted', style: { fontSize: '11px' } },
           `${data?.total_open ?? 0} open • ${data?.total_completed ?? 0} completed`
         )
       )
     ),
-    tickets.length > 0 ? h('div', { className: 'ticket-list' },
-      tickets.map((ticket, i) =>
-        h('div', { key: ticket.ticket_id || i, className: 'ticket-item' },
-          h('div', { className: 'ticket-item-header' },
-            h('span', {
-              className: `priority-badge ${ticket.priority.toLowerCase()}`
-            }, ticket.priority),
-            h('span', {
-              className: `status-badge ${ticket.status}`
-            }, ticket.status),
-            h('span', { className: 'ticket-id' }, ticket.ticket_id?.slice(0, 12) || 'N/A'),
-            h('span', { className: 'text-dim', style: { fontSize: '10px', marginLeft: 'auto' } },
-              formatRelativeTime(ticket.created)
+    tickets.length > 0 ? h('div', { className: 'priority-lanes' },
+      PRIORITY_ORDER.map((priority) => {
+        const group = groupedTickets[priority];
+        const openTickets = group?.open || [];
+        const completedTickets = group?.completed || [];
+        const label = PRIORITY_LABELS[priority] || 'Priority';
+
+        return h('section', {
+          key: priority,
+          className: 'priority-lane',
+          'data-priority': priority,
+        },
+          h('div', { className: 'priority-lane-header' },
+            h('div', { className: 'priority-lane-title' },
+              h('span', { className: `priority-badge ${priority.toLowerCase()}` }, priority),
+              h('div', { className: 'priority-lane-label' }, label)
+            ),
+            h('div', { className: 'priority-lane-counts' },
+              h('span', { className: 'lane-count open' }, `${openTickets.length} open`),
+              h('span', { className: 'lane-count completed' }, `${completedTickets.length} done`)
             )
           ),
-          h('div', { className: 'ticket-type' }, ticket.error_type || 'Unknown'),
-          h('div', { className: 'ticket-message' }, ticket.message || ''),
-          h('div', { className: 'ticket-meta' },
-            h('span', null, '📁 ', ticket.source || 'unknown'),
-            h('span', null, '🏷️ ', ticket.created ? formatTime(ticket.created) : 'N/A')
+          openTickets.length > 0
+            ? openTickets.map(renderTicketCard)
+            : h('div', { className: 'lane-empty' }, 'No open tickets'),
+          completedTickets.length > 0 && h('details', { className: 'lane-completed' },
+            h('summary', null, `Show ${completedTickets.length} completed`),
+            h('div', { className: 'lane-completed-list' },
+              completedTickets.map(renderTicketCard)
+            )
           )
-        )
-      )
+        );
+      })
     ) : h('div', { style: { padding: '24px', textAlign: 'center', color: 'var(--text-dim)' } }, 'No tickets found')
   );
 };
@@ -602,12 +681,13 @@ const SystemView = () => {
 
 // Settings View Component
 const SettingsView = () => {
-  const [aiProvider, setAiProvider] = useState('openai');
+  const [aiProvider, setAiProvider] = useState('mimo-flash-v2-free');
   const [aiApiKey, setAiApiKey] = useState('');
   const [aiModel, setAiModel] = useState('');
   const [aiEnabled, setAiEnabled] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
+  const { data: aiStatus } = useFetch('/ai-status', 8000);
 
   // Load current settings
   useEffect(() => {
@@ -616,7 +696,7 @@ const SettingsView = () => {
         const response = await fetch(`${API_BASE}/settings`);
         if (response.ok) {
           const data = await response.json();
-          setAiProvider(data.ai_provider || 'openai');
+          setAiProvider(data.ai_provider || 'mimo-flash-v2-free');
           setAiApiKey(data.ai_api_key || '');
           setAiModel(data.ai_model || '');
           setAiEnabled(data.ai_enabled || false);
@@ -660,13 +740,27 @@ const SettingsView = () => {
     }
   };
 
-  const providers = [
-    { value: 'openai', label: 'OpenAI' },
-    { value: 'anthropic', label: 'Anthropic (Claude)' },
-    { value: 'google', label: 'Google (Gemini)' },
-    { value: 'openrouter', label: 'OpenRouter' },
-    { value: 'ollama', label: 'Ollama (Local)' },
+  const fallbackProviders = [
+    { value: 'auto', label: 'Auto (Do_AF fallback chain)' },
+    { value: 'claude_local', label: 'Claude Code (local CLI)' },
+    { value: 'openai_cli', label: 'OpenAI CLI (local session)' },
+    { value: 'claude_api', label: 'Claude API' },
+    { value: 'openai', label: 'OpenAI API' },
+    { value: 'ollama', label: 'Ollama (local)' },
+    { value: 'mimo-flash-v2-free', label: 'Mimo Flash v2 Free (default)' },
   ];
+  const providerOptions = aiStatus?.provider_options || fallbackProviders;
+  const feedbackLog = aiStatus?.feedback_log?.join('\n') || 'No AI feedback yet.';
+  const providerOrder = aiStatus?.provider_order?.join(' → ') || '—';
+  const activeProvider = aiStatus?.active_provider || '—';
+  const activeModel = aiStatus?.active_model || '—';
+  const preferredProvider = aiStatus?.preferred_provider || aiProvider;
+
+  useEffect(() => {
+    if (aiProvider === 'mimo-flash-v2-free' && (!aiModel || aiModel === '')) {
+      setAiModel('mimo-flash-v2-free');
+    }
+  }, [aiProvider, aiModel]);
 
   return h('div', { className: 'panel' },
     h('div', { className: 'panel-header' },
@@ -675,120 +769,100 @@ const SettingsView = () => {
         'Settings'
       )
     ),
-    h('div', { style: { padding: '24px' } },
-      h('div', { style: { maxWidth: '600px', margin: '0 auto' } },
-        // AI Provider
-        h('div', { style: { marginBottom: '24px' } },
-          h('label', { style: { display: 'block', marginBottom: '8px', fontWeight: 600, fontSize: '13px' } }, 'AI Provider'),
+    h('div', { className: 'settings-grid' },
+      h('div', { className: 'settings-card' },
+        h('div', { className: 'settings-card-title' }, 'Active AI'),
+        h('div', { className: 'settings-metric' },
+          h('span', { className: 'settings-metric-label' }, 'Preferred'),
+          h('span', { className: 'settings-metric-value' }, preferredProvider)
+        ),
+        h('div', { className: 'settings-metric' },
+          h('span', { className: 'settings-metric-label' }, 'Active'),
+          h('span', { className: 'settings-metric-value' }, `${activeProvider} • ${activeModel}`)
+        ),
+        h('div', { className: 'settings-metric' },
+          h('span', { className: 'settings-metric-label' }, 'Provider Order'),
+          h('span', { className: 'settings-metric-value' }, providerOrder)
+        ),
+        h('div', { className: 'settings-pill-row' },
+          (aiStatus?.providers || []).map((provider) =>
+            h('span', {
+              key: provider.provider,
+              className: `settings-pill ${provider.available ? 'available' : 'unavailable'}`
+            }, provider.provider)
+          )
+        )
+      ),
+      h('div', { className: 'settings-card' },
+        h('div', { className: 'settings-card-title' }, 'AI Controls'),
+        h('div', { className: 'settings-field' },
+          h('label', { className: 'settings-label' }, 'Provider'),
           h('select', {
             value: aiProvider,
             onChange: (e) => setAiProvider(e.target.value),
-            style: {
-              width: '100%',
-              padding: '10px',
-              borderRadius: 'var(--radius-md)',
-              border: '1px solid var(--border)',
-              background: 'var(--bg-secondary)',
-              color: 'var(--text-primary)',
-              fontSize: '13px',
-            }
+            className: 'settings-input',
           },
-            providers.map(p => h('option', { key: p.value, value: p.value }, p.label))
+            providerOptions.map((p) => h('option', { key: p.value, value: p.value }, p.label))
           )
         ),
-
-        // API Key
-        h('div', { style: { marginBottom: '24px' } },
-          h('label', { style: { display: 'block', marginBottom: '8px', fontWeight: 600, fontSize: '13px' } }, 'API Key'),
+        h('div', { className: 'settings-field' },
+          h('label', { className: 'settings-label' }, 'API Key'),
           h('input', {
             type: 'password',
             value: aiApiKey,
             onChange: (e) => setAiApiKey(e.target.value),
-            placeholder: 'Enter your API key',
-            style: {
-              width: '100%',
-              padding: '10px',
-              borderRadius: 'var(--radius-md)',
-              border: '1px solid var(--border)',
-              background: 'var(--bg-secondary)',
-              color: 'var(--text-primary)',
-              fontSize: '13px',
-            }
+            placeholder: 'Provider API key (when needed)',
+            className: 'settings-input',
           })
         ),
-
-        // AI Model
-        h('div', { style: { marginBottom: '24px' } },
-          h('label', { style: { display: 'block', marginBottom: '8px', fontWeight: 600, fontSize: '13px' } }, 'Model Name (Optional)'),
+        h('div', { className: 'settings-field' },
+          h('label', { className: 'settings-label' }, 'Model'),
           h('input', {
             type: 'text',
             value: aiModel,
             onChange: (e) => setAiModel(e.target.value),
-            placeholder: 'e.g., gpt-4, claude-3-sonnet, gemini-pro',
-            style: {
-              width: '100%',
-              padding: '10px',
-              borderRadius: 'var(--radius-md)',
-              border: '1px solid var(--border)',
-              background: 'var(--bg-secondary)',
-              color: 'var(--text-primary)',
-              fontSize: '13px',
-            }
+            placeholder: 'Default model override',
+            className: 'settings-input',
           })
         ),
-
-        // Enable AI
-        h('div', { style: { marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '12px' } },
+        h('div', { className: 'settings-toggle' },
           h('input', {
             type: 'checkbox',
             checked: aiEnabled,
             onChange: (e) => setAiEnabled(e.target.checked),
             id: 'ai-enabled',
-            style: { width: '18px', height: '18px', cursor: 'pointer' }
           }),
-          h('label', { htmlFor: 'ai-enabled', style: { fontWeight: 600, fontSize: '13px', cursor: 'pointer' } }, 'Enable AI Integration')
+          h('label', { htmlFor: 'ai-enabled' }, 'Enable AI Integration')
         ),
-
-        // Save Button
-        h('div', { style: { marginTop: '32px', display: 'flex', gap: '12px', alignItems: 'center' } },
+        h('div', { className: 'settings-actions' },
           h('button', {
             className: 'btn btn-primary',
             onClick: handleSave,
             disabled: saving,
-            style: {
-              padding: '10px 24px',
-              fontSize: '13px',
-              fontWeight: 600,
-            }
           }, saving ? 'Saving...' : 'Save Settings'),
           message && h('span', {
-            style: {
-              fontSize: '12px',
-              color: message.includes('Error') ? '#ef4444' : '#10b981',
-            }
+            className: `settings-message ${message.includes('Error') ? 'error' : 'ok'}`,
           }, message)
+        )
+      ),
+      h('div', { className: 'settings-card' },
+        h('div', { className: 'settings-card-title' }, 'AI Feedback Log'),
+        h('textarea', {
+          className: 'settings-log',
+          readOnly: true,
+          value: feedbackLog,
+        })
+      ),
+      h('div', { className: 'settings-card settings-note' },
+        h('div', { className: 'settings-card-title' }, 'Notes'),
+        h('div', { className: 'settings-note-text' },
+          'Settings are stored in memory and will reset when the server restarts. For persistent configuration, set environment variables:'
         ),
-
-        // Info
-        h('div', {
-          style: {
-            marginTop: '32px',
-            padding: '16px',
-            background: 'var(--bg-secondary)',
-            border: '1px solid var(--border)',
-            borderRadius: 'var(--radius-md)',
-            fontSize: '12px',
-            color: 'var(--text-muted)',
-          }
-        },
-          h('div', { style: { marginBottom: '8px', fontWeight: 600 } }, '💡 Note:'),
-          h('div', null, 'Settings are stored in memory and will reset when the server restarts. For persistent configuration, set environment variables:'),
-          h('ul', { style: { marginTop: '8px', paddingLeft: '20px' } },
-            h('li', null, 'ACTIFIX_AI_PROVIDER'),
-            h('li', null, 'ACTIFIX_AI_API_KEY'),
-            h('li', null, 'ACTIFIX_AI_MODEL'),
-            h('li', null, 'ACTIFIX_AI_ENABLED')
-          )
+        h('ul', { className: 'settings-note-list' },
+          h('li', null, 'ACTIFIX_AI_PROVIDER'),
+          h('li', null, 'ACTIFIX_AI_API_KEY'),
+          h('li', null, 'ACTIFIX_AI_MODEL'),
+          h('li', null, 'ACTIFIX_AI_ENABLED')
         )
       )
     )
@@ -798,6 +872,8 @@ const SettingsView = () => {
 // Modules View Component
 const ModulesView = () => {
   const { data, loading, error } = useFetch('/modules', 15000);
+  const [sortBy, setSortBy] = useState('name');
+  const [sortDir, setSortDir] = useState('asc');
 
   if (loading) return h(LoadingSpinner);
   if (error) return h(ErrorDisplay, { message: error });
@@ -805,42 +881,65 @@ const ModulesView = () => {
   const systemModules = data?.system || [];
   const userModules = data?.user || [];
 
-  const renderModuleGroup = (title, modules, icon) => (
-    h('div', { className: 'panel' },
+  const sortModules = (modules) => {
+    return [...modules].sort((a, b) => {
+      let aVal = (a[sortBy] || '').toString().toLowerCase();
+      let bVal = (b[sortBy] || '').toString().toLowerCase();
+      if (aVal < bVal) return sortDir === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortDir === 'asc' ? 1 : -1;
+      return 0;
+    });
+  };
+
+  const handleSort = (column) => {
+    if (sortBy === column) {
+      setSortDir(sortDir === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortBy(column);
+      setSortDir('asc');
+    }
+  };
+
+  const sortIndicator = (column) => {
+    if (sortBy !== column) return '';
+    return sortDir === 'asc' ? ' ↑' : ' ↓';
+  };
+
+  const renderModuleTable = (title, modules, icon) => {
+    const sortedModules = sortModules(modules);
+    return h('div', { className: 'panel' },
       h('div', { className: 'panel-header' },
         h('div', { className: 'panel-title' },
           h('span', { className: 'panel-title-icon' }, icon),
           title
         ),
-        h('span', { className: 'text-muted', style: { fontSize: '11px' } }, `${modules.length} modules`)
+        h('span', { className: 'text-muted', style: { fontSize: '10px' } }, `${sortedModules.length} modules`),
+        h('span', { className: 'text-dim', style: { fontSize: '9px' } }, `Sorted: ${sortBy} ${sortDir.toUpperCase()}`)
       ),
       modules.length === 0 ?
-        h('div', { style: { padding: '24px', textAlign: 'center', color: 'var(--text-dim)' } }, 'No modules') :
-        h('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '12px' } },
-          modules.map((m, idx) =>
-            h('div', {
-              key: `${title}-${idx}`,
-              style: {
-                background: 'var(--bg-secondary)',
-                border: '1px solid var(--border)',
-                borderRadius: 'var(--radius-md)',
-                padding: '12px'
-              }
-            },
-              h('div', { style: { fontWeight: 600, marginBottom: '4px', fontSize: '12px' } }, m.name || 'unknown'),
-              h('div', { style: { fontSize: '10px', color: 'var(--text-dim)', marginBottom: '4px' } },
-                `${m.domain || '—'} • ${m.owner || '—'}`
-              ),
-              m.summary && h('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginTop: '8px' } }, m.summary)
+        h('div', { className: 'module-empty' }, 'No modules') :
+        h('div', { className: 'modules-table' },
+          h('div', { className: 'table-header' },
+            h('div', { className: 'table-cell name', onClick: () => handleSort('name'), title: 'Click to sort' }, 'Name', sortIndicator('name')),
+            h('div', { className: 'table-cell domain', onClick: () => handleSort('domain'), title: 'Click to sort' }, 'Domain', sortIndicator('domain')),
+            h('div', { className: 'table-cell owner', onClick: () => handleSort('owner'), title: 'Click to sort' }, 'Owner', sortIndicator('owner')),
+            h('div', { className: 'table-cell summary', onClick: () => handleSort('summary'), title: 'Click to sort' }, 'Summary', sortIndicator('summary'))
+          ),
+          sortedModules.map((m, idx) =>
+            h('div', { key: `${title}-${idx}`, className: 'table-row' },
+              h('div', { className: 'table-cell name truncate' }, m.name || '—'),
+              h('div', { className: 'table-cell domain truncate' }, m.domain || '—'),
+              h('div', { className: 'table-cell owner truncate' }, m.owner || '—'),
+              h('div', { className: 'table-cell summary truncate' }, m.summary || '—')
             )
           )
         )
-    )
-  );
+    );
+  };
 
   return h('div', null,
-    renderModuleGroup('SYSTEM MODULES', systemModules, '⚙️'),
-    renderModuleGroup('USER MODULES', userModules, '👤')
+    renderModuleTable('SYSTEM MODULES', systemModules, '⚙️'),
+    renderModuleTable('USER MODULES', userModules, '👤')
   );
 };
 
@@ -873,6 +972,22 @@ const App = () => {
   const handleFix = async () => {
     if (isFixing) return;
     setIsFixing(true);
+    setFixStatus('Checking tickets…');
+    
+    try {
+      const statsResp = await fetch(`${API_BASE}/tickets?limit=1`);
+      const statsData = await statsResp.json();
+      if (!statsResp.ok || !statsData || (statsData.total_open || 0) <= 0) {
+        setFixStatus('No open tickets to fix');
+        setIsFixing(false);
+        return;
+      }
+    } catch (err) {
+      setFixStatus(`Error: ${err.message}`);
+      setIsFixing(false);
+      return;
+    }
+    
     setFixStatus('Fixing the highest priority ticket…');
     triggerLogFlash();
 

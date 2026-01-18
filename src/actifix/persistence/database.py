@@ -30,81 +30,90 @@ class DatabaseSecurityError(Exception):
     pass
 
 
-def _validate_database_path(db_path: Path) -> None:
+DANGEROUS_PATH_PATTERNS = (
+    # Unix/Linux
+    "/tmp",
+    "/var/tmp",
+    "/dev/shm",  # Shared memory
+    "/mnt",      # Mounted filesystems
+    "/media",    # Removable media
+    "/proc",
+    "/sys",
+    "/root/.trash",
+    "/root/trash",
+    # macOS equivalents (after resolve())
+    "/private/tmp",
+    "/private/var/tmp",
+    # Trash directories
+    "/.trash",
+    "/trash",
+    # Windows
+    "c:\\temp",
+    "c:\\users\\public",
+    "c:\\windows\\temp",
+    "%temp%",
+    "%tmp%",
+)
+
+
+def _validate_database_path_directory(resolved_db_path: Path) -> None:
     """
-    Validate database path isn't in shared or public directories.
-
-    Prevents data leakage by ensuring the database is stored in
-    user-owned private directories, not shared system locations.
-
-    Args:
-        db_path: Path to the database file.
-
-    Raises:
-        DatabaseSecurityError: If path is in unsafe location.
+    Validate the directory portion of the database path against shared locations.
     """
-    db_path = db_path.resolve()
-    path_str = str(db_path).lower()
+    path_str = str(resolved_db_path).lower()
 
-    # Dangerous common shared/public locations (after resolve() on macOS)
-    # On macOS, /tmp -> /private/tmp, /var/tmp -> /private/var/tmp, etc.
-    dangerous_patterns = [
-        # Unix/Linux
-        "/tmp",
-        "/var/tmp",
-        "/dev/shm",  # Shared memory
-        "/mnt",      # Mounted filesystems
-        "/media",    # Removable media
-        "/proc",
-        "/sys",
-        "/root/.trash",
-        "/root/trash",
-        # macOS equivalents (after resolve())
-        "/private/tmp",
-        "/private/var/tmp",
-        # Trash directories
-        "/.trash",
-        "/trash",
-        # Windows
-        "c:\\temp",
-        "c:\\users\\public",
-        "c:\\windows\\temp",
-        "%temp%",
-        "%tmp%",
-    ]
-
-    # Check for dangerous paths
-    for pattern in dangerous_patterns:
+    for pattern in DANGEROUS_PATH_PATTERNS:
         pattern_lower = pattern.lower()
-        # Check if path starts with pattern or contains it as a directory component
         if (path_str.startswith(pattern_lower) or
             f"/{pattern_lower}/" in path_str or
             f"\\{pattern_lower}\\" in path_str):
             raise DatabaseSecurityError(
-                f"Database path '{db_path}' is in a shared or public directory. "
-                f"Please use a private user directory (e.g., ~/.actifix or ./data)."
+                f"Database path '{resolved_db_path}' is in a shared or public directory. "
+                "Please use a private user directory (e.g., ~/.actifix or ./data)."
             )
 
-    # Check file permissions if file exists
+
+def _validate_database_file_permissions(resolved_db_path: Path) -> None:
+    """
+    Ensure the database file is not world-readable or world-writable.
+    """
     try:
-        if db_path.exists():
-            # Get file stat
-            stat_info = db_path.stat()
-            # Check if world-readable (mode & 0o004 != 0)
-            # or world-writable (mode & 0o002 != 0)
+        if resolved_db_path.exists():
+            stat_info = resolved_db_path.stat()
             if stat_info.st_mode & 0o004:
                 raise DatabaseSecurityError(
-                    f"Database file '{db_path}' is world-readable. "
-                    f"Restrict file permissions with 'chmod 600'."
+                    f"Database file '{resolved_db_path}' is world-readable. "
+                    "Restrict file permissions with 'chmod 600'."
                 )
             if stat_info.st_mode & 0o002:
                 raise DatabaseSecurityError(
-                    f"Database file '{db_path}' is world-writable. "
-                    f"Restrict file permissions with 'chmod 600'."
+                    f"Database file '{resolved_db_path}' is world-writable. "
+                    "Restrict file permissions with 'chmod 600'."
                 )
-    except (OSError, PermissionError) as e:
-        # If we can't check permissions, log warning but continue
-        # (might be on different filesystem or permission issue)
+    except (OSError, PermissionError):
+        # Permission checks may fail on exotic filesystems; tolerate them.
+        pass
+
+
+def _validate_database_path(db_path: Path) -> None:
+    """
+    Validate database path isn't in shared or public directories and has secure permissions.
+    """
+    resolved = db_path.resolve()
+    _validate_database_path_directory(resolved)
+    _validate_database_file_permissions(resolved)
+
+
+def _ensure_database_file_secure(db_path: Path) -> None:
+    """Create/security-fix the database file before opening it."""
+    resolved = db_path.resolve()
+    resolved.parent.mkdir(parents=True, exist_ok=True)
+    resolved.touch(exist_ok=True)
+
+    try:
+        os.chmod(resolved, 0o600)
+    except OSError:
+        # Unable to adjust permissions; validation will flag this later.
         pass
 
 # Database schema with indexing and locking support
@@ -343,6 +352,18 @@ class DatabasePool:
             # Ensure database directory exists
             self.config.db_path.parent.mkdir(parents=True, exist_ok=True)
 
+            # Create database file with secure permissions BEFORE SQLite creates it
+            # This prevents the window where the file exists with world-readable permissions
+            if not self.config.db_path.exists():
+                # Touch the file and immediately set secure permissions
+                self.config.db_path.touch(mode=0o600, exist_ok=True)
+            else:
+                # File exists - ensure it has secure permissions
+                try:
+                    os.chmod(self.config.db_path, 0o600)
+                except OSError:
+                    pass
+
             conn = sqlite3.connect(
                 str(self.config.db_path),
                 timeout=self.config.timeout,
@@ -360,16 +381,21 @@ class DatabasePool:
             # Row factory for dict-like access
             conn.row_factory = sqlite3.Row
 
-            self._local.connection = conn
-
             # Initialize schema if this is first connection
             # Acquire lock to prevent race condition where multiple threads
             # try to initialize schema simultaneously
+            # IMPORTANT: Do this BEFORE assigning connection to prevent other threads
+            # from getting an incompletely initialized connection
             with self._lock:
                 # Double-check pattern: check again inside lock
                 if not self._initialized:
                     self._initialize_schema(conn)
                     self._initialized = True
+
+            # Only assign connection AFTER schema is fully initialized
+            # This prevents race condition where fast path returns connection
+            # before schema initialization completes
+            self._local.connection = conn
 
         except sqlite3.Error as e:
             raise DatabaseConnectionError(f"Failed to connect to database: {e}") from e
@@ -597,12 +623,25 @@ class DatabasePool:
                         # RESTART checkpoint: blocks until all frames in WAL are transferred to database
                         # This ensures data is properly persisted before connection closes
                         self._local.connection.execute("PRAGMA wal_checkpoint(RESTART)")
-                        # Force filesystem sync to ensure data is physically written to disk
-                        # This prevents data loss even in case of power failure or OS crash
-                        self._local.connection.execute("PRAGMA fullfsync = ON")
+                        # Explicit commit to ensure all transactions are flushed
+                        self._local.connection.commit()
                     except sqlite3.Error:
                         # Non-fatal: continue with close even if checkpoint fails
                         pass
+
+                # Perform explicit fsync on the database file itself
+                # This ensures data is physically written to disk, preventing data loss
+                # in case of power failure or OS crash after the checkpoint
+                try:
+                    db_fd = os.open(str(self.config.db_path), os.O_RDONLY)
+                    try:
+                        os.fsync(db_fd)
+                    finally:
+                        os.close(db_fd)
+                except (OSError, IOError):
+                    # Non-fatal: database may not exist or be accessible
+                    pass
+
                 self._local.connection.close()
             except sqlite3.Error:
                 pass
@@ -639,15 +678,36 @@ def get_database_pool(db_path: Optional[Path] = None) -> DatabasePool:
         env_db_path = os.environ.get("ACTIFIX_DB_PATH")
         db_path = Path(env_db_path).expanduser() if env_db_path else (_Path.cwd() / "data" / "actifix.db")
 
-    # Validate database path for security
-    _validate_database_path(db_path)
+    resolved_db_path = db_path.resolve()
+    _validate_database_path_directory(resolved_db_path)
+    _ensure_database_file_secure(resolved_db_path)
+    _validate_database_file_permissions(resolved_db_path)
 
     with _pool_lock:
-        if _global_pool is None or _global_pool.config.db_path != db_path:
-            config = DatabaseConfig(db_path=db_path)
+        if _global_pool is None or _global_pool.config.db_path != resolved_db_path:
+            config = DatabaseConfig(db_path=resolved_db_path)
             _global_pool = DatabasePool(config)
         
         return _global_pool
+
+
+def get_database_connection(paths: Optional[object] = None) -> sqlite3.Connection:
+    """
+    Backward-compatible helper to get a raw database connection.
+
+    Accepts an optional paths object with a project_root attribute. Uses
+    ACTIFIX_DB_PATH when set, otherwise falls back to <project_root>/data/actifix.db.
+    """
+    env_db_path = os.environ.get("ACTIFIX_DB_PATH")
+    if env_db_path:
+        db_path = Path(env_db_path).expanduser()
+    elif paths is not None and hasattr(paths, "project_root"):
+        db_path = Path(getattr(paths, "project_root")) / "data" / "actifix.db"
+    else:
+        db_path = Path.cwd() / "data" / "actifix.db"
+
+    pool = get_database_pool(db_path=db_path)
+    return pool._get_connection()
 
 
 def reset_database_pool() -> None:

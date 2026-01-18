@@ -2,7 +2,11 @@ import threading
 from types import SimpleNamespace
 from pathlib import Path
 
-import start
+import pytest
+
+from scripts import start
+
+pytestmark = [pytest.mark.integration]
 
 
 class DummyProcess:

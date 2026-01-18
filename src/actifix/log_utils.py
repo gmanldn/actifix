@@ -10,6 +10,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
+LOG_ROTATION_THRESHOLD_BYTES = int(
+    os.getenv("ACTIFIX_LOG_ROTATION_THRESHOLD_BYTES", str(8 * 1024 * 1024))
+)
+LOG_ROTATION_KEEP_FILES = int(os.getenv("ACTIFIX_LOG_ROTATION_KEEP_FILES", "3"))
+
 
 def atomic_write(path: Path, content: str, encoding: str = "utf-8") -> None:
     """
@@ -118,25 +123,65 @@ def trim_to_line_boundary(content: str, max_bytes: int) -> str:
     return truncated
 
 
+def _rotate_log_file(path: Path, threshold: int, keep: int) -> None:
+    """Rotate the log file when it exceeds the configured threshold."""
+    if keep <= 0:
+        return
+    path = Path(path)
+    if not path.exists():
+        return
+
+    try:
+        if path.stat().st_size < threshold:
+            return
+    except OSError:
+        return
+
+    try:
+        for idx in range(keep - 1, 0, -1):
+            src = path.with_name(f"{path.name}.{idx}")
+            dst = path.with_name(f"{path.name}.{idx + 1}")
+            if dst.exists():
+                dst.unlink()
+            if src.exists():
+                src.replace(dst)
+
+        rotated = path.with_name(f"{path.name}.1")
+        if rotated.exists():
+            rotated.unlink()
+        path.replace(rotated)
+        path.touch()
+    except OSError:
+        # Rotation failure should not block logging
+        return
+
+
 def append_with_guard(
     path: Path,
     content: str,
-    max_size_bytes: int = 10 * 1024 * 1024,  # 10MB default
+    max_size_bytes: Optional[int] = None,
     encoding: str = "utf-8",
 ) -> None:
     """
     Append content to file with size limit enforcement.
-    
+
     If file exceeds max size after append, trims from the beginning
     at line boundaries.
-    
+
     Args:
         path: Target file path.
         content: Content to append.
-        max_size_bytes: Maximum file size in bytes.
+        max_size_bytes: Maximum file size in bytes. Defaults to config.max_log_size_bytes.
         encoding: Text encoding.
     """
     path = Path(path)
+
+    # Use config default if not specified
+    if max_size_bytes is None:
+        from .config import get_config
+        max_size_bytes = get_config().max_log_size_bytes
+
+    _rotate_log_file(path, LOG_ROTATION_THRESHOLD_BYTES, LOG_ROTATION_KEEP_FILES)
     
     # Read existing content
     existing = ""
@@ -209,8 +254,8 @@ def log_event(
     """
     Log a structured event to the database event_log table.
     
-    MIGRATION NOTE: Now uses database storage instead of AFLog.txt.
-    The 'path' parameter is deprecated and ignored.
+    MIGRATION NOTE: Uses database storage; file logging is deprecated.
+    The 'path' parameter is ignored for backward compatibility.
     
     Args:
         event_type: Type of event (e.g., TICKET_CREATED, DISPATCH_STARTED). Legacy
@@ -226,7 +271,6 @@ def log_event(
         path: DEPRECATED - ignored (for backward compatibility).
     """
     try:
-        from .persistence.event_repo import get_event_repository
         import json
 
         # Support the legacy signature that passed the AF log path first.
@@ -252,29 +296,24 @@ def log_event(
                 extra_json = json.dumps(extra, default=str)
             except Exception:
                 extra_json = str(extra)
-        
-        # Log to database
-        repo = get_event_repository()
-        repo.log_event(
-            event_type=event_type,
-            message=message,
-            ticket_id=ticket_id,
-            correlation_id=correlation_id,
-            extra_json=extra_json,
-            source=source,
-            level=level,
-        )
 
-        if path:
-            try:
-                timestamp = datetime.now(timezone.utc).isoformat()
-                entry = (
-                    f"{timestamp} | {level} | "
-                    f"{event_type} | {message}\n"
-                )
-                append_with_guard(Path(path), entry)
-            except Exception:
-                pass
+        # Log to database (independent try-except to not block file logging)
+        try:
+            from .persistence.event_repo import get_event_repository
+            repo = get_event_repository()
+            repo.log_event(
+                event_type=event_type,
+                message=message,
+                ticket_id=ticket_id,
+                correlation_id=correlation_id,
+                extra_json=extra_json,
+                source=source,
+                level=level,
+            )
+        except Exception:
+            # Silently fail database logging to not block file logging
+            pass
+
     except Exception:
         # Silently fail to avoid recursive logging errors
         pass

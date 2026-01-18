@@ -252,6 +252,19 @@ class TestTokenDetection:
         finally:
             os.unlink(temp_file)
 
+
+class TestScannerSkipsFixtures:
+    """Ensure known fixtures are ignored during pre-commit scanning."""
+
+    def test_skips_test_fixture_files(self):
+        scanner = SecretsScanner()
+        # These files intentionally contain sample secrets; they should be skipped
+        matches = scanner.scan_file("test/test_secrets_scanner.py")
+        assert matches == []
+
+        matches = scanner.scan_file("test/test_actifix_basic.py")
+        assert matches == []
+
     def test_detects_jwt_token(self):
         """Verify JWT token pattern is detected."""
         scanner = SecretsScanner()
@@ -472,14 +485,14 @@ class TestScanResults:
     def test_secret_match_dataclass(self):
         """Verify SecretMatch dataclass works."""
         match = SecretMatch(
-            file_path='test.py',
+            file_path='test/test_runner.py',
             line_number=42,
             secret_type='openai_api_key',
             context='api_key = "sk-1234567890abcdef1234"',
             severity='high',
         )
 
-        assert match.file_path == 'test.py'
+        assert match.file_path == 'test/test_runner.py'
         assert match.line_number == 42
         assert match.secret_type == 'openai_api_key'
         assert match.severity == 'high'

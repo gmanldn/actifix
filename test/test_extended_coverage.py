@@ -48,7 +48,10 @@ from actifix.persistence.paths import (
     get_storage_paths,
 )
 from actifix.persistence.ticket_repo import get_ticket_repository
+from actifix.persistence.event_repo import get_event_repository, EventFilter
 from actifix.raise_af import ActifixEntry, TicketPriority
+
+pytestmark = [pytest.mark.integration, pytest.mark.slow]
 
 
 def _seed_ticket(
@@ -448,9 +451,9 @@ class TestDoAFProcessing:
         assert processed is not None
         stored = get_ticket_repository().get_ticket(entry.ticket_id)
         assert stored["status"] == "Completed"
-        log_content = paths.aflog_file.read_text()
-        assert "DISPATCH_STARTED" in log_content
-        assert "TICKET_COMPLETED" in log_content
+        repo = get_event_repository()
+        assert repo.get_events(EventFilter(event_type="DISPATCH_STARTED", limit=5))
+        assert repo.get_events(EventFilter(event_type="TICKET_COMPLETED", limit=5))
 
     def test_process_tickets_respects_limit(self, tmp_path):
         paths = get_actifix_paths(project_root=tmp_path)
@@ -473,7 +476,8 @@ class TestDoAFProcessing:
 
         processed = process_next_ticket(fail_handler, paths=paths, use_ai=False)
         assert processed is not None
-        assert "DISPATCH_FAILED" in paths.aflog_file.read_text()
+        repo = get_event_repository()
+        assert repo.get_events(EventFilter(event_type="DISPATCH_FAILED", limit=5))
 
     def test_mark_ticket_complete_summary_persists(self, tmp_path):
         paths = get_actifix_paths(project_root=tmp_path)
@@ -491,51 +495,47 @@ class TestDoAFProcessing:
 class TestLogUtils:
     """Test logging utilities."""
     
-    def test_log_event_writes_log(self, tmp_path):
-        """Test log event writes to file."""
-        log_file = tmp_path / "test.log"
-        
-        log_event(log_file, "TEST_EVENT", "Test message")
-        
-        assert log_file.exists()
-    
-    def test_log_event_includes_timestamp(self, tmp_path):
+    def test_log_event_writes_db(self):
+        """Test log event writes to the database."""
+        repo = get_event_repository()
+        log_event("TEST_EVENT", "Test message")
+
+        events = repo.get_events(EventFilter(event_type="TEST_EVENT", limit=5))
+        assert any(event.get("message") == "Test message" for event in events)
+
+    def test_log_event_includes_timestamp(self):
         """Test log includes timestamp."""
-        log_file = tmp_path / "test.log"
-        
-        log_event(log_file, "EVENT", "Message")
-        
-        content = log_file.read_text()
-        assert len(content) > 0
-    
-    def test_log_event_includes_event_type(self, tmp_path):
+        repo = get_event_repository()
+        log_event("EVENT_TS", "Message")
+
+        events = repo.get_events(EventFilter(event_type="EVENT_TS", limit=1))
+        assert events and events[0].get("timestamp")
+
+    def test_log_event_includes_event_type(self):
         """Test log includes event type."""
-        log_file = tmp_path / "test.log"
-        
-        log_event(log_file, "TEST_TYPE", "Message")
-        
-        content = log_file.read_text()
-        assert "TEST_TYPE" in content
-    
-    def test_log_event_includes_message(self, tmp_path):
+        repo = get_event_repository()
+        log_event("TEST_TYPE", "Message")
+
+        events = repo.get_events(EventFilter(event_type="TEST_TYPE", limit=1))
+        assert events and events[0].get("event_type") == "TEST_TYPE"
+
+    def test_log_event_includes_message(self):
         """Test log includes message."""
-        log_file = tmp_path / "test.log"
-        
-        log_event(log_file, "EVENT", "Specific message")
-        
-        content = log_file.read_text()
-        assert "Specific message" in content
-    
-    def test_log_event_appends(self, tmp_path):
-        """Test log event appends to existing file."""
-        log_file = tmp_path / "test.log"
-        
-        log_event(log_file, "EVENT1", "First")
-        log_event(log_file, "EVENT2", "Second")
-        
-        content = log_file.read_text()
-        assert "First" in content
-        assert "Second" in content
+        repo = get_event_repository()
+        log_event("EVENT_MESSAGE", "Specific message")
+
+        events = repo.get_events(EventFilter(event_type="EVENT_MESSAGE", limit=1))
+        assert events and events[0].get("message") == "Specific message"
+
+    def test_log_event_appends(self):
+        """Test log event appends to event log table."""
+        repo = get_event_repository()
+        log_event("EVENT1", "First")
+        log_event("EVENT2", "Second")
+
+        events_one = repo.get_events(EventFilter(event_type="EVENT1", limit=1))
+        events_two = repo.get_events(EventFilter(event_type="EVENT2", limit=1))
+        assert events_one and events_two
 
     def test_append_with_guard_trims(self, tmp_path):
         """Test append_with_guard trims oversized content."""
@@ -560,11 +560,11 @@ class TestLogUtils:
     
     def test_log_event_extra_data(self, tmp_path):
         """Test log event with extra data."""
-        log_file = tmp_path / "test.log"
-        
-        log_event(log_file, "EVENT", "Message", extra={"key": "value"})
-        
-        assert log_file.exists()
+        repo = get_event_repository()
+        log_event("EVENT_EXTRA", "Message", extra={"key": "value"})
+
+        events = repo.get_events(EventFilter(event_type="EVENT_EXTRA", limit=1))
+        assert events and "key" in (events[0].get("extra_json") or "")
     
     def test_trim_to_line_boundary_basic(self):
         """Test trimming to line boundary."""
@@ -598,43 +598,38 @@ class TestLogUtils:
         assert result == ""
     
     def test_log_rotation_size_limit(self, tmp_path):
-        """Test log rotation based on size."""
-        log_file = tmp_path / "rotating.log"
-        
+        """Test repeated logging does not fail."""
+        repo = get_event_repository()
         for i in range(100):
-            log_event(log_file, "EVENT", f"Message {i}")
-        
-        # File should exist and have content
-        assert log_file.exists()
+            log_event("ROTATE_EVENT", f"Message {i}")
+
+        events = repo.get_events(EventFilter(event_type="ROTATE_EVENT", limit=200))
+        assert len(events) >= 50
     
     def test_log_format_consistency(self, tmp_path):
         """Test consistent log format."""
-        log_file = tmp_path / "format.log"
-        
-        log_event(log_file, "EVENT", "Message")
-        
-        content = log_file.read_text()
-        # Should have structured format
-        assert len(content) > 0
+        repo = get_event_repository()
+        log_event("FORMAT_EVENT", "Message")
+
+        events = repo.get_events(EventFilter(event_type="FORMAT_EVENT", limit=1))
+        assert events and events[0].get("event_type") == "FORMAT_EVENT"
     
     def test_log_unicode_support(self, tmp_path):
         """Test logging unicode content."""
-        log_file = tmp_path / "unicode.log"
-        
-        log_event(log_file, "EVENT", "Unicode: 测试")
-        
-        content = log_file.read_text()
-        assert "测试" in content
+        repo = get_event_repository()
+        log_event("UNICODE_EVENT", "Unicode: 测试")
+
+        events = repo.get_events(EventFilter(event_type="UNICODE_EVENT", limit=1))
+        assert events and "测试" in (events[0].get("message") or "")
     
     def test_log_concurrent_writes(self, tmp_path):
         """Test concurrent log writes."""
-        log_file = tmp_path / "concurrent.log"
-        
+        repo = get_event_repository()
         for i in range(50):
-            log_event(log_file, f"EVENT{i}", f"Message {i}")
-        
-        # All writes should succeed
-        assert log_file.exists()
+            log_event(f"EVENT{i}", f"Message {i}")
+
+        events = repo.get_events(EventFilter(limit=100))
+        assert len(events) >= 50
     
     def test_log_error_handling(self, tmp_path):
         """Test log handles write errors gracefully."""

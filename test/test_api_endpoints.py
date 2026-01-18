@@ -22,13 +22,20 @@ from actifix.persistence.ticket_repo import (
 )
 from actifix.raise_af import ActifixEntry, TicketPriority
 from actifix.state_paths import get_actifix_paths, init_actifix_files
+from actifix.log_utils import log_event
 
 
 def _write_log(paths):
-    paths.aflog_file.write_text(
-        "2026-01-12T00:00:00Z | TICKET_COMPLETED | ACT-1 | Completed via API | {}\n"
-        "2026-01-12T01:00:00Z | ASCII_BANNER | ACT-1 | ✓ Banner line\n",
-        encoding="utf-8",
+    log_event(
+        "TICKET_COMPLETED",
+        "Completed via API",
+        ticket_id="ACT-1",
+        level="SUCCESS",
+    )
+    log_event(
+        "ASCII_BANNER",
+        "✓ Banner line",
+        ticket_id="ACT-1",
     )
 
 
@@ -84,6 +91,7 @@ def api_workspace(tmp_path, monkeypatch):
     reset_ticket_repository()
 
 
+@pytest.mark.api
 def test_api_version_and_modules(api_workspace, monkeypatch):
     app = create_app(project_root=api_workspace)
 
@@ -112,6 +120,7 @@ def test_api_version_and_modules(api_workspace, monkeypatch):
     assert any(m["name"] == "runtime-utils" for m in modules["system"])
 
 
+@pytest.mark.api
 def test_api_logs_stats_and_tickets(api_workspace, monkeypatch):
     app = create_app(project_root=api_workspace)
     client = app.test_client()
@@ -143,6 +152,7 @@ def test_api_logs_stats_and_tickets(api_workspace, monkeypatch):
     assert any(line["level"] == "SUCCESS" for line in logs_resp["content"])
 
 
+@pytest.mark.api
 def test_api_settings_and_ping(api_workspace):
     app = create_app(project_root=api_workspace)
     client = app.test_client()
@@ -164,6 +174,7 @@ def test_api_settings_and_ping(api_workspace):
     assert ping["status"] == "ok"
 
 
+@pytest.mark.api
 def test_api_fix_and_system(api_workspace):
     app = create_app(project_root=api_workspace)
     client = app.test_client()

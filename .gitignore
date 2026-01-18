@@ -2,9 +2,13 @@
 .coverage
 __pycache__/
 .pytest_cache/
+.pytest_results.xml
 .actifix/test_logs/
 .actifix/
 .state/
+data/actifix.db
+data/actifix.db-shm
+data/actifix.db-wal
 actifix/ACTIFIX-LIST.md
 actifix/ACTIFIX.md
 actifix/ACTIFIX-LOG.md
@@ -14,3 +18,12 @@ actifix/quarantine/
 logs/
 src/actifix/**/__pycache__/
 test/**/__pycache__/
+.vscode/
+scripts/data/
+scripts/actifix/
+
+# Databases to prevent merge conflicts in multi-agent workflows
+test/data/actifix.*
+test/data/*.db
+test/data/*.db-shm
+test/data/*.db-wal

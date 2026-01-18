@@ -7,6 +7,93 @@ Ticket Repository - Database operations for Actifix tickets
 Provides CRUD operations with locking, filtering, and duplicate prevention.
 Thread-safe with lease-based locking for concurrent ticket processing.
 
+LEASE-BASED LOCKING MECHANISM:
+
+This module implements a sophisticated lease-based distributed locking pattern
+that is essential for concurrent ticket processing in a multi-agent environment.
+
+Why Lease-Based Locking?
+------------------------
+Traditional persistent locks can deadlock if a process crashes while holding a lock.
+Lease-based locking prevents this through automatic expiry:
+
+1. When a lock is acquired, it has a fixed duration (default: 1 hour)
+2. If the lock holder doesn't renew it before expiry, the lock automatically expires
+3. Other processes can then acquire the same ticket, preventing deadlock scenarios
+4. Lock holders must periodically renew locks on tickets they're still processing
+
+Lock Acquisition Strategy:
+--------------------------
+The lock acquisition uses SQLite's IMMEDIATE transactions to prevent TOCTOU
+(Time-Of-Check-Time-Of-Use) race conditions:
+
+1. Start an IMMEDIATE transaction (acquires write lock immediately)
+2. Check ticket status and expiry time atomically
+3. Update lock fields only if conditions still hold
+4. Commit atomic transaction - this prevents other threads from interleaving
+
+Key Properties:
+- ATOMIC: Lock check and acquisition are indivisible
+- SAFE: No TOCTOU race conditions between threads
+- RELIABLE: Automatic cleanup of stale locks prevents deadlock
+- FAIR: get_and_lock_next_ticket() ensures each thread gets different tickets
+
+Default Lease Duration (1 Hour):
+--------------------------------
+The 1-hour default was chosen based on these considerations:
+
+1. LONG ENOUGH: Gives typical AI agents sufficient time to process complex tickets
+   - Most ticket processing takes 5-30 minutes
+   - 1 hour provides 2-12x safety margin
+   - Accounts for occasional network delays
+
+2. SHORT ENOUGH: Prevents blocking for too long if a process crashes
+   - System can recover from failed agents within 1 hour
+   - Doesn't leave tickets locked for days/weeks
+   - Balances availability vs. processing safety
+
+3. CONFIGURABLE: Can be tuned per-deployment via lease_duration parameter
+   - Fast agents can renew frequently
+   - Slow systems can use longer leases
+   - Emergency overrides possible with shorter leases
+
+Lock Lifecycle Example:
+-----------------------
+>>> # Agent 1 acquires lock
+>>> lock = repo.acquire_lock("ACT-20260114-ABC12", "agent-1", lease_duration=timedelta(hours=1))
+>>> # Agent works on ticket... processing takes 30 minutes
+>>> # Agent renews lock before it expires (e.g., after 50 minutes)
+>>> renewed = repo.renew_lock("ACT-20260114-ABC12", "agent-1", lease_duration=timedelta(hours=1))
+>>> # Agent finishes and completes ticket
+>>> repo.release_lock("ACT-20260114-ABC12", "agent-1")
+>>> # If agent crashed without releasing, lock auto-expires after 1 hour
+>>> # Then other agents can acquire it via get_and_lock_next_ticket()
+
+TICKET THROTTLING & LIMITS:
+
+The repository enforces several configurable limits to prevent DoS attacks
+and system overload:
+
+1. Message Length Limit (max_ticket_message_length)
+   - Prevents extremely long error messages from consuming disk space
+   - Default: 5000 characters
+   - Configurable via ACTIFIX_MAX_MESSAGE_LENGTH env var
+
+2. File Context Size Limit (max_file_context_size_bytes)
+   - Prevents large captured file context from bloating the database
+   - Default: 1MB
+   - Configurable via ACTIFIX_MAX_FILE_CONTEXT_BYTES env var
+   - Enforced at both create and update time
+
+3. Open Tickets Limit (max_open_tickets)
+   - Prevents system from accumulating too many unprocessed tickets
+   - Default: 10000
+   - Configurable via ACTIFIX_MAX_OPEN_TICKETS env var
+   - Enforced at create time to prevent queue overflow
+
+All limits are validated against configuration and raise appropriate exceptions
+when exceeded, providing clear error messages with actual vs. maximum values.
+
 Version: 1.0.0
 """
 
@@ -18,6 +105,7 @@ from pathlib import Path
 from typing import Optional, List, Dict, Any
 
 from ..raise_af import ActifixEntry, TicketPriority
+from ..config import ActifixConfig, get_config
 from .database import (
     get_database_pool,
     DatabasePool,
@@ -43,6 +131,11 @@ class FieldLengthError(ValueError):
     pass
 
 
+class OpenTicketLimitExceededError(Exception):
+    """Raised when attempting to create a ticket and open ticket limit is exceeded."""
+    pass
+
+
 def _validate_field_length(value: Optional[str], max_length: int, field_name: str) -> None:
     """Validate that a field doesn't exceed maximum length.
 
@@ -58,6 +151,35 @@ def _validate_field_length(value: Optional[str], max_length: int, field_name: st
         raise FieldLengthError(
             f"Field '{field_name}' exceeds maximum length of {max_length} chars "
             f"(got {len(value)} chars)"
+        )
+
+
+def _validate_file_context_size(
+    file_context: Optional[Dict[str, str]],
+    max_size_bytes: int,
+    field_name: str = "file_context"
+) -> None:
+    """Validate that file context doesn't exceed maximum size.
+
+    Args:
+        file_context: The file context dict to validate.
+        max_size_bytes: Maximum allowed size in bytes.
+        field_name: Name of the field for error messages.
+
+    Raises:
+        FieldLengthError: If serialized size exceeds max_size_bytes.
+    """
+    if not file_context:
+        return
+
+    # Serialize to JSON to get actual storage size
+    json_str = serialize_json_field(file_context)
+    size_bytes = len(json_str.encode('utf-8'))
+
+    if size_bytes > max_size_bytes:
+        raise FieldLengthError(
+            f"Field '{field_name}' exceeds maximum size of {max_size_bytes} bytes "
+            f"(got {size_bytes} bytes, {len(file_context)} files)"
         )
 
 
@@ -98,14 +220,16 @@ class TicketRepository:
     Provides thread-safe CRUD operations with locking support.
     """
     
-    def __init__(self, pool: Optional[DatabasePool] = None):
+    def __init__(self, pool: Optional[DatabasePool] = None, config: Optional[ActifixConfig] = None):
         """
         Initialize ticket repository.
-        
+
         Args:
             pool: Optional database pool (uses global pool if None).
+            config: Optional configuration (uses global config if None).
         """
         self.pool = pool or get_database_pool()
+        self.config = config or get_config()
     
     def create_ticket(self, entry: ActifixEntry) -> bool:
         """
@@ -119,19 +243,40 @@ class TicketRepository:
 
         Raises:
             FieldLengthError: If any field exceeds maximum length.
+            OpenTicketLimitExceededError: If open ticket limit is exceeded.
             DatabaseError: On database errors.
         """
         # Validate field lengths to prevent DoS attacks
-        _validate_field_length(entry.message, MAX_MESSAGE_LENGTH, "message")
+        _validate_field_length(entry.message, self.config.max_ticket_message_length, "message")
         _validate_field_length(entry.source, MAX_SOURCE_LENGTH, "source")
         _validate_field_length(entry.error_type, MAX_ERROR_TYPE_LENGTH, "error_type")
         _validate_field_length(entry.stack_trace, MAX_STACK_TRACE_LENGTH, "stack_trace")
         _validate_field_length(entry.ai_remediation_notes, MAX_FIELD_LENGTH, "ai_remediation_notes")
 
+        # Validate file context size
+        if entry.file_context:
+            _validate_file_context_size(
+                entry.file_context,
+                self.config.max_file_context_size_bytes,
+                "file_context"
+            )
+
         success = False
 
         try:
             with self.pool.transaction() as conn:
+                # Check if we would exceed the open ticket limit
+                cursor = conn.execute(
+                    "SELECT COUNT(*) as count FROM tickets WHERE status = 'Open' AND deleted = 0"
+                )
+                open_count = cursor.fetchone()['count']
+
+                if open_count >= self.config.max_open_tickets:
+                    raise OpenTicketLimitExceededError(
+                        f"Cannot create new ticket: Open ticket limit ({self.config.max_open_tickets}) "
+                        f"has been reached. Currently {open_count} open tickets exist. "
+                        f"Please complete or close some tickets before creating new ones."
+                    )
                 conn.execute(
                     """
                     INSERT INTO tickets (
@@ -335,7 +480,7 @@ class TicketRepository:
 
         # Validate field lengths to prevent DoS attacks
         field_limits = {
-            "message": MAX_MESSAGE_LENGTH,
+            "message": self.config.max_ticket_message_length,
             "source": MAX_SOURCE_LENGTH,
             "error_type": MAX_ERROR_TYPE_LENGTH,
             "stack_trace": MAX_STACK_TRACE_LENGTH,
@@ -346,10 +491,20 @@ class TicketRepository:
             if field_name in updates:
                 _validate_field_length(updates[field_name], max_length, field_name)
 
+        # Validate file_context size if present
+        if "file_context" in updates and updates["file_context"]:
+            _validate_file_context_size(
+                updates["file_context"],
+                self.config.max_file_context_size_bytes,
+                "file_context"
+            )
+
         old_values = {}
         success = False
 
-        with self.pool.transaction() as conn:
+        # Use BEGIN IMMEDIATE to acquire write locks upfront and prevent
+        # lock escalation conflicts in concurrent scenarios
+        with self.pool.transaction(immediate=True) as conn:
             # Get current ticket values for audit log
             cursor = conn.execute("SELECT * FROM tickets WHERE id = ?", (ticket_id,))
             current_row = cursor.fetchone()
@@ -502,26 +657,9 @@ class TicketRepository:
 
         try:
             with self.pool.transaction(immediate=True) as conn:
-                # Check if ticket exists and is not locked (or lease expired)
-                # Using immediate transaction prevents TOCTOU race condition
-                cursor = conn.execute(
-                    """
-                    SELECT id, locked_by, locked_at, lease_expires
-                    FROM tickets
-                    WHERE id = ? AND (
-                        locked_by IS NULL
-                        OR lease_expires < ?
-                    )
-                    """,
-                    (ticket_id, serialize_timestamp(now))
-                )
-
-                row = cursor.fetchone()
-                if row is None:
-                    return None
-
-                # Acquire lock - use WHERE clause to prevent TOCTOU race
-                # Only update if the condition still holds
+                # Acquire lock directly without separate SELECT to eliminate TOCTOU race
+                # The WHERE clause ensures we only lock if ticket is available or lease expired
+                # This is atomic - no window for another transaction to interfere
                 cursor = conn.execute(
                     """
                     UPDATE tickets
@@ -540,7 +678,7 @@ class TicketRepository:
                     )
                 )
 
-                # Verify update succeeded (prevent race condition where another thread locked it)
+                # If no rows updated, ticket doesn't exist or is already locked
                 if cursor.rowcount == 0:
                     return None
 
@@ -932,21 +1070,22 @@ class TicketRepository:
 _global_repo: Optional[TicketRepository] = None
 
 
-def get_ticket_repository(pool: Optional[DatabasePool] = None) -> TicketRepository:
+def get_ticket_repository(pool: Optional[DatabasePool] = None, config: Optional[ActifixConfig] = None) -> TicketRepository:
     """
     Get or create global ticket repository.
-    
+
     Args:
         pool: Optional database pool override.
-    
+        config: Optional configuration override.
+
     Returns:
         Ticket repository instance.
     """
     global _global_repo
-    
-    if _global_repo is None or (pool and _global_repo.pool != pool):
-        _global_repo = TicketRepository(pool=pool)
-    
+
+    if _global_repo is None or (pool and _global_repo.pool != pool) or (config and _global_repo.config != config):
+        _global_repo = TicketRepository(pool=pool, config=config)
+
     return _global_repo
 
 
