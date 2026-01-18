@@ -671,12 +671,13 @@ const SystemView = () => {
 
 // Settings View Component
 const SettingsView = () => {
-  const [aiProvider, setAiProvider] = useState('openai');
+  const [aiProvider, setAiProvider] = useState('mimo-flash-v2-free');
   const [aiApiKey, setAiApiKey] = useState('');
   const [aiModel, setAiModel] = useState('');
   const [aiEnabled, setAiEnabled] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
+  const { data: aiStatus } = useFetch('/ai-status', 8000);
 
   // Load current settings
   useEffect(() => {
@@ -685,7 +686,7 @@ const SettingsView = () => {
         const response = await fetch(`${API_BASE}/settings`);
         if (response.ok) {
           const data = await response.json();
-          setAiProvider(data.ai_provider || 'openai');
+          setAiProvider(data.ai_provider || 'mimo-flash-v2-free');
           setAiApiKey(data.ai_api_key || '');
           setAiModel(data.ai_model || '');
           setAiEnabled(data.ai_enabled || false);
@@ -729,13 +730,27 @@ const SettingsView = () => {
     }
   };
 
-  const providers = [
-    { value: 'openai', label: 'OpenAI' },
-    { value: 'anthropic', label: 'Anthropic (Claude)' },
-    { value: 'google', label: 'Google (Gemini)' },
-    { value: 'openrouter', label: 'OpenRouter' },
-    { value: 'ollama', label: 'Ollama (Local)' },
+  const fallbackProviders = [
+    { value: 'auto', label: 'Auto (Do_AF fallback chain)' },
+    { value: 'claude_local', label: 'Claude Code (local CLI)' },
+    { value: 'openai_cli', label: 'OpenAI CLI (local session)' },
+    { value: 'claude_api', label: 'Claude API' },
+    { value: 'openai', label: 'OpenAI API' },
+    { value: 'ollama', label: 'Ollama (local)' },
+    { value: 'mimo-flash-v2-free', label: 'Mimo Flash v2 Free (default)' },
   ];
+  const providerOptions = aiStatus?.provider_options || fallbackProviders;
+  const feedbackLog = aiStatus?.feedback_log?.join('\n') || 'No AI feedback yet.';
+  const providerOrder = aiStatus?.provider_order?.join(' → ') || '—';
+  const activeProvider = aiStatus?.active_provider || '—';
+  const activeModel = aiStatus?.active_model || '—';
+  const preferredProvider = aiStatus?.preferred_provider || aiProvider;
+
+  useEffect(() => {
+    if (aiProvider === 'mimo-flash-v2-free' && (!aiModel || aiModel === '')) {
+      setAiModel('mimo-flash-v2-free');
+    }
+  }, [aiProvider, aiModel]);
 
   return h('div', { className: 'panel' },
     h('div', { className: 'panel-header' },
@@ -744,120 +759,100 @@ const SettingsView = () => {
         'Settings'
       )
     ),
-    h('div', { style: { padding: '24px' } },
-      h('div', { style: { maxWidth: '600px', margin: '0 auto' } },
-        // AI Provider
-        h('div', { style: { marginBottom: '24px' } },
-          h('label', { style: { display: 'block', marginBottom: '8px', fontWeight: 600, fontSize: '13px' } }, 'AI Provider'),
+    h('div', { className: 'settings-grid' },
+      h('div', { className: 'settings-card' },
+        h('div', { className: 'settings-card-title' }, 'Active AI'),
+        h('div', { className: 'settings-metric' },
+          h('span', { className: 'settings-metric-label' }, 'Preferred'),
+          h('span', { className: 'settings-metric-value' }, preferredProvider)
+        ),
+        h('div', { className: 'settings-metric' },
+          h('span', { className: 'settings-metric-label' }, 'Active'),
+          h('span', { className: 'settings-metric-value' }, `${activeProvider} • ${activeModel}`)
+        ),
+        h('div', { className: 'settings-metric' },
+          h('span', { className: 'settings-metric-label' }, 'Provider Order'),
+          h('span', { className: 'settings-metric-value' }, providerOrder)
+        ),
+        h('div', { className: 'settings-pill-row' },
+          (aiStatus?.providers || []).map((provider) =>
+            h('span', {
+              key: provider.provider,
+              className: `settings-pill ${provider.available ? 'available' : 'unavailable'}`
+            }, provider.provider)
+          )
+        )
+      ),
+      h('div', { className: 'settings-card' },
+        h('div', { className: 'settings-card-title' }, 'AI Controls'),
+        h('div', { className: 'settings-field' },
+          h('label', { className: 'settings-label' }, 'Provider'),
           h('select', {
             value: aiProvider,
             onChange: (e) => setAiProvider(e.target.value),
-            style: {
-              width: '100%',
-              padding: '10px',
-              borderRadius: 'var(--radius-md)',
-              border: '1px solid var(--border)',
-              background: 'var(--bg-secondary)',
-              color: 'var(--text-primary)',
-              fontSize: '13px',
-            }
+            className: 'settings-input',
           },
-            providers.map(p => h('option', { key: p.value, value: p.value }, p.label))
+            providerOptions.map((p) => h('option', { key: p.value, value: p.value }, p.label))
           )
         ),
-
-        // API Key
-        h('div', { style: { marginBottom: '24px' } },
-          h('label', { style: { display: 'block', marginBottom: '8px', fontWeight: 600, fontSize: '13px' } }, 'API Key'),
+        h('div', { className: 'settings-field' },
+          h('label', { className: 'settings-label' }, 'API Key'),
           h('input', {
             type: 'password',
             value: aiApiKey,
             onChange: (e) => setAiApiKey(e.target.value),
-            placeholder: 'Enter your API key',
-            style: {
-              width: '100%',
-              padding: '10px',
-              borderRadius: 'var(--radius-md)',
-              border: '1px solid var(--border)',
-              background: 'var(--bg-secondary)',
-              color: 'var(--text-primary)',
-              fontSize: '13px',
-            }
+            placeholder: 'Provider API key (when needed)',
+            className: 'settings-input',
           })
         ),
-
-        // AI Model
-        h('div', { style: { marginBottom: '24px' } },
-          h('label', { style: { display: 'block', marginBottom: '8px', fontWeight: 600, fontSize: '13px' } }, 'Model Name (Optional)'),
+        h('div', { className: 'settings-field' },
+          h('label', { className: 'settings-label' }, 'Model'),
           h('input', {
             type: 'text',
             value: aiModel,
             onChange: (e) => setAiModel(e.target.value),
-            placeholder: 'e.g., gpt-4, claude-3-sonnet, gemini-pro',
-            style: {
-              width: '100%',
-              padding: '10px',
-              borderRadius: 'var(--radius-md)',
-              border: '1px solid var(--border)',
-              background: 'var(--bg-secondary)',
-              color: 'var(--text-primary)',
-              fontSize: '13px',
-            }
+            placeholder: 'Default model override',
+            className: 'settings-input',
           })
         ),
-
-        // Enable AI
-        h('div', { style: { marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '12px' } },
+        h('div', { className: 'settings-toggle' },
           h('input', {
             type: 'checkbox',
             checked: aiEnabled,
             onChange: (e) => setAiEnabled(e.target.checked),
             id: 'ai-enabled',
-            style: { width: '18px', height: '18px', cursor: 'pointer' }
           }),
-          h('label', { htmlFor: 'ai-enabled', style: { fontWeight: 600, fontSize: '13px', cursor: 'pointer' } }, 'Enable AI Integration')
+          h('label', { htmlFor: 'ai-enabled' }, 'Enable AI Integration')
         ),
-
-        // Save Button
-        h('div', { style: { marginTop: '32px', display: 'flex', gap: '12px', alignItems: 'center' } },
+        h('div', { className: 'settings-actions' },
           h('button', {
             className: 'btn btn-primary',
             onClick: handleSave,
             disabled: saving,
-            style: {
-              padding: '10px 24px',
-              fontSize: '13px',
-              fontWeight: 600,
-            }
           }, saving ? 'Saving...' : 'Save Settings'),
           message && h('span', {
-            style: {
-              fontSize: '12px',
-              color: message.includes('Error') ? '#ef4444' : '#10b981',
-            }
+            className: `settings-message ${message.includes('Error') ? 'error' : 'ok'}`,
           }, message)
+        )
+      ),
+      h('div', { className: 'settings-card' },
+        h('div', { className: 'settings-card-title' }, 'AI Feedback Log'),
+        h('textarea', {
+          className: 'settings-log',
+          readOnly: true,
+          value: feedbackLog,
+        })
+      ),
+      h('div', { className: 'settings-card settings-note' },
+        h('div', { className: 'settings-card-title' }, 'Notes'),
+        h('div', { className: 'settings-note-text' },
+          'Settings are stored in memory and will reset when the server restarts. For persistent configuration, set environment variables:'
         ),
-
-        // Info
-        h('div', {
-          style: {
-            marginTop: '32px',
-            padding: '16px',
-            background: 'var(--bg-secondary)',
-            border: '1px solid var(--border)',
-            borderRadius: 'var(--radius-md)',
-            fontSize: '12px',
-            color: 'var(--text-muted)',
-          }
-        },
-          h('div', { style: { marginBottom: '8px', fontWeight: 600 } }, '💡 Note:'),
-          h('div', null, 'Settings are stored in memory and will reset when the server restarts. For persistent configuration, set environment variables:'),
-          h('ul', { style: { marginTop: '8px', paddingLeft: '20px' } },
-            h('li', null, 'ACTIFIX_AI_PROVIDER'),
-            h('li', null, 'ACTIFIX_AI_API_KEY'),
-            h('li', null, 'ACTIFIX_AI_MODEL'),
-            h('li', null, 'ACTIFIX_AI_ENABLED')
-          )
+        h('ul', { className: 'settings-note-list' },
+          h('li', null, 'ACTIFIX_AI_PROVIDER'),
+          h('li', null, 'ACTIFIX_AI_API_KEY'),
+          h('li', null, 'ACTIFIX_AI_MODEL'),
+          h('li', null, 'ACTIFIX_AI_ENABLED')
         )
       )
     )
