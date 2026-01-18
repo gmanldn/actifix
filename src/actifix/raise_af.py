@@ -224,15 +224,24 @@ def _truncate_context_text(text: str, max_chars: int) -> str:
     if not text or len(text) <= max_chars:
         return text
 
-    head = text[: max_chars // 2]
-    tail = text[-(max_chars // 2) :]
+    # Reserve space for truncation marker
+    marker = "\n... (truncated) ...\n"
+    marker_len = len(marker)
+    available = max_chars - marker_len
+
+    # Split available space between head and tail
+    head_size = available // 2
+    tail_size = available - head_size  # Use remaining space for tail
+
+    head = text[:head_size]
+    tail = text[-tail_size:]
     head_border = head.rfind("\n")
     tail_border = tail.find("\n")
 
     head = head[: head_border] if head_border > 0 else head
     tail = tail[tail_border + 1 :] if tail_border >= 0 else tail
 
-    return f"{head}\n... (truncated) ...\n{tail}"
+    return f"{head}{marker}{tail}"
 
 
 def _ensure_structured_message(message: str) -> str:
