@@ -315,6 +315,7 @@ def run_pytest(
     # Add JUnit XML output for failure tracking
     junit_file = ROOT / ".pytest_results.xml"
     cmd += ["--junit-xml", str(junit_file)]
+    xdist_args = _collect_xdist_args()
 
     if coverage:
         try:
@@ -330,10 +331,10 @@ def run_pytest(
                 "-m",
                 "not slow and not very_slow and not performance and not db and not integration and not concurrent",
             ]
-            cmd.extend(_collect_xdist_args())
+            cmd.extend(xdist_args)
         else:
             # Full coverage: run all tests, but still use parallel if available
-            cmd.extend(_collect_xdist_args())
+            cmd.extend(xdist_args)
     else:
         # Non-coverage runs can also use fast mode
         if fast_coverage:
@@ -341,6 +342,9 @@ def run_pytest(
                 "-m",
                 "not slow and not very_slow and not performance and not db and not integration and not concurrent",
             ]
+            cmd.extend(xdist_args)
+        else:
+            cmd.extend(xdist_args)
 
     if quick:
         # Quick mode keeps the suite narrow and quiet
