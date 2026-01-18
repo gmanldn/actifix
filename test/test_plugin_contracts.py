@@ -24,18 +24,13 @@ class PluginProtocolContract:
     """Defines the expected contract for Plugin implementations."""
 
     REQUIRED_METHODS = {
-        "name",
-        "version",
-        "initialize",
-        "shutdown",
-        "get_features",
-        "handle_event",
+        "register",
+        "unregister",
+        "health",
     }
 
     REQUIRED_ATTRIBUTES = {
-        "name",
-        "version",
-        "description",
+        "metadata",
     }
 
     @classmethod
@@ -99,106 +94,87 @@ class TestPluginContracts:
 
     def test_core_plugin_method_signatures(self):
         """Test CorePlugin method signatures are correct."""
-        # Check initialize method
-        assert callable(CorePlugin.initialize), "initialize must be callable"
+        # Check register method
+        assert callable(CorePlugin.register), "register must be callable"
 
-        # Check shutdown method
-        assert callable(CorePlugin.shutdown), "shutdown must be callable"
+        # Check unregister method
+        assert callable(CorePlugin.unregister), "unregister must be callable"
 
-        # Check get_features method
-        assert callable(CorePlugin.get_features), "get_features must be callable"
-
-        # Check handle_event method
-        assert callable(CorePlugin.handle_event), "handle_event must be callable"
+        # Check health method
+        assert callable(CorePlugin.health), "health must be callable"
 
     def test_core_plugin_attributes(self):
         """Test CorePlugin has required attributes."""
-        # Create instance to test attributes
-        plugin = CorePlugin()
+        # Check metadata attribute on class
+        assert hasattr(
+            CorePlugin, "metadata"
+        ), "Plugin must have 'metadata' attribute"
+
+        # Verify metadata has required fields
+        metadata = CorePlugin.metadata
+        assert hasattr(metadata, "name"), "Metadata must have 'name' field"
+        assert isinstance(metadata.name, str), "Plugin name must be string"
+        assert len(metadata.name) > 0, "Plugin name must not be empty"
+
+        assert hasattr(metadata, "version"), "Metadata must have 'version' field"
+        assert isinstance(metadata.version, str), "Plugin version must be string"
 
         assert hasattr(
-            plugin, "name"
-        ), "Plugin must have 'name' attribute"
-        assert isinstance(plugin.name, str), "Plugin name must be string"
-        assert len(plugin.name) > 0, "Plugin name must not be empty"
-
-        assert hasattr(
-            plugin, "version"
-        ), "Plugin must have 'version' attribute"
-        assert isinstance(plugin.version, str), "Plugin version must be string"
-
-        assert hasattr(
-            plugin, "description"
-        ), "Plugin must have 'description' attribute"
+            metadata, "description"
+        ), "Metadata must have 'description' field"
 
     def test_core_plugin_initialize(self):
-        """Test CorePlugin initialize method works."""
+        """Test CorePlugin register method works."""
         plugin = CorePlugin()
 
-        # Initialize should not raise
+        # Register should not raise (using mock registry)
         try:
-            result = plugin.initialize()
-            # Should return truthy value or None
-            assert result is None or result
+            from unittest.mock import Mock
+            mock_app = Mock()
+            mock_registry = Mock()
+            plugin.register(mock_app, mock_registry)
+            # Registration should complete without error
         except Exception as e:
-            pytest.fail(f"Plugin initialize failed: {e}")
+            pytest.fail(f"Plugin register failed: {e}")
 
     def test_core_plugin_shutdown(self):
-        """Test CorePlugin shutdown method works."""
+        """Test CorePlugin unregister method works."""
         plugin = CorePlugin()
 
-        # Shutdown should not raise
+        # Unregister should not raise
         try:
-            result = plugin.shutdown()
-            # Should return truthy value or None
-            assert result is None or result
+            plugin.unregister()
+            # Should complete without error
         except Exception as e:
-            pytest.fail(f"Plugin shutdown failed: {e}")
+            pytest.fail(f"Plugin unregister failed: {e}")
 
     def test_core_plugin_get_features(self):
-        """Test CorePlugin get_features returns valid feature list."""
+        """Test CorePlugin health returns valid status."""
         plugin = CorePlugin()
 
-        features = plugin.get_features()
+        health_status = plugin.health()
 
-        assert isinstance(features, (list, dict)), (
-            "get_features must return list or dict"
-        )
-
-        if isinstance(features, list):
-            for feature in features:
-                assert isinstance(feature, str), (
-                    "Features must be strings"
-                )
-
-        if isinstance(features, dict):
-            for key, value in features.items():
-                assert isinstance(key, str), "Feature keys must be strings"
+        assert health_status is not None, "health must return status object"
+        assert hasattr(health_status, "plugin_name"), "Health status must have plugin_name"
+        assert hasattr(health_status, "healthy"), "Health status must have healthy flag"
+        assert hasattr(health_status, "checked_at"), "Health status must have checked_at timestamp"
 
     def test_core_plugin_handle_event(self):
-        """Test CorePlugin handle_event accepts events."""
-        plugin = CorePlugin()
+        """Test CorePlugin metadata contains capabilities."""
+        # Check that metadata includes capabilities
+        metadata = CorePlugin.metadata
 
-        # Should accept various event types
-        test_events = [
-            {"type": "error", "data": "test"},
-            {"type": "warning", "message": "warning"},
-            {"type": "info"},
-        ]
-
-        for event in test_events:
-            try:
-                result = plugin.handle_event(event)
-                # Should not raise
-                assert result is None or isinstance(result, (bool, dict))
-            except Exception as e:
-                pytest.fail(f"Failed to handle event {event}: {e}")
+        assert hasattr(metadata, "capabilities"), "Metadata should have capabilities"
+        if metadata.capabilities:
+            assert isinstance(metadata.capabilities, dict), (
+                "Capabilities must be a dict"
+            )
 
     def test_plugin_docstrings(self):
         """Test plugin methods have documentation."""
         plugin = CorePlugin()
 
-        methods = ["initialize", "shutdown", "get_features", "handle_event"]
+        methods = ["register", "unregister", "health"]
 
         for method_name in methods:
             method = getattr(plugin, method_name)
@@ -211,9 +187,8 @@ class TestPluginCompatibility:
 
     def test_plugin_version_format(self):
         """Test plugin version follows semantic versioning."""
-        plugin = CorePlugin()
-
-        version = plugin.version
+        metadata = CorePlugin.metadata
+        version = metadata.version
         parts = version.split(".")
 
         assert len(parts) >= 2, (
@@ -227,9 +202,8 @@ class TestPluginCompatibility:
 
     def test_plugin_name_valid(self):
         """Test plugin name is valid."""
-        plugin = CorePlugin()
-
-        name = plugin.name
+        metadata = CorePlugin.metadata
+        name = metadata.name
 
         assert name, "Plugin name must not be empty"
         assert isinstance(name, str), "Plugin name must be string"
