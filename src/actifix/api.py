@@ -97,6 +97,27 @@ def _is_system_domain(domain: Optional[str]) -> bool:
 
 def _load_modules(project_root: Path) -> Dict[str, List[Dict[str, str]]]:
     """Load modules from canonical DEPGRAPH.json."""
+    from actifix.state_paths import get_actifix_paths
+    paths = get_actifix_paths(project_root=project_root)
+    status_file = paths.state_dir / "module_statuses.json"
+    
+    # Load statuses or default to active
+    statuses = {"active": set()}
+    if status_file.exists():
+        try:
+            import json
+            with open(status_file, 'r') as f:
+                statuses = json.load(f)
+        except:
+            pass
+    
+    def get_status(name):
+        if name in statuses.get("disabled", []):
+            return "disabled"
+        if name in statuses.get("error", []):
+            return "error"
+        return "active"
+    
     depgraph_path = project_root / "docs" / "architecture" / "DEPGRAPH.json"
     if not depgraph_path.exists():
         return {"system": [], "user": []}
@@ -112,11 +133,13 @@ def _load_modules(project_root: Path) -> Dict[str, List[Dict[str, str]]]:
     system_domains = {"runtime", "infra", "core", "tooling", "security", "plugins", "persistence"}
     modules = []
     for node in nodes:
+        module_id = node["id"]
         modules.append({
-            "name": node["id"],
+            "name": module_id,
             "domain": node.get("domain", ""),
             "owner": node.get("owner", ""),
-            "summary": node.get("label", node["id"])
+            "summary": node.get("label", node["id"]),
+            "status": get_status(module_id)
         })
 
     system_modules = [m for m in modules if m["domain"] in system_domains]
@@ -642,11 +665,41 @@ def create_app(project_root: Optional[Path] = None) -> "Flask":
             'timestamp': datetime.now(timezone.utc).isoformat(),
         })
 
-    @app.route('/api/modules', methods=['GET'])
-    def api_modules():
-        """List system/user modules from architecture catalog."""
-        modules = _load_modules(app.config['PROJECT_ROOT'])
-        return jsonify(modules)
+@app.route('/api/modules', methods=['GET'])
+def api_modules():
+    """List system/user modules from architecture catalog."""
+    modules = _load_modules(app.config['PROJECT_ROOT'])
+    return jsonify(modules)
+
+
+@app.route('/api/modules/<module_id>', methods=['POST'])
+def api_toggle_module(module_id):
+    """Toggle module status (enable/disable)."""
+    from actifix.log_utils import atomic_write
+    from actifix.state_paths import get_actifix_paths
+    paths = get_actifix_paths(project_root=app.config['PROJECT_ROOT'])
+    status_file = paths.state_dir / "module_statuses.json"
+    
+    try:
+        import json
+        statuses = {"active": [], "disabled": [], "error": []}
+        if status_file.exists():
+            with open(status_file, 'r') as f:
+                statuses = json.load(f)
+        
+        if module_id in statuses.get("disabled", []):
+            statuses["disabled"].remove(module_id)
+            statuses["active"].append(module_id)
+            action = "enabled"
+        else:
+            statuses["active"].remove(module_id) if module_id in statuses.get("active", []) else None
+            statuses["disabled"].append(module_id)
+            action = "disabled"
+        
+        atomic_write(status_file, json.dumps(statuses, indent=2))
+        return jsonify({"success": True, "module_id": module_id, "action": action})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
     
     @app.route('/api/ping', methods=['GET'])
     def api_ping():

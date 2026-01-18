@@ -1000,9 +1000,23 @@ const SettingsView = () => {
 
 // Modules View Component
 const ModulesView = () => {
-  const { data, loading, error } = useFetch('/modules', 15000);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const { data, loading, error } = useFetch(`/modules?key=${refreshKey}`, 15000);
   const [sortBy, setSortBy] = useState('name');
   const [sortDir, setSortDir] = useState('asc');
+
+  const handleToggle = async (moduleId) => {
+    try {
+      const response = await fetch(`${API_BASE}/modules/${moduleId}`, { method: 'POST' });
+      if (response.ok) {
+        setRefreshKey((rk) => rk + 1);
+      } else {
+        console.error('Toggle failed:', await response.text());
+      }
+    } catch (e) {
+      console.error('Toggle failed:', e);
+    }
+  };
 
   if (loading) return h(LoadingSpinner);
   if (error) return h(ErrorDisplay, { message: error });
@@ -1052,6 +1066,8 @@ const ModulesView = () => {
             h('div', { className: 'table-cell name', onClick: () => handleSort('name'), title: 'Click to sort' }, 'Name', sortIndicator('name')),
             h('div', { className: 'table-cell domain', onClick: () => handleSort('domain'), title: 'Click to sort' }, 'Domain', sortIndicator('domain')),
             h('div', { className: 'table-cell owner', onClick: () => handleSort('owner'), title: 'Click to sort' }, 'Owner', sortIndicator('owner')),
+            h('div', { className: 'table-cell status', onClick: () => handleSort('status'), title: 'Click to sort' }, 'Status', sortIndicator('status')),
+            h('div', { className: 'table-cell actions' }, 'Actions'),
             h('div', { className: 'table-cell summary', onClick: () => handleSort('summary'), title: 'Click to sort' }, 'Summary', sortIndicator('summary'))
           ),
           sortedModules.map((m, idx) =>
@@ -1059,6 +1075,16 @@ const ModulesView = () => {
               h('div', { className: 'table-cell name truncate' }, m.name || '—'),
               h('div', { className: 'table-cell domain truncate' }, m.domain || '—'),
               h('div', { className: 'table-cell owner truncate' }, m.owner || '—'),
+              h('div', { className: 'table-cell status' },
+                h('span', { className: `status-badge ${m.status || 'active'}` }, m.status || 'active')
+              ),
+              h('div', { className: 'table-cell actions' },
+                h('button', {
+                  className: `btn-small ${m.status === 'disabled' ? 'btn-success' : 'btn-warning'}`,
+                  onClick: () => handleToggle(m.name),
+                  title: `Toggle ${m.name}`
+                }, m.status === 'disabled' ? 'Enable' : 'Disable')
+              ),
               h('div', { className: 'table-cell summary truncate' }, m.summary || '—')
             )
           )
