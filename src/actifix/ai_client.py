@@ -97,6 +97,13 @@ class AIClient:
         all_errors = []
 
         for provider in providers:
+            if provider == AIProvider.OPENAI_CLI:
+                response = self._call_openai_cli(prompt)
+                if response.success:
+                    return response
+                all_errors.append(f"{provider.value}: {response.error or 'OpenAI CLI failed'}")
+                continue
+
             # Log attempt (database is canonical, no text files)
             # log_event removed as database is the canonical storage
 
@@ -146,6 +153,11 @@ class AIClient:
         if self._is_claude_local_available():
             if AIProvider.CLAUDE_LOCAL not in providers:
                 providers.append(AIProvider.CLAUDE_LOCAL)
+        
+        # Add OpenAI CLI if logged in
+        if self._is_openai_cli_logged_in():
+            if AIProvider.OPENAI_CLI not in providers:
+                providers.append(AIProvider.OPENAI_CLI)
         
         # Add Claude API if key available
         if self._has_claude_api_key():
