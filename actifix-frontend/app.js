@@ -688,6 +688,7 @@ const SettingsView = () => {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
   const { data: aiStatus } = useFetch('/ai-status', 8000);
+  const { data: systemInfo } = useFetch('/system', 10000);
 
   // Load current settings
   useEffect(() => {
@@ -755,6 +756,20 @@ const SettingsView = () => {
   const activeProvider = aiStatus?.active_provider || '—';
   const activeModel = aiStatus?.active_model || '—';
   const preferredProvider = aiStatus?.preferred_provider || aiProvider;
+  const aiHealth = aiStatus?.status || 'Unknown';
+  const lastSync = aiStatus?.timestamp
+    ? new Date(aiStatus.timestamp).toLocaleString()
+    : '—';
+  const serverUptime = systemInfo?.server?.uptime || '—';
+  const platformSummary = systemInfo?.platform
+    ? `${systemInfo.platform.system} ${systemInfo.platform.release}`
+    : '—';
+  const memoryPercent = systemInfo?.resources?.memory?.percent
+    ? `${systemInfo.resources.memory.percent}%`
+    : '—';
+  const projectRoot = systemInfo?.project?.root || '—';
+  const aiHeaderLabel = aiEnabled ? 'AI automation ON' : 'AI automation OFF';
+  const aiHeaderTone = aiEnabled ? 'enabled' : 'disabled';
 
   useEffect(() => {
     if (aiProvider === 'mimo-flash-v2-free' && (!aiModel || aiModel === '')) {
@@ -762,11 +777,16 @@ const SettingsView = () => {
     }
   }, [aiProvider, aiModel]);
 
-  return h('div', { className: 'panel' },
-    h('div', { className: 'panel-header' },
+  return h('div', { className: 'panel settings-panel' },
+    h('div', { className: 'panel-header settings-header' },
       h('div', { className: 'panel-title' },
         h('span', { className: 'panel-title-icon' }, '🔧'),
         'Settings'
+      ),
+      h('div', { className: 'settings-header-meta' },
+        h('span', { className: `settings-chip ${aiHeaderTone}` }, aiHeaderLabel),
+        h('span', { className: 'settings-chip secondary' }, `AI Health • ${aiHealth}`),
+        h('span', { className: 'settings-chip secondary' }, `Last sync • ${lastSync}`)
       )
     ),
     h('div', { className: 'settings-grid' },
@@ -791,6 +811,25 @@ const SettingsView = () => {
               className: `settings-pill ${provider.available ? 'available' : 'unavailable'}`
             }, provider.provider)
           )
+        )
+      ),
+      h('div', { className: 'settings-card' },
+        h('div', { className: 'settings-card-title' }, 'System Snapshot'),
+        h('div', { className: 'settings-metric' },
+          h('span', { className: 'settings-metric-label' }, 'Platform'),
+          h('span', { className: 'settings-metric-value' }, platformSummary)
+        ),
+        h('div', { className: 'settings-metric' },
+          h('span', { className: 'settings-metric-label' }, 'Uptime'),
+          h('span', { className: 'settings-metric-value' }, serverUptime)
+        ),
+        h('div', { className: 'settings-metric' },
+          h('span', { className: 'settings-metric-label' }, 'Memory usage'),
+          h('span', { className: 'settings-metric-value' }, memoryPercent)
+        ),
+        h('div', { className: 'settings-metric' },
+          h('span', { className: 'settings-metric-label' }, 'Project root'),
+          h('span', { className: 'settings-metric-value' }, projectRoot)
         )
       ),
       h('div', { className: 'settings-card' },
