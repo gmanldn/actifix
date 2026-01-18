@@ -695,23 +695,80 @@ class AIClient:
                 success=False,
                 error=f"Ollama error: {e}"
             )
-    
+
+    def _call_openrouter(self, prompt: str, ticket_info: Dict[str, Any], model: str) -> AIResponse:
+        """Call OpenRouter API (OpenAI-compatible endpoint)."""
+        api_key = os.environ.get("OPENROUTER_API_KEY")
+        if not api_key:
+            return AIResponse(
+                content="",
+                provider=AIProvider.FREE_ALTERNATIVE,
+                model=model,
+                success=False,
+                error="OPENROUTER_API_KEY not set. Falling back to manual prompt."
+            )
+        try:
+            import openai
+            model_id = model.split("/", 1)[1] if "/" in model else model
+            client = openai.OpenAI(
+                api_key=api_key,
+                base_url="https://openrouter.ai/api/v1"
+            )
+            response = client.chat.completions.create(
+                model=model_id,
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=4000,
+                temperature=0.1
+            )
+            content = response.choices[0].message.content or ""
+            input_tokens = getattr(response.usage, 'prompt_tokens', 0)
+            output_tokens = getattr(response.usage, 'completion_tokens', 0)
+            tokens_used = input_tokens + output_tokens
+            cost_usd = self._estimate_openai_cost(input_tokens, output_tokens)
+            return AIResponse(
+                content=content,
+                provider=AIProvider.FREE_ALTERNATIVE,
+                model=model,
+                success=True,
+                tokens_used=tokens_used,
+                cost_usd=cost_usd
+            )
+        except ImportError:
+            return AIResponse(
+                content="",
+                provider=AIProvider.FREE_ALTERNATIVE,
+                model=model,
+                success=False,
+                error="openai package not installed"
+            )
+        except Exception as e:
+            return AIResponse(
+                content="",
+                provider=AIProvider.FREE_ALTERNATIVE,
+                model=model,
+                success=False,
+                error=f"OpenRouter API error: {str(e)}"
+            )
+
     def _call_free_alternative(
         self,
         prompt: str,
         ticket_info: Dict[str, Any],
         preferred_model: Optional[str] = None,
     ) -> AIResponse:
-        """Prompt user to choose a free alternative."""
+        model = preferred_model or DEFAULT_FREE_MODEL
+        if "openrouter" in model.lower() and os.environ.get("OPENROUTER_API_KEY"):
+            return self._call_openrouter(prompt, ticket_info, model)
+        """Prompt user to choose a free alternative (fallback)."""
         if os.getenv("ACTIFIX_NONINTERACTIVE") == "1" or not sys.stdin.isatty():
             return AIResponse(
                 content="",
                 provider=AIProvider.FREE_ALTERNATIVE,
-                model=preferred_model or DEFAULT_FREE_MODEL,
+                model=model,
                 success=False,
                 error="Non-interactive session: free alternative prompt disabled",
             )
-        default_model = preferred_model or DEFAULT_FREE_MODEL
+        default_model = model
         print("\n" + "="*60)
         print("🤖 AI ASSISTANCE NEEDED")
         print("="*60)
