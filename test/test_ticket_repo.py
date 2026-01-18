@@ -88,17 +88,19 @@ def test_ticket_repository_locking_and_completion(ticket_repo_env):
         test_results="All 12 concurrent locking tests passed",
         summary="Done"
     ) is True
+    # Second call to mark_complete should return False (idempotency check)
     assert repo.mark_complete(
         entry.entry_id,
         completion_notes="Fixed the locking issue in the repository layer",
         test_steps="Ran pytest test_ticket_repo.py with concurrent tests",
         test_results="All 12 concurrent locking tests passed",
         summary="Already done"
-    ) is True
+    ) is False
 
     ticket = repo.get_ticket(entry.entry_id)
     assert ticket["status"] == "Completed"
-    assert ticket["completion_summary"] == "Already done"
+    # Summary should be from first call ("Done"), not second (which was rejected)
+    assert ticket["completion_summary"] == "Done"
 
     stats = repo.get_stats()
     assert stats["total"] == 1
