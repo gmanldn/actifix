@@ -247,6 +247,9 @@ const Header = ({ onFix, isFixing, fixStatus }) => {
   const [connected, setConnected] = useState(false);
   const [time, setTime] = useState(new Date().toLocaleTimeString());
   const { data: health } = useFetch('/health', 10000);
+  // Search query for the dashboard.
+  const [search, setSearch] = useState('');
+  const handleSearchChange = (e) => setSearch(e.target.value);
 
   useEffect(() => {
     const checkConnection = async () => {
@@ -279,6 +282,7 @@ const Header = ({ onFix, isFixing, fixStatus }) => {
       )
     ),
     h('div', { className: 'header-right' },
+      h('input', { type: 'text', className: 'header-search', placeholder: 'Search…', value: search, onChange: handleSearchChange }),
       h('div', { className: 'header-stats' },
         h('div', { className: 'stat-card', style: { padding: '6px 14px', minWidth: '70px' } },
           h('div', { className: 'stat-value', style: { fontSize: '18px', fontWeight: '700' } }, health?.metrics?.open_tickets ?? '—'),
@@ -940,7 +944,7 @@ const App = () => {
   const handleFix = async () => {
     if (isFixing) return;
     setIsFixing(true);
-    setFixStatus('Fixing the highest priority ticket…');
+    setFixStatus('Checking tickets…');\n    try {\n      const statsResp = await fetch(`${API_BASE}/tickets?limit=1`);\n      const statsData = await statsResp.json();\n      if (!statsResp.ok || !statsData || (statsData.total_open || 0) <= 0) {\n        setFixStatus('No open tickets to fix');\n        setIsFixing(false);\n        return;\n      }\n    } catch (err) {\n      setFixStatus(`Error: ${err.message}`);\n      setIsFixing(false);\n      return;\n    }\n    setFixStatus('Fixing the highest priority ticket…');
     triggerLogFlash();
 
     try {
