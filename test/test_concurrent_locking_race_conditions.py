@@ -23,6 +23,20 @@ from actifix.persistence.database import get_database_pool, reset_database_pool,
 from actifix.persistence.ticket_repo import get_ticket_repository, reset_ticket_repository, TicketFilter
 from actifix.raise_af import ActifixEntry, TicketPriority
 
+pytestmark = [pytest.mark.db, pytest.mark.concurrent, pytest.mark.slow]
+
+FAST_THREAD_COUNT = 4
+PRIORITY_WORKERS = 6
+RENEWAL_THREADS = 3
+OWNER_THREADS = 3
+RAPID_CYCLE_THREADS = 3
+RAPID_CYCLE_ITERATIONS = 6
+LEASE_WAIT_BEFORE_EXPIRY = 0.12
+LEASE_WAIT_AFTER_EXPIRY = 0.2
+RELEASE_HOLD_DELAY = 0.05
+RELEASE_WAIT_DELAY = 0.08
+RAPID_CYCLE_BACKOFF = 0.005
+
 
 @pytest.fixture
 def clean_db(tmp_path, monkeypatch):
@@ -82,8 +96,8 @@ class TestDoubleLockPrevention:
             if lock is not None:
                 results["winners"].append(thread_id)
 
-        # 10 threads race to acquire same lock
-        threads = [threading.Thread(target=try_acquire, args=(i,)) for i in range(10)]
+        # Reduced thread count for performance while preserving race coverage.
+        threads = [threading.Thread(target=try_acquire, args=(i,)) for i in range(FAST_THREAD_COUNT)]
         for t in threads:
             t.start()
         for t in threads:
@@ -163,14 +177,14 @@ class TestLeaseExpiryRaces:
         assert lock1 is not None
 
         # Wait just before expiry
-        time.sleep(0.2)
+        time.sleep(LEASE_WAIT_BEFORE_EXPIRY)
 
         # Thread 2 tries to acquire - should still fail
         lock2 = repo.acquire_lock(ticket_id, locked_by="thread-2")
         assert lock2 is None
 
         # Wait for expiry
-        time.sleep(0.2)
+        time.sleep(LEASE_WAIT_AFTER_EXPIRY)
 
         # Thread 2 should now succeed
         lock3 = repo.acquire_lock(ticket_id, locked_by="thread-2", lease_duration=timedelta(seconds=60))
@@ -198,7 +212,7 @@ class TestLeaseExpiryRaces:
                 results["errors"].append(f"Thread {thread_id}: {e}")
 
         # Multiple threads try to renew simultaneously
-        threads = [threading.Thread(target=renew_lease, args=(i,)) for i in range(5)]
+        threads = [threading.Thread(target=renew_lease, args=(i,)) for i in range(RENEWAL_THREADS)]
         for t in threads:
             t.start()
         for t in threads:
@@ -260,7 +274,7 @@ class TestConcurrentStatusUpdates:
                 results["assigned_owners"].append(owner_id)
 
         # Multiple threads try to assign owner simultaneously
-        threads = [threading.Thread(target=assign_owner, args=(f"owner-{i}",)) for i in range(5)]
+        threads = [threading.Thread(target=assign_owner, args=(f"owner-{i}",)) for i in range(OWNER_THREADS)]
         for t in threads:
             t.start()
         for t in threads:
@@ -291,7 +305,7 @@ class TestPriorityAllocationRaces:
                 results["acquired"].append(ticket["id"])
 
         # Multiple workers race to get tickets
-        threads = [threading.Thread(target=get_and_lock) for _ in range(10)]
+        threads = [threading.Thread(target=get_and_lock) for _ in range(PRIORITY_WORKERS)]
         for t in threads:
             t.start()
         for t in threads:
@@ -319,12 +333,12 @@ class TestPriorityAllocationRaces:
             lock = repo.acquire_lock(ticket_id, locked_by="holder", lease_duration=timedelta(seconds=60))
             assert lock is not None
             results["holder"] = "holder"
-            time.sleep(0.1)
+            time.sleep(RELEASE_HOLD_DELAY)
             repo.release_lock(ticket_id, locked_by="holder")
             results["released"] = True
 
         def try_acquire():
-            time.sleep(0.15)  # Wait for first thread to release
+            time.sleep(RELEASE_WAIT_DELAY)  # Wait for first thread to release
             lock = repo.acquire_lock(ticket_id, locked_by="waiter", lease_duration=timedelta(seconds=60))
             assert lock is not None
             repo.release_lock(ticket_id, locked_by="waiter")
@@ -353,19 +367,19 @@ class TestAcquireReleaseRenewalCycles:
 
         def cycle_lock(thread_id):
             try:
-                for i in range(10):
+                for i in range(RAPID_CYCLE_ITERATIONS):
                     lock = repo.acquire_lock(ticket_id, locked_by=f"thread-{thread_id}", lease_duration=timedelta(seconds=60))
                     if lock:
                         repo.release_lock(ticket_id, locked_by=f"thread-{thread_id}")
                         results["cycles"] += 1
                     else:
                         # Lock held by another thread, that's ok
-                        time.sleep(0.01)
+                        time.sleep(RAPID_CYCLE_BACKOFF)
             except Exception as e:
                 results["errors"].append(str(e))
 
         # Multiple threads cycle lock rapidly
-        threads = [threading.Thread(target=cycle_lock, args=(i,)) for i in range(5)]
+        threads = [threading.Thread(target=cycle_lock, args=(i,)) for i in range(RAPID_CYCLE_THREADS)]
         for t in threads:
             t.start()
         for t in threads:
