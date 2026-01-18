@@ -81,6 +81,30 @@ actifix.track_development_progress(
 - Use Raise_AF, DoAF, the CLI, or SQL for ticket lifecycle work.
 - Avoid manual edits to the database or legacy Markdown task lists.
 
+## Raise_AF Ticketing Requirement
+
+All code changes to Actifix must originate from a ticket created via `actifix.raise_af.record_error()`. This ensures:
+- Every change is tracked and documented
+- Regressions are visible in the ticket system
+- AI assistants have context for improvements
+
+Before making changes, always set:
+```bash
+export ACTIFIX_CHANGE_ORIGIN=raise_af
+```
+
+Create tickets programmatically:
+```python
+import actifix
+
+actifix.record_error(
+    message="Description of issue or improvement",
+    source="module.py:line",
+    error_type="BugFix",  # or "Feature", "Refactor", etc.
+    priority=actifix.TicketPriority.P2,
+)
+```
+
 ## Workflow guardrails
 - Set `ACTIFIX_CHANGE_ORIGIN=raise_af` before running Actifix or making changes.
 - Capture errors via `actifix.raise_af.record_error(...)` and re-raise when needed.
