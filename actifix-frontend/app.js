@@ -217,8 +217,8 @@ const { data, loading } = useFetch('/version', REFRESH_INTERVAL);
   return h('span', {
     className: 'version-indicator',
     style: {
-      borderColor: accentColor,
-      color: accentColor,
+      borderColor: '#000',
+      color: '#000',
     }
   },
     h('span', { className: 'version-label' }, `v${version}`),

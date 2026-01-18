@@ -45,7 +45,7 @@ See `CHANGELOG.md` for full history. Recent highlights:
 
 | Version | Highlights |
 |---------|------------|
-| **4.0.38** (2026-01-21) | Silenced Flask/Werkzeug access logging so the CLI remains free of repeated GET entries when the dashboard polls the API. |
+| **4.0.40** (2026-01-21) | Version indicator UI now uses an all-black border and text so the status is readable against light/dark backgrounds. |
 | **4.0.2** (2026-01-20) | Fixed API module parsing so `/api/modules` always returns system/user buckets, keeping the quick test cycle green after the dashboard refresh. |
 | **4.0.0** (2026-01-18) | Monochrome compact dashboard refresh, AI settings + status sync with Do_AF, default Mimo Flash v2 free fallback, faster test suite defaults. |
 | **3.3.11** (2026-01-18) | Documentation consolidation, quickstart refresh, and workflow accuracy cleanup. |
