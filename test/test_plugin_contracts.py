@@ -18,6 +18,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from actifix.plugins.builtin import CorePlugin
+from actifix.plugins.protocol import Plugin, PluginMetadata, PluginHealthStatus
 
 
 class PluginProtocolContract:
@@ -169,6 +170,15 @@ class TestPluginContracts:
             assert isinstance(metadata.capabilities, dict), (
                 "Capabilities must be a dict"
             )
+
+    def test_core_plugin_protocol_compliance(self):
+        """Verify CorePlugin conforms to the Plugin protocol."""
+        plugin = CorePlugin()
+        assert isinstance(plugin, Plugin)
+        assert isinstance(plugin.metadata, PluginMetadata)
+        health_status = plugin.health()
+        if health_status is not None:
+            assert isinstance(health_status, PluginHealthStatus)
 
     def test_plugin_docstrings(self):
         """Test plugin methods have documentation."""
