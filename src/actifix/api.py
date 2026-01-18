@@ -399,10 +399,13 @@ def create_app(project_root: Optional[Path] = None) -> "Flask":
         """Get recent tickets list."""
         paths = get_actifix_paths(project_root=app.config['PROJECT_ROOT'])
         limit = request.args.get('limit', 20, type=int)
-        
+
         open_tickets = get_open_tickets(paths)
         completed_tickets = get_completed_tickets(paths)
-        
+
+        # Get stats using same method as /health endpoint for consistency
+        stats = get_ticket_stats(paths)
+
         # Format tickets for API response
         def format_ticket(ticket, status='open'):
             return {
@@ -414,20 +417,20 @@ def create_app(project_root: Optional[Path] = None) -> "Flask":
                 'created': ticket.created,
                 'status': status,
             }
-        
+
         all_tickets = [
             format_ticket(t, 'open') for t in open_tickets
         ] + [
             format_ticket(t, 'completed') for t in completed_tickets
         ]
-        
+
         # Sort by created date (newest first)
         all_tickets.sort(key=lambda x: x['created'], reverse=True)
-        
+
         return jsonify({
             'tickets': all_tickets[:limit],
-            'total_open': len(open_tickets),
-            'total_completed': len(completed_tickets),
+            'total_open': stats.get('open', 0),
+            'total_completed': stats.get('completed', 0),
         })
 
     @app.route('/api/fix-ticket', methods=['POST'])

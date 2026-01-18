@@ -246,7 +246,7 @@ const FixToolbar = ({ onFix, isFixing, status }) => {
 const Header = ({ onFix, isFixing, fixStatus }) => {
   const [connected, setConnected] = useState(false);
   const [time, setTime] = useState(new Date().toLocaleTimeString());
-  const { data: health } = useFetch('/health', 10000);
+  const { data: health } = useFetch('/health', REFRESH_INTERVAL);
   // Search query for the dashboard.
   const [search, setSearch] = useState('');
   const handleSearchChange = (e) => setSearch(e.target.value);
@@ -403,7 +403,7 @@ const OverviewView = () => {
         ),
         h('div', { className: 'panel-actions' },
           h('span', { className: 'text-muted', style: { fontSize: '11px' } },
-            `${tickets?.total_open ?? 0} open • ${tickets?.total_completed ?? 0} done`
+            `${metrics.open_tickets ?? 0} open • ${metrics.completed_tickets ?? 0} done`
           )
         )
       ),
