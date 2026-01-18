@@ -36,6 +36,8 @@ from .state_paths import (
     get_logs_dir,
 )
 from .health import get_health, run_health_check, format_health_report
+from .persistence.ticket_cleanup import run_automatic_cleanup, apply_retention_policy, cleanup_test_tickets
+from .persistence.cleanup_config import CleanupConfig, get_cleanup_config
 
 __version__ = "3.3.11"
 __author__ = "Actifix Framework"
@@ -74,4 +76,9 @@ __all__ = [
     "ensure_scaffold",
     "ACTIFIX_CAPTURE_ENV_VAR",
     "quick_start",
+    "run_automatic_cleanup",
+    "apply_retention_policy",
+    "cleanup_test_tickets",
+    "CleanupConfig",
+    "get_cleanup_config",
 ]

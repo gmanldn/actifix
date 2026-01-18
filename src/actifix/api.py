@@ -70,6 +70,8 @@ from .do_af import (
 from .raise_af import enforce_raise_af_only, record_error, TicketPriority
 from .state_paths import get_actifix_paths
 from .persistence.event_repo import get_event_repository, EventFilter
+from .persistence.ticket_cleanup import run_automatic_cleanup
+from .persistence.cleanup_config import get_cleanup_config
 from .config import get_config, set_config, load_config
 from .ai_client import get_ai_client, resolve_provider_selection
 
@@ -706,7 +708,56 @@ def create_app(project_root: Optional[Path] = None) -> "Flask":
             return jsonify({
                 'error': str(e)
             }), 500
-    
+
+    @app.route('/api/cleanup', methods=['POST'])
+    def api_cleanup():
+        """Run ticket cleanup with retention policies."""
+        try:
+            data = request.get_json() or {}
+
+            # Get cleanup parameters from request or use defaults
+            config = get_cleanup_config()
+            retention_days = data.get('retention_days', config.retention_days)
+            test_retention_days = data.get('test_retention_days', config.test_ticket_retention_days)
+            auto_complete = data.get('auto_complete_test_tickets', config.auto_complete_test_tickets)
+            dry_run = data.get('dry_run', True)  # Default to dry run for safety
+
+            # Run cleanup
+            results = run_automatic_cleanup(
+                retention_days=retention_days,
+                test_ticket_retention_days=test_retention_days,
+                auto_complete_test_tickets=auto_complete,
+                dry_run=dry_run
+            )
+
+            return jsonify({
+                'success': True,
+                'results': results,
+            })
+        except Exception as e:
+            record_error(
+                message=f"Cleanup failed: {e}",
+                source="api.py:api_cleanup",
+                priority=TicketPriority.P2,
+            )
+            return jsonify({
+                'error': str(e)
+            }), 500
+
+    @app.route('/api/cleanup/config', methods=['GET'])
+    def api_cleanup_config():
+        """Get cleanup configuration."""
+        try:
+            config = get_cleanup_config()
+            return jsonify({
+                'success': True,
+                'config': config.to_dict(),
+            })
+        except Exception as e:
+            return jsonify({
+                'error': str(e)
+            }), 500
+
     return app
 
 
