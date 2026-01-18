@@ -19,6 +19,7 @@ sys.path.insert(0, str(ROOT / "src"))
 ALLOWED_ROOT_FILES = {
     # Core project files
     "pyproject.toml",
+    "pytest.ini",
     "README.md",
     "AGENTS.md",
     "CHANGELOG.md",
@@ -59,6 +60,10 @@ class TestRootFolderStructure:
 
             # Skip hidden files/dirs
             if name.startswith("."):
+                continue
+
+            # Skip symlinks (convenience links to scripts/ are allowed)
+            if item.is_symlink():
                 continue
 
             # Check files
