@@ -136,8 +136,12 @@ class TestAcquireLockRaceCondition:
         )
         repo.create_ticket(entry)
 
-        # First thread acquires with 1-second lease
-        lock1 = repo.acquire_lock("ACT-TEST-EXPIRE", locked_by="thread-1", lease_duration=timedelta(seconds=1))
+        # First thread acquires with short lease
+        lock1 = repo.acquire_lock(
+            "ACT-TEST-EXPIRE",
+            locked_by="thread-1",
+            lease_duration=timedelta(milliseconds=200),
+        )
         assert lock1 is not None, "First lock should succeed"
 
         # Second thread tries immediately - should fail
@@ -145,7 +149,7 @@ class TestAcquireLockRaceCondition:
         assert lock2 is None, "Second lock should fail immediately"
 
         # Wait for lease to expire
-        time.sleep(1.1)
+        time.sleep(0.25)
 
         # Second thread should now succeed
         lock3 = repo.acquire_lock("ACT-TEST-EXPIRE", locked_by="thread-2", lease_duration=timedelta(seconds=60))

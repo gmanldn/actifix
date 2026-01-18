@@ -19,7 +19,7 @@ python3 -m pytest test/ -m "not slow"
 1. System tests via `actifix.testing`.
 2. Pytest with optional coverage.
 3. Ticket creation for failed system or pytest tests.
-4. Stage logs written to `test_logs/`.
+4. Stage logs written to `ACTIFIX_STATE_DIR/test_logs` (default `.actifix/test_logs`).
 
 ## Coverage expectations
 Coverage settings live in `pyproject.toml`:
@@ -35,7 +35,8 @@ Common markers:
 See `docs/TEST_MARKERS_GUIDE.md` for detailed usage.
 
 ## Test artifacts
-- `test_logs/` contains cycle logs, inventories, and stage summaries.
+- `ACTIFIX_STATE_DIR/test_logs` (default `.actifix/test_logs`) contains cycle logs, inventories, and stage summaries.
+- `ACTIFIX_STATE_DIR/test_logs/pytest_performance_<run_id>.json` captures slow-test timing data.
 - `.pytest_results.xml` is generated during `test.py` runs for failure ticketing.
 
 ## Recommended workflow

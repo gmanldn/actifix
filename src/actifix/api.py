@@ -78,9 +78,10 @@ SERVER_START_TIME = time.time()
 SYSTEM_OWNERS = {"runtime", "infra", "core", "persistence", "testing", "tooling"}
 
 
-def _is_system_domain(domain: str) -> bool:
+def _is_system_domain(domain: Optional[str]) -> bool:
     """Decide whether a module belongs to the system catalog."""
-    return domain.strip().lower() in {
+    normalized = (domain or "").strip().lower()
+    return normalized in {
         "runtime",
         "infra",
         "core",

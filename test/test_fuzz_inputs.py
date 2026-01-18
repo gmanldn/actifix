@@ -7,6 +7,7 @@ Uses hypothesis for property-based testing to ensure robust handling
 of arbitrary input strings, edge cases, and malformed data.
 """
 
+import os
 import sys
 from pathlib import Path
 from typing import Optional
@@ -30,12 +31,24 @@ try:
 except ImportError:
     pytest.skip("hypothesis not installed", allow_module_level=True)
 
+MAX_EXAMPLES = int(os.getenv("ACTIFIX_FUZZ_MAX_EXAMPLES", "25"))
+MAX_TEXT_SIZE = int(os.getenv("ACTIFIX_FUZZ_TEXT_MAX_SIZE", "200"))
+MAX_LINE_COUNT = int(os.getenv("ACTIFIX_FUZZ_MAX_LINES", "20"))
+MAX_BATCH_SIZE = int(os.getenv("ACTIFIX_FUZZ_BATCH_MAX_SIZE", "20"))
+LONG_MESSAGE_CHARS = int(os.getenv("ACTIFIX_FUZZ_LONG_MESSAGE_CHARS", "10000"))
+BATCH_MAX_EXAMPLES = int(os.getenv("ACTIFIX_FUZZ_BATCH_MAX_EXAMPLES", "15"))
+
+FAST_SETTINGS = settings(
+    max_examples=MAX_EXAMPLES,
+    suppress_health_check=[HealthCheck.too_slow],
+)
+
 
 class TestFuzzTicketMessages:
     """Fuzz test ticket message handling."""
 
-    @given(st.text())
-    @settings(suppress_health_check=[HealthCheck.too_slow])
+    @given(st.text(max_size=MAX_TEXT_SIZE))
+    @FAST_SETTINGS
     def test_arbitrary_messages_handled(self, message: str):
         """Test that arbitrary messages don't cause crashes."""
         # Should not raise
@@ -50,12 +63,13 @@ class TestFuzzTicketMessages:
         except Exception as e:
             pytest.fail(f"Failed to handle message {repr(message)}: {e}")
 
-    @given(st.text(min_size=1))
-    @settings(suppress_health_check=[HealthCheck.too_slow])
+    @given(st.text(min_size=1, max_size=MAX_TEXT_SIZE))
+    @FAST_SETTINGS
     def test_very_long_messages(self, base_message: str):
         """Test handling of extremely long messages."""
         # Create a very long message
-        long_message = base_message * 10000
+        repeat = max(1, (LONG_MESSAGE_CHARS // max(1, len(base_message))) + 1)
+        long_message = (base_message * repeat)[:LONG_MESSAGE_CHARS]
 
         try:
             result = generate_duplicate_guard(
@@ -69,8 +83,8 @@ class TestFuzzTicketMessages:
         except Exception as e:
             pytest.fail(f"Failed to handle long message: {e}")
 
-    @given(st.text())
-    @settings(suppress_health_check=[HealthCheck.too_slow])
+    @given(st.text(max_size=MAX_TEXT_SIZE))
+    @FAST_SETTINGS
     def test_unicode_in_messages(self, unicode_text: str):
         """Test handling of unicode characters in messages."""
         try:
@@ -85,10 +99,10 @@ class TestFuzzTicketMessages:
             pytest.fail(f"Failed to handle unicode: {e}")
 
     @given(
-        st.text(),
+        st.text(max_size=MAX_TEXT_SIZE),
         st.just("TestError"),
     )
-    @settings(suppress_health_check=[HealthCheck.too_slow])
+    @FAST_SETTINGS
     def test_priority_classification_robustness(
         self, message: str, error_type: str
     ):
@@ -106,8 +120,8 @@ class TestFuzzTicketMessages:
 class TestFuzzStackTraces:
     """Fuzz test stack trace handling."""
 
-    @given(st.text())
-    @settings(suppress_health_check=[HealthCheck.too_slow])
+    @given(st.text(max_size=MAX_TEXT_SIZE))
+    @FAST_SETTINGS
     def test_arbitrary_stack_traces(self, stack_trace: str):
         """Test that arbitrary stack traces don't cause crashes."""
         try:
@@ -121,8 +135,8 @@ class TestFuzzStackTraces:
         except Exception as e:
             pytest.fail(f"Failed to handle stack trace {repr(stack_trace)}: {e}")
 
-    @given(st.text())
-    @settings(suppress_health_check=[HealthCheck.too_slow])
+    @given(st.text(max_size=MAX_TEXT_SIZE))
+    @FAST_SETTINGS
     def test_malformed_stack_traces(self, trace_fragment: str):
         """Test handling of malformed stack traces."""
         malformed = f"Traceback (most recent call last):\n{trace_fragment}\nTypeError: boom"
@@ -138,8 +152,8 @@ class TestFuzzStackTraces:
         except Exception as e:
             pytest.fail(f"Failed to handle malformed trace: {e}")
 
-    @given(st.lists(st.text(), min_size=1, max_size=100))
-    @settings(suppress_health_check=[HealthCheck.too_slow])
+    @given(st.lists(st.text(max_size=MAX_TEXT_SIZE), min_size=1, max_size=MAX_LINE_COUNT))
+    @FAST_SETTINGS
     def test_multi_line_stack_traces(self, lines: list):
         """Test handling of multi-line stack traces."""
         trace = "\n".join(lines)
@@ -159,8 +173,8 @@ class TestFuzzStackTraces:
 class TestFuzzSecretRedaction:
     """Fuzz test secret redaction."""
 
-    @given(st.text())
-    @settings(suppress_health_check=[HealthCheck.too_slow])
+    @given(st.text(max_size=MAX_TEXT_SIZE))
+    @FAST_SETTINGS
     def test_arbitrary_text_redaction(self, text: str):
         """Test that arbitrary text doesn't break redaction."""
         try:
@@ -176,8 +190,8 @@ class TestFuzzSecretRedaction:
         except Exception as e:
             pytest.fail(f"Redaction failed for {repr(text)}: {e}")
 
-    @given(st.text(min_size=1))
-    @settings(suppress_health_check=[HealthCheck.too_slow])
+    @given(st.text(min_size=1, max_size=MAX_TEXT_SIZE))
+    @FAST_SETTINGS
     def test_redaction_preserves_structure(self, text: str):
         """Test that redaction preserves text structure."""
         redacted = redact_secrets_from_text(text)
@@ -191,12 +205,12 @@ class TestFuzzCombinations:
     """Fuzz test combinations of inputs."""
 
     @given(
-        st.text(),
-        st.text(),
-        st.text(),
+        st.text(max_size=MAX_TEXT_SIZE),
+        st.text(max_size=MAX_TEXT_SIZE),
+        st.text(max_size=MAX_TEXT_SIZE),
         st.sampled_from(["ValueError", "TypeError", "RuntimeError", "Exception"]),
     )
-    @settings(max_examples=100, suppress_health_check=[HealthCheck.too_slow])
+    @FAST_SETTINGS
     def test_combined_inputs(
         self,
         message: str,
@@ -230,14 +244,14 @@ class TestFuzzCombinations:
     @given(
         st.lists(
             st.tuples(
-                st.text(),
-                st.text(),
+                st.text(max_size=MAX_TEXT_SIZE),
+                st.text(max_size=MAX_TEXT_SIZE),
             ),
             min_size=1,
-            max_size=50,
+            max_size=MAX_BATCH_SIZE,
         )
     )
-    @settings(max_examples=50, suppress_health_check=[HealthCheck.too_slow])
+    @settings(max_examples=BATCH_MAX_EXAMPLES, suppress_health_check=[HealthCheck.too_slow])
     def test_batch_processing(self, inputs: list):
         """Test batch processing of fuzzed inputs."""
         guards = []

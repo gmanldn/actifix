@@ -149,6 +149,12 @@ This document summarizes the modules in the Actifix architecture. Use `MAP.yaml`
 - Depends on: `infra.logging`, `infra.persistence.manager`
 - Contracts: recover from incomplete operations; rollback failed transactions
 
+### core.self_repair
+- Summary: self-repair blueprints and logging orchestration
+- Entrypoints: `src/actifix/self_repair.py`
+- Depends on: `infra.logging`
+- Contracts: publish recoverability blueprints and record verification hints via log events
+
 ## Tooling
 
 ### tooling.testing.system

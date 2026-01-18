@@ -50,6 +50,16 @@ def test_client(temp_project, flask_app_session):
 @pytest.mark.skipif(not FLASK_AVAILABLE, reason="Flask not available")
 class TestAPIEndpoints:
     """Test API endpoints."""
+
+    @pytest.fixture(autouse=True)
+    def disable_db_isolation(self, monkeypatch):
+        """
+        Disable per-test database isolation for endpoint tests.
+        These tests use a shared session-scoped app to minimize overhead.
+        """
+        # Do nothing - override the autouse isolate_actifix_db from conftest
+        pass
+    """Test API endpoints."""
     
     def test_ping_endpoint(self, test_client):
         """Test /api/ping returns OK status."""

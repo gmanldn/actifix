@@ -154,19 +154,23 @@ class TestLeaseExpiryRaces:
         repo = get_ticket_repository()
         ticket_id = create_test_ticket(repo, "ACT-RACE-005")
 
-        # Thread 1 acquires with 0.5 second lease
-        lock1 = repo.acquire_lock(ticket_id, locked_by="thread-1", lease_duration=timedelta(milliseconds=500))
+        # Thread 1 acquires with short lease
+        lock1 = repo.acquire_lock(
+            ticket_id,
+            locked_by="thread-1",
+            lease_duration=timedelta(milliseconds=300),
+        )
         assert lock1 is not None
 
         # Wait just before expiry
-        time.sleep(0.3)
+        time.sleep(0.2)
 
         # Thread 2 tries to acquire - should still fail
         lock2 = repo.acquire_lock(ticket_id, locked_by="thread-2")
         assert lock2 is None
 
         # Wait for expiry
-        time.sleep(0.3)
+        time.sleep(0.2)
 
         # Thread 2 should now succeed
         lock3 = repo.acquire_lock(ticket_id, locked_by="thread-2", lease_duration=timedelta(seconds=60))
@@ -315,12 +319,12 @@ class TestPriorityAllocationRaces:
             lock = repo.acquire_lock(ticket_id, locked_by="holder", lease_duration=timedelta(seconds=60))
             assert lock is not None
             results["holder"] = "holder"
-            time.sleep(0.2)
+            time.sleep(0.1)
             repo.release_lock(ticket_id, locked_by="holder")
             results["released"] = True
 
         def try_acquire():
-            time.sleep(0.3)  # Wait for first thread to release
+            time.sleep(0.15)  # Wait for first thread to release
             lock = repo.acquire_lock(ticket_id, locked_by="waiter", lease_duration=timedelta(seconds=60))
             assert lock is not None
             repo.release_lock(ticket_id, locked_by="waiter")
@@ -378,12 +382,16 @@ class TestAcquireReleaseRenewalCycles:
         results = {"holder": None, "renewed": False, "released": False}
 
         # Acquire
-        lock = repo.acquire_lock(ticket_id, locked_by="worker", lease_duration=timedelta(seconds=1))
+        lock = repo.acquire_lock(
+            ticket_id,
+            locked_by="worker",
+            lease_duration=timedelta(milliseconds=300),
+        )
         assert lock is not None
         results["holder"] = "worker"
 
         # Renew before expiry
-        time.sleep(0.5)
+        time.sleep(0.15)
         renewed = repo.renew_lock(ticket_id, locked_by="worker", lease_duration=timedelta(seconds=60))
         assert renewed is not None
         results["renewed"] = True

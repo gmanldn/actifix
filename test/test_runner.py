@@ -119,75 +119,185 @@ def run_system_suite() -> tuple[TestCycleReporter, TestRunner, Dict[str, Any]]:
     return reporter, runner, summary
 
 
-def raise_tickets_for_pytest_failures(junit_file: Path, paths) -> int:
-    """Parse JUnit XML and raise tickets for pytest failures."""
+def parse_pytest_junit(junit_file: Path, paths) -> Dict[str, Any]:
+    """Parse JUnit XML into a summary payload for reporting."""
     import xml.etree.ElementTree as ET
 
-    tickets_raised = 0
+    summary: Dict[str, Any] = {
+        "tests": 0,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 0,
+        "failed_tests": [],
+        "error_tests": [],
+        "skipped_tests": [],
+    }
 
     try:
         tree = ET.parse(junit_file)
         root = tree.getroot()
 
-        # Iterate through all testcases
         for testsuite in root.findall(".//testsuite"):
+            summary["tests"] += int(testsuite.get("tests", 0))
+            summary["failures"] += int(testsuite.get("failures", 0))
+            summary["errors"] += int(testsuite.get("errors", 0))
+            summary["skipped"] += int(testsuite.get("skipped", 0))
+
             for testcase in testsuite.findall("testcase"):
                 classname = testcase.get("classname", "unknown")
                 name = testcase.get("name", "unknown")
                 test_id = f"{classname}::{name}"
 
-                # Check for failures
                 failure = testcase.find("failure")
                 if failure is not None:
-                    failure_msg = failure.get("message", "Test failed")
-                    failure_text = failure.text or ""
+                    summary["failed_tests"].append({
+                        "id": test_id,
+                        "message": failure.get("message", "Test failed"),
+                        "details": failure.text or "",
+                        "source": classname,
+                    })
 
-                    try:
-                        record_error(
-                            message=f"Pytest failure: {test_id}\n{failure_msg}",
-                            source=classname,
-                            run_label="test-suite",
-                            error_type="PytestFailure",
-                            priority=TicketPriority.P1,
-                            stack_trace=failure_text,
-                            capture_context=True,
-                            paths=paths,
-                        )
-                        tickets_raised += 1
-                        print(f"  ✗ Raised ticket for failed test: {test_id}")
-                    except Exception as e:
-                        print(f"  ⚠️  Failed to raise ticket for {test_id}: {e}")
-
-                # Check for errors
                 error = testcase.find("error")
                 if error is not None:
-                    error_msg = error.get("message", "Test error")
-                    error_text = error.text or ""
+                    summary["error_tests"].append({
+                        "id": test_id,
+                        "message": error.get("message", "Test error"),
+                        "details": error.text or "",
+                        "source": classname,
+                    })
 
-                    try:
-                        record_error(
-                            message=f"Pytest error: {test_id}\n{error_msg}",
-                            source=classname,
-                            run_label="test-suite",
-                            error_type="PytestError",
-                            priority=TicketPriority.P0,
-                            stack_trace=error_text,
-                            capture_context=True,
-                            paths=paths,
-                        )
-                        tickets_raised += 1
-                        print(f"  ✗ Raised ticket for test error: {test_id}")
-                    except Exception as e:
-                        print(f"  ⚠️  Failed to raise ticket for {test_id}: {e}")
+                skipped = testcase.find("skipped")
+                if skipped is not None:
+                    summary["skipped_tests"].append(test_id)
 
-    except Exception as e:
-        print(f"  ⚠️  Failed to parse JUnit XML: {e}")
+        summary["passed"] = (
+            summary["tests"] - summary["failures"] - summary["errors"] - summary["skipped"]
+        )
+    except Exception as exc:
+        record_error(
+            message=f"Failed to parse pytest JUnit XML: {exc}",
+            source=f"{RUNNER_SOURCE}::parse_pytest_junit",
+            run_label="test-suite",
+            error_type="PytestReportParseError",
+            priority=TicketPriority.P2,
+            capture_context=True,
+            paths=paths,
+        )
+        raise
+
+    return summary
+
+
+def raise_tickets_for_pytest_failures(summary: Dict[str, Any], paths) -> int:
+    """Raise tickets for pytest failures using parsed JUnit data."""
+    tickets_raised = 0
+
+    for failure in summary.get("failed_tests", []):
+        try:
+            record_error(
+                message=f"Pytest failure: {failure['id']}\n{failure['message']}",
+                source=failure.get("source", "unknown"),
+                run_label="test-suite",
+                error_type="PytestFailure",
+                priority=TicketPriority.P1,
+                stack_trace=failure.get("details", ""),
+                capture_context=True,
+                paths=paths,
+            )
+            tickets_raised += 1
+            print(f"  ✗ Raised ticket for failed test: {failure['id']}")
+        except Exception as e:
+            print(f"  ⚠️  Failed to raise ticket for {failure['id']}: {e}")
+
+    for error in summary.get("error_tests", []):
+        try:
+            record_error(
+                message=f"Pytest error: {error['id']}\n{error['message']}",
+                source=error.get("source", "unknown"),
+                run_label="test-suite",
+                error_type="PytestError",
+                priority=TicketPriority.P0,
+                stack_trace=error.get("details", ""),
+                capture_context=True,
+                paths=paths,
+            )
+            tickets_raised += 1
+            print(f"  ✗ Raised ticket for test error: {error['id']}")
+        except Exception as e:
+            print(f"  ⚠️  Failed to raise ticket for {error['id']}: {e}")
 
     return tickets_raised
 
 
-def run_pytest(coverage: bool, quick: bool, pattern: Optional[str], fast_coverage: bool = False) -> Dict[str, Any]:
+def load_performance_report(report_path: Path, paths) -> Dict[str, Any]:
+    """Load pytest performance report if present."""
+    try:
+        return json.loads(report_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        record_error(
+            message=f"Failed to read pytest performance report: {exc}",
+            source=f"{RUNNER_SOURCE}::load_performance_report",
+            run_label="test-suite",
+            error_type="PytestPerformanceReportReadError",
+            priority=TicketPriority.P2,
+            capture_context=True,
+            paths=paths,
+        )
+        raise
+
+
+def report_pytest_summary(summary: Dict[str, Any]) -> None:
+    """Print a concise pytest summary for immediate feedback."""
+    print("\nPytest summary")
+    print(
+        f"  Total: {summary['tests']} | Passed: {summary['passed']} | "
+        f"Failed: {summary['failures']} | Errors: {summary['errors']} | "
+        f"Skipped: {summary['skipped']}"
+    )
+
+    failures = summary.get("failed_tests", [])
+    errors = summary.get("error_tests", [])
+
+    if failures:
+        print("  Failures:")
+        for failure in failures[:10]:
+            print(f"    - {failure['id']}")
+        if len(failures) > 10:
+            print(f"    - ... and {len(failures) - 10} more")
+
+    if errors:
+        print("  Errors:")
+        for error in errors[:10]:
+            print(f"    - {error['id']}")
+        if len(errors) > 10:
+            print(f"    - ... and {len(errors) - 10} more")
+
+
+def report_perf_summary(perf_report: Dict[str, Any]) -> None:
+    """Print top slow tests from the performance report."""
+    slowest = perf_report.get("slowest_tests", [])
+    if not slowest:
+        return
+
+    print("\nTop slow tests (from performance report)")
+    for entry in slowest[:5]:
+        markers = ", ".join(entry.get("markers") or []) or "no markers"
+        duration_ms = entry.get("duration_ms", 0.0)
+        print(f"  {duration_ms:7.1f}ms | {markers:20s} | {entry.get('name', 'unknown')}")
+
+
+def run_pytest(
+    coverage: bool,
+    quick: bool,
+    pattern: Optional[str],
+    fast_coverage: bool = False,
+    run_id: Optional[str] = None,
+    paths=None,
+) -> Dict[str, Any]:
     """Execute pytest with optional coverage and pattern filtering."""
+    if paths is None:
+        paths = get_actifix_paths()
     cmd: List[str] = [sys.executable, "-m", "pytest"]
 
     # Parallelize coverage runs when optional pytest-xdist is installed/configured
@@ -216,7 +326,7 @@ def run_pytest(coverage: bool, quick: bool, pattern: Optional[str], fast_coverag
         # Fast coverage mode: exclude slow tests and use parallel execution
         if fast_coverage:
             print("  → Fast coverage mode: excluding slow tests and using parallel execution")
-            cmd += ["-m", "not slow"]
+            cmd += ["-m", "not slow and not very_slow and not performance"]
             cmd.extend(_collect_xdist_args())
         else:
             # Full coverage: run all tests, but still use parallel if available
@@ -224,7 +334,7 @@ def run_pytest(coverage: bool, quick: bool, pattern: Optional[str], fast_coverag
     else:
         # Non-coverage runs can also use fast mode
         if fast_coverage:
-            cmd += ["-m", "not slow"]
+            cmd += ["-m", "not slow and not very_slow and not performance"]
 
     if quick:
         # Quick mode keeps the suite narrow and quiet
@@ -237,22 +347,48 @@ def run_pytest(coverage: bool, quick: bool, pattern: Optional[str], fast_coverag
 
     env = os.environ.copy()
     env.setdefault("PYTHONPATH", str(ROOT / "src"))
+    if run_id:
+        env["ACTIFIX_TEST_RUN_ID"] = run_id
 
     print("\nRunning pytest suite...")
     process = subprocess.run(cmd, cwd=ROOT, env=env)
 
+    junit_summary = None
+    perf_report = None
+    perf_report_path = None
+
+    if junit_file.exists():
+        junit_summary = parse_pytest_junit(junit_file, paths)
+        report_pytest_summary(junit_summary)
+
+    if run_id:
+        perf_report_path = paths.test_logs_dir / f"pytest_performance_{run_id}.json"
+        if perf_report_path.exists():
+            perf_report = load_performance_report(perf_report_path, paths)
+            report_perf_summary(perf_report)
+
     # Raise tickets for failures if JUnit XML was generated
     tickets_raised = 0
-    if junit_file.exists() and process.returncode != 0:
+    if junit_summary and process.returncode != 0:
         print("\nRaising tickets for pytest failures...")
-        paths = get_actifix_paths()
-        tickets_raised = raise_tickets_for_pytest_failures(junit_file, paths)
+        tickets_raised = raise_tickets_for_pytest_failures(junit_summary, paths)
         print(f"  → {tickets_raised} ticket(s) raised for pytest failures\n")
 
     return {
         "returncode": process.returncode,
         "command": " ".join(cmd),
         "tickets_raised": tickets_raised,
+        "summary": {
+            "tests": junit_summary["tests"],
+            "passed": junit_summary["passed"],
+            "failures": junit_summary["failures"],
+            "errors": junit_summary["errors"],
+            "skipped": junit_summary["skipped"],
+            "failed_tests": [entry["id"] for entry in junit_summary["failed_tests"]],
+            "error_tests": [entry["id"] for entry in junit_summary["error_tests"]],
+        } if junit_summary else None,
+        "performance_report": str(perf_report_path) if perf_report_path and perf_report_path.exists() else None,
+        "slow_test_count": perf_report.get("slow_tests") if perf_report else None,
     }
 
 
@@ -271,6 +407,19 @@ def main(argv: Optional[list[str]] = None) -> int:
     reporter, runner, system_summary = run_system_suite()
     plan = system_summary["plan"]
     result = system_summary["result"]
+
+    print(
+        f"\nSystem tests summary: {result.passed} passed, {result.failed} failed, "
+        f"{result.errors} errors ({result.duration_seconds:.2f}s)"
+    )
+    if result.failed_tests:
+        print("  Failed system tests:")
+        for name in result.failed_tests:
+            print(f"    - {name}")
+    if result.error_tests:
+        print("  System test errors:")
+        for name in result.error_tests:
+            print(f"    - {name}")
     
     quick = True
     if args.full:
@@ -280,7 +429,14 @@ def main(argv: Optional[list[str]] = None) -> int:
 
     # Use fast coverage mode if specified, otherwise use regular coverage
     use_fast_coverage = args.fast_coverage or (args.coverage and os.getenv("ACTIFIX_FAST_COVERAGE"))
-    pytest_stage = run_pytest(args.coverage, quick, args.pattern, fast_coverage=use_fast_coverage)
+    pytest_stage = run_pytest(
+        args.coverage,
+        quick,
+        args.pattern,
+        fast_coverage=use_fast_coverage,
+        run_id=reporter.run_id,
+        paths=reporter.paths,
+    )
     reporter.record_stage(
         "pytest",
         pytest_stage["returncode"] == 0,

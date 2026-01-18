@@ -38,6 +38,15 @@ export ACTIFIX_DISABLE_XDIST=1  # disable
 python3 -m pytest test/ --durations=30
 ```
 
+## Performance reports
+Every pytest run writes a timing report to `ACTIFIX_STATE_DIR/test_logs/pytest_performance_<run_id>.json`
+(default `.actifix/test_logs`). Thresholds can be tuned with:
+
+```bash
+export ACTIFIX_SLOW_TEST_THRESHOLD_MS=250
+export ACTIFIX_HANG_TEST_THRESHOLD_MS=30000
+```
+
 ## Suggested workflow
 1. Run `python3 test.py --fast-coverage` while iterating.
 2. Run `python3 test.py --coverage` before commit.

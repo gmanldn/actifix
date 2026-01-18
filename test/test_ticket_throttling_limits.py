@@ -408,12 +408,16 @@ class TestLeaseBasedLocking:
         repo.create_ticket(entry)
         
         # Acquire lock with very short duration
-        lock1 = repo.acquire_lock("ACT-20260114-302", "agent-1", lease_duration=timedelta(seconds=1))
+        lock1 = repo.acquire_lock(
+            "ACT-20260114-302",
+            "agent-1",
+            lease_duration=timedelta(milliseconds=200),
+        )
         assert lock1 is not None
         
         # Wait for lease to expire
         import time
-        time.sleep(2)
+        time.sleep(0.25)
         
         # New agent should be able to acquire
         lock2 = repo.acquire_lock("ACT-20260114-302", "agent-2", lease_duration=timedelta(hours=1))
@@ -438,7 +442,7 @@ class TestLeaseBasedLocking:
         original_expiry = lock1.lease_expires
         
         import time
-        time.sleep(1)
+        time.sleep(0.05)
         
         # Renew lock
         lock2 = repo.renew_lock("ACT-20260114-303", "agent-1", lease_duration=timedelta(hours=1))
@@ -462,7 +466,11 @@ class TestLeaseBasedLocking:
         repo.create_ticket(entry)
         
         # Acquire lock with very short duration
-        lock = repo.acquire_lock("ACT-20260114-304", "agent-1", lease_duration=timedelta(seconds=1))
+        lock = repo.acquire_lock(
+            "ACT-20260114-304",
+            "agent-1",
+            lease_duration=timedelta(milliseconds=200),
+        )
         assert lock is not None
         
         # Verify ticket is locked
@@ -471,7 +479,7 @@ class TestLeaseBasedLocking:
         
         # Wait for lease to expire
         import time
-        time.sleep(2)
+        time.sleep(0.25)
         
         # Cleanup should free it
         count = repo.cleanup_expired_locks()

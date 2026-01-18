@@ -392,6 +392,17 @@ modules:
   depends_on:
   - infra.logging
   - infra.persistence.manager
+- id: core.self_repair
+  domain: core
+  owner: core
+  summary: Discoverable self-repair blueprints and verification workflows
+  entrypoints:
+  - src/actifix/self_repair.py
+  contracts:
+  - document automated repair blueprints
+  - log verification hints via log_utils events
+  depends_on:
+  - infra.logging
 - id: security.api
   domain: security
   owner: security
