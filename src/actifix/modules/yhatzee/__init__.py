@@ -96,7 +96,7 @@ _HTML_PAGE = """<!doctype html>
     }
     body {
       margin: 0;
-      font-family: "Georgia", "Times New Roman", serif;
+      font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", "Palatino", "Georgia", serif;
       background: radial-gradient(circle at top, #fff8e6, #f2efe2 60%, #e7e0cf);
       color: var(--ink);
     }
@@ -112,15 +112,23 @@ _HTML_PAGE = """<!doctype html>
       gap: 16px;
     }
     h1 {
-      font-size: 40px;
+      font-family: "Copperplate", "Palatino Linotype", "Book Antiqua", "Palatino", serif;
+      font-size: 42px;
       margin: 0;
-      letter-spacing: 1px;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
     }
     .subtitle {
-      font-size: 14px;
+      font-size: 12px;
       text-transform: uppercase;
-      letter-spacing: 2px;
+      letter-spacing: 3px;
       color: var(--muted);
+    }
+    h2 {
+      font-family: "Copperplate", "Palatino Linotype", "Book Antiqua", "Palatino", serif;
+      font-size: 20px;
+      letter-spacing: 1px;
+      margin-top: 0;
     }
     .grid {
       display: grid;
