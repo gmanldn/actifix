@@ -3,6 +3,16 @@
 Actifix is a self-improving error management system that captures prioritized tickets, preserves operational context, and keeps the development workflow auditable. It is stdlib-first, resilient under failure, and designed to feed AI copilots with consistent context.
 
 ## What Actifix provides
+
+**Dashboard Panes**:
+- =Ê **Overview**: Health metrics, recent tickets, system stats
+- <« **Tickets**: Priority lanes (P0-P4), ticket details modal
+- =Ü **Logs**: Live structured logs with filtering
+- ™ **System**: Resources, paths, git status, recent events
+- >é **Modules**: System/user modules with toggle controls
+- =¡ **Ideas**: Submit requests ’ AI generates actionable tickets
+- =' **Settings**: AI provider config, status, feedback log
+
 - Structured error capture with priority classification (P0-P4).
 - Deduplication via duplicate guards and ticket repository checks.
 - Context capture (stack traces, file snippets, system state) with configurable limits.
@@ -45,6 +55,7 @@ See `CHANGELOG.md` for full history. Recent highlights:
 
 | Version | Highlights |
 |---------|------------|
+| **4.0.48** (2026-01-18) | **Ideas pane (=¡)**: Submit natural language feature requests/ideas via dashboard. AI analyzes and generates detailed tickets with priority, technical implementation details, success criteria, and remediation notes. Tickets created via `/api/ideas` ’ `ai_client.generate_fix()` ’ `record_error(source='gui_ideas')`. |
 | **4.0.43** (2026-01-21) | Added OpenRouter Grok4 Fast support in AI provider options so the dashboard can pick the high-speed Grok4 endpoint when requested. |
 | **4.0.42** (2026-01-21) | Redesigned the settings panel with gradient cards, status chips, and richer AI/system context so configuration feels themed and informative. |
 | **4.0.41** (2026-01-21) | Added multi-agent workflow smoke tests to verify gitignore isolation, ignored agent directories, and develop-only flow, keeping binaries out. |

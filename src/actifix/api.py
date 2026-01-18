@@ -843,6 +843,73 @@ def create_app(project_root: Optional[Path] = None) -> "Flask":
                 'error': str(e)
             }), 500
 
+    @app.route('/api/ideas', methods=['POST'])
+    def api_ideas():
+        """Process user idea into AI-enriched ticket."""
+        try:
+            data = request.get_json()
+            idea = data.get('idea', '').strip()
+            if not idea:
+                return jsonify({'error': 'Idea text required'}), 400
+
+            paths = get_actifix_paths(project_root=app.config['PROJECT_ROOT'])
+
+            # Dummy ticket info for AI analysis
+            dummy_ticket = {
+                'id': 'IDEA-GUI',
+                'priority': 'P3',
+                'error_type': 'feature_request',
+                'message': idea,
+                'source': 'gui_ideas',
+                'stack_trace': '',
+            }
+
+            # Use AI to generate detailed analysis/remediation notes
+            ai_client = get_ai_client()
+            ai_response = ai_client.generate_fix(dummy_ticket)
+
+            ai_notes = ai_response.content if ai_response.success else f"AI analysis unavailable: {ai_response.error}"
+
+            # Create enriched ticket
+            from .raise_af import record_error, TicketPriority
+            entry = record_error(
+                message=f"User Feature Request: {idea}",
+                source="gui_ideas",
+                run_label="dashboard",
+                error_type="feature_request",
+                priority=TicketPriority.P3,
+                paths=paths,
+                skip_ai_notes=True  # Use our custom notes
+            )
+
+            if not entry:
+                return jsonify({'error': 'Failed to create ticket (possible duplicate)'}), 500
+
+            # Update with AI notes
+            from .persistence.ticket_repo import get_ticket_repository
+            repo = get_ticket_repository()
+            repo.update_ticket(entry.entry_id, {
+                'ai_remediation_notes': ai_notes[:4000],  # Truncate if needed
+                'message': f"User Idea → AI Expanded\n\nOriginal: {idea}\n\nAI Analysis:\n{ai_notes[:500]}...",
+            })
+
+            preview = ai_notes[:150] + '...' if len(ai_notes) > 150 else ai_notes
+
+            return jsonify({
+                'success': True,
+                'ticket_id': entry.entry_id,
+                'priority': entry.priority.value,
+                'preview': preview,
+                'ai_provider': ai_response.provider.value if ai_response.provider else 'none',
+            })
+        except Exception as e:
+            record_error(
+                message=f"Ideas endpoint failed: {e}",
+                source="api.py:api_ideas",
+                priority=TicketPriority.P2,
+            )
+            return jsonify({'error': str(e)}), 500
+
     @app.route('/api/cleanup', methods=['POST'])
     def api_cleanup():
         """Run ticket cleanup with retention policies."""

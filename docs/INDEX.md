@@ -6,7 +6,7 @@ This index keeps documentation discoverable and aligned with the Actifix workflo
 - **README** `../README.md` - project overview, core commands, guardrails
 - **QUICKSTART** `QUICKSTART.md` - fastest path to running Actifix
 - **INSTALLATION** `INSTALLATION.md` - installation and configuration details
-- **FRAMEWORK OVERVIEW** `FRAMEWORK_OVERVIEW.md` - architecture, release notes, roadmap
+- **FRAMEWORK OVERVIEW** [`FRAMEWORK_OVERVIEW.md#dashboard-panes`](FRAMEWORK_OVERVIEW.md#dashboard-panes) - architecture, dashboard panes (incl. new Ideas pane), release notes, roadmap
 
 ## Operators and support
 - **MONITORING** `MONITORING.md` - health checks, metrics, and alerting

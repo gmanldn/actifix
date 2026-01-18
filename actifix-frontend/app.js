@@ -154,14 +154,15 @@ const ErrorDisplay = ({ message }) => {
 
 // Navigation Rail Component
 const NavigationRail = ({ activeView, onViewChange, logAlert }) => {
-  const navItems = [
-    { id: 'overview', icon: '📊', label: 'Overview' },
-    { id: 'tickets', icon: '🎫', label: 'Tickets' },
-    { id: 'logs', icon: '📜', label: 'Logs' },
-    { id: 'system', icon: '⚙️', label: 'System' },
-    { id: 'modules', icon: '🧩', label: 'Modules' },
-    { id: 'settings', icon: '🔧', label: 'Settings' },
-  ];
+const navItems = [
+  { id: 'overview', icon: '📊', label: 'Overview' },
+  { id: 'tickets', icon: '🎫', label: 'Tickets' },
+  { id: 'logs', icon: '📜', label: 'Logs' },
+  { id: 'system', icon: '⚙️', label: 'System' },
+  { id: 'modules', icon: '🧩', label: 'Modules' },
+  { id: 'ideas', icon: '💡', label: 'Ideas' },
+  { id: 'settings', icon: '🔧', label: 'Settings' },
+];
 
   return h('nav', { className: 'nav-rail' },
     h('img', { src: './assets/pangolin.svg', alt: 'Actifix', className: 'nav-rail-logo' }),
@@ -1292,6 +1293,98 @@ const ModulesView = () => {
   );
 };
 
+// Ideas View Component
+const IdeasView = () => {
+  const [idea, setIdea] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState(null);
+  const [errorMsg, setErrorMsg] = useState('');
+
+  const submitIdea = async () => {
+    if (!idea.trim()) return;
+    setLoading(true);
+    setErrorMsg('');
+    setResult(null);
+    try {
+      const response = await fetch(`${API_BASE}/ideas`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idea: idea.trim() })
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setResult(data);
+      } else {
+        setErrorMsg(data.error || 'Failed to generate ticket');
+      }
+    } catch (err) {
+      setErrorMsg(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return h('div', { className: 'panel' },
+    h('div', { className: 'panel-header' },
+      h('div', { className: 'panel-title' },
+        h('span', { className: 'panel-title-icon' }, '💡'),
+        'IDEAS & REQUESTS'
+      ),
+      h('div', { className: 'panel-actions' },
+        h('span', { className: 'text-muted', style: { fontSize: '11px' } },
+          'Submit ideas → AI generates actionable tickets'
+        )
+      )
+    ),
+    h('div', { style: { display: 'flex', flexDirection: 'column', gap: 'var(--spacing-lg)' } },
+      h('textarea', {
+        value: idea,
+        onChange: (e) => setIdea(e.target.value),
+        placeholder: `Enter your idea or feature request...
+
+Examples:
+• Add dark mode toggle to dashboard
+• Implement user authentication
+• Create export tickets to CSV
+• Add real-time notifications for P0 tickets`,
+        rows: 6,
+        style: {
+          width: '100%',
+          padding: 'var(--spacing-md)',
+          border: '1px solid var(--border)',
+          borderRadius: 'var(--radius-lg)',
+          background: 'var(--bg-panel)',
+          color: 'var(--text-primary)',
+          fontSize: '13px',
+          fontFamily: 'IBM Plex Mono, monospace',
+          resize: 'vertical',
+          lineHeight: '1.5'
+        }
+      }),
+      h('div', { style: { display: 'flex', gap: 'var(--spacing-md)', alignItems: 'center', flexWrap: 'wrap' } },
+        h('button', {
+          className: 'btn btn-primary',
+          onClick: submitIdea,
+          disabled: loading || !idea.trim(),
+          style: { minWidth: '140px' }
+        }, loading ? 'Processing...' : 'Generate Ticket'),
+        result && h('div', {
+          className: 'panel',
+          style: { flex: 1, minHeight: '80px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', maxWidth: 'none' }
+        },
+          h('div', { style: { fontSize: '16px', fontWeight: '600', color: '#10b981', marginBottom: 'var(--spacing-sm)' } },
+            `🎫 Ticket Created: ${result.ticket_id}`
+          ),
+          result.preview && h('div', {
+            style: { fontSize: '12px', color: 'var(--text-muted)', textAlign: 'center', maxWidth: '600px' }
+          }, result.preview)
+        ),
+        errorMsg && h(ErrorDisplay, { message: errorMsg })
+      )
+    )
+  );
+};
+
 // Main App Component
 const App = () => {
   const [activeView, setActiveView] = useState('overview');
@@ -1386,6 +1479,7 @@ const App = () => {
       case 'logs': return h(LogsView);
       case 'system': return h(SystemView);
       case 'modules': return h(ModulesView);
+      case 'ideas': return h(IdeasView);
       case 'settings': return h(SettingsView);
       default: return h(OverviewView);
     }

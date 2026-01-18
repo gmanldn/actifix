@@ -44,15 +44,16 @@ modules:
 - id: runtime.api
   domain: runtime
   owner: runtime
-  summary: Public API surface and package exports
+  summary: Public API surface and package exports (incl. /api/ideas for GUI Ideas pane)
   entrypoints:
   - src/actifix/__init__.py
   - src/actifix/api.py
   contracts:
-  - expose stable API
+  - expose stable API incl. /api/ideas (idea ’ AI ticket)
   - centralize package exports
   depends_on:
   - core.raise_af
+  - core.ai_client
   - bootstrap.main
   - runtime.state
   - infra.health
