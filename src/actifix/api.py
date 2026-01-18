@@ -96,49 +96,31 @@ def _is_system_domain(domain: Optional[str]) -> bool:
 
 
 def _load_modules(project_root: Path) -> Dict[str, List[Dict[str, str]]]:
-    """Parse docs/architecture/MODULES.md into system/user buckets."""
-    modules_md = project_root / "docs" / "architecture" / "MODULES.md"
-    if not modules_md.exists():
+    """Load modules from canonical DEPGRAPH.json."""
+    depgraph_path = project_root / "docs" / "architecture" / "DEPGRAPH.json"
+    if not depgraph_path.exists():
         return {"system": [], "user": []}
 
-    name = None
-    domain = None
-    owner = None
-    summary = None
-    modules: List[Dict[str, str]] = []
-
     try:
-        for line in modules_md.read_text(encoding="utf-8").splitlines():
-            if line.startswith("## "):
-                if name:
-                    modules.append({
-                        "name": name,
-                        "domain": domain or "",
-                        "owner": owner or "",
-                        "summary": summary or "",
-                    })
-                name = line.replace("## ", "").strip()
-                domain = owner = summary = None
-                continue
-            if line.startswith("**Domain:**"):
-                domain = line.replace("**Domain:**", "").strip()
-            elif line.startswith("**Owner:**"):
-                owner = line.replace("**Owner:**", "").strip()
-            elif line.startswith("**Summary:**"):
-                summary = line.replace("**Summary:**", "").strip()
-
-        if name:
-            modules.append({
-                "name": name,
-                "domain": domain or "",
-                "owner": owner or "",
-                "summary": summary or "",
-            })
+        import json
+        with open(depgraph_path, 'r') as f:
+            data = json.load(f)
+        nodes = data.get("nodes", [])
     except Exception:
         return {"system": [], "user": []}
 
-    system_modules = [m for m in modules if _is_system_domain(m["domain"])]
-    user_modules = [m for m in modules if not _is_system_domain(m["domain"])]
+    system_domains = {"runtime", "infra", "core", "tooling", "security", "plugins", "persistence"}
+    modules = []
+    for node in nodes:
+        modules.append({
+            "name": node["id"],
+            "domain": node.get("domain", ""),
+            "owner": node.get("owner", ""),
+            "summary": node.get("label", node["id"])
+        })
+
+    system_modules = [m for m in modules if m["domain"] in system_domains]
+    user_modules = [m for m in modules if m["domain"] not in system_domains]
     return {"system": system_modules, "user": user_modules}
 
 
