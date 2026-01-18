@@ -110,6 +110,33 @@ actifix.record_error(
 - Capture errors via `actifix.raise_af.record_error(...)` and re-raise when needed.
 - Keep `docs/INDEX.md` in sync with documentation changes.
 
+## Multi-Agent Workflow
+
+Actifix supports multiple AI agents working together on the codebase.
+
+### Collaboration Model
+- **Work on `develop`**: Agents make changes directly on the `develop` branch. No per-change branches requiredjust regular commits and pushes after each ticket.
+- **Isolated State**: Each agent uses a unique `ACTIFIX_DATA_DIR` for local database (`data/actifix.db`), logs, and state to prevent conflicts.
+- **Database Untracked**: `data/actifix.db` is in `.gitignore`, allowing independent ticket views and processing per agent without merge issues.
+
+### Quick-Start Agent Setup
+```bash
+# Create isolated dir for this agent
+mkdir -p ~/actifix-agent-$(date +%s)/data
+export ACTIFIX_DATA_DIR=~/actifix-agent-$(date +%s)
+
+# Enforce workflow guard
+export ACTIFIX_CHANGE_ORIGIN=raise_af
+
+# View tickets
+python3 scripts/view_tickets.py
+
+# Process (manual or auto)
+python3 Do_AF.py 1  # or fix manually per AGENTS.md
+```
+
+Agents sync via git pull/push after commits.
+
 ## Documentation
 - `docs/INDEX.md` - documentation hub
 - `docs/QUICKSTART.md` - hands-on setup

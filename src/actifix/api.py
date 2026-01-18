@@ -4,6 +4,7 @@ Actifix API Server - Flask-based REST API for frontend dashboard.
 Provides endpoints for health, stats, tickets, logs, and system information.
 """
 
+import logging
 import os
 import platform
 import subprocess
@@ -333,6 +334,8 @@ def create_app(project_root: Optional[Path] = None) -> "Flask":
         static_folder=str(frontend_dir),
         static_url_path=''
     )
+    werkzeug_logger = logging.getLogger('werkzeug')
+    werkzeug_logger.setLevel(logging.ERROR)
     CORS(app)  # Enable CORS for frontend
     
     # Store project root in app config
