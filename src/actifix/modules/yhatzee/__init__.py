@@ -151,24 +151,40 @@ _HTML_PAGE = """<!doctype html>
       font-size: 16px;
       margin-top: 6px;
     }
+    .setup input:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(196, 79, 44, 0.2);
+    }
     .button {
       appearance: none;
       border: none;
-      padding: 10px 16px;
+      padding: 10px 18px;
       border-radius: 999px;
       font-size: 14px;
       text-transform: uppercase;
       letter-spacing: 1px;
       cursor: pointer;
-      background: var(--accent);
+      background: linear-gradient(135deg, #d25a2d, #b84a28);
       color: #fff7ed;
+      box-shadow: 0 8px 16px rgba(196, 79, 44, 0.35);
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
     }
     .button.secondary {
-      background: var(--accent-2);
+      background: linear-gradient(135deg, #1c6e6a, #155955);
+      box-shadow: 0 8px 16px rgba(28, 110, 106, 0.3);
+    }
+    .button:hover:not([disabled]) {
+      transform: translateY(-1px);
+      box-shadow: 0 10px 18px rgba(44, 42, 36, 0.25);
+    }
+    .button:active:not([disabled]) {
+      transform: translateY(1px);
     }
     .button[disabled] {
       opacity: 0.5;
       cursor: not-allowed;
+      box-shadow: none;
     }
     .status {
       display: flex;
@@ -251,8 +267,8 @@ _HTML_PAGE = """<!doctype html>
     }
     .score-btn {
       border: 1px dashed var(--accent);
-      background: transparent;
-      padding: 6px 10px;
+      background: rgba(255, 255, 255, 0.6);
+      padding: 6px 12px;
       border-radius: 8px;
       cursor: pointer;
       font-size: 12px;
