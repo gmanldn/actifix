@@ -222,10 +222,13 @@ _HTML_PAGE = """<!doctype html>
     table {
       width: 100%;
       border-collapse: collapse;
+      background: #fffdf7;
+      border-radius: 14px;
+      overflow: hidden;
     }
     th, td {
       border-bottom: 1px solid var(--border);
-      padding: 8px;
+      padding: 10px 8px;
       text-align: center;
       font-size: 14px;
     }
@@ -234,10 +237,17 @@ _HTML_PAGE = """<!doctype html>
       font-size: 12px;
       letter-spacing: 1px;
       color: var(--muted);
+      background: #f3ecdb;
     }
     td.category {
       text-align: left;
       font-weight: 600;
+    }
+    tbody tr:nth-child(even) {
+      background: #fdf7ea;
+    }
+    tbody tr:hover {
+      background: #f7f0df;
     }
     .score-btn {
       border: 1px dashed var(--accent);
