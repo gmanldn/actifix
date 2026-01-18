@@ -258,7 +258,9 @@ def run_pytest(coverage: bool, quick: bool, pattern: Optional[str], fast_coverag
 
 def main(argv: Optional[list[str]] = None) -> int:
     parser = argparse.ArgumentParser(description="Actifix test runner")
-    parser.add_argument("--quick", action="store_true", help="Run a faster subset of tests")
+    quick_group = parser.add_mutually_exclusive_group()
+    quick_group.add_argument("--quick", action="store_true", help="Run the quick test subset (default)")
+    quick_group.add_argument("--full", action="store_true", help="Run the full pytest suite")
     parser.add_argument("--coverage", action="store_true", help="Include coverage reporting")
     parser.add_argument("--fast-coverage", action="store_true", help="Fast coverage mode (exclude slow tests, use parallel execution)")
     parser.add_argument("--pattern", type=str, help="Pytest -k pattern")
@@ -270,9 +272,15 @@ def main(argv: Optional[list[str]] = None) -> int:
     plan = system_summary["plan"]
     result = system_summary["result"]
     
+    quick = True
+    if args.full:
+        quick = False
+    elif args.quick:
+        quick = True
+
     # Use fast coverage mode if specified, otherwise use regular coverage
     use_fast_coverage = args.fast_coverage or (args.coverage and os.getenv("ACTIFIX_FAST_COVERAGE"))
-    pytest_stage = run_pytest(args.coverage, args.quick, args.pattern, fast_coverage=use_fast_coverage)
+    pytest_stage = run_pytest(args.coverage, quick, args.pattern, fast_coverage=use_fast_coverage)
     reporter.record_stage(
         "pytest",
         pytest_stage["returncode"] == 0,
