@@ -23,6 +23,8 @@ domains:
   summary: Testing, quality assurance, architecture validation
 - id: plugins
   summary: Plugin discovery, validation, and lifecycle orchestration
+- id: modules
+  summary: User-facing modules and local experiences
 modules:
 - id: bootstrap.main
   domain: runtime
@@ -605,6 +607,19 @@ modules:
   depends_on:
   - plugins.registry
   - plugins.protocol
+- id: modules.yhatzee
+  domain: modules
+  owner: modules
+  summary: Two-player Yhatzee game module with local GUI
+  entrypoints:
+  - src/actifix/modules/yhatzee/__init__.py
+  contracts:
+  - serve a local Yhatzee GUI on localhost:8090
+  - use Actifix logging and error capture interfaces
+  depends_on:
+  - runtime.state
+  - infra.logging
+  - core.raise_af
 contracts:
 - id: contract.logging
   summary: All modules must log via centralized logging system with correlation IDs

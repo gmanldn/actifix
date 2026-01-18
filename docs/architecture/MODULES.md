@@ -286,3 +286,11 @@ This document summarizes the modules in the Actifix architecture. Use `MAP.yaml`
 - Entrypoints: `src/actifix/plugins/builtin.py`
 - Depends on: `plugins.registry`, `plugins.protocol`
 - Contracts: exercise registry sandboxing and health checks
+
+## Modules
+
+### modules.yhatzee
+- Summary: two-player Yhatzee game module with local GUI
+- Entrypoints: `src/actifix/modules/yhatzee/__init__.py`
+- Depends on: `runtime.state`, `infra.logging`, `core.raise_af`
+- Contracts: serve a local Yhatzee GUI on localhost:8090; use Actifix logging and error capture
