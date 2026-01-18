@@ -91,6 +91,7 @@ def api_workspace(tmp_path, monkeypatch):
     reset_ticket_repository()
 
 
+@pytest.mark.api
 def test_api_version_and_modules(api_workspace, monkeypatch):
     app = create_app(project_root=api_workspace)
 
@@ -119,6 +120,7 @@ def test_api_version_and_modules(api_workspace, monkeypatch):
     assert any(m["name"] == "runtime-utils" for m in modules["system"])
 
 
+@pytest.mark.api
 def test_api_logs_stats_and_tickets(api_workspace, monkeypatch):
     app = create_app(project_root=api_workspace)
     client = app.test_client()
@@ -150,6 +152,7 @@ def test_api_logs_stats_and_tickets(api_workspace, monkeypatch):
     assert any(line["level"] == "SUCCESS" for line in logs_resp["content"])
 
 
+@pytest.mark.api
 def test_api_settings_and_ping(api_workspace):
     app = create_app(project_root=api_workspace)
     client = app.test_client()
@@ -171,6 +174,7 @@ def test_api_settings_and_ping(api_workspace):
     assert ping["status"] == "ok"
 
 
+@pytest.mark.api
 def test_api_fix_and_system(api_workspace):
     app = create_app(project_root=api_workspace)
     client = app.test_client()

@@ -172,3 +172,38 @@ def database_profiler_session():
     yield profiler
     # Report at end of session
     profiler.report()
+
+
+@pytest.fixture(scope="session")
+def flask_app_session(tmp_path_factory):
+    """Create a session-scoped Flask app for API tests to avoid repeated app creation overhead."""
+    # Create a temporary project directory
+    base = tmp_path_factory.mktemp("flask_app_session")
+    
+    # Set up Actifix environment
+    import os
+    os.environ["ACTIFIX_DATA_DIR"] = str(base / "actifix")
+    os.environ["ACTIFIX_STATE_DIR"] = str(base / ".actifix")
+    os.environ["ACTIFIX_DB_PATH"] = str(base / "data" / "actifix.db")
+    os.environ["ACTIFIX_CHANGE_ORIGIN"] = "raise_af"
+    
+    # Initialize Actifix paths
+    from actifix.state_paths import get_actifix_paths, init_actifix_files
+    paths = get_actifix_paths(project_root=base)
+    init_actifix_files(paths)
+    
+    # Create the Flask app
+    from actifix.api import create_app
+    app = create_app(base)
+    app.config['TESTING'] = True
+    
+    yield app
+    
+    # Clean up
+    from actifix.persistence.database import reset_database_pool
+    from actifix.persistence.ticket_repo import reset_ticket_repository
+    from actifix.persistence.event_repo import reset_event_repository
+    
+    reset_database_pool()
+    reset_ticket_repository()
+    reset_event_repository()

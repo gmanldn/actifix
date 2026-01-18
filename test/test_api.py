@@ -36,18 +36,17 @@ def temp_project(tmp_path):
 
 
 @pytest.fixture
-def test_client(temp_project):
-    """Create a Flask test client."""
+def test_client(temp_project, flask_app_session):
+    """Create a Flask test client using session-scoped app."""
     if not FLASK_AVAILABLE:
         pytest.skip("Flask not available")
     
-    from actifix.api import create_app
-    app = create_app(temp_project)
-    app.config['TESTING'] = True
-    with app.test_client() as client:
+    # Use the session-scoped Flask app
+    with flask_app_session.test_client() as client:
         yield client
 
 
+@pytest.mark.api
 @pytest.mark.skipif(not FLASK_AVAILABLE, reason="Flask not available")
 class TestAPIEndpoints:
     """Test API endpoints."""
@@ -157,6 +156,7 @@ class TestAPIEndpoints:
         assert 'start_time' in server
 
 
+@pytest.mark.api
 @pytest.mark.skipif(not FLASK_AVAILABLE, reason="Flask not available")
 class TestAPIWithData:
     """Test API with actual ticket data."""
@@ -220,6 +220,7 @@ class TestAPIWithData:
             assert 'error_type' in ticket
 
 
+@pytest.mark.api
 @pytest.mark.skipif(not FLASK_AVAILABLE, reason="Flask not available")
 class TestAPIAppCreation:
     """Test API app creation and configuration."""
