@@ -1,0 +1,30 @@
+name: Reject Binary Files
+
+on:
+  push:
+    branches: [ develop ]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 2  # Fetch one previous commit for push events
+
+    - name: Check changed files for binaries
+      run: |
+        if [ "${{ github.event_name }}" = "pull_request" ]; then
+          git fetch origin ${{ github.base_ref }}:${{ github.base_ref }}
+          CHANGED_FILES=$(git diff --name-only origin/${{ github.base_ref }} HEAD)
+        else
+          CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD)
+        fi
+        
+        if echo "$CHANGED_FILES" | grep -qE '\.(db|db-shm|db-wal|png|jpg|jpeg|gif|bmp|tiff|zip|tar\.gz|exe|dll|so|dylib|pyc|pyd)$'; then
+          echo "❌ Binary files detected in changed files:"
+          echo "$CHANGED_FILES" | grep -E '\.(db|db-shm|db-wal|png|jpg|jpeg|gif|bmp|tiff|zip|tar\.gz|exe|dll|so|dylib|pyc|pyd)$'
+          exit 1
+        fi
+        echo "✅ No binary files in changed files"

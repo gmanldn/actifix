@@ -121,6 +121,22 @@ def check_version_consistency() -> bool:
     print("✓ Version consistency check passed")
     return True
 
+
+def check_no_binaries(staged_files):
+    """Reject commits containing binary files to prevent merge conflicts in multi-agent workflows."""
+    disallowed_suffixes = [
+        '.db', '.db-shm', '.db-wal', '.png', '.jpg', '.jpeg', '.gif', '.bmp', 
+        '.tiff', '.zip', '.tar.gz', '.exe', '.dll', '.so', '.dylib', '.pyc', '.pyd'
+    ]
+    for file_path in staged_files:
+        suffix = Path(file_path).suffix.lower()
+        if suffix in disallowed_suffixes:
+            print(f"✗ Binary file staged: {file_path}")
+            print("Rejecting commit containing binary files.")
+            return False
+    print("✓ No disallowed binary files staged")
+    return True
+
 def main():
     """Main pre-commit hook logic."""
     staged_files = get_staged_files()
@@ -130,6 +146,9 @@ def main():
         return 0
 
     if not check_version_consistency():
+        return 1
+
+    if not check_no_binaries(staged_files):
         return 1
 
     # Check if we should run full suite
