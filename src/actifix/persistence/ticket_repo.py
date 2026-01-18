@@ -105,6 +105,7 @@ from pathlib import Path
 from typing import Optional, List, Dict, Any
 
 from ..raise_af import ActifixEntry, TicketPriority
+from ..config import ActifixConfig, get_config
 from .database import (
     get_database_pool,
     DatabasePool,
@@ -130,6 +131,11 @@ class FieldLengthError(ValueError):
     pass
 
 
+class OpenTicketLimitExceededError(Exception):
+    """Raised when attempting to create a ticket and open ticket limit is exceeded."""
+    pass
+
+
 def _validate_field_length(value: Optional[str], max_length: int, field_name: str) -> None:
     """Validate that a field doesn't exceed maximum length.
 
@@ -145,6 +151,35 @@ def _validate_field_length(value: Optional[str], max_length: int, field_name: st
         raise FieldLengthError(
             f"Field '{field_name}' exceeds maximum length of {max_length} chars "
             f"(got {len(value)} chars)"
+        )
+
+
+def _validate_file_context_size(
+    file_context: Optional[Dict[str, str]],
+    max_size_bytes: int,
+    field_name: str = "file_context"
+) -> None:
+    """Validate that file context doesn't exceed maximum size.
+
+    Args:
+        file_context: The file context dict to validate.
+        max_size_bytes: Maximum allowed size in bytes.
+        field_name: Name of the field for error messages.
+
+    Raises:
+        FieldLengthError: If serialized size exceeds max_size_bytes.
+    """
+    if not file_context:
+        return
+
+    # Serialize to JSON to get actual storage size
+    json_str = serialize_json_field(file_context)
+    size_bytes = len(json_str.encode('utf-8'))
+
+    if size_bytes > max_size_bytes:
+        raise FieldLengthError(
+            f"Field '{field_name}' exceeds maximum size of {max_size_bytes} bytes "
+            f"(got {size_bytes} bytes, {len(file_context)} files)"
         )
 
 
@@ -185,14 +220,16 @@ class TicketRepository:
     Provides thread-safe CRUD operations with locking support.
     """
     
-    def __init__(self, pool: Optional[DatabasePool] = None):
+    def __init__(self, pool: Optional[DatabasePool] = None, config: Optional[ActifixConfig] = None):
         """
         Initialize ticket repository.
-        
+
         Args:
             pool: Optional database pool (uses global pool if None).
+            config: Optional configuration (uses global config if None).
         """
         self.pool = pool or get_database_pool()
+        self.config = config or get_config()
     
     def create_ticket(self, entry: ActifixEntry) -> bool:
         """
@@ -206,19 +243,40 @@ class TicketRepository:
 
         Raises:
             FieldLengthError: If any field exceeds maximum length.
+            OpenTicketLimitExceededError: If open ticket limit is exceeded.
             DatabaseError: On database errors.
         """
         # Validate field lengths to prevent DoS attacks
-        _validate_field_length(entry.message, MAX_MESSAGE_LENGTH, "message")
+        _validate_field_length(entry.message, self.config.max_ticket_message_length, "message")
         _validate_field_length(entry.source, MAX_SOURCE_LENGTH, "source")
         _validate_field_length(entry.error_type, MAX_ERROR_TYPE_LENGTH, "error_type")
         _validate_field_length(entry.stack_trace, MAX_STACK_TRACE_LENGTH, "stack_trace")
         _validate_field_length(entry.ai_remediation_notes, MAX_FIELD_LENGTH, "ai_remediation_notes")
 
+        # Validate file context size
+        if entry.file_context:
+            _validate_file_context_size(
+                entry.file_context,
+                self.config.max_file_context_size_bytes,
+                "file_context"
+            )
+
         success = False
 
         try:
             with self.pool.transaction() as conn:
+                # Check if we would exceed the open ticket limit
+                cursor = conn.execute(
+                    "SELECT COUNT(*) as count FROM tickets WHERE status = 'Open' AND deleted = 0"
+                )
+                open_count = cursor.fetchone()['count']
+
+                if open_count >= self.config.max_open_tickets:
+                    raise OpenTicketLimitExceededError(
+                        f"Cannot create new ticket: Open ticket limit ({self.config.max_open_tickets}) "
+                        f"has been reached. Currently {open_count} open tickets exist. "
+                        f"Please complete or close some tickets before creating new ones."
+                    )
                 conn.execute(
                     """
                     INSERT INTO tickets (
@@ -422,7 +480,7 @@ class TicketRepository:
 
         # Validate field lengths to prevent DoS attacks
         field_limits = {
-            "message": MAX_MESSAGE_LENGTH,
+            "message": self.config.max_ticket_message_length,
             "source": MAX_SOURCE_LENGTH,
             "error_type": MAX_ERROR_TYPE_LENGTH,
             "stack_trace": MAX_STACK_TRACE_LENGTH,
@@ -432,6 +490,14 @@ class TicketRepository:
         for field_name, max_length in field_limits.items():
             if field_name in updates:
                 _validate_field_length(updates[field_name], max_length, field_name)
+
+        # Validate file_context size if present
+        if "file_context" in updates and updates["file_context"]:
+            _validate_file_context_size(
+                updates["file_context"],
+                self.config.max_file_context_size_bytes,
+                "file_context"
+            )
 
         old_values = {}
         success = False
@@ -1004,21 +1070,22 @@ class TicketRepository:
 _global_repo: Optional[TicketRepository] = None
 
 
-def get_ticket_repository(pool: Optional[DatabasePool] = None) -> TicketRepository:
+def get_ticket_repository(pool: Optional[DatabasePool] = None, config: Optional[ActifixConfig] = None) -> TicketRepository:
     """
     Get or create global ticket repository.
-    
+
     Args:
         pool: Optional database pool override.
-    
+        config: Optional configuration override.
+
     Returns:
         Ticket repository instance.
     """
     global _global_repo
-    
-    if _global_repo is None or (pool and _global_repo.pool != pool):
-        _global_repo = TicketRepository(pool=pool)
-    
+
+    if _global_repo is None or (pool and _global_repo.pool != pool) or (config and _global_repo.config != config):
+        _global_repo = TicketRepository(pool=pool, config=config)
+
     return _global_repo
 
 
