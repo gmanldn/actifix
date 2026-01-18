@@ -13,6 +13,19 @@ const LOG_REFRESH_INTERVAL = 3000;
 const TICKET_REFRESH_INTERVAL = 4000;
 const TICKET_LIMIT = 250;
 
+const applyAssetVersion = () => {
+  const version = window.ACTIFIX_ASSET_VERSION || '4';
+  const link = document.querySelector('link[rel="stylesheet"]');
+  if (!link) return;
+  const href = link.getAttribute('href') || '';
+  if (!href.includes(`v=${version}`)) {
+    const nextHref = href.split('?')[0] + `?v=${version}`;
+    link.setAttribute('href', nextHref);
+  }
+};
+
+applyAssetVersion();
+
 // ============================================================================
 // Utility Functions
 // ============================================================================
