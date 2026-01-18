@@ -19,6 +19,8 @@ All Changes Must Start via Raise_AF
 9. **Rules** 
 Always follow the actifix rules.
 Always commit after every ticket and push.
+Never reinvent the wheel, check if a system is already in the codebase. Use that. 
+Be reluctant to make new scripts or entire new systems unless you've checked for existing code.
 
 ```bash
 # Commit convention
