@@ -28,7 +28,7 @@ from typing import Optional, Callable, Iterator, TYPE_CHECKING
 from .log_utils import atomic_write, log_event
 from .raise_af import enforce_raise_af_only
 from .state_paths import ActifixPaths, get_actifix_paths, init_actifix_files
-from .config import get_config
+from .config import get_config, load_config
 
 if TYPE_CHECKING:
     from .persistence.ticket_repo import TicketRepository
@@ -69,7 +69,7 @@ class StatefulTicketManager:
         """Refresh cache from the ticket repository."""
         from .persistence.ticket_repo import TicketFilter
 
-        repo = _get_ticket_repository()
+        repo = _get_ticket_repository(self.paths)
         open_records = repo.get_tickets(TicketFilter(status="Open"))
         completed_records = repo.get_tickets(TicketFilter(status="Completed"))
 
@@ -175,15 +175,20 @@ def _ticket_info_from_record(record: dict) -> TicketInfo:
     )
 
 
-def _get_ticket_repository() -> 'TicketRepository':
+def _get_ticket_repository(paths: Optional[ActifixPaths] = None) -> 'TicketRepository':
     from .persistence.ticket_repo import get_ticket_repository
-    return get_ticket_repository()
+    from .persistence.database import get_database_pool
+    if paths is None or os.environ.get("ACTIFIX_DB_PATH"):
+        return get_ticket_repository()
+    config = load_config(project_root=paths.project_root, fail_fast=False)
+    pool = get_database_pool(db_path=paths.project_root / "data" / "actifix.db")
+    return get_ticket_repository(pool=pool, config=config)
 
 
 def _select_and_lock_ticket(paths: ActifixPaths) -> Optional[tuple[dict, str]]:
     from .persistence.ticket_repo import TicketFilter
 
-    repo = _get_ticket_repository()
+    repo = _get_ticket_repository(paths)
     lock_owner = f"do_af:{os.getpid()}"
     candidates = repo.get_tickets(TicketFilter(status="Open"))
     for ticket in candidates:
@@ -208,9 +213,10 @@ def get_open_tickets(paths: Optional[ActifixPaths] = None, use_cache: bool = Tru
         manager = StatefulTicketManager(paths=paths)
         return manager.get_open_tickets()
 
+    release_lock = True
     try:
-        from .persistence.ticket_repo import get_ticket_repository, TicketFilter
-        repo = get_ticket_repository()
+        from .persistence.ticket_repo import TicketFilter
+        repo = _get_ticket_repository(paths)
         db_tickets = repo.get_tickets(TicketFilter(status="Open"))
         return [_ticket_info_from_record(ticket) for ticket in db_tickets]
     except Exception:
@@ -249,7 +255,7 @@ def mark_ticket_complete(
 
     enforce_raise_af_only(paths)
 
-    repo = _get_ticket_repository()
+    repo = _get_ticket_repository(paths)
     existing = repo.get_ticket(ticket_id)
     if not existing:
         log_event(
@@ -345,7 +351,7 @@ def fix_highest_priority_ticket(
     ticket_record, lock_owner = locked
     ticket = _ticket_info_from_record(ticket_record)
 
-    repo = _get_ticket_repository()
+    repo = _get_ticket_repository(paths)
 
     # Prepare ultrathink narrative for auditing
     thought_text = (
@@ -455,7 +461,7 @@ def process_next_ticket(
 
     ticket_record, lock_owner = locked
     ticket = _ticket_info_from_record(ticket_record)
-    repo = _get_ticket_repository()
+    repo = _get_ticket_repository(paths)
 
     log_event(
         "DISPATCH_STARTED",
@@ -512,7 +518,7 @@ def process_next_ticket(
                     if ai_response.cost_usd:
                         summary += f" - Cost: ${ai_response.cost_usd:.4f}"
 
-                    mark_ticket_complete(
+                    if mark_ticket_complete(
                         ticket.ticket_id,
                         completion_notes=f"Fixed by {ai_response.provider.value} using {ai_response.model}: {ai_response.content[:200]}",
                         test_steps=f"AI validation performed by {ai_response.provider.value}",
@@ -520,7 +526,8 @@ def process_next_ticket(
                         summary=summary,
                         paths=paths,
                         use_lock=False,
-                    )
+                    ):
+                        release_lock = False
 
                     log_event(
                         "AI_DISPATCH_SUCCESS",
@@ -554,7 +561,7 @@ def process_next_ticket(
             try:
                 success = ai_handler(ticket)
                 if success:
-                    mark_ticket_complete(
+                    if mark_ticket_complete(
                         ticket.ticket_id,
                         completion_notes=f"Fixed via custom AI handler for {ticket.ticket_id}",
                         test_steps="Custom AI handler validation performed",
@@ -562,7 +569,8 @@ def process_next_ticket(
                         summary="Fixed via custom AI handler",
                         paths=paths,
                         use_lock=False,
-                    )
+                    ):
+                        release_lock = False
                     log_event(
                         "CUSTOM_DISPATCH_SUCCESS",
                         f"Custom AI handler completed: {ticket.ticket_id}",
@@ -579,7 +587,8 @@ def process_next_ticket(
 
         return ticket
     finally:
-        repo.release_lock(ticket.ticket_id, lock_owner)
+        if release_lock:
+            repo.release_lock(ticket.ticket_id, lock_owner)
 
 
 def process_tickets(
@@ -629,8 +638,8 @@ def get_completed_tickets(paths: Optional[ActifixPaths] = None, use_cache: bool 
         return manager.get_completed_tickets()
 
     try:
-        from .persistence.ticket_repo import get_ticket_repository, TicketFilter
-        repo = get_ticket_repository()
+        from .persistence.ticket_repo import TicketFilter
+        repo = _get_ticket_repository(paths)
         db_tickets = repo.get_tickets(TicketFilter(status="Completed"))
         return [_ticket_info_from_record(ticket) for ticket in db_tickets]
     except Exception:
@@ -654,8 +663,7 @@ def get_ticket_stats(paths: Optional[ActifixPaths] = None, use_cache: bool = Tru
         return manager.get_stats()
 
     try:
-        from .persistence.ticket_repo import get_ticket_repository
-        repo = get_ticket_repository()
+        repo = _get_ticket_repository(paths)
         return repo.get_stats()
     except Exception:
         manager = get_ticket_manager(paths=paths)
