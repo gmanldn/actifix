@@ -23,6 +23,8 @@ from actifix.raise_af import (
     capture_file_context,
 )
 
+pytestmark = pytest.mark.slow
+
 try:
     from hypothesis import given, strategies as st, settings, HealthCheck
 except ImportError:

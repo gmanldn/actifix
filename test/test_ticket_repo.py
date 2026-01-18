@@ -169,6 +169,7 @@ def test_ticket_repository_expired_lock_cleanup(ticket_repo_env):
 
 # ===================== RACE CONDITION TESTS =====================
 
+@pytest.mark.slow
 class TestConcurrentLocking:
     """Tests for concurrent ticket locking scenarios."""
 

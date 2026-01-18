@@ -9,6 +9,8 @@ import pytest
 from actifix.persistence.ticket_repo import get_ticket_repository
 from actifix.raise_af import ActifixEntry, TicketPriority
 
+pytestmark = pytest.mark.slow
+
 
 @pytest.fixture
 def comprehensive_tickets():
