@@ -47,6 +47,7 @@ def test_client(temp_project, flask_app_session):
 
 
 @pytest.mark.api
+@pytest.mark.no_db_isolation
 @pytest.mark.skipif(not FLASK_AVAILABLE, reason="Flask not available")
 class TestAPIEndpoints:
     """Test API endpoints."""

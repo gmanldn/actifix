@@ -45,6 +45,7 @@ def pytest_configure(config):
         "concurrent: Concurrent/threading tests",
         "io: File I/O tests",
         "network: Network/external service tests",
+        "no_db_isolation: Skip per-test database isolation when using shared fixtures",
     ]
 
     for marker in markers:
@@ -140,8 +141,11 @@ def disable_actifix_capture(monkeypatch):
 
 
 @pytest.fixture(autouse=True, scope="function")
-def isolate_actifix_db(monkeypatch, tmp_path):
+def isolate_actifix_db(monkeypatch, tmp_path, request):
     """Use a fresh SQLite database per test to avoid cross-test leakage."""
+    if request.node.get_closest_marker("no_db_isolation") or os.environ.get("ACTIFIX_DISABLE_DB_ISOLATION") == "1":
+        yield
+        return
     # Set database path BEFORE any imports that might use it
     db_path = tmp_path / "actifix.db"
     monkeypatch.setenv("ACTIFIX_DB_PATH", str(db_path))
