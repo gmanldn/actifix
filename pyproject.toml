@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "actifix"
-version = "4.0.19"
+version = "4.0.20"
 
 [project.optional-dependencies]
 web = ["flask", "flask-cors"]
