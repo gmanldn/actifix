@@ -610,31 +610,42 @@ const SystemView = () => {
   const project = data?.project || {};
   const server = data?.server || {};
   const resources = data?.resources || {};
+  const health = data?.health || {};
+  const git = data?.git || {};
+  const paths = data?.paths || {};
+  const recentEvents = data?.recent_events || [];
+
+  const getDiskColor = (percent) => percent > 90 ? '#ef4444' : percent > 80 ? '#f59e0b' : '#10b981';
 
   return h('div', null,
+    // Enhanced Stats Grid
     h('div', { className: 'stats-grid' },
       h(MetricTile, {
-        label: 'PYTHON',
-        value: platform.python_version?.split('.').slice(0, 2).join('.') || 'N/A',
-        icon: '🐍',
-        subvalue: platform.python_version || 'N/A'
+        label: 'HEALTH',
+        value: health.status || 'UNKNOWN',
+        icon: '📡',
+        color: health.healthy ? '#10b981' : '#ef4444',
+        subvalue: `${health.warnings || 0} warnings • ${health.errors || 0} errors`
       }),
       h(MetricTile, {
-        label: 'SYSTEM',
-        value: platform.system || 'N/A',
-        icon: '💻',
-        subvalue: platform.release || ''
+        label: 'DISK',
+        value: resources.disk ? `${resources.disk.percent}%` : 'N/A',
+        icon: '💿',
+        color: resources.disk ? getDiskColor(resources.disk.percent) : undefined,
+        subvalue: resources.disk ? `${resources.disk.used_gb}/${resources.disk.total_gb} GB` : ''
       }),
       h(MetricTile, {
-        label: 'MACHINE',
-        value: platform.machine || 'N/A',
-        icon: '⚙️'
+        label: 'GIT',
+        value: git.clean ? 'CLEAN' : 'DIRTY',
+        icon: '🐙',
+        color: git.clean ? '#10b981' : '#f59e0b',
+        subvalue: git.branch ? `branch ${git.branch}` : 'unknown'
       }),
       h(MetricTile, {
-        label: 'UPTIME',
-        value: server.uptime?.split(' ')[0] || 'N/A',
-        icon: '⏰',
-        subvalue: server.uptime || ''
+        label: 'OPEN TICKETS',
+        value: health.open_tickets || 0,
+        icon: '🎫',
+        color: (health.open_tickets || 0) > 0 ? '#f59e0b' : '#10b981'
       }),
       h(MetricTile, {
         label: 'MEMORY',
@@ -648,33 +659,111 @@ const SystemView = () => {
         value: resources.cpu_percent !== null ? `${resources.cpu_percent}%` : 'N/A',
         icon: '🔥',
         color: resources.cpu_percent > 80 ? '#ef4444' : '#10b981'
+      }),
+      h(MetricTile, {
+        label: 'PYTHON',
+        value: platform.python_version?.split('.').slice(0, 2).join('.') || 'N/A',
+        icon: '🐍',
+        subvalue: platform.python_version || 'N/A'
+      }),
+      h(MetricTile, {
+        label: 'UPTIME',
+        value: server.uptime?.split(' ')[0] || 'N/A',
+        icon: '⏰',
+        subvalue: server.uptime || ''
       })
     ),
-    
+
+    // Paths Panel
     h('div', { className: 'panel' },
       h('div', { className: 'panel-header' },
         h('div', { className: 'panel-title' },
-          h('span', { className: 'panel-title-icon' }, '📋'),
-          'SYSTEM DETAILS'
+          h('span', { className: 'panel-title-icon' }, '📁'),
+          'PATHS'
         )
       ),
-      h('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' } },
-        h('div', null,
-          h('div', { className: 'stat-label', style: { marginBottom: '4px' } }, 'PROJECT ROOT'),
-          h('div', { className: 'mono', style: { fontSize: '11px', color: 'var(--text-muted)', wordBreak: 'break-all' } }, project.root || 'N/A')
+      h('div', { className: 'paths-table' },
+        h('div', { className: 'table-row header' },
+          h('div', { className: 'table-cell label' }, 'Path'),
+          h('div', { className: 'table-cell value truncate' }, 'Location')
         ),
-        h('div', null,
-          h('div', { className: 'stat-label', style: { marginBottom: '4px' } }, 'ACTIFIX DIR'),
-          h('div', { className: 'mono', style: { fontSize: '11px', color: 'var(--text-muted)', wordBreak: 'break-all' } }, project.actifix_dir || 'N/A')
+        h('div', { className: 'table-row' },
+          h('div', { className: 'table-cell label' }, 'Project'),
+          h('div', { className: 'table-cell value mono truncate' }, project.root || 'N/A')
         ),
-        h('div', null,
-          h('div', { className: 'stat-label', style: { marginBottom: '4px' } }, 'SERVER START'),
-          h('div', { className: 'mono', style: { fontSize: '11px', color: 'var(--text-muted)' } }, server.start_time ? formatTime(server.start_time) : 'N/A')
+        h('div', { className: 'table-row' },
+          h('div', { className: 'table-cell label' }, 'Base'),
+          h('div', { className: 'table-cell value mono truncate' }, paths.base_dir || 'N/A')
         ),
-        h('div', null,
-          h('div', { className: 'stat-label', style: { marginBottom: '4px' } }, 'SNAPSHOT'),
-          h('div', { className: 'mono', style: { fontSize: '11px', color: 'var(--text-muted)' } }, data?.timestamp ? formatTime(data.timestamp) : 'N/A')
+        h('div', { className: 'table-row' },
+          h('div', { className: 'table-cell label' }, 'Data'),
+          h('div', { className: 'table-cell value mono truncate' }, paths.data_dir || 'N/A')
+        ),
+        h('div', { className: 'table-row' },
+          h('div', { className: 'table-cell label' }, 'Logs'),
+          h('div', { className: 'table-cell value mono truncate' }, paths.logs_dir || 'N/A')
         )
+      )
+    ),
+
+    // Git Panel
+    h('div', { className: 'panel' },
+      h('div', { className: 'panel-header' },
+        h('div', { className: 'panel-title' },
+          h('span', { className: 'panel-title-icon' }, '🐙'),
+          'GIT STATUS'
+        )
+      ),
+      h('div', { className: 'git-table' },
+        h('div', { className: 'table-row header' },
+          h('div', { className: 'table-cell label' }, 'Info'),
+          h('div', { className: 'table-cell value' }, 'Value')
+        ),
+        h('div', { className: 'table-row' },
+          h('div', { className: 'table-cell label' }, 'Branch'),
+          h('div', { className: 'table-cell value mono' }, git.branch || 'N/A')
+        ),
+        h('div', { className: 'table-row' },
+          h('div', { className: 'table-cell label' }, 'Commit'),
+          h('div', { className: 'table-cell value mono truncate' }, git.commit?.slice(0,8) || 'N/A')
+        ),
+        h('div', { className: 'table-row' },
+          h('div', { className: 'table-cell label' }, 'Clean'),
+          h('div', { className: 'table-cell value', style: { color: git.clean ? '#10b981' : '#f59e0b' } }, git.clean ? 'Yes' : 'No')
+        )
+      )
+    ),
+
+    // Recent Events
+    recentEvents.length > 0 && h('div', { className: 'panel' },
+      h('div', { className: 'panel-header' },
+        h('div', { className: 'panel-title' },
+          h('span', { className: 'panel-title-icon' }, '📜'),
+          'RECENT EVENTS'
+        ),
+        h('span', { className: 'text-muted', style: { fontSize: '11px' } }, `${recentEvents.length} events`)
+      ),
+      h('div', { className: 'events-list' },
+        recentEvents.map((event, i) =>
+          h('div', { key: i, className: 'event-item' },
+            h('span', { className: 'event-event' }, event.event),
+            h('span', { className: 'event-text truncate' }, event.text)
+          )
+        )
+      )
+    ),
+
+    // Health Warnings (if any)
+    (health.warnings > 0 || health.errors > 0) && h('div', { className: 'panel warning-panel' },
+      h('div', { className: 'panel-header' },
+        h('div', { className: 'panel-title' },
+          h('span', { className: 'panel-title-icon' }, '⚠️'),
+          'HEALTH ISSUES'
+        )
+      ),
+      h('ul', { className: 'health-list' },
+        ...((health.warnings || []).map(w => h('li', { className: 'health-warning' }, w))),
+        ...((health.errors || []).map(e => h('li', { className: 'health-error' }, e)))
       )
     )
   );

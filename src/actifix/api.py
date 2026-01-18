@@ -338,6 +338,48 @@ def create_app(project_root: Optional[Path] = None) -> "Flask":
     def api_health():
         """Get comprehensive health check data."""
         paths = get_actifix_paths(project_root=app.config['PROJECT_ROOT'])
+        
+        # Health summary
+        health = get_health(paths)
+        
+        # Git info
+        git_info = _gather_version_info(app.config['PROJECT_ROOT'])
+        
+        # Disk usage
+        disk_info = None
+        try:
+            import psutil
+            disk = psutil.disk_usage(str(paths.data_dir.parent))
+            disk_gb = lambda b: round(b / (1024**3), 1)
+            disk_info = {
+                'total_gb': disk_gb(disk.total),
+                'used_gb': disk_gb(disk.used),
+                'free_gb': disk_gb(disk.free),
+                'percent': round((disk.used / disk.total) * 100, 1)
+            }
+        except Exception:
+            disk_info = None
+        
+        # Recent events snippet
+        recent_events = []
+        try:
+            repo = get_event_repository()
+            raw_events = repo.get_recent_events(limit=5)
+            recent_events = [{
+                "timestamp": e.get("timestamp", ""),
+                "event": e.get("event_type", "LOG"),
+                "text": (e.get("message", "")[:50] + "...") if len(e.get("message", "")) > 50 else e.get("message", "")
+            } for e in raw_events[-5:][::-1]]
+        except Exception:
+            recent_events = []
+        
+        # Paths summary
+        paths_dict = {
+            "base_dir": str(paths.base_dir),
+            "data_dir": str(paths.data_dir),
+            "logs_dir": str(paths.logs_dir),
+            "state_dir": str(paths.state_dir),
+        }
         health = get_health(paths)
         
         return jsonify({
@@ -585,7 +627,18 @@ def create_app(project_root: Optional[Path] = None) -> "Flask":
             'resources': {
                 'memory': memory_info if memory_info else None,
                 'cpu_percent': cpu_percent,
+                'disk': disk_info,
             },
+            'health': {
+                'healthy': health.healthy,
+                'status': health.status,
+                'open_tickets': getattr(health, 'open_tickets', 0),
+                'warnings': len(getattr(health, 'warnings', [])),
+                'errors': len(getattr(health, 'errors', [])),
+            },
+            'git': git_info,
+            'paths': paths_dict,
+            'recent_events': recent_events,
             'timestamp': datetime.now(timezone.utc).isoformat(),
         })
 
