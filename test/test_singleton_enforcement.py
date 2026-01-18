@@ -12,6 +12,7 @@ import time
 import unittest
 from pathlib import Path
 from unittest.mock import MagicMock, patch, call
+import pytest
 
 # Add project root to path
 ROOT = Path(__file__).resolve().parent.parent
@@ -20,6 +21,8 @@ if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
 from scripts import start
+
+pytestmark = [pytest.mark.integration]
 
 
 class TestBackendSingleton(unittest.TestCase):

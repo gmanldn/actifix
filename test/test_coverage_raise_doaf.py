@@ -13,6 +13,8 @@ from types import SimpleNamespace
 
 import pytest
 
+pytestmark = [pytest.mark.integration, pytest.mark.slow]
+
 import actifix.do_af as do_af
 import actifix.raise_af as raise_af
 from actifix.do_af import TicketInfo

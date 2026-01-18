@@ -26,6 +26,8 @@ from actifix.persistence.database import (
     reset_database_pool,
 )
 
+pytestmark = [pytest.mark.integration]
+
 
 class TestDatabasePathValidation:
     """Test database path security validation."""

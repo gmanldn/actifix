@@ -26,6 +26,8 @@ from actifix.persistence.ticket_repo import get_ticket_repository, reset_ticket_
 from actifix.persistence.database import reset_database_pool
 from actifix.config import set_config, reset_config
 
+pytestmark = [pytest.mark.db, pytest.mark.integration]
+
 
 @pytest.fixture
 def temp_dir():

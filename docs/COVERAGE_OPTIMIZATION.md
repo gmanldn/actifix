@@ -4,7 +4,7 @@ This guide explains how to run coverage quickly while keeping quality gates inta
 
 ## Commands
 ```bash
-# Fast coverage (skips slow tests)
+# Fast coverage (skips slow/integration tests)
 python3 test.py --fast-coverage
 
 # Full coverage
@@ -19,7 +19,7 @@ export ACTIFIX_XDIST_WORKERS=4  # set worker count
 ```
 
 ## What fast coverage does
-- Excludes tests marked `slow`.
+- Excludes tests marked `slow`, `very_slow`, `performance`, `db`, `integration`, and `concurrent`.
 - Enables pytest-xdist when available.
 - Preserves system tests via `actifix.testing`.
 

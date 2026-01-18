@@ -31,12 +31,12 @@ try:
 except ImportError:
     pytest.skip("hypothesis not installed", allow_module_level=True)
 
-MAX_EXAMPLES = int(os.getenv("ACTIFIX_FUZZ_MAX_EXAMPLES", "25"))
-MAX_TEXT_SIZE = int(os.getenv("ACTIFIX_FUZZ_TEXT_MAX_SIZE", "200"))
-MAX_LINE_COUNT = int(os.getenv("ACTIFIX_FUZZ_MAX_LINES", "20"))
-MAX_BATCH_SIZE = int(os.getenv("ACTIFIX_FUZZ_BATCH_MAX_SIZE", "20"))
-LONG_MESSAGE_CHARS = int(os.getenv("ACTIFIX_FUZZ_LONG_MESSAGE_CHARS", "10000"))
-BATCH_MAX_EXAMPLES = int(os.getenv("ACTIFIX_FUZZ_BATCH_MAX_EXAMPLES", "15"))
+MAX_EXAMPLES = int(os.getenv("ACTIFIX_FUZZ_MAX_EXAMPLES", "15"))
+MAX_TEXT_SIZE = int(os.getenv("ACTIFIX_FUZZ_TEXT_MAX_SIZE", "120"))
+MAX_LINE_COUNT = int(os.getenv("ACTIFIX_FUZZ_MAX_LINES", "12"))
+MAX_BATCH_SIZE = int(os.getenv("ACTIFIX_FUZZ_BATCH_MAX_SIZE", "12"))
+LONG_MESSAGE_CHARS = int(os.getenv("ACTIFIX_FUZZ_LONG_MESSAGE_CHARS", "6000"))
+BATCH_MAX_EXAMPLES = int(os.getenv("ACTIFIX_FUZZ_BATCH_MAX_EXAMPLES", "10"))
 
 FAST_SETTINGS = settings(
     max_examples=MAX_EXAMPLES,

@@ -28,6 +28,8 @@ from actifix.persistence.storage import (
     JSONStorageMixin,
 )
 from actifix.persistence.ticket_repo import get_ticket_repository
+
+pytestmark = [pytest.mark.integration]
 from actifix.raise_af import ActifixEntry, TicketPriority
 from actifix.testing import (
     TestRunner,

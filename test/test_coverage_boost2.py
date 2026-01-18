@@ -8,6 +8,8 @@ from pathlib import Path
 
 import pytest
 
+pytestmark = [pytest.mark.integration, pytest.mark.slow]
+
 import actifix.api as api
 import actifix.log_utils as log_utils
 import actifix.persistence.atomic as atomic_module

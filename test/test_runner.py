@@ -325,8 +325,11 @@ def run_pytest(
 
         # Fast coverage mode: exclude slow tests and use parallel execution
         if fast_coverage:
-            print("  → Fast coverage mode: excluding slow tests and using parallel execution")
-            cmd += ["-m", "not slow and not very_slow and not performance"]
+            print("  → Fast coverage mode: excluding slow, heavy integration, and perf tests")
+            cmd += [
+                "-m",
+                "not slow and not very_slow and not performance and not db and not integration and not concurrent",
+            ]
             cmd.extend(_collect_xdist_args())
         else:
             # Full coverage: run all tests, but still use parallel if available
@@ -334,7 +337,10 @@ def run_pytest(
     else:
         # Non-coverage runs can also use fast mode
         if fast_coverage:
-            cmd += ["-m", "not slow and not very_slow and not performance"]
+            cmd += [
+                "-m",
+                "not slow and not very_slow and not performance and not db and not integration and not concurrent",
+            ]
 
     if quick:
         # Quick mode keeps the suite narrow and quiet

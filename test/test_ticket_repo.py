@@ -25,6 +25,8 @@ from actifix.persistence.ticket_repo import (
 from actifix.raise_af import ActifixEntry, TicketPriority
 from actifix.state_paths import get_actifix_paths, init_actifix_files
 
+pytestmark = [pytest.mark.db, pytest.mark.integration]
+
 
 @pytest.fixture
 def ticket_repo_env(tmp_path, monkeypatch):

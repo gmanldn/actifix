@@ -45,6 +45,8 @@ from actifix.testing.system import build_system_tests
 from actifix.state_paths import get_actifix_paths, get_raise_af_sentinel, init_actifix_files
 from actifix.raise_af import ActifixEntry, TicketPriority
 
+pytestmark = [pytest.mark.integration]
+
 
 def test_quick_start_output(capsys):
     actifix.quick_start()

@@ -10,7 +10,7 @@ This guide explains how to keep Actifix test cycles fast without sacrificing cov
 ## Fast coverage mode
 `test.py --fast-coverage`:
 - Runs system tests and pytest.
-- Skips tests marked `slow`.
+- Skips tests marked `slow`, `very_slow`, `performance`, `db`, `integration`, and `concurrent`.
 - Uses pytest-xdist automatically if available.
 
 ```bash

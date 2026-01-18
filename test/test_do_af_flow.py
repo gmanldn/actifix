@@ -100,5 +100,8 @@ def test_process_tickets_respects_limit(doaf_paths):
     repo.create_ticket(_build_entry("ACT-20260115-ONE", TicketPriority.P2))
     repo.create_ticket(_build_entry("ACT-20260115-TWO", TicketPriority.P3))
 
-    processed = process_tickets(max_tickets=1, paths=doaf_paths)
+    def handler(ticket):
+        return True
+
+    processed = process_tickets(max_tickets=1, paths=doaf_paths, ai_handler=handler)
     assert len(processed) == 1

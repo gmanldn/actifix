@@ -29,6 +29,8 @@ from actifix.persistence.ticket_repo import (
 from actifix.persistence.database import get_database_pool, reset_database_pool
 from actifix.raise_af import ActifixEntry, TicketPriority
 
+pytestmark = [pytest.mark.db, pytest.mark.integration]
+
 
 @pytest.fixture
 def clean_db(tmp_path, monkeypatch):

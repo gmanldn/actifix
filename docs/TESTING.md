@@ -7,7 +7,7 @@ Actifix testing is a two-stage flow: system checks via the Actifix test runner a
 # Full test cycle (system checks + pytest)
 python3 test.py --coverage
 
-# Fast coverage (skip slow tests)
+# Fast coverage (skip slow/integration tests)
 python3 test.py --fast-coverage
 
 # Quick pytest pass
@@ -40,7 +40,7 @@ See `docs/TEST_MARKERS_GUIDE.md` for detailed usage.
 - `.pytest_results.xml` is generated during `test.py` runs for failure ticketing.
 
 ## Recommended workflow
-1. Run `python3 test.py --fast-coverage` while iterating.
+1. Run `python3 test.py --fast-coverage` while iterating (skips `slow`, `very_slow`, `performance`, `db`, `integration`, `concurrent`).
 2. Run `python3 test.py --coverage` before commit.
 3. Validate architecture if you touched module boundaries:
    ```bash

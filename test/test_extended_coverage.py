@@ -51,6 +51,8 @@ from actifix.persistence.ticket_repo import get_ticket_repository
 from actifix.persistence.event_repo import get_event_repository, EventFilter
 from actifix.raise_af import ActifixEntry, TicketPriority
 
+pytestmark = [pytest.mark.integration, pytest.mark.slow]
+
 
 def _seed_ticket(
     ticket_id: str,
