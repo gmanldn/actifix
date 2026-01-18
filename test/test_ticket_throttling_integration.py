@@ -79,12 +79,13 @@ class TestP2Throttling:
         import os
         os.environ['ACTIFIX_CAPTURE_ENABLED'] = '1'
 
-        # Create tickets up to limit (3)
+        # Create tickets up to limit (3) with unique messages to avoid deduplication
+        error_types = ["FirstError", "SecondError", "ThirdError"]
         for i in range(3):
             entry = record_error(
-                message=f"P2 error {i}",
-                source="test/test_runner.py:1",
-                error_type="TestError",
+                message=f"P2 throttle test error type {error_types[i]}",
+                source=f"test/test_runner.py:{10+i}",
+                error_type=error_types[i],
                 priority=TicketPriority.P2,
                 paths=test_config_with_throttling.paths,
             )
@@ -95,12 +96,13 @@ class TestP2Throttling:
         import os
         os.environ['ACTIFIX_CAPTURE_ENABLED'] = '1'
 
-        # Create tickets up to limit (3)
+        # Create tickets up to limit (3) with unique messages
+        error_types = ["FirstBlockError", "SecondBlockError", "ThirdBlockError"]
         for i in range(3):
             entry = record_error(
-                message=f"P2 error {i}",
-                source="test/test_runner.py:1",
-                error_type="TestError",
+                message=f"P2 block test error type {error_types[i]}",
+                source=f"test/test_runner.py:{20+i}",
+                error_type=error_types[i],
                 priority=TicketPriority.P2,
                 paths=test_config_with_throttling.paths,
             )
@@ -108,9 +110,9 @@ class TestP2Throttling:
 
         # Next ticket should be throttled
         entry = record_error(
-            message="P2 error over limit",
-            source="test/test_runner.py:1",
-            error_type="TestError",
+            message="P2 error over limit FourthBlockError",
+            source="test/test_runner.py:30",
+            error_type="FourthBlockError",
             priority=TicketPriority.P2,
             paths=test_config_with_throttling.paths,
         )
@@ -125,12 +127,13 @@ class TestP3Throttling:
         import os
         os.environ['ACTIFIX_CAPTURE_ENABLED'] = '1'
 
-        # Create tickets up to limit (2)
+        # Create tickets up to limit (2) with unique messages
+        error_types = ["P3FirstError", "P3SecondError"]
         for i in range(2):
             entry = record_error(
-                message=f"P3 error {i}",
-                source="test/test_runner.py:1",
-                error_type="TestError",
+                message=f"P3 throttle test error type {error_types[i]}",
+                source=f"test/test_runner.py:{40+i}",
+                error_type=error_types[i],
                 priority=TicketPriority.P3,
                 paths=test_config_with_throttling.paths,
             )
@@ -141,12 +144,13 @@ class TestP3Throttling:
         import os
         os.environ['ACTIFIX_CAPTURE_ENABLED'] = '1'
 
-        # Create tickets up to limit (2)
+        # Create tickets up to limit (2) with unique messages
+        error_types = ["P3FirstBlockError", "P3SecondBlockError"]
         for i in range(2):
             entry = record_error(
-                message=f"P3 error {i}",
-                source="test/test_runner.py:1",
-                error_type="TestError",
+                message=f"P3 block test error type {error_types[i]}",
+                source=f"test/test_runner.py:{50+i}",
+                error_type=error_types[i],
                 priority=TicketPriority.P3,
                 paths=test_config_with_throttling.paths,
             )
@@ -154,9 +158,9 @@ class TestP3Throttling:
 
         # Next ticket should be throttled
         entry = record_error(
-            message="P3 error over limit",
-            source="test/test_runner.py:1",
-            error_type="TestError",
+            message="P3 error over limit ThirdBlockError",
+            source="test/test_runner.py:60",
+            error_type="P3ThirdBlockError",
             priority=TicketPriority.P3,
             paths=test_config_with_throttling.paths,
         )
@@ -215,12 +219,13 @@ class TestP0P1NoThrottling:
         import os
         os.environ['ACTIFIX_CAPTURE_ENABLED'] = '1'
 
-        # Create many P0 tickets rapidly
+        # Create many P0 tickets rapidly with unique messages
+        error_types = [f"P0CriticalError{chr(65+i)}" for i in range(10)]
         for i in range(10):
             entry = record_error(
-                message=f"P0 critical error {i}",
-                source="test/test_runner.py:1",
-                error_type="CriticalError",
+                message=f"P0 critical throttle test error type {error_types[i]}",
+                source=f"test/test_runner.py:{70+i}",
+                error_type=error_types[i],
                 priority=TicketPriority.P0,
                 paths=test_config_with_throttling.paths,
             )
@@ -231,12 +236,13 @@ class TestP0P1NoThrottling:
         import os
         os.environ['ACTIFIX_CAPTURE_ENABLED'] = '1'
 
-        # Create many P1 tickets rapidly
+        # Create many P1 tickets rapidly with unique messages
+        error_types = [f"P1HighPriorityError{chr(65+i)}" for i in range(10)]
         for i in range(10):
             entry = record_error(
-                message=f"P1 high priority error {i}",
-                source="test/test_runner.py:1",
-                error_type="HighPriorityError",
+                message=f"P1 high priority throttle test error type {error_types[i]}",
+                source=f"test/test_runner.py:{80+i}",
+                error_type=error_types[i],
                 priority=TicketPriority.P1,
                 paths=test_config_with_throttling.paths,
             )
@@ -252,15 +258,16 @@ class TestEmergencyBrake:
         os.environ['ACTIFIX_CAPTURE_ENABLED'] = '1'
 
         # Create tickets up to emergency threshold (5)
-        # Mix of priorities to test cross-priority emergency brake
+        # Mix of priorities to test cross-priority emergency brake with unique messages
         priorities = [TicketPriority.P2, TicketPriority.P3, TicketPriority.P2,
                       TicketPriority.P3, TicketPriority.P2]
+        error_types = [f"EmergencyTest{chr(65+i)}" for i in range(5)]
 
         for i, priority in enumerate(priorities):
             entry = record_error(
-                message=f"Error {i}",
-                source=f"test/test_runner.py:{i}",
-                error_type="TestError",
+                message=f"Emergency brake test error type {error_types[i]}",
+                source=f"test/test_runner.py:{90+i}",
+                error_type=error_types[i],
                 priority=priority,
                 paths=test_config_with_throttling.paths,
             )
@@ -268,9 +275,9 @@ class TestEmergencyBrake:
 
         # Next ticket should trigger emergency brake (even P1)
         entry = record_error(
-            message="This should be blocked by emergency brake",
+            message="This should be blocked by emergency brake EmergencyBrakeTest",
             source="test/test_runner.py:999",
-            error_type="TestError",
+            error_type="EmergencyBrakeTest",
             priority=TicketPriority.P1,
             paths=test_config_with_throttling.paths,
         )
@@ -293,12 +300,13 @@ class TestThrottlingDisabled:
         )
         set_config(config)
 
-        # Create many P2 tickets - should all succeed
+        # Create many P2 tickets - should all succeed with unique messages
+        error_types = [f"DisabledThrottleTest{chr(65+i)}" for i in range(20)]
         for i in range(20):
             entry = record_error(
-                message=f"P2 error {i}",
-                source="test/test_runner.py:1",
-                error_type="TestError",
+                message=f"P2 disabled throttle test error type {error_types[i]}",
+                source=f"test/test_runner.py:{100+i}",
+                error_type=error_types[i],
                 priority=TicketPriority.P2,
                 paths=config.paths,
             )

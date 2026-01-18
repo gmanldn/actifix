@@ -125,11 +125,11 @@ class ActifixConfig:
     stale_lock_timeout_seconds: float = 300.0
     
     # AI Integration
-    ai_provider: str = "mimo-flash-v2-free"  # default free fallback
-    ai_api_key: str = ""
-    ai_model: str = "mimo-flash-v2-free"  # e.g., gpt-4, claude-3-sonnet, gemini-pro
+    ai_provider: str = "openrouter"  # OpenRouter for Mimo 2 with thinking
+    ai_api_key: str = ""  # Set your OPENROUTER_API_KEY environment variable
+    ai_model: str = "xiaomi/mimo-v2-flash"  # Mimo 2 via OpenRouter with thinking support
     ollama_model: str = "codellama:7b"  # Default Ollama model
-    ai_enabled: bool = False
+    ai_enabled: bool = True  # AI dispatch enabled by default
 
 
 def _parse_bool(value: str) -> bool:
