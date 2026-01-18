@@ -33,6 +33,11 @@ jobs:
         ACTIFIX_CHANGE_ORIGIN: raise_af
         ACTIFIX_CAPTURE_ENABLED: "0"
 
+    - name: Enforce coverage threshold
+      run: |
+        coverage report --fail-under=95 --skip-covered
+      if: success() || failure()
+
     - name: Enforce 100% test pass rate
       run: |
         # This step ensures no test failures are tolerated
