@@ -320,10 +320,16 @@ class AIClient:
         if active_provider is None:
             active_provider = AIProvider.FREE_ALTERNATIVE
 
+        active_provider_value = (
+            selection.model or DEFAULT_FREE_MODEL
+            if active_provider == AIProvider.FREE_ALTERNATIVE
+            else active_provider.value
+        )
+
         return {
             "preferred_provider": selection.label,
             "preferred_model": selection.model or "",
-            "active_provider": active_provider.value,
+            "active_provider": active_provider_value,
             "active_model": self._default_model_for(active_provider, selection),
             "provider_order": [provider.value for provider in provider_order],
             "providers": providers,
