@@ -40,6 +40,7 @@ class AIProvider(Enum):
 
 
 DEFAULT_FREE_MODEL = "mimo-flash-v2-free"
+GROK4_FAST_MODEL = "openrouter/grok-4o-fast"
 AI_PROVIDER_OPTIONS = [
     {
         "value": "auto",
@@ -72,11 +73,16 @@ AI_PROVIDER_OPTIONS = [
         "description": "Use local Ollama runtime.",
     },
     {
-        "value": DEFAULT_FREE_MODEL,
-        "label": "Mimo Flash v2 Free (default)",
-        "description": "Default free fallback when no other provider is selected.",
+      "value": DEFAULT_FREE_MODEL,
+      "label": "Mimo Flash v2 Free (default)",
+      "description": "Default free fallback when no other provider is selected.",
     },
-]
+    {
+      "value": "openrouter_grok4_fast",
+      "label": "OpenRouter Grok4 Fast",
+      "description": "High-speed Grok4 via OpenRouter for quick fixes.",
+    },
+  ]
 
 
 @dataclass
@@ -105,6 +111,18 @@ def resolve_provider_selection(
 ) -> ProviderSelection:
     normalized = (provider_name or "").strip().lower()
     model_value = (model_name or "").strip() or DEFAULT_FREE_MODEL
+
+    if normalized in {
+        "grok4_fast",
+        "grok4",
+        "openrouter_grok4_fast",
+    }:
+        return ProviderSelection(
+            provider=AIProvider.FREE_ALTERNATIVE,
+            model=GROK4_FAST_MODEL,
+            strict_preferred=True,
+            label="openrouter_grok4_fast",
+        )
 
     if not normalized or normalized in {
         "default",

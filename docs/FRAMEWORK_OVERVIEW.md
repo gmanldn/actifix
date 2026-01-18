@@ -45,6 +45,7 @@ See `CHANGELOG.md` for full history. Recent highlights:
 
 | Version | Highlights |
 |---------|------------|
+| **4.0.43** (2026-01-21) | Added OpenRouter Grok4 Fast support in AI provider options so the dashboard can pick the high-speed Grok4 endpoint when requested. |
 | **4.0.42** (2026-01-21) | Redesigned the settings panel with gradient cards, status chips, and richer AI/system context so configuration feels themed and informative. |
 | **4.0.41** (2026-01-21) | Added multi-agent workflow smoke tests to verify gitignore isolation, ignored agent directories, and develop-only flow, keeping binaries out. |
 | **4.0.2** (2026-01-20) | Fixed API module parsing so `/api/modules` always returns system/user buckets, keeping the quick test cycle green after the dashboard refresh. |
