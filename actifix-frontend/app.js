@@ -881,26 +881,16 @@ const ModulesView = () => {
           h('span', { className: 'panel-title-icon' }, icon),
           title
         ),
-        h('span', { className: 'text-muted', style: { fontSize: '11px' } }, `${modules.length} modules`)
+        h('span', { className: 'text-muted', style: { fontSize: '10px' } }, `${modules.length} modules`)
       ),
       modules.length === 0 ?
-        h('div', { style: { padding: '24px', textAlign: 'center', color: 'var(--text-dim)' } }, 'No modules') :
-        h('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '12px' } },
+        h('div', { className: 'module-empty' }, 'No modules') :
+        h('div', { className: 'module-grid' },
           modules.map((m, idx) =>
-            h('div', {
-              key: `${title}-${idx}`,
-              style: {
-                background: 'var(--bg-secondary)',
-                border: '1px solid var(--border)',
-                borderRadius: 'var(--radius-md)',
-                padding: '12px'
-              }
-            },
-              h('div', { style: { fontWeight: 600, marginBottom: '4px', fontSize: '12px' } }, m.name || 'unknown'),
-              h('div', { style: { fontSize: '10px', color: 'var(--text-dim)', marginBottom: '4px' } },
-                `${m.domain || '—'} • ${m.owner || '—'}`
-              ),
-              m.summary && h('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginTop: '8px' } }, m.summary)
+            h('div', { key: `${title}-${idx}`, className: 'module-card' },
+              h('div', { className: 'module-card-title' }, m.name || 'unknown'),
+              h('div', { className: 'module-card-meta' }, `${m.domain || '—'} • ${m.owner || '—'}`),
+              m.summary && h('div', { className: 'module-card-summary' }, m.summary)
             )
           )
         )
