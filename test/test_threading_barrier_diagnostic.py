@@ -259,6 +259,12 @@ def test_raw_sqlite_transaction():
 
     base, repo, db_path = setup_test_env()
     try:
+        # Ensure database schema is initialized by triggering pool initialization
+        from actifix.persistence.database import get_database_pool
+        pool = get_database_pool(db_path)
+        with pool.connection() as conn:
+            pass  # Schema is initialized when connection is created
+
         # Create a test database to understand transaction behavior
         print(f"\nDatabase path: {db_path}")
 
