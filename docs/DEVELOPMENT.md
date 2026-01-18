@@ -95,6 +95,26 @@ If you add or move modules:
 - Update `docs/INDEX.md` any time sections move.
 - Avoid new standalone documentation files; merge into existing guides.
 
+## Daemon Mode (macOS)
+To run Actifix persistently as a user daemon (auto-start on login, auto-restart if crashed):
+
+1. **Load daemon**:
+   ```bash
+   launchctl load ~/Library/LaunchAgents/actifix.plist
+   ```
+
+2. **Unload daemon**:
+   ```bash
+   launchctl unload ~/Library/LaunchAgents/actifix.plist
+   ```
+
+**Logs**: `logs/actifix.out.log` (stdout), `logs/actifix.err.log` (stderr)
+
+**Notes**:
+- Runs `scripts/start.py` with API watchdog (auto-restarts if port 5001 down).
+- Uses project venv PATH.
+- `KeepAlive: true` ensures restart on crash/exit.
+
 ## Commit and push
 Commit format:
 ```bash

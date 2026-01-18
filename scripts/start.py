@@ -304,6 +304,25 @@ def start_api_server(port: int, project_root: Path) -> threading.Thread:
         return thread
 
 
+def start_api_watchdog(api_port: int, project_root: Path, interval_seconds: float = 30.0, stop_event: Optional[threading.Event] = None) -> threading.Thread:
+    """API watchdog: monitor port and auto-restart if down."""
+    def watchdog_loop():
+        while True:
+            if stop_event and stop_event.is_set():
+                break
+            if not is_port_in_use(api_port):
+                log_warning(f"API port {api_port} down - restarting...")
+                try:
+                    start_api_server(api_port, project_root)
+                except Exception as e:
+                    log_error(f"Watchdog restart failed: {e}")
+            time.sleep(interval_seconds)
+
+    thread = threading.Thread(target=watchdog_loop, daemon=True)
+    thread.start()
+    return thread
+
+
 def read_project_version(project_root: Path) -> Optional[str]:
     """Return the current project version from pyproject.toml."""
     pyproject_path = project_root / "pyproject.toml"
@@ -552,11 +571,14 @@ def main(argv: Optional[list[str]] = None) -> int:
 
     # Step 4: Start API server (if enabled)
     api_thread = None
+    api_watchdog_thread = None
     if not args.no_api:
         current_step += 1
         log_step(current_step, total_steps, "Starting API server")
         try:
             api_thread = start_api_server(args.api_port, ROOT)
+            api_watchdog_thread = start_api_watchdog(args.api_port, ROOT)
+            log_success("API server + watchdog started")
         except Exception as e:
             log_error(f"Failed to start API server: {e}")
             return 1
