@@ -12,6 +12,7 @@ To install: cp scripts/pre-commit-hook.py .git/hooks/pre-commit && chmod +x .git
 import subprocess
 import sys
 from pathlib import Path
+import re
 
 def get_staged_files():
     """Get list of staged files."""
@@ -72,6 +73,54 @@ def run_tests(modules=None):
     result = subprocess.run(cmd, env=env)
     return result.returncode
 
+def _read_version_from_pyproject(pyproject_path: Path) -> str | None:
+    content = pyproject_path.read_text(encoding="utf-8")
+    match = re.search(r'^version\\s*=\\s*\"([^\"]+)\"', content, re.MULTILINE)
+    return match.group(1) if match else None
+
+def _read_version_from_init(init_path: Path) -> str | None:
+    content = init_path.read_text(encoding="utf-8")
+    match = re.search(r'^__version__\\s*=\\s*\"([^\"]+)\"', content, re.MULTILINE)
+    return match.group(1) if match else None
+
+def _read_asset_version(index_path: Path) -> str | None:
+    content = index_path.read_text(encoding="utf-8")
+    match = re.search(r'ACTIFIX_ASSET_VERSION\\s*=\\s*\"([^\"]+)\"', content)
+    return match.group(1) if match else None
+
+def check_version_consistency() -> bool:
+    """Ensure project versions are consistent before commit."""
+    repo_root = Path(__file__).resolve().parents[1]
+    pyproject = repo_root / "pyproject.toml"
+    init_file = repo_root / "src" / "actifix" / "__init__.py"
+    frontend_index = repo_root / "actifix-frontend" / "index.html"
+
+    if not pyproject.exists() or not init_file.exists():
+        return True
+
+    pyproject_version = _read_version_from_pyproject(pyproject)
+    init_version = _read_version_from_init(init_file)
+    asset_version = _read_asset_version(frontend_index) if frontend_index.exists() else None
+
+    mismatches = []
+    if not pyproject_version:
+        mismatches.append("pyproject.toml version missing")
+    if not init_version:
+        mismatches.append("src/actifix/__init__.py __version__ missing")
+    if pyproject_version and init_version and pyproject_version != init_version:
+        mismatches.append(f"pyproject.toml ({pyproject_version}) != __init__.py ({init_version})")
+    if asset_version and pyproject_version and asset_version != pyproject_version:
+        mismatches.append(f"actifix-frontend/index.html ({asset_version}) != pyproject.toml ({pyproject_version})")
+
+    if mismatches:
+        print("✗ Version mismatch detected:")
+        for issue in mismatches:
+            print(f"  - {issue}")
+        return False
+
+    print("✓ Version consistency check passed")
+    return True
+
 def main():
     """Main pre-commit hook logic."""
     staged_files = get_staged_files()
@@ -79,6 +128,9 @@ def main():
     if not staged_files or staged_files == [""]:
         print("✓ No staged files - skipping pre-commit tests")
         return 0
+
+    if not check_version_consistency():
+        return 1
 
     # Check if we should run full suite
     if should_run_full_suite(staged_files):

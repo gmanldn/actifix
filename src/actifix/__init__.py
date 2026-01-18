@@ -39,7 +39,7 @@ from .health import get_health, run_health_check, format_health_report
 from .persistence.ticket_cleanup import run_automatic_cleanup, apply_retention_policy, cleanup_test_tickets
 from .persistence.cleanup_config import CleanupConfig, get_cleanup_config
 
-__version__ = "953"
+__version__ = "4.0.10"
 __author__ = "Actifix Framework"
 __description__ = "Generic Error Tracking and Management Framework with AI Integration"
 
