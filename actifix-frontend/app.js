@@ -8,6 +8,7 @@ const { useState, useEffect, useRef, createElement: h } = React;
 
 // API Configuration
 const API_BASE = 'http://localhost:5001/api';
+const UI_VERSION = '4.0.48';
 const REFRESH_INTERVAL = 5000;
 const LOG_REFRESH_INTERVAL = 3000;
 const TICKET_REFRESH_INTERVAL = 4000;
@@ -188,6 +189,7 @@ const [prevVersion, setPrevVersion] = useState(null);
 const firstVersionCheck = useRef(true);
 const { data, loading } = useFetch('/version', REFRESH_INTERVAL);
   const version = data?.version || '—';
+  const versionMismatch = version !== '—' && version !== UI_VERSION;
 
   useEffect(() => {
     if (loading) return;
@@ -217,10 +219,11 @@ const { data, loading } = useFetch('/version', REFRESH_INTERVAL);
 
   return h('span', {
     className: 'version-indicator',
+    title: versionMismatch ? `UI version (${UI_VERSION}) does not match API version (${version}). Reload recommended.` : '',
     style: {
-      backgroundColor: 'var(--accent)',
+      backgroundColor: versionMismatch ? '#ef4444' : 'var(--accent)',
       borderColor: '#000',
-      color: '#000',
+      color: versionMismatch ? '#fff' : '#000',
     }
   },
     h('span', { className: 'version-label' }, `v${version}`),
