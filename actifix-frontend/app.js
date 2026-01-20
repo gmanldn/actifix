@@ -14,11 +14,24 @@ const LOG_REFRESH_INTERVAL = 3000;
 const TICKET_REFRESH_INTERVAL = 4000;
 const TICKET_LIMIT = 250;
 
-// Authentication state
-const getAuthToken = () => localStorage.getItem('actifix_auth_token');
-const setAuthToken = (token) => localStorage.setItem('actifix_auth_token', token);
-const clearAuthToken = () => localStorage.removeItem('actifix_auth_token');
-const isAuthenticated = () => !!getAuthToken();
+const ADMIN_PASSWORD_KEY = 'actifix_admin_password';
+const getAdminPassword = () => localStorage.getItem(ADMIN_PASSWORD_KEY) || '';
+const setAdminPasswordInStorage = (value) => {
+  if (!value) {
+    localStorage.removeItem(ADMIN_PASSWORD_KEY);
+  } else {
+    localStorage.setItem(ADMIN_PASSWORD_KEY, value);
+  }
+};
+
+const buildAdminHeaders = (initial = {}) => {
+  const headers = { ...initial };
+  const adminPassword = getAdminPassword();
+  if (adminPassword) {
+    headers['X-Admin-Password'] = adminPassword;
+  }
+  return headers;
+};
 
 const applyAssetVersion = () => {
   const version = window.ACTIFIX_ASSET_VERSION || '4';
@@ -121,16 +134,8 @@ const useFetch = (endpoint, interval = REFRESH_INTERVAL) => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const headers = {};
-        const token = getAuthToken();
-        if (token) {
-          headers['Authorization'] = `Bearer ${token}`;
-        }
-        
-        const response = await fetch(`${API_BASE}${endpoint}`, { 
-          cache: 'no-store',
-          headers
-        });
+        const headers = buildAdminHeaders();
+        const response = await fetch(`${API_BASE}${endpoint}`, { cache: 'no-store', headers });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const json = await response.json();
         setData(json);
