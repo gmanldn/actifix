@@ -990,6 +990,37 @@ def create_app(
             rate_limiter.record_call(provider, success=success, error=None if success else response.status)
         return response
 
+    @app.after_request
+    def _add_security_headers(response):
+        """Add security headers including Content Security Policy."""
+        # Content Security Policy - restricts sources for scripts, styles, etc.
+        # Allow self for API and frontend assets
+        csp = {
+            "default-src": "'self'",
+            "script-src": "'self' 'unsafe-inline'",  # Needed for inline scripts in frontend
+            "style-src": "'self' 'unsafe-inline'",   # Needed for inline styles in frontend
+            "img-src": "'self' data: https:",
+            "connect-src": "'self'",
+            "font-src": "'self'",
+            "object-src": "'none'",
+            "base-uri": "'self'",
+            "form-action": "'self'",
+        }
+        
+        # Convert CSP dict to header string
+        csp_header = "; ".join([f"{k} {v}" for k, v in csp.items()])
+        
+        response.headers["Content-Security-Policy"] = csp_header
+        
+        # Additional security headers
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
+        
+        return response
+
     @app.route('/', methods=['GET'])
     def serve_index():
         """Serve the dashboard frontend."""
