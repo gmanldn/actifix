@@ -847,6 +847,7 @@ modules:
   - expose the SuperQuiz GUI at /modules/superquiz on the runtime API server
   - support 1 to 6 players with category selection and random mode
   - use Actifix logging and error capture interfaces from the shared runtime
+  - ensure the launcher starts the module via scripts/start.py, including dependency checks and a /health probe on the configured host/port
   depends_on:
   - runtime.state
   - infra.logging

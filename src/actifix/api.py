@@ -279,10 +279,10 @@ def _register_module_blueprint(
             return False
 
         dependencies = getattr(module, "MODULE_DEPENDENCIES", [])
-        dependency_errors = (
-            _validate_module_dependencies(module_name, dependencies, depgraph_edges)
-            if depgraph_edges
-            else []
+        dependency_errors = _validate_module_dependencies(
+            module_name,
+            dependencies,
+            depgraph_edges,
         )
         if dependency_errors:
             record_error(

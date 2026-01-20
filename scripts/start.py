@@ -51,6 +51,7 @@ FRONTEND_DIR = ROOT / "actifix-frontend"
 DEFAULT_FRONTEND_PORT = 8080
 DEFAULT_API_PORT = 5001
 DEFAULT_YHATZEE_PORT = 8090
+DEFAULT_SUPERQUIZ_PORT = 8070
 VERSION_LINE_RE = re.compile(r'^version\s*=\s*["\'](?P<version>[^"\']+)["\']', re.MULTILINE)
 
 # Global singleton instances - only one of each can exist
@@ -58,6 +59,8 @@ _API_SERVER_INSTANCE: Optional[threading.Thread] = None
 _API_SERVER_LOCK = threading.Lock()
 _YHATZEE_SERVER_INSTANCE: Optional[threading.Thread] = None
 _YHATZEE_SERVER_LOCK = threading.Lock()
+_SUPERQUIZ_SERVER_INSTANCE: Optional[threading.Thread] = None
+_SUPERQUIZ_SERVER_LOCK = threading.Lock()
 _FRONTEND_MANAGER_INSTANCE: Optional['FrontendManager'] = None
 _FRONTEND_LOCK = threading.Lock()
 
@@ -277,7 +280,7 @@ def cleanup_existing_instances() -> None:
         pass
 
     # Kill any http.server processes on our ports
-    for port in [DEFAULT_FRONTEND_PORT, DEFAULT_API_PORT, DEFAULT_YHATZEE_PORT]:
+    for port in [DEFAULT_FRONTEND_PORT, DEFAULT_API_PORT, DEFAULT_YHATZEE_PORT, DEFAULT_SUPERQUIZ_PORT]:
         if is_port_in_use(port):
             log_warning(f"Port {port} is in use")
             kill_processes_on_port(port)
@@ -353,11 +356,65 @@ def start_yhatzee_server(port: int, project_root: Path, host: str = "127.0.0.1")
             except Exception as exc:
                 log_error(f"Yhatzee GUI server error: {exc}")
 
+    thread = threading.Thread(target=run_server, daemon=True)
+    thread.start()
+    _YHATZEE_SERVER_INSTANCE = thread
+    time.sleep(0.3)
+    log_success(f"Yhatzee GUI server running at http://{host}:{port}")
+    return thread
+
+
+def _wait_for_superquiz_health(host: str, port: int, timeout: float = 5.0) -> bool:
+    """Probe the SuperQuiz health endpoint to ensure the GUI started cleanly."""
+    from urllib.request import urlopen
+
+    url = f"http://{host}:{port}/health"
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        try:
+            with urlopen(url, timeout=1.0) as response:
+                if response.status == 200:
+                    return True
+        except Exception:
+            time.sleep(0.3)
+    return False
+
+
+def start_superquiz_server(port: int, project_root: Path, host: str = "127.0.0.1") -> threading.Thread:
+    """Launch the SuperQuiz GUI server and verify its dependencies."""
+    global _SUPERQUIZ_SERVER_INSTANCE
+
+    with _SUPERQUIZ_SERVER_LOCK:
+        if _SUPERQUIZ_SERVER_INSTANCE is not None and _SUPERQUIZ_SERVER_INSTANCE.is_alive():
+            log_warning("SuperQuiz server already running - refusing to start duplicate instance")
+            return _SUPERQUIZ_SERVER_INSTANCE
+
+        log_info(f"Starting SuperQuiz GUI server on {host}:{port}...")
+
+        try:
+            from actifix.modules.superquiz import run_gui
+        except ImportError as exc:
+            log_error("SuperQuiz module requires Flask (install via pip install -e '.[web]')")
+            raise exc
+
+        def run_server():
+            try:
+                run_gui(host=host, port=port, project_root=project_root, debug=False)
+            except Exception as exc:
+                log_error(f"SuperQuiz GUI server error: {exc}")
+
         thread = threading.Thread(target=run_server, daemon=True)
         thread.start()
-        _YHATZEE_SERVER_INSTANCE = thread
+        _SUPERQUIZ_SERVER_INSTANCE = thread
         time.sleep(0.3)
-        log_success(f"Yhatzee GUI server running at http://{host}:{port}")
+
+        if not _wait_for_superquiz_health(host, port):
+            message = "SuperQuiz GUI failed to respond on /health (check Flask/dependencies)"
+            log_error(message)
+            raise RuntimeError(message)
+
+        log_success(f"SuperQuiz GUI server running at http://{host}:{port}")
+        log_info("SuperQuiz health endpoint responded; dependencies validated")
         return thread
 
 
@@ -552,6 +609,17 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
         help="Do not start the standalone Yhatzee GUI",
     )
     parser.add_argument(
+        "--superquiz-port",
+        type=int,
+        default=DEFAULT_SUPERQUIZ_PORT,
+        help=f"Port for the standalone SuperQuiz GUI (default: {DEFAULT_SUPERQUIZ_PORT})",
+    )
+    parser.add_argument(
+        "--no-superquiz",
+        action="store_true",
+        help="Do not start the standalone SuperQuiz GUI",
+    )
+    parser.add_argument(
         "--browser",
         action="store_true",
         default=False,
@@ -595,6 +663,8 @@ def main(argv: Optional[list[str]] = None) -> int:
     if not args.no_api:
         total_steps += 1
     if not args.no_yhatzee:
+        total_steps += 1
+    if not args.no_superquiz:
         total_steps += 1
     total_steps += 1  # frontend step
     current_step = 0
@@ -668,11 +738,22 @@ def main(argv: Optional[list[str]] = None) -> int:
             log_error("Try manually: pkill -f 'start.py' or use --yhatzee-port <PORT>")
             return 1
 
+    if not args.no_superquiz and is_port_in_use(args.superquiz_port):
+        log_warning(f"SuperQuiz port {args.superquiz_port} still in use, forcing cleanup")
+        kill_processes_on_port(args.superquiz_port)
+        time.sleep(0.5)
+
+        if is_port_in_use(args.superquiz_port):
+            log_error(f"Could not free SuperQuiz port {args.superquiz_port}")
+            log_error("Try manually: pkill -f 'start.py' or use --superquiz-port <PORT>")
+            return 1
+
     # Step 4: Start API server (if enabled)
     api_thread = None
     api_watchdog_thread = None
     version_monitor_thread: Optional[threading.Thread] = None
     yhatzee_thread: Optional[threading.Thread] = None
+    superquiz_thread: Optional[threading.Thread] = None
     stop_event = threading.Event()
     if not args.no_api:
         current_step += 1
@@ -693,6 +774,15 @@ def main(argv: Optional[list[str]] = None) -> int:
             yhatzee_thread = start_yhatzee_server(args.yhatzee_port, ROOT)
         except Exception as e:
             log_error(f"Failed to start Yhatzee GUI: {e}")
+            return 1
+
+    if not args.no_superquiz:
+        current_step += 1
+        log_step(current_step, total_steps, "Starting SuperQuiz GUI")
+        try:
+            superquiz_thread = start_superquiz_server(args.superquiz_port, ROOT)
+        except Exception as e:
+            log_error(f"Failed to start SuperQuiz GUI: {e}")
             return 1
 
     # Start frontend server
@@ -718,6 +808,9 @@ def main(argv: Optional[list[str]] = None) -> int:
     if not args.no_yhatzee:
         yhatzee_url = f"http://localhost:{args.yhatzee_port}/"
         print(f"{Color.BOLD}{Color.GREEN}Yhatzee:{Color.RESET}   {Color.CYAN}{yhatzee_url}{Color.RESET}")
+    if not args.no_superquiz:
+        superquiz_url = f"http://localhost:{args.superquiz_port}/"
+        print(f"{Color.BOLD}{Color.GREEN}SuperQuiz:{Color.RESET} {Color.CYAN}{superquiz_url}{Color.RESET}")
 
     print()
 

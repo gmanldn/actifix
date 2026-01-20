@@ -1,10 +1,13 @@
 {
   "schema_version": "arch-depgraph.v1",
   "meta": {
-    "generated_at": "2026-01-20T13:16:31Z",
+    "generated_at": "2026-01-20T17:45:50Z",
     "generator": "update_architecture_docs.py",
     "generator_version": "2.0.0",
-    "source_commit": "current_development"
+    "source_commit": "current_development",
+    "notes": [
+      "scripts.start now launches the SuperQuiz GUI and probes /health before reporting the endpoint alongside other services."
+    ]
   },
   "nodes": [
     {

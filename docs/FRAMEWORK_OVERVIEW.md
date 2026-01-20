@@ -102,6 +102,8 @@ Override example:
 }
 ```
 
+The launcher now starts the standalone SuperQuiz GUI on its configured host/port (default `127.0.0.1:8070`) and probes `/health` to validate Flask and related dependencies before reporting the endpoint alongside the dashboard, backend, and Yhatzee servers. Use `--superquiz-port` to adjust the binding or `--no-superquiz` to skip the extra GUI when you do not need it.
+
 ## Ticket lifecycle (high-level)
 1. Exception raised or manual capture call.
 2. Raise_AF captures context, deduplicates, and classifies priority.
