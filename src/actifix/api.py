@@ -4,6 +4,7 @@ Actifix API Server - Flask-based REST API for frontend dashboard.
 Provides endpoints for health, stats, tickets, logs, and system information.
 """
 
+import json
 import logging
 import os
 import platform
@@ -79,6 +80,114 @@ from .ai_client import get_ai_client, resolve_provider_selection
 # Server start time for uptime calculation
 SERVER_START_TIME = time.time()
 SYSTEM_OWNERS = {"runtime", "infra", "core", "persistence", "testing", "tooling"}
+MODULE_STATUS_SCHEMA_VERSION = "module-statuses.v1"
+
+
+def _default_module_status_payload() -> Dict[str, Dict[str, List[str]]]:
+    return {
+        "schema_version": MODULE_STATUS_SCHEMA_VERSION,
+        "statuses": {
+            "active": [],
+            "disabled": [],
+            "error": [],
+        },
+    }
+
+
+def _coerce_status_list(values: object) -> List[str]:
+    if not isinstance(values, (list, tuple, set)):
+        return []
+    cleaned: List[str] = []
+    seen = set()
+    for value in values:
+        if value is None:
+            continue
+        name = str(value)
+        if name in seen:
+            continue
+        seen.add(name)
+        cleaned.append(name)
+    return cleaned
+
+
+def _normalize_module_statuses(payload: object) -> Dict[str, List[str]]:
+    statuses = {"active": [], "disabled": [], "error": []}
+    if isinstance(payload, dict):
+        for key in statuses:
+            statuses[key] = _coerce_status_list(payload.get(key))
+    return statuses
+
+
+def _backup_corrupt_module_statuses(status_file: Path, raw_content: str) -> None:
+    from actifix.log_utils import atomic_write
+
+    corrupt_path = status_file.with_suffix(".corrupt.json")
+    atomic_write(corrupt_path, raw_content)
+
+
+def _write_module_status_payload(status_file: Path, payload: Dict[str, object]) -> None:
+    from actifix.log_utils import atomic_write
+
+    atomic_write(status_file, json.dumps(payload, indent=2))
+
+
+def _read_module_status_payload(status_file: Path) -> Dict[str, Dict[str, List[str]]]:
+    default_payload = _default_module_status_payload()
+    if not status_file.exists():
+        return default_payload
+
+    try:
+        raw_content = status_file.read_text(encoding="utf-8")
+    except Exception as exc:
+        record_error(
+            message=f"Failed to read module status file: {exc}",
+            source="api.py:_read_module_status_payload",
+            priority=TicketPriority.P2,
+        )
+        return default_payload
+
+    if not raw_content.strip():
+        return default_payload
+
+    try:
+        data = json.loads(raw_content)
+    except json.JSONDecodeError as exc:
+        record_error(
+            message=f"Invalid module status JSON: {exc}",
+            source="api.py:_read_module_status_payload",
+            priority=TicketPriority.P2,
+        )
+        try:
+            _backup_corrupt_module_statuses(status_file, raw_content)
+            _write_module_status_payload(status_file, default_payload)
+        except Exception as write_exc:
+            record_error(
+                message=f"Failed to recover module status file: {write_exc}",
+                source="api.py:_read_module_status_payload",
+                priority=TicketPriority.P2,
+            )
+        return default_payload
+
+    if isinstance(data, dict) and "schema_version" in data and "statuses" in data:
+        statuses = _normalize_module_statuses(data.get("statuses"))
+        return {
+            "schema_version": data.get("schema_version") or MODULE_STATUS_SCHEMA_VERSION,
+            "statuses": statuses,
+        }
+
+    if isinstance(data, dict):
+        statuses = _normalize_module_statuses(data)
+        return {
+            "schema_version": MODULE_STATUS_SCHEMA_VERSION,
+            "statuses": statuses,
+        }
+
+    record_error(
+        message="Unexpected module status payload format",
+        source="api.py:_read_module_status_payload",
+        priority=TicketPriority.P2,
+    )
+    return default_payload
 
 
 def _is_system_domain(domain: Optional[str]) -> bool:
@@ -100,17 +209,10 @@ def _load_modules(project_root: Path) -> Dict[str, List[Dict[str, str]]]:
     from actifix.state_paths import get_actifix_paths
     paths = get_actifix_paths(project_root=project_root)
     status_file = paths.state_dir / "module_statuses.json"
-    
-    # Load statuses or default to active
-    statuses = {"active": set()}
-    if status_file.exists():
-        try:
-            import json
-            with open(status_file, 'r') as f:
-                statuses = json.load(f)
-        except:
-            pass
-    
+
+    status_payload = _read_module_status_payload(status_file)
+    statuses = status_payload["statuses"]
+
     def get_status(name):
         if name in statuses.get("disabled", []):
             return "disabled"
@@ -123,9 +225,7 @@ def _load_modules(project_root: Path) -> Dict[str, List[Dict[str, str]]]:
         return {"system": [], "user": []}
 
     try:
-        import json
-        with open(depgraph_path, 'r') as f:
-            data = json.load(f)
+        data = json.loads(depgraph_path.read_text(encoding="utf-8"))
         nodes = data.get("nodes", [])
     except Exception:
         return {"system": [], "user": []}
@@ -760,31 +860,39 @@ def create_app(
     @app.route('/api/modules/<module_id>', methods=['POST'])
     def api_toggle_module(module_id):
         """Toggle module status (enable/disable)."""
-        from actifix.log_utils import atomic_write
         from actifix.state_paths import get_actifix_paths
 
         paths = get_actifix_paths(project_root=app.config['PROJECT_ROOT'])
         status_file = paths.state_dir / "module_statuses.json"
 
         try:
-            import json
-            statuses = {"active": [], "disabled": [], "error": []}
-            if status_file.exists():
-                with open(status_file, 'r') as f:
-                    statuses = json.load(f)
+            status_payload = _read_module_status_payload(status_file)
+            statuses = status_payload["statuses"]
 
             if module_id in statuses.get("disabled", []):
                 statuses["disabled"].remove(module_id)
-                statuses["active"].append(module_id)
+                if module_id not in statuses.get("active", []):
+                    statuses["active"].append(module_id)
+                if module_id in statuses.get("error", []):
+                    statuses["error"].remove(module_id)
                 action = "enabled"
             else:
-                statuses["active"].remove(module_id) if module_id in statuses.get("active", []) else None
-                statuses["disabled"].append(module_id)
+                if module_id in statuses.get("active", []):
+                    statuses["active"].remove(module_id)
+                if module_id not in statuses.get("disabled", []):
+                    statuses["disabled"].append(module_id)
                 action = "disabled"
 
-            atomic_write(status_file, json.dumps(statuses, indent=2))
+            status_payload["statuses"] = _normalize_module_statuses(statuses)
+            status_payload["schema_version"] = MODULE_STATUS_SCHEMA_VERSION
+            _write_module_status_payload(status_file, status_payload)
             return jsonify({"success": True, "module_id": module_id, "action": action})
         except Exception as e:
+            record_error(
+                message=f"Failed to toggle module status for {module_id}: {e}",
+                source="api.py:api_toggle_module",
+                priority=TicketPriority.P2,
+            )
             return jsonify({"error": str(e)}), 500
 
     @app.route('/api/ping', methods=['GET'])

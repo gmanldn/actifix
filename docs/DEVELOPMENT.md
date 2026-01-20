@@ -90,6 +90,21 @@ If you add or move modules:
 2. Sync `docs/architecture/MODULES.md`.
 3. Update `docs/INDEX.md` references.
 
+## Module status persistence
+Module enable/disable state lives in `.actifix/module_statuses.json` using a versioned schema:
+```json
+{
+  "schema_version": "module-statuses.v1",
+  "statuses": {
+    "active": ["runtime.api"],
+    "disabled": ["modules.superquiz"],
+    "error": []
+  }
+}
+```
+Writes must go through `atomic_write()` and the system will back up malformed JSON to
+`module_statuses.corrupt.json` before restoring defaults.
+
 ## Documentation workflow
 - Use `docs/FRAMEWORK_OVERVIEW.md` for release notes and feature narratives.
 - Update `docs/INDEX.md` any time sections move.
