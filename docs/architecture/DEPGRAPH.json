@@ -308,6 +308,12 @@
       "label": "pokertool.detector"
     },
     {
+      "id": "modules.pokertool.solvers",
+      "domain": "modules",
+      "owner": "modules",
+      "label": "pokertool.solvers"
+    },
+    {
       "id": "modules.registry",
       "domain": "modules",
       "owner": "modules",
@@ -890,6 +896,21 @@
       "from": "modules.pokertool.detector",
       "to": "core.raise_af",
       "reason": "modules.pokertool.detector records errors through core.raise_af helpers"
+    },
+    {
+      "from": "modules.pokertool.solvers",
+      "to": "runtime.state",
+      "reason": "modules.pokertool.solvers uses Actifix state paths"
+    },
+    {
+      "from": "modules.pokertool.solvers",
+      "to": "infra.logging",
+      "reason": "modules.pokertool.solvers logs solver events via infra.logging"
+    },
+    {
+      "from": "modules.pokertool.solvers",
+      "to": "core.raise_af",
+      "reason": "modules.pokertool.solvers records solver errors through raise_af helpers"
     },
     {
       "from": "modules.dev_assistant",

@@ -13,6 +13,11 @@ from actifix.raise_af import TicketPriority
 from actifix.modules.base import ModuleBase
 from .core import PokerToolAnalysisError, evaluate_hand
 from .detector import DetectionPipeline
+from .solvers import (
+    PokerToolSolverError,
+    compute_nash_equilibrium,
+    estimate_icm_value,
+)
 
 if TYPE_CHECKING:
     from flask import Blueprint
@@ -158,6 +163,65 @@ def create_blueprint(
                 raise
             return jsonify(
                 _stub_response("Analysis payload processed.", {"analysis": analysis_result})
+            )
+
+        @blueprint.route("/api/solvers/nash", methods=["POST"])
+        def solvers_nash() -> Response:
+            payload = request.get_json(silent=True)
+            if not isinstance(payload, dict):
+                helper.record_module_error(
+                    message="Solver endpoint requires a JSON payload.",
+                    source="modules.pokertool.__init__:solvers_nash",
+                    error_type="PayloadError",
+                    priority=TicketPriority.P3,
+                )
+                return jsonify({"status": "error", "message": "JSON body expected."}), 400
+            try:
+                recommendation = compute_nash_equilibrium(
+                    payload.get("hand") or [],
+                    payload.get("board"),
+                )
+            except PokerToolSolverError as exc:
+                helper.record_module_error(
+                    message=f"Nash computation failed: {exc}",
+                    source="modules.pokertool.__init__:solvers_nash",
+                    error_type=type(exc).__name__,
+                    priority=TicketPriority.P3,
+                )
+                return jsonify({"status": "error", "message": str(exc)}), 400
+            return jsonify(
+                _stub_response(
+                    "Nash computation completed.",
+                    {"recommendation": recommendation.__dict__},
+                )
+            )
+
+        @blueprint.route("/api/solvers/icm", methods=["POST"])
+        def solvers_icm() -> Response:
+            payload = request.get_json(silent=True)
+            if not isinstance(payload, dict):
+                helper.record_module_error(
+                    message="ICM endpoint requires a JSON payload.",
+                    source="modules.pokertool.__init__:solvers_icm",
+                    error_type="PayloadError",
+                    priority=TicketPriority.P3,
+                )
+                return jsonify({"status": "error", "message": "JSON body expected."}), 400
+            try:
+                result = estimate_icm_value(
+                    payload.get("stacks") or [],
+                    payload.get("payouts") or [],
+                )
+            except PokerToolSolverError as exc:
+                helper.record_module_error(
+                    message=f"ICM estimation failed: {exc}",
+                    source="modules.pokertool.__init__:solvers_icm",
+                    error_type=type(exc).__name__,
+                    priority=TicketPriority.P3,
+                )
+                return jsonify({"status": "error", "message": str(exc)}), 400
+            return jsonify(
+                _stub_response("ICM estimation complete.", result)
             )
 
         @blueprint.route("/api/detect/start", methods=["POST"])

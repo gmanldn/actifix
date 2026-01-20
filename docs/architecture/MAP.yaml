@@ -929,6 +929,20 @@ modules:
   - infra.logging
   - core.raise_af
 
+- id: modules.pokertool.solvers
+  domain: modules
+  owner: modules
+  summary: Solver heuristics for Nash/ICM guidance in the PokerTool port
+  entrypoints:
+  - src/actifix/modules/pokertool/solvers.py
+  contracts:
+  - provide Nash-equilibrium and ICM heuristics
+  - log solver failures through RaiseAF helpers
+  depends_on:
+  - runtime.state
+  - infra.logging
+  - core.raise_af
+
 - id: modules.yhatzee.game
   domain: modules
   owner: modules
