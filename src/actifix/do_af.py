@@ -450,6 +450,11 @@ def process_next_ticket(
         use_ai = False
     elif os.getenv("PYTEST_CURRENT_TEST") and os.getenv("ACTIFIX_ENABLE_AI_TESTS") != "1":
         use_ai = False
+    
+    # Check if AI is enabled in config
+    config = get_config()
+    if not config.ai_enabled:
+        use_ai = False
 
     locked = _select_and_lock_ticket(paths)
     if not locked:
@@ -550,6 +555,7 @@ def process_next_ticket(
                         ticket_id=ticket.ticket_id,
                         extra={"error": ai_response.error}
                     )
+                    return None
 
             except Exception as e:
                 log_event(
