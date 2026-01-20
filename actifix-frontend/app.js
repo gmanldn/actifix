@@ -23,6 +23,8 @@ const setAdminPasswordInStorage = (value) => {
     localStorage.setItem(ADMIN_PASSWORD_KEY, value);
   }
 };
+const clearAuthToken = () => setAdminPasswordInStorage('');
+const isAuthenticated = () => !!getAdminPassword();
 
 const buildAdminHeaders = (initial = {}) => {
   const headers = { ...initial };
@@ -1745,70 +1747,31 @@ Examples:
 
 // Login Component
 const LoginView = ({ onLogin }) => {
-  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [showCreateFirst, setShowCreateFirst] = useState(false);
 
   const handleLogin = async () => {
-    if (!username || !password) {
-      setError('Please enter username and password');
+    if (!password) {
+      setError('Please enter the admin password');
       return;
     }
-    
+
     setLoading(true);
     setError('');
 
     try {
-      const response = await fetch(`${API_BASE}/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password })
+      // Test the password by making a simple API call
+      const response = await fetch(`${API_BASE}/health`, {
+        headers: { 'X-Admin-Password': password }
       });
 
-      const data = await response.json();
-
       if (response.ok) {
-        setAuthToken(data.token);
+        // Password is correct, store it and log in
+        setAdminPasswordInStorage(password);
         onLogin();
       } else {
-        setError(data.error || 'Login failed');
-        // If no users exist, show create first user option
-        if (data.error && data.error.includes('no users exist')) {
-          setShowCreateFirst(true);
-        }
-      }
-    } catch (err) {
-      setError(`Connection error: ${err.message}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleCreateFirstUser = async () => {
-    if (!username || !password) {
-      setError('Please enter username and password');
-      return;
-    }
-    
-    setLoading(true);
-    setError('');
-
-    try {
-      const response = await fetch(`${API_BASE}/auth/create-first-user`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password })
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        setAuthToken(data.token);
-        onLogin();
-      } else {
-        setError(data.error || 'Failed to create user');
+        setError('Invalid admin password');
       }
     } catch (err) {
       setError(`Connection error: ${err.message}`);
@@ -1827,24 +1790,12 @@ const LoginView = ({ onLogin }) => {
       
       h('div', { className: 'login-form' },
         h('div', { className: 'form-group' },
-          h('label', null, 'Username'),
-          h('input', {
-            type: 'text',
-            value: username,
-            onChange: (e) => setUsername(e.target.value),
-            placeholder: 'Enter username',
-            className: 'login-input',
-            disabled: loading
-          })
-        ),
-        
-        h('div', { className: 'form-group' },
-          h('label', null, 'Password'),
+          h('label', null, 'Admin Password'),
           h('input', {
             type: 'password',
             value: password,
             onChange: (e) => setPassword(e.target.value),
-            placeholder: 'Enter password',
+            placeholder: 'Enter admin password',
             className: 'login-input',
             disabled: loading,
             onKeyPress: (e) => e.key === 'Enter' && handleLogin()
@@ -1853,20 +1804,13 @@ const LoginView = ({ onLogin }) => {
 
         error && h('div', { className: 'login-error' }, error),
 
-        showCreateFirst ? h('div', { className: 'login-actions' },
-          h('button', {
-            onClick: handleCreateFirstUser,
-            disabled: loading,
-            className: 'btn btn-primary'
-          }, loading ? 'Creating...' : 'Create First Admin User'),
-          h('p', { className: 'login-help' }, 'No admin user exists yet. Create one to get started.')
-        ) : h('div', { className: 'login-actions' },
+        h('div', { className: 'login-actions' },
           h('button', {
             onClick: handleLogin,
-            disabled: loading,
+            disabled: loading || !password,
             className: 'btn btn-primary'
-          }, loading ? 'Logging in...' : 'Login'),
-          h('p', { className: 'login-help' }, 'Enter your admin credentials to access the dashboard')
+          }, loading ? 'Authenticating...' : 'Login'),
+          h('p', { className: 'login-help' }, 'Default password: admin123')
         )
       )
     )
