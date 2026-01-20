@@ -76,6 +76,7 @@ from .persistence.ticket_cleanup import run_automatic_cleanup
 from .persistence.cleanup_config import get_cleanup_config
 from .config import get_config, set_config, load_config
 from .security.rate_limiter import RateLimitConfig, RateLimitError, get_rate_limiter
+from .log_utils import log_event
 from .ai_client import get_ai_client, resolve_provider_selection
 
 # Server start time for uptime calculation
@@ -111,6 +112,53 @@ def _parse_module_rate_limit_overrides(raw: str) -> dict[str, dict[str, int]]:
             "calls_per_day": int(value.get("calls_per_day", 0) or 0),
         }
     return overrides
+
+
+def _register_module_blueprint(
+    app,
+    module_name: str,
+    create_blueprint,
+    *,
+    project_root: Path,
+    host: str,
+    port: int,
+    status_file: Path,
+    access_rule: str,
+    register_access,
+    register_rate_limit,
+) -> bool:
+    """Register a module blueprint with consistent logging and guards."""
+    expected_prefix = f"/modules/{module_name}"
+    try:
+        blueprint = create_blueprint(project_root=project_root, host=host, port=port)
+        blueprint_prefix = getattr(blueprint, "url_prefix", None)
+        if blueprint_prefix is None:
+            app.register_blueprint(blueprint, url_prefix=expected_prefix)
+        elif blueprint_prefix == expected_prefix:
+            app.register_blueprint(blueprint)
+        else:
+            raise ValueError(
+                f"Module {module_name} url_prefix mismatch: {blueprint_prefix} != {expected_prefix}"
+            )
+        register_access(module_name, access_rule)
+        register_rate_limit(module_name)
+        log_event(
+            "MODULE_REGISTERED",
+            f"Registered module blueprint: {module_name}",
+            extra={"module": module_name, "url_prefix": expected_prefix},
+            source="api.py:_register_module_blueprint",
+        )
+        return True
+    except Exception as exc:
+        record_error(
+            message=f"Module registration failed for {module_name}: {exc}",
+            source="api.py:_register_module_blueprint",
+            run_label=f"{module_name}-gui",
+            error_type=type(exc).__name__,
+            priority=TicketPriority.P2,
+        )
+        _mark_module_status(status_file, f"modules.{module_name}", "error")
+        return False
 
 
 def _default_module_status_payload() -> Dict[str, Dict[str, List[str]]]:
@@ -591,36 +639,32 @@ def create_app(
         _superquiz_access_rule = MODULE_ACCESS_PUBLIC
 
     if _create_yhatzee_blueprint:
-        try:
-            yhatzee_blueprint = _create_yhatzee_blueprint(project_root=root, host=host, port=port)
-            app.register_blueprint(yhatzee_blueprint)
-            _register_module_access("yhatzee", _yhatzee_access_rule)
-            _register_module_rate_limit("yhatzee")
-        except Exception as exc:
-            record_error(
-                message=f"Yhatzee module registration failed: {exc}",
-                source="api.py:create_app",
-                run_label="yhatzee-gui",
-                error_type=type(exc).__name__,
-                priority=TicketPriority.P2,
-            )
-            _mark_module_status(status_file, "modules.yhatzee", "error")
+        _register_module_blueprint(
+            app,
+            "yhatzee",
+            _create_yhatzee_blueprint,
+            project_root=root,
+            host=host,
+            port=port,
+            status_file=status_file,
+            access_rule=_yhatzee_access_rule,
+            register_access=_register_module_access,
+            register_rate_limit=_register_module_rate_limit,
+        )
 
     if _create_superquiz_blueprint:
-        try:
-            superquiz_blueprint = _create_superquiz_blueprint(project_root=root, host=host, port=port)
-            app.register_blueprint(superquiz_blueprint)
-            _register_module_access("superquiz", _superquiz_access_rule)
-            _register_module_rate_limit("superquiz")
-        except Exception as exc:
-            record_error(
-                message=f"SuperQuiz module registration failed: {exc}",
-                source="api.py:create_app",
-                run_label="superquiz-gui",
-                error_type=type(exc).__name__,
-                priority=TicketPriority.P2,
-            )
-            _mark_module_status(status_file, "modules.superquiz", "error")
+        _register_module_blueprint(
+            app,
+            "superquiz",
+            _create_superquiz_blueprint,
+            project_root=root,
+            host=host,
+            port=port,
+            status_file=status_file,
+            access_rule=_superquiz_access_rule,
+            register_access=_register_module_access,
+            register_rate_limit=_register_module_rate_limit,
+        )
 
     @app.before_request
     def _enforce_module_access():

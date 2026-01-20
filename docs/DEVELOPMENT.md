@@ -101,6 +101,11 @@ client = create_module_test_client("yhatzee", url_prefix=None)
 assert client.get("/health").status_code == 200
 ```
 
+## Module registration
+Runtime API registration uses the helper in `src/actifix/api.py` to enforce
+consistent error handling and `/modules/<name>` prefixes. Keep module blueprints
+aligned with that prefix to avoid registration failures.
+
 ## Architecture updates
 If you add or move modules:
 1. Update `docs/architecture/MAP.yaml` and `docs/architecture/DEPGRAPH.json`.
