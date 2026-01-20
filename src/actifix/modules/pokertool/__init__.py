@@ -18,6 +18,11 @@ from .solvers import (
     compute_nash_equilibrium,
     estimate_icm_value,
 )
+from .ml import (
+    PokerToolMLError,
+    active_learning_hint,
+    build_opponent_model,
+)
 
 if TYPE_CHECKING:
     from flask import Blueprint
@@ -223,6 +228,54 @@ def create_blueprint(
             return jsonify(
                 _stub_response("ICM estimation complete.", result)
             )
+
+        @blueprint.route("/api/ml/opponent", methods=["POST"])
+        def ml_opponent() -> Response:
+            payload = request.get_json(silent=True)
+            if not isinstance(payload, dict):
+                helper.record_module_error(
+                    message="Opponent model endpoint requires a JSON payload.",
+                    source="modules.pokertool.__init__:ml_opponent",
+                    error_type="PayloadError",
+                    priority=TicketPriority.P3,
+                )
+                return jsonify({"status": "error", "message": "JSON body expected."}), 400
+            try:
+                profile = build_opponent_model(payload.get("history") or [])
+            except PokerToolMLError as exc:
+                helper.record_module_error(
+                    message=f"Opponent model failed: {exc}",
+                    source="modules.pokertool.__init__:ml_opponent",
+                    error_type=type(exc).__name__,
+                    priority=TicketPriority.P3,
+                )
+                return jsonify({"status": "error", "message": str(exc)}), 400
+            return jsonify(
+                _stub_response("Opponent model ready.", profile.__dict__)
+            )
+
+        @blueprint.route("/api/ml/learn", methods=["POST"])
+        def ml_learn() -> Response:
+            payload = request.get_json(silent=True)
+            if not isinstance(payload, dict):
+                helper.record_module_error(
+                    message="Active learning endpoint requires a JSON payload.",
+                    source="modules.pokertool.__init__:ml_learn",
+                    error_type="PayloadError",
+                    priority=TicketPriority.P3,
+                )
+                return jsonify({"status": "error", "message": "JSON body expected."}), 400
+            try:
+                hint = active_learning_hint(payload.get("scores") or [])
+            except PokerToolMLError as exc:
+                helper.record_module_error(
+                    message=f"Active learning failed: {exc}",
+                    source="modules.pokertool.__init__:ml_learn",
+                    error_type=type(exc).__name__,
+                    priority=TicketPriority.P3,
+                )
+                return jsonify({"status": "error", "message": str(exc)}), 400
+            return jsonify(_stub_response("Active learning hint produced.", hint))
 
         @blueprint.route("/api/detect/start", methods=["POST"])
         def detect_start() -> Response:

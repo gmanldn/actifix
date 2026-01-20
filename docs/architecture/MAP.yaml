@@ -943,6 +943,20 @@ modules:
   - infra.logging
   - core.raise_af
 
+- id: modules.pokertool.ml
+  domain: modules
+  owner: modules
+  summary: Machine-learning helpers for opponent profiling and active learning
+  entrypoints:
+  - src/actifix/modules/pokertool/ml.py
+  contracts:
+  - produce opponent profiles based on historical actions
+  - deliver active learning hints for model improvement
+  depends_on:
+  - runtime.state
+  - infra.logging
+  - core.raise_af
+
 - id: modules.yhatzee.game
   domain: modules
   owner: modules
