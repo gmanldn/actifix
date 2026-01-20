@@ -302,6 +302,12 @@
       "label": "pokertool"
     },
     {
+      "id": "modules.pokertool.detector",
+      "domain": "modules",
+      "owner": "modules",
+      "label": "pokertool.detector"
+    },
+    {
       "id": "modules.registry",
       "domain": "modules",
       "owner": "modules",
@@ -869,6 +875,21 @@
       "from": "modules.pokertool",
       "to": "runtime.api",
       "reason": "modules.pokertool registers a blueprint on the runtime API server"
+    },
+    {
+      "from": "modules.pokertool.detector",
+      "to": "runtime.state",
+      "reason": "modules.pokertool.detector uses Actifix state paths"
+    },
+    {
+      "from": "modules.pokertool.detector",
+      "to": "infra.logging",
+      "reason": "modules.pokertool.detector logs pipeline events via infra.logging"
+    },
+    {
+      "from": "modules.pokertool.detector",
+      "to": "core.raise_af",
+      "reason": "modules.pokertool.detector records errors through core.raise_af helpers"
     },
     {
       "from": "modules.dev_assistant",

@@ -2,14 +2,17 @@
 
 from __future__ import annotations
 
+import json
+import time
 from pathlib import Path
-from typing import Optional, TYPE_CHECKING, Union
+from typing import Iterable, Optional, TYPE_CHECKING, Union
 
 from actifix.log_utils import log_event
 from actifix.raise_af import TicketPriority
 
-from .core import PokerToolAnalysisError, evaluate_hand
 from actifix.modules.base import ModuleBase
+from .core import PokerToolAnalysisError, evaluate_hand
+from .detector import DetectionPipeline
 
 if TYPE_CHECKING:
     from flask import Blueprint
@@ -40,6 +43,9 @@ MODULE_DEPENDENCIES = [
 ]
 
 
+DETECTION_PIPELINE = DetectionPipeline()
+
+
 def _module_helper(project_root: Optional[Union[str, Path]] = None) -> ModuleBase:
     """Build a ModuleBase helper for the PokerTool scaffolding."""
     return ModuleBase(
@@ -57,6 +63,26 @@ def _stub_response(message: str, extra: Optional[dict[str, object]] = None) -> d
     return payload
 
 
+def _format_sse(event: str, payload: dict[str, object]) -> str:
+    return f"event: {event}\ndata: {json.dumps(payload)}\n\n"
+
+
+def _stream_detection_events() -> Iterable[str]:
+    last_sequence = -1
+    while True:
+        summary = DETECTION_PIPELINE.summary()
+        latest = DETECTION_PIPELINE.latest_update()
+        if latest and latest.sequence != last_sequence:
+            last_sequence = latest.sequence
+            yield _format_sse("update", DETECTION_PIPELINE.payload_for(latest))
+            continue
+        yield _format_sse("status", summary)
+        if not summary["active"]:
+            break
+        time.sleep(0.75)
+    yield _format_sse("status", {"active": False, "note": "Stream closed"})
+
+
 def create_blueprint(
     project_root: Optional[Union[str, Path]] = None,
     host: Optional[str] = None,
@@ -66,7 +92,7 @@ def create_blueprint(
     """Create the Flask blueprint that shields the PokerTool surface."""
     helper = _module_helper(project_root)
     try:
-        from flask import Blueprint, jsonify, request, Response
+        from flask import Blueprint, Response, jsonify, request
 
         resolved_host, resolved_port = helper.resolve_host_port(host, port)
         blueprint = Blueprint("pokertool", __name__, url_prefix=url_prefix)
@@ -133,6 +159,45 @@ def create_blueprint(
             return jsonify(
                 _stub_response("Analysis payload processed.", {"analysis": analysis_result})
             )
+
+        @blueprint.route("/api/detect/start", methods=["POST"])
+        def detect_start() -> Response:
+            try:
+                DETECTION_PIPELINE.start()
+                return jsonify(_stub_response("Detection pipeline started.", DETECTION_PIPELINE.summary()))
+            except RuntimeError as exc:
+                helper.record_module_error(
+                    message=f"Detection pipeline start failed: {exc}",
+                    source="modules.pokertool.__init__:detect_start",
+                    error_type="RuntimeError",
+                    priority=TicketPriority.P3,
+                )
+                return (
+                    jsonify(
+                        {
+                            "status": "error",
+                            "message": str(exc),
+                            "active": DETECTION_PIPELINE.active,
+                        }
+                    ),
+                    409,
+                )
+
+        @blueprint.route("/api/detect/stop", methods=["POST"])
+        def detect_stop() -> Response:
+            DETECTION_PIPELINE.stop()
+            return jsonify(_stub_response("Detection pipeline stopped.", DETECTION_PIPELINE.summary()))
+
+        @blueprint.route("/api/detect/status")
+        def detect_status() -> Response:
+            latest = DETECTION_PIPELINE.latest_update()
+            payload = DETECTION_PIPELINE.payload_for(latest)
+            payload.update(DETECTION_PIPELINE.summary())
+            return jsonify(_stub_response("Detection status snapshot.", payload))
+
+        @blueprint.route("/api/detect/stream")
+        def detect_stream() -> Response:
+            return Response(_stream_detection_events(), mimetype="text/event-stream")
 
         helper.log_gui_init(resolved_host, resolved_port, extra={"module": helper.module_id})
         return blueprint
