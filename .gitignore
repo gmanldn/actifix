@@ -9,6 +9,7 @@ __pycache__/
 data/actifix.db
 data/actifix.db-shm
 data/actifix.db-wal
+*.db
 actifix/ACTIFIX-LIST.md
 actifix/ACTIFIX.md
 actifix/ACTIFIX-LOG.md
