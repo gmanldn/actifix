@@ -92,6 +92,15 @@ python3 -m actifix.main modules disable modules.yhatzee
 python3 -m actifix.main modules enable modules.yhatzee
 ```
 
+## Module testing harness
+Use the module testing helpers to spin up blueprints in isolation:
+```python
+from actifix.testing import create_module_test_client
+
+client = create_module_test_client("yhatzee", url_prefix=None)
+assert client.get("/health").status_code == 200
+```
+
 ## Architecture updates
 If you add or move modules:
 1. Update `docs/architecture/MAP.yaml` and `docs/architecture/DEPGRAPH.json`.

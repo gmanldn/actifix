@@ -8,6 +8,8 @@ Provides a testing framework that:
 - Provides deterministic, numbered progress reporting
 """
 
+import importlib
+import inspect
 import time
 import traceback
 from dataclasses import dataclass, field
@@ -505,3 +507,60 @@ def assert_contains(container: Any, item: Any, message: str = "") -> None:
     if item not in container:
         msg = message or f"Expected {container!r} to contain {item!r}"
         raise AssertionError(msg)
+
+
+def _resolve_module_import_path(module_name: str) -> str:
+    name = module_name.strip()
+    if name.startswith("actifix."):
+        return name
+    if name.startswith("modules."):
+        return f"actifix.{name}"
+    return f"actifix.modules.{name}"
+
+
+def create_module_blueprint(
+    module_name: str,
+    *,
+    project_root: Optional[Path] = None,
+    host: str = "127.0.0.1",
+    port: int = 0,
+    url_prefix: Optional[str] = None,
+):
+    """Create a module blueprint for testing in isolation."""
+    module_path = _resolve_module_import_path(module_name)
+    module = importlib.import_module(module_path)
+    create_blueprint = getattr(module, "create_blueprint", None)
+    if not create_blueprint:
+        raise ValueError(f"Module {module_path} does not expose create_blueprint")
+
+    kwargs = {"project_root": project_root, "host": host, "port": port}
+    signature = inspect.signature(create_blueprint)
+    if "url_prefix" in signature.parameters:
+        kwargs["url_prefix"] = url_prefix
+    return create_blueprint(**kwargs)
+
+
+def create_module_test_client(
+    module_name: str,
+    *,
+    project_root: Optional[Path] = None,
+    host: str = "127.0.0.1",
+    port: int = 0,
+    url_prefix: Optional[str] = None,
+):
+    """Create a Flask test client for a module blueprint."""
+    try:
+        from flask import Flask
+    except ImportError as exc:
+        raise ImportError("Flask is required for module test clients") from exc
+
+    app = Flask(module_name)
+    blueprint = create_module_blueprint(
+        module_name,
+        project_root=project_root,
+        host=host,
+        port=port,
+        url_prefix=url_prefix,
+    )
+    app.register_blueprint(blueprint)
+    return app.test_client()
