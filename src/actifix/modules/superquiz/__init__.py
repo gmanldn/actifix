@@ -41,6 +41,12 @@ MODULE_METADATA = {
     },
     "permissions": ["logging", "fs_read", "network_http"],
 }
+MODULE_DEPENDENCIES = [
+    "runtime.state",
+    "infra.logging",
+    "core.raise_af",
+    "runtime.api",
+]
 
 CATEGORIES: Tuple[str, ...] = (
     "General Knowledge",

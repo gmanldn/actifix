@@ -34,6 +34,12 @@ MODULE_METADATA = {
     },
     "permissions": ["logging", "fs_read"],
 }
+MODULE_DEPENDENCIES = [
+    "runtime.state",
+    "infra.logging",
+    "core.raise_af",
+    "runtime.api",
+]
 
 
 def _normalize_project_root(project_root: Optional[Union[str, Path]]) -> Optional[Path]:

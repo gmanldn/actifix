@@ -110,6 +110,11 @@ Runtime API registration uses the helper in `src/actifix/api.py` to enforce
 consistent error handling and `/modules/<name>` prefixes. Keep module blueprints
 aligned with that prefix to avoid registration failures.
 
+## Module dependency validation
+Declare module dependencies in `MODULE_DEPENDENCIES` and ensure every edge exists
+in `docs/architecture/DEPGRAPH.json`. Startup will block modules with invalid edges
+and record an error ticket.
+
 ## Architecture updates
 If you add or move modules:
 1. Update `docs/architecture/MAP.yaml` and `docs/architecture/DEPGRAPH.json`.

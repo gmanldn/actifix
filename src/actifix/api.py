@@ -126,12 +126,12 @@ def _parse_module_rate_limit_overrides(raw: str) -> dict[str, dict[str, int]]:
     return overrides
 
 
-def _load_module_metadata(create_blueprint) -> tuple[Optional[str], Optional[dict]]:
+def _load_module_metadata(create_blueprint) -> tuple[Optional[str], Optional[dict], Optional[object]]:
     module_path = getattr(create_blueprint, "__module__", "")
     if not module_path:
-        return None, None
+        return None, None, None
     module = importlib.import_module(module_path)
-    return module_path, getattr(module, "MODULE_METADATA", None)
+    return module_path, getattr(module, "MODULE_METADATA", None), module
 
 
 def _validate_module_metadata(module_name: str, metadata: Optional[dict]) -> list[str]:
@@ -173,6 +173,44 @@ def _validate_module_metadata(module_name: str, metadata: Optional[dict]) -> lis
     return errors
 
 
+def _load_depgraph_edges(project_root: Path) -> set[tuple[str, str]]:
+    depgraph_path = project_root / "docs" / "architecture" / "DEPGRAPH.json"
+    if not depgraph_path.exists():
+        record_error(
+            message="DEPGRAPH.json missing for module dependency validation",
+            source="api.py:_load_depgraph_edges",
+            priority=TicketPriority.P2,
+        )
+        return set()
+    try:
+        data = json.loads(depgraph_path.read_text(encoding="utf-8"))
+        edges = data.get("edges", []) if isinstance(data, dict) else []
+        return {(edge.get("from"), edge.get("to")) for edge in edges if edge}
+    except Exception as exc:
+        record_error(
+            message=f"Failed to read DEPGRAPH.json: {exc}",
+            source="api.py:_load_depgraph_edges",
+            priority=TicketPriority.P2,
+        )
+        return set()
+
+
+def _validate_module_dependencies(
+    module_name: str,
+    dependencies: object,
+    depgraph_edges: set[tuple[str, str]],
+) -> list[str]:
+    if not dependencies:
+        return []
+    if not isinstance(dependencies, list):
+        return ["dependencies_invalid"]
+    module_id = f"modules.{module_name}"
+    missing = [dep for dep in dependencies if (module_id, dep) not in depgraph_edges]
+    if missing:
+        return [f"missing_edges: {sorted(missing)}"]
+    return []
+
+
 def _register_module_blueprint(
     app,
     module_name: str,
@@ -185,11 +223,12 @@ def _register_module_blueprint(
     access_rule: str,
     register_access,
     register_rate_limit,
+    depgraph_edges: set[tuple[str, str]],
 ) -> bool:
     """Register a module blueprint with consistent logging and guards."""
     expected_prefix = f"/modules/{module_name}"
     try:
-        module_path, metadata = _load_module_metadata(create_blueprint)
+        module_path, metadata, module = _load_module_metadata(create_blueprint)
         metadata_errors = _validate_module_metadata(module_name, metadata)
         if metadata_errors:
             record_error(
@@ -200,6 +239,26 @@ def _register_module_blueprint(
                 source="api.py:_register_module_blueprint",
                 run_label=f"{module_name}-gui",
                 error_type="ModuleMetadataError",
+                priority=TicketPriority.P2,
+            )
+            _mark_module_status(status_file, f"modules.{module_name}", "error")
+            return False
+
+        dependencies = getattr(module, "MODULE_DEPENDENCIES", [])
+        dependency_errors = _validate_module_dependencies(
+            module_name,
+            dependencies,
+            depgraph_edges,
+        )
+        if dependency_errors:
+            record_error(
+                message=(
+                    f"Module dependency validation failed for {module_name}: "
+                    f"{', '.join(dependency_errors)}"
+                ),
+                source="api.py:_register_module_blueprint",
+                run_label=f"{module_name}-gui",
+                error_type="ModuleDependencyError",
                 priority=TicketPriority.P2,
             )
             _mark_module_status(status_file, f"modules.{module_name}", "error")
@@ -736,6 +795,7 @@ def create_app(
     app.config['API_HOST'] = host
     app.config['API_PORT'] = port
     status_file = get_actifix_paths(project_root=root).state_dir / "module_statuses.json"
+    depgraph_edges = _load_depgraph_edges(root)
     config = load_config(project_root=root, fail_fast=False)
     rate_limiter = get_rate_limiter()
     module_rate_overrides = _parse_module_rate_limit_overrides(
@@ -789,6 +849,7 @@ def create_app(
             access_rule=_yhatzee_access_rule,
             register_access=_register_module_access,
             register_rate_limit=_register_module_rate_limit,
+            depgraph_edges=depgraph_edges,
         )
 
     if _create_superquiz_blueprint:
@@ -803,6 +864,7 @@ def create_app(
             access_rule=_superquiz_access_rule,
             register_access=_register_module_access,
             register_rate_limit=_register_module_rate_limit,
+            depgraph_edges=depgraph_edges,
         )
 
     @app.before_request

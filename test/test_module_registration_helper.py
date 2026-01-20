@@ -39,6 +39,7 @@ def test_register_module_blueprint_sets_prefix(tmp_path, monkeypatch):
         access_rule=api.MODULE_ACCESS_PUBLIC,
         register_access=lambda *_: None,
         register_rate_limit=lambda *_: None,
+        depgraph_edges=set(),
     )
 
     assert ok
@@ -72,6 +73,7 @@ def test_register_module_blueprint_rejects_mismatch(tmp_path, monkeypatch):
         access_rule=api.MODULE_ACCESS_PUBLIC,
         register_access=lambda *_: None,
         register_rate_limit=lambda *_: None,
+        depgraph_edges=set(),
     )
 
     assert not ok
