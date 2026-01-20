@@ -52,8 +52,10 @@
     {"id": "plugins.loader", "domain": "plugins", "owner": "plugins", "label": "loader"},
     {"id": "plugins.api", "domain": "plugins", "owner": "plugins", "label": "api"},
     {"id": "plugins.builtin", "domain": "plugins", "owner": "plugins", "label": "builtin"},
+    {"id": "modules.core", "domain": "modules", "owner": "modules", "label": "core"},
     {"id": "modules.superquiz", "domain": "modules", "owner": "modules", "label": "superquiz"},
-    {"id": "modules.yhatzee", "domain": "modules", "owner": "modules", "label": "yhatzee"}
+    {"id": "modules.yhatzee", "domain": "modules", "owner": "modules", "label": "yhatzee"},
+    {"id": "modules.registry", "domain": "modules", "owner": "modules", "label": "registry"}
   ],
   "edges": [
     {"from": "bootstrap.main", "to": "runtime.config", "reason": "bootstrap.main depends on runtime.config"},
@@ -61,9 +63,15 @@
     {"from": "bootstrap.main", "to": "infra.health", "reason": "bootstrap.main depends on infra.health"},
     {"from": "bootstrap.main", "to": "infra.persistence.database", "reason": "bootstrap.main ensures the ticket database is initialized"},
     {"from": "runtime.api", "to": "core.raise_af", "reason": "runtime.api depends on core.raise_af"},
+    {"from": "runtime.api", "to": "core.ai_client", "reason": "runtime.api depends on core.ai_client"},
     {"from": "runtime.api", "to": "bootstrap.main", "reason": "runtime.api depends on bootstrap.main"},
     {"from": "runtime.api", "to": "runtime.state", "reason": "runtime.api depends on runtime.state"},
     {"from": "runtime.api", "to": "infra.health", "reason": "runtime.api depends on infra.health"},
+    {"from": "runtime.api", "to": "modules.registry", "reason": "runtime.api depends on modules.registry"},
+    {"from": "modules.core", "to": "runtime.config", "reason": "modules.core depends on runtime.config"},
+    {"from": "modules.core", "to": "core.raise_af", "reason": "modules.core depends on core.raise_af"},
+    {"from": "modules.registry", "to": "infra.logging", "reason": "modules.registry depends on infra.logging"},
+    {"from": "modules.registry", "to": "core.raise_af", "reason": "modules.registry depends on core.raise_af"},
     {"from": "runtime.config", "to": "infra.logging", "reason": "runtime.config depends on infra.logging"},
     {"from": "runtime.state", "to": "infra.logging", "reason": "runtime.state depends on infra.logging"},
     {"from": "infra.health", "to": "infra.logging", "reason": "infra.health depends on infra.logging"},

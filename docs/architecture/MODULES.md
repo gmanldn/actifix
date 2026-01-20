@@ -1,6 +1,6 @@
 # Actifix Architecture Modules
 
-Last updated: 2026-01-18
+Last updated: 2026-01-20
 Source of truth: `docs/architecture/MAP.yaml`
 
 This document summarizes the modules in the Actifix architecture. Use `MAP.yaml` and `DEPGRAPH.json` for canonical topology and dependency validation.
@@ -288,6 +288,24 @@ This document summarizes the modules in the Actifix architecture. Use `MAP.yaml`
 - Contracts: exercise registry sandboxing and health checks
 
 ## Modules
+
+### modules.core
+- Summary: module execution helpers (env/context, config overrides)
+- Entrypoints: `src/actifix/modules/__init__.py`
+- Depends on: `runtime.config`, `core.raise_af`
+- Contracts: build a sanitized module environment; resolve per-module config overrides with safe defaults
+
+### modules.registry
+- Summary: central registry for module lifecycle hooks
+- Entrypoints: `src/actifix/modules/registry.py`
+- Depends on: `infra.logging`, `core.raise_af`
+- Contracts: track module registration and shutdown hooks; emit module lifecycle log events; invoke module `module_register`/`module_unregister` hooks
+
+### modules.superquiz
+- Summary: multi-player quiz experience served via the dashboard API
+- Entrypoints: `src/actifix/modules/superquiz/__init__.py`
+- Depends on: `runtime.state`, `infra.logging`, `core.raise_af`, `runtime.api`
+- Contracts: expose the SuperQuiz GUI at `/modules/superquiz` on the runtime API server while continuing to use centralized logging and error capture
 
 ### modules.yhatzee
 - Summary: two-player Yhatzee game module whose GUI is embedded in the dashboard API

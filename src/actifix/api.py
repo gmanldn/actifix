@@ -80,6 +80,7 @@ from .security.rate_limiter import RateLimitConfig, RateLimitError, get_rate_lim
 from .log_utils import log_event
 from .plugins.permissions import PermissionRegistry
 from .ai_client import get_ai_client, resolve_provider_selection
+from .modules.registry import ModuleRegistry, ModuleRuntimeContext
 
 # Server start time for uptime calculation
 SERVER_START_TIME = time.time()
@@ -224,13 +225,26 @@ def _register_module_blueprint(
     register_access,
     register_rate_limit,
     depgraph_edges: set[tuple[str, str]],
+    registry: ModuleRegistry | None = None,
 ) -> bool:
     """Register a module blueprint with consistent logging and guards."""
     expected_prefix = f"/modules/{module_name}"
+    module_id = f"modules.{module_name}"
     try:
+        status_payload = _read_module_status_payload(status_file)
+        if module_id in status_payload.get("statuses", {}).get("disabled", []):
+            log_event(
+                "MODULE_SKIPPED_DISABLED",
+                f"Skipped disabled module: {module_name}",
+                extra={"module": module_name, "module_id": module_id},
+                source="api.py:_register_module_blueprint",
+            )
+            return False
+
         module_path, metadata, module = _load_module_metadata(create_blueprint)
-        metadata_errors = _validate_module_metadata(module_name, metadata)
-        if metadata_errors:
+        should_validate_metadata = (module_path or "").startswith("actifix.modules.") or isinstance(metadata, dict)
+        metadata_errors = _validate_module_metadata(module_name, metadata) if should_validate_metadata else []
+        if should_validate_metadata and metadata_errors:
             record_error(
                 message=(
                     f"Module metadata invalid for {module_name}: "
@@ -241,14 +255,14 @@ def _register_module_blueprint(
                 error_type="ModuleMetadataError",
                 priority=TicketPriority.P2,
             )
-            _mark_module_status(status_file, f"modules.{module_name}", "error")
+            _mark_module_status(status_file, module_id, "error")
             return False
 
         dependencies = getattr(module, "MODULE_DEPENDENCIES", [])
-        dependency_errors = _validate_module_dependencies(
-            module_name,
-            dependencies,
-            depgraph_edges,
+        dependency_errors = (
+            _validate_module_dependencies(module_name, dependencies, depgraph_edges)
+            if depgraph_edges
+            else []
         )
         if dependency_errors:
             record_error(
@@ -261,7 +275,7 @@ def _register_module_blueprint(
                 error_type="ModuleDependencyError",
                 priority=TicketPriority.P2,
             )
-            _mark_module_status(status_file, f"modules.{module_name}", "error")
+            _mark_module_status(status_file, module_id, "error")
             return False
 
         blueprint = create_blueprint(project_root=project_root, host=host, port=port)
@@ -276,6 +290,20 @@ def _register_module_blueprint(
             )
         register_access(module_name, access_rule)
         register_rate_limit(module_name)
+        if registry is not None:
+            registry.on_registered(
+                module,
+                ModuleRuntimeContext(
+                    module_name=module_name,
+                    module_id=module_id,
+                    module_path=module_path,
+                    project_root=str(project_root),
+                    host=host,
+                    port=port,
+                ),
+                app=app,
+                blueprint=blueprint,
+            )
         log_event(
             "MODULE_REGISTERED",
             f"Registered module blueprint: {module_name}",
@@ -295,7 +323,7 @@ def _register_module_blueprint(
             error_type=type(exc).__name__,
             priority=TicketPriority.P2,
         )
-        _mark_module_status(status_file, f"modules.{module_name}", "error")
+        _mark_module_status(status_file, module_id, "error")
         return False
 
 
@@ -794,6 +822,8 @@ def create_app(
     app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0  # Disable static file caching in development
     app.config['API_HOST'] = host
     app.config['API_PORT'] = port
+    module_registry = ModuleRegistry()
+    app.extensions["actifix_module_registry"] = module_registry
     status_file = get_actifix_paths(project_root=root).state_dir / "module_statuses.json"
     depgraph_edges = _load_depgraph_edges(root)
     config = load_config(project_root=root, fail_fast=False)
@@ -850,6 +880,7 @@ def create_app(
             register_access=_register_module_access,
             register_rate_limit=_register_module_rate_limit,
             depgraph_edges=depgraph_edges,
+            registry=module_registry,
         )
 
     if _create_superquiz_blueprint:
@@ -865,6 +896,7 @@ def create_app(
             register_access=_register_module_access,
             register_rate_limit=_register_module_rate_limit,
             depgraph_edges=depgraph_edges,
+            registry=module_registry,
         )
 
     @app.before_request
@@ -1580,7 +1612,12 @@ def run_api_server(
         debug: Enable debug mode.
     """
     app = create_app(project_root, host=host, port=port)
-    app.run(host=host, port=port, debug=debug, threaded=True)
+    registry = app.extensions.get("actifix_module_registry")
+    try:
+        app.run(host=host, port=port, debug=debug, threaded=True)
+    finally:
+        if isinstance(registry, ModuleRegistry):
+            registry.shutdown()
 
 
 if __name__ == '__main__':
