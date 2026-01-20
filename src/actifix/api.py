@@ -80,7 +80,16 @@ from .security.rate_limiter import RateLimitConfig, RateLimitError, get_rate_lim
 from .log_utils import log_event
 from .plugins.permissions import PermissionRegistry
 from .ai_client import get_ai_client, resolve_provider_selection
-from .modules.registry import ModuleRegistry, ModuleRuntimeContext
+from .modules.registry import (
+    MODULE_STATUS_SCHEMA_VERSION,
+    ModuleRegistry,
+    ModuleRuntimeContext,
+    _default_module_status_payload,
+    _mark_module_status,
+    _normalize_module_statuses,
+    _read_module_status_payload,
+    _write_module_status_payload,
+)
 
 # Server start time for uptime calculation
 SERVER_START_TIME = time.time()
@@ -231,6 +240,14 @@ def _register_module_blueprint(
     expected_prefix = f"/modules/{module_name}"
     module_id = f"modules.{module_name}"
     try:
+        if registry and registry.is_disabled(module_id):
+            log_event(
+                "MODULE_SKIPPED_DISABLED",
+                f"Skipped disabled module: {module_name}",
+                extra={"module": module_name, "module_id": module_id},
+                source="api.py:_register_module_blueprint",
+            )
+            return False
         status_payload = _read_module_status_payload(status_file)
         if module_id in status_payload.get("statuses", {}).get("disabled", []):
             log_event(
@@ -255,7 +272,10 @@ def _register_module_blueprint(
                 error_type="ModuleMetadataError",
                 priority=TicketPriority.P2,
             )
-            _mark_module_status(status_file, module_id, "error")
+            if registry:
+                registry.mark_status(module_id, "error")
+            else:
+                _mark_module_status(status_file, module_id, "error")
             return False
 
         dependencies = getattr(module, "MODULE_DEPENDENCIES", [])
@@ -275,7 +295,10 @@ def _register_module_blueprint(
                 error_type="ModuleDependencyError",
                 priority=TicketPriority.P2,
             )
-            _mark_module_status(status_file, module_id, "error")
+            if registry:
+                registry.mark_status(module_id, "error")
+            else:
+                _mark_module_status(status_file, module_id, "error")
             return False
 
         blueprint = create_blueprint(project_root=project_root, host=host, port=port)
@@ -323,138 +346,11 @@ def _register_module_blueprint(
             error_type=type(exc).__name__,
             priority=TicketPriority.P2,
         )
-        _mark_module_status(status_file, module_id, "error")
+        if registry:
+            registry.mark_status(module_id, "error")
+        else:
+            _mark_module_status(status_file, module_id, "error")
         return False
-
-
-def _default_module_status_payload() -> Dict[str, Dict[str, List[str]]]:
-    return {
-        "schema_version": MODULE_STATUS_SCHEMA_VERSION,
-        "statuses": {
-            "active": [],
-            "disabled": [],
-            "error": [],
-        },
-    }
-
-
-def _coerce_status_list(values: object) -> List[str]:
-    if not isinstance(values, (list, tuple, set)):
-        return []
-    cleaned: List[str] = []
-    seen = set()
-    for value in values:
-        if value is None:
-            continue
-        name = str(value)
-        if name in seen:
-            continue
-        seen.add(name)
-        cleaned.append(name)
-    return cleaned
-
-
-def _normalize_module_statuses(payload: object) -> Dict[str, List[str]]:
-    statuses = {"active": [], "disabled": [], "error": []}
-    if isinstance(payload, dict):
-        for key in statuses:
-            statuses[key] = _coerce_status_list(payload.get(key))
-    return statuses
-
-
-def _backup_corrupt_module_statuses(status_file: Path, raw_content: str) -> None:
-    from actifix.log_utils import atomic_write
-
-    corrupt_path = status_file.with_suffix(".corrupt.json")
-    atomic_write(corrupt_path, raw_content)
-
-
-def _write_module_status_payload(status_file: Path, payload: Dict[str, object]) -> None:
-    from actifix.log_utils import atomic_write
-
-    atomic_write(status_file, json.dumps(payload, indent=2))
-
-
-def _mark_module_status(status_file: Path, module_id: str, status: str) -> None:
-    status_payload = _read_module_status_payload(status_file)
-    statuses = status_payload["statuses"]
-
-    for key in statuses:
-        if module_id in statuses[key]:
-            statuses[key].remove(module_id)
-
-    if status in statuses:
-        statuses[status].append(module_id)
-
-    status_payload["statuses"] = _normalize_module_statuses(statuses)
-    status_payload["schema_version"] = MODULE_STATUS_SCHEMA_VERSION
-    try:
-        _write_module_status_payload(status_file, status_payload)
-    except Exception as exc:
-        record_error(
-            message=f"Failed to persist module status for {module_id}: {exc}",
-            source="api.py:_mark_module_status",
-            priority=TicketPriority.P2,
-        )
-
-
-def _read_module_status_payload(status_file: Path) -> Dict[str, Dict[str, List[str]]]:
-    default_payload = _default_module_status_payload()
-    if not status_file.exists():
-        return default_payload
-
-    try:
-        raw_content = status_file.read_text(encoding="utf-8")
-    except Exception as exc:
-        record_error(
-            message=f"Failed to read module status file: {exc}",
-            source="api.py:_read_module_status_payload",
-            priority=TicketPriority.P2,
-        )
-        return default_payload
-
-    if not raw_content.strip():
-        return default_payload
-
-    try:
-        data = json.loads(raw_content)
-    except json.JSONDecodeError as exc:
-        record_error(
-            message=f"Invalid module status JSON: {exc}",
-            source="api.py:_read_module_status_payload",
-            priority=TicketPriority.P2,
-        )
-        try:
-            _backup_corrupt_module_statuses(status_file, raw_content)
-            _write_module_status_payload(status_file, default_payload)
-        except Exception as write_exc:
-            record_error(
-                message=f"Failed to recover module status file: {write_exc}",
-                source="api.py:_read_module_status_payload",
-                priority=TicketPriority.P2,
-            )
-        return default_payload
-
-    if isinstance(data, dict) and "schema_version" in data and "statuses" in data:
-        statuses = _normalize_module_statuses(data.get("statuses"))
-        return {
-            "schema_version": data.get("schema_version") or MODULE_STATUS_SCHEMA_VERSION,
-            "statuses": statuses,
-        }
-
-    if isinstance(data, dict):
-        statuses = _normalize_module_statuses(data)
-        return {
-            "schema_version": MODULE_STATUS_SCHEMA_VERSION,
-            "statuses": statuses,
-        }
-
-    record_error(
-        message="Unexpected module status payload format",
-        source="api.py:_read_module_status_payload",
-        priority=TicketPriority.P2,
-    )
-    return default_payload
 
 
 def _is_local_request(req) -> bool:
@@ -822,7 +718,7 @@ def create_app(
     app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0  # Disable static file caching in development
     app.config['API_HOST'] = host
     app.config['API_PORT'] = port
-    module_registry = ModuleRegistry()
+    module_registry = ModuleRegistry(project_root=root)
     app.extensions["actifix_module_registry"] = module_registry
     status_file = get_actifix_paths(project_root=root).state_dir / "module_statuses.json"
     depgraph_edges = _load_depgraph_edges(root)
@@ -853,19 +749,35 @@ def create_app(
         rate_limiter.set_limit(provider_key, limit_config)
         module_rate_rules[module_name] = limit_config
 
+    _create_yhatzee_blueprint = None
+    _yhatzee_access_rule = MODULE_ACCESS_PUBLIC
     try:
-        from actifix.modules.yhatzee import create_blueprint as _create_yhatzee_blueprint
-        from actifix.modules.yhatzee import ACCESS_RULE as _yhatzee_access_rule
+        _, yhatzee_module, _ = module_registry.import_module("yhatzee")
+        _create_yhatzee_blueprint = getattr(yhatzee_module, "create_blueprint", None)
+        _yhatzee_access_rule = getattr(yhatzee_module, "ACCESS_RULE", MODULE_ACCESS_PUBLIC)
     except ImportError:
-        _create_yhatzee_blueprint = None
-        _yhatzee_access_rule = MODULE_ACCESS_PUBLIC
+        pass
+    except Exception as exc:
+        record_error(
+            message=f"Failed to import yhatzee module: {exc}",
+            source="api.py:module_loader",
+            priority=TicketPriority.P2,
+        )
 
+    _create_superquiz_blueprint = None
+    _superquiz_access_rule = MODULE_ACCESS_PUBLIC
     try:
-        from actifix.modules.superquiz import create_blueprint as _create_superquiz_blueprint
-        from actifix.modules.superquiz import ACCESS_RULE as _superquiz_access_rule
+        _, superquiz_module, _ = module_registry.import_module("superquiz")
+        _create_superquiz_blueprint = getattr(superquiz_module, "create_blueprint", None)
+        _superquiz_access_rule = getattr(superquiz_module, "ACCESS_RULE", MODULE_ACCESS_PUBLIC)
     except ImportError:
-        _create_superquiz_blueprint = None
-        _superquiz_access_rule = MODULE_ACCESS_PUBLIC
+        pass
+    except Exception as exc:
+        record_error(
+            message=f"Failed to import superquiz module: {exc}",
+            source="api.py:module_loader",
+            priority=TicketPriority.P2,
+        )
 
     if _create_yhatzee_blueprint:
         _register_module_blueprint(

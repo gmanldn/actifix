@@ -11,9 +11,9 @@ from urllib.parse import quote
 from urllib.request import Request, urlopen
 
 from actifix.log_utils import log_event
-from actifix.modules import get_module_config
-from actifix.raise_af import TicketPriority, record_error, redact_secrets_from_text
-from actifix.state_paths import get_actifix_paths
+from actifix.raise_af import TicketPriority
+
+from actifix.modules.base import ModuleBase
 
 if TYPE_CHECKING:
     from flask import Blueprint
@@ -105,57 +105,13 @@ WILLFRY_CATEGORY_MAP: Dict[str, str] = {
 USER_AGENT = "Actifix-SuperQuiz/1.0"
 
 
-def _normalize_project_root(project_root: Optional[Union[str, Path]]) -> Optional[Path]:
-    if project_root is None:
-        return None
-    return Path(project_root)
-
-
-def _resolve_module_config(
-    project_root: Optional[Union[str, Path]],
-    host: Optional[str],
-    port: Optional[int],
-) -> tuple[str, int]:
-    config = get_module_config(
-        "superquiz",
-        MODULE_DEFAULTS,
-        project_root=str(project_root) if project_root else None,
-    )
-    resolved_host = host or str(config.get("host", MODULE_DEFAULTS["host"]))
-    resolved_port = port or int(config.get("port", MODULE_DEFAULTS["port"]))
-    return resolved_host, resolved_port
-
-
-def _log_gui_init(project_root: Optional[Union[str, Path]], host: str, port: int) -> None:
-    paths = get_actifix_paths(project_root=_normalize_project_root(project_root))
-    log_event(
-        "SUPERQUIZ_GUI_INIT",
-        "SuperQuiz GUI configured",
-        extra={
-            "host": host,
-            "port": port,
-            "state_dir": str(paths.state_dir),
-            "module": "modules.superquiz",
-        },
-        source="modules.superquiz.create_blueprint",
-    )
-
-
-def _record_module_error(
-    message: str,
-    *,
-    source: str,
-    run_label: str,
-    error_type: str,
-    priority: TicketPriority,
-) -> None:
-    safe_message = redact_secrets_from_text(message)
-    record_error(
-        message=safe_message,
-        source=source,
-        run_label=run_label,
-        error_type=error_type,
-        priority=priority,
+def _module_helper(project_root: Optional[Union[str, Path]] = None) -> ModuleBase:
+    """Build a ModuleBase helper for SuperQuiz."""
+    return ModuleBase(
+        module_key="superquiz",
+        defaults=MODULE_DEFAULTS,
+        metadata=MODULE_METADATA,
+        project_root=project_root,
     )
 
 
@@ -403,10 +359,11 @@ def create_blueprint(
     url_prefix: Optional[str] = "/modules/superquiz",
 ) -> Blueprint:
     """Create the Flask blueprint that serves the SuperQuiz GUI."""
+    helper = _module_helper(project_root)
     try:
         from flask import Blueprint, Response, jsonify, request
 
-        resolved_host, resolved_port = _resolve_module_config(project_root, host, port)
+        resolved_host, resolved_port = helper.resolve_host_port(host, port)
         blueprint = Blueprint("superquiz", __name__, url_prefix=url_prefix)
 
         @blueprint.route("/")
@@ -415,7 +372,7 @@ def create_blueprint(
 
         @blueprint.route("/health")
         def health():
-            return {"status": "ok"}
+            return helper.health_response()
 
         @blueprint.route("/api/questions", methods=["GET"])
         def api_questions():
@@ -433,10 +390,9 @@ def create_blueprint(
                     }
                 )
             except Exception as exc:
-                _record_module_error(
+                helper.record_module_error(
                     message=f"Failed to fetch SuperQuiz questions: {exc}",
                     source="modules/superquiz/__init__.py:api_questions",
-                    run_label="superquiz-gui",
                     error_type=type(exc).__name__,
                     priority=TicketPriority.P2,
                 )
@@ -467,22 +423,20 @@ def create_blueprint(
                     }
                 )
             except Exception as exc:
-                _record_module_error(
+                helper.record_module_error(
                     message=f"Failed to fetch SuperQuiz snap questions: {exc}",
                     source="modules/superquiz/__init__.py:api_snap",
-                    run_label="superquiz-gui",
                     error_type=type(exc).__name__,
                     priority=TicketPriority.P2,
                 )
                 raise
 
-        _log_gui_init(project_root, resolved_host, resolved_port)
+        helper.log_gui_init(resolved_host, resolved_port)
         return blueprint
     except Exception as exc:
-        _record_module_error(
+        helper.record_module_error(
             message=f"Failed to create SuperQuiz blueprint: {exc}",
             source="modules/superquiz/__init__.py:create_blueprint",
-            run_label="superquiz-gui",
             error_type=type(exc).__name__,
             priority=TicketPriority.P2,
         )
@@ -503,10 +457,10 @@ def create_app(
         app.register_blueprint(blueprint)
         return app
     except Exception as exc:
-        _record_module_error(
+        helper = _module_helper(project_root)
+        helper.record_module_error(
             message=f"Failed to create SuperQuiz GUI app: {exc}",
             source="modules/superquiz/__init__.py:create_app",
-            run_label="superquiz-gui",
             error_type=type(exc).__name__,
             priority=TicketPriority.P2,
         )
@@ -520,8 +474,9 @@ def run_gui(
     debug: bool = False,
 ) -> None:
     """Run the SuperQuiz GUI on localhost."""
+    helper = _module_helper(project_root)
+    resolved_host, resolved_port = helper.resolve_host_port(host, port)
     try:
-        resolved_host, resolved_port = _resolve_module_config(project_root, host, port)
         app = create_app(project_root=project_root, host=resolved_host, port=resolved_port)
         log_event(
             "SUPERQUIZ_GUI_START",
@@ -531,10 +486,9 @@ def run_gui(
         )
         app.run(host=resolved_host, port=resolved_port, debug=debug)
     except Exception as exc:
-        _record_module_error(
+        helper.record_module_error(
             message=f"Failed to start SuperQuiz GUI: {exc}",
             source="modules/superquiz/__init__.py:run_gui",
-            run_label="superquiz-gui",
             error_type=type(exc).__name__,
             priority=TicketPriority.P1,
         )

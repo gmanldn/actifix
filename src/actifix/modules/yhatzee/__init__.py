@@ -6,9 +6,9 @@ from pathlib import Path
 from typing import Optional, TYPE_CHECKING, Union
 
 from actifix.log_utils import log_event
-from actifix.modules import get_module_config
-from actifix.raise_af import TicketPriority, record_error, redact_secrets_from_text
-from actifix.state_paths import get_actifix_paths
+from actifix.raise_af import TicketPriority
+
+from actifix.modules.base import ModuleBase
 
 if TYPE_CHECKING:
     from flask import Blueprint
@@ -42,57 +42,13 @@ MODULE_DEPENDENCIES = [
 ]
 
 
-def _normalize_project_root(project_root: Optional[Union[str, Path]]) -> Optional[Path]:
-    if project_root is None:
-        return None
-    return Path(project_root)
-
-
-def _resolve_module_config(
-    project_root: Optional[Union[str, Path]],
-    host: Optional[str],
-    port: Optional[int],
-) -> tuple[str, int]:
-    config = get_module_config(
-        "yhatzee",
-        MODULE_DEFAULTS,
-        project_root=str(project_root) if project_root else None,
-    )
-    resolved_host = host or str(config.get("host", MODULE_DEFAULTS["host"]))
-    resolved_port = port or int(config.get("port", MODULE_DEFAULTS["port"]))
-    return resolved_host, resolved_port
-
-
-def _log_gui_init(project_root: Optional[Union[str, Path]], host: str, port: int) -> None:
-    paths = get_actifix_paths(project_root=_normalize_project_root(project_root))
-    log_event(
-        "YHATZEE_GUI_INIT",
-        "Yhatzee GUI configured",
-        extra={
-            "host": host,
-            "port": port,
-            "state_dir": str(paths.state_dir),
-            "module": "modules.yhatzee",
-        },
-        source="modules.yhatzee.create_blueprint",
-    )
-
-
-def _record_module_error(
-    message: str,
-    *,
-    source: str,
-    run_label: str,
-    error_type: str,
-    priority: TicketPriority,
-) -> None:
-    safe_message = redact_secrets_from_text(message)
-    record_error(
-        message=safe_message,
-        source=source,
-        run_label=run_label,
-        error_type=error_type,
-        priority=priority,
+def _module_helper(project_root: Optional[Union[str, Path]] = None) -> ModuleBase:
+    """Build a ModuleBase helper for Yhatzee."""
+    return ModuleBase(
+        module_key="yhatzee",
+        defaults=MODULE_DEFAULTS,
+        metadata=MODULE_METADATA,
+        project_root=project_root,
     )
 
 
@@ -103,10 +59,11 @@ def create_blueprint(
     url_prefix: Optional[str] = "/modules/yhatzee",
 ) -> Blueprint:
     """Create the Flask blueprint that serves the Yhatzee GUI."""
+    helper = _module_helper(project_root)
     try:
         from flask import Blueprint, Response  # Local import keeps Flask optional
 
-        resolved_host, resolved_port = _resolve_module_config(project_root, host, port)
+        resolved_host, resolved_port = helper.resolve_host_port(host, port)
         blueprint = Blueprint("yhatzee", __name__, url_prefix=url_prefix)
 
         @blueprint.route("/")
@@ -115,15 +72,14 @@ def create_blueprint(
 
         @blueprint.route("/health")
         def health():
-            return {"status": "ok"}
+            return helper.health_response()
 
-        _log_gui_init(project_root, resolved_host, resolved_port)
+        helper.log_gui_init(resolved_host, resolved_port)
         return blueprint
     except Exception as exc:
-        _record_module_error(
+        helper.record_module_error(
             message=f"Failed to create Yhatzee blueprint: {exc}",
             source="modules/yhatzee/__init__.py:create_blueprint",
-            run_label="yhatzee-gui",
             error_type=type(exc).__name__,
             priority=TicketPriority.P2,
         )
@@ -144,10 +100,10 @@ def create_app(
         app.register_blueprint(blueprint)
         return app
     except Exception as exc:
-        _record_module_error(
+        helper = _module_helper(project_root)
+        helper.record_module_error(
             message=f"Failed to create Yhatzee GUI app: {exc}",
             source="modules/yhatzee/__init__.py:create_app",
-            run_label="yhatzee-gui",
             error_type=type(exc).__name__,
             priority=TicketPriority.P2,
         )
@@ -161,8 +117,9 @@ def run_gui(
     debug: bool = False,
 ) -> None:
     """Run the Yhatzee GUI on localhost."""
+    helper = _module_helper(project_root)
+    resolved_host, resolved_port = helper.resolve_host_port(host, port)
     try:
-        resolved_host, resolved_port = _resolve_module_config(project_root, host, port)
         app = create_app(project_root=project_root, host=resolved_host, port=resolved_port)
         log_event(
             "YHATZEE_GUI_START",
@@ -172,10 +129,9 @@ def run_gui(
         )
         app.run(host=resolved_host, port=resolved_port, debug=debug)
     except Exception as exc:
-        _record_module_error(
+        helper.record_module_error(
             message=f"Failed to start Yhatzee GUI: {exc}",
             source="modules/yhatzee/__init__.py:run_gui",
-            run_label="yhatzee-gui",
             error_type=type(exc).__name__,
             priority=TicketPriority.P1,
         )

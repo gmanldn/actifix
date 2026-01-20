@@ -2,20 +2,21 @@
 
 from __future__ import annotations
 
-import json
 import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Mapping
 
 from actifix.raise_af import redact_secrets_from_text
-from actifix.raise_af import record_error, TicketPriority
-from actifix.config import load_config
+from .base import ModuleBase
+from .config import get_module_config
 
 __all__ = [
+    "ModuleBase",
     "ModuleContext",
     "build_module_env",
     "get_module_context",
+    "get_module_config",
     "yhatzee",
 ]
 
@@ -114,43 +115,3 @@ def get_module_context(
     """Build a module execution context with sanitized env."""
     return ModuleContext(env=build_module_env(env, extra_safe_keys=extra_safe_keys))
 
-
-def _parse_module_config_overrides(raw: str) -> dict[str, dict[str, object]]:
-    if not raw:
-        return {}
-    try:
-        data = json.loads(raw)
-    except json.JSONDecodeError as exc:
-        record_error(
-            message=f"Invalid module config overrides JSON: {exc}",
-            source="modules.__init__:_parse_module_config_overrides",
-            priority=TicketPriority.P2,
-        )
-        return {}
-    if not isinstance(data, dict):
-        return {}
-    overrides: dict[str, dict[str, object]] = {}
-    for key, value in data.items():
-        if isinstance(value, dict):
-            overrides[str(key)] = value
-    return overrides
-
-
-def get_module_config(
-    module_name: str,
-    defaults: Mapping[str, object],
-    *,
-    project_root: str | None = None,
-) -> dict[str, object]:
-    """Return module config merged with overrides."""
-    config = load_config(project_root=Path(project_root) if project_root else None, fail_fast=False)
-    overrides = _parse_module_config_overrides(config.module_config_overrides_json)
-    normalized = module_name.strip()
-    full_name = normalized if "." in normalized else f"modules.{normalized}"
-    short_name = normalized.split(".", 1)[1] if normalized.startswith("modules.") else normalized
-
-    module_overrides = overrides.get(full_name) or overrides.get(short_name) or {}
-    merged = dict(defaults)
-    if isinstance(module_overrides, dict):
-        merged.update(module_overrides)
-    return merged

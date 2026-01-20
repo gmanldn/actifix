@@ -242,11 +242,39 @@ modules:
   owner: persistence
   summary: SQLite database backend with connection pooling and schema management
   entrypoints:
-  - src/actifix/persistence/database.py
+  - src/actifix/persistence/database/__init__.py
   contracts:
   - thread-safe connection pooling
   - automatic schema migrations
   - WAL mode for concurrency
+  depends_on:
+  - infra.logging
+  - infra.persistence.database.schema
+  - infra.persistence.database.pool
+
+- id: infra.persistence.database.schema
+  domain: infra
+  owner: persistence
+  summary: Database schema definitions, migrations, and table creation
+  entrypoints:
+  - src/actifix/persistence/database/schema.py
+  contracts:
+  - define database schema
+  - manage migrations
+  - create tables
+  depends_on:
+  - infra.logging
+
+- id: infra.persistence.database.pool
+  domain: infra
+  owner: persistence
+  summary: Connection pooling and thread-safe database access
+  entrypoints:
+  - src/actifix/persistence/database/pool.py
+  contracts:
+  - thread-safe connection pooling
+  - connection lifecycle management
+  - WAL mode configuration
   depends_on:
   - infra.logging
 - id: infra.persistence.ticket_repo
@@ -254,7 +282,7 @@ modules:
   owner: persistence
   summary: Ticket repository with CRUD operations and locking
   entrypoints:
-  - src/actifix/persistence/ticket_repo.py
+  - src/actifix/persistence/ticket_repo/__init__.py
   contracts:
   - database CRUD for tickets
   - lease-based locking
@@ -262,13 +290,41 @@ modules:
   depends_on:
   - infra.logging
   - infra.persistence.database
+  - infra.persistence.ticket_repo.queries
+  - infra.persistence.ticket_repo.locking
   - core.raise_af
+
+- id: infra.persistence.ticket_repo.queries
+  domain: infra
+  owner: persistence
+  summary: SQL query builders and search operations for tickets
+  entrypoints:
+  - src/actifix/persistence/ticket_repo/queries.py
+  contracts:
+  - build SQL queries for ticket operations
+  - search tickets by criteria
+  - retrieve tickets by ID
+  depends_on:
+  - infra.logging
+
+- id: infra.persistence.ticket_repo.locking
+  domain: infra
+  owner: persistence
+  summary: Lease-based locking mechanism for concurrent ticket processing
+  entrypoints:
+  - src/actifix/persistence/ticket_repo/locking.py
+  contracts:
+  - claim tickets with lease
+  - release ticket locks
+  - extend lease duration
+  depends_on:
+  - infra.logging
 - id: core.raise_af
   domain: core
   owner: core
   summary: Error capture and ticket creation system (persists entries into the SQLite ticket repository)
   entrypoints:
-  - src/actifix/raise_af.py
+  - src/actifix/raise_af/__init__.py
   contracts:
   - capture all errors
   - create structured tickets persisted in `data/actifix.db`
@@ -278,12 +334,67 @@ modules:
   - core.quarantine
   - infra.persistence.ticket_repo
   - security.ticket_throttler
+  - core.raise_af.models
+  - core.raise_af.context
+  - core.raise_af.dedup
+  - core.raise_af.fallback
+
+- id: core.raise_af.models
+  domain: core
+  owner: core
+  summary: Data models for error capture (TicketPriority, ActifixEntry)
+  entrypoints:
+  - src/actifix/raise_af/models.py
+  contracts:
+  - define ticket priority levels
+  - define entry data structures
+  depends_on:
+  - infra.logging
+
+- id: core.raise_af.context
+  domain: core
+  owner: core
+  summary: Context capture utilities (stack trace, file context, system state)
+  entrypoints:
+  - src/actifix/raise_af/context.py
+  contracts:
+  - capture stack traces
+  - capture file context
+  - capture system state
+  depends_on:
+  - infra.logging
+
+- id: core.raise_af.dedup
+  domain: core
+  owner: core
+  summary: Duplicate detection and normalization utilities
+  entrypoints:
+  - src/actifix/raise_af/dedup.py
+  contracts:
+  - generate duplicate guards
+  - normalize text for comparison
+  - prevent duplicate tickets
+  depends_on:
+  - infra.logging
+
+- id: core.raise_af.fallback
+  domain: core
+  owner: core
+  summary: Fallback queue management for error persistence
+  entrypoints:
+  - src/actifix/raise_af/fallback.py
+  contracts:
+  - queue errors to fallback storage
+  - replay fallback queue on recovery
+  depends_on:
+  - infra.logging
+  - runtime.state
 - id: core.do_af
   domain: core
   owner: core
   summary: Ticket processing and automated remediation
   entrypoints:
-  - src/actifix/do_af.py
+  - src/actifix/do_af/__init__.py
   contracts:
   - process tickets systematically
   - integrate with AI systems
@@ -293,6 +404,54 @@ modules:
   - core.raise_af
   - core.ai_client
   - infra.persistence.ticket_repo
+  - core.do_af.manager
+  - core.do_af.processing
+  - core.do_af.cli
+
+- id: core.do_af.manager
+  domain: core
+  owner: core
+  summary: Stateful ticket manager with caching
+  entrypoints:
+  - src/actifix/do_af/manager.py
+  contracts:
+  - manage ticket cache state
+  - refresh ticket cache
+  - get open/completed tickets
+  depends_on:
+  - infra.logging
+  - infra.persistence.ticket_repo
+
+- id: core.do_af.processing
+  domain: core
+  owner: core
+  summary: Ticket processing and automated remediation logic
+  entrypoints:
+  - src/actifix/do_af/processing.py
+  contracts:
+  - process tickets systematically
+  - fix highest priority tickets
+  - validate fixes
+  depends_on:
+  - infra.logging
+  - core.raise_af
+  - core.ai_client
+  - infra.persistence.ticket_repo
+
+- id: core.do_af.cli
+  domain: core
+  owner: core
+  summary: CLI interface for ticket processing
+  entrypoints:
+  - src/actifix/do_af/cli.py
+  contracts:
+  - parse CLI arguments
+  - execute ticket processing commands
+  - display ticket information
+  depends_on:
+  - infra.logging
+  - core.do_af.manager
+  - core.do_af.processing
 - id: core.quarantine
   domain: core
   owner: core
@@ -378,7 +537,7 @@ modules:
   owner: core
   summary: Multi-provider AI integration with automatic fallback chain
   entrypoints:
-  - src/actifix/ai_client.py
+  - src/actifix/ai_client/__init__.py
   contracts:
   - Claude Code local auth detection
   - Claude API integration
@@ -391,6 +550,51 @@ modules:
   - runtime.config
   - infra.logging
   - runtime.state
+  - core.ai_client.models
+  - core.ai_client.providers
+  - core.ai_client.prompts
+
+- id: core.ai_client.models
+  domain: core
+  owner: core
+  summary: AI client data models (AIProvider, AIResponse, ProviderSelection)
+  entrypoints:
+  - src/actifix/ai_client/models.py
+  contracts:
+  - define AI provider enum
+  - define AI response structure
+  - define provider selection logic
+  depends_on:
+  - infra.logging
+
+- id: core.ai_client.providers
+  domain: core
+  owner: core
+  summary: Provider-specific AI integration implementations
+  entrypoints:
+  - src/actifix/ai_client/providers.py
+  contracts:
+  - Claude Code local integration
+  - Claude API integration
+  - OpenAI integration
+  - Ollama integration
+  - OpenRouter integration
+  - Free alternative integration
+  depends_on:
+  - infra.logging
+  - core.ai_client.models
+
+- id: core.ai_client.prompts
+  domain: core
+  owner: core
+  summary: AI prompt templates and construction
+  entrypoints:
+  - src/actifix/ai_client/prompts.py
+  contracts:
+  - build fix prompts
+  - manage prompt templates
+  depends_on:
+  - infra.logging
 - id: core.error_taxonomy
   domain: core
   owner: core
@@ -648,6 +852,36 @@ modules:
   - infra.logging
   - core.raise_af
   - runtime.api
+  - modules.superquiz.game
+  - modules.superquiz.routes
+
+- id: modules.superquiz.game
+  domain: modules
+  owner: modules
+  summary: SuperQuiz game logic, scoring, and question handling
+  entrypoints:
+  - src/actifix/modules/superquiz/game.py
+  contracts:
+  - manage game state and logic
+  - handle scoring and questions
+  - support 1 to 6 players
+  depends_on:
+  - infra.logging
+
+- id: modules.superquiz.routes
+  domain: modules
+  owner: modules
+  summary: SuperQuiz Flask route handlers
+  entrypoints:
+  - src/actifix/modules/superquiz/routes.py
+  contracts:
+  - handle HTTP requests for SuperQuiz
+  - serve quiz interface
+  - manage player sessions
+  depends_on:
+  - infra.logging
+  - modules.superquiz.game
+
 - id: modules.yhatzee
   domain: modules
   owner: modules
@@ -662,6 +896,35 @@ modules:
   - infra.logging
   - core.raise_af
   - runtime.api
+  - modules.yhatzee.game
+  - modules.yhatzee.routes
+
+- id: modules.yhatzee.game
+  domain: modules
+  owner: modules
+  summary: Yhatzee game logic, dice, and scoring
+  entrypoints:
+  - src/actifix/modules/yhatzee/game.py
+  contracts:
+  - manage game state and logic
+  - handle dice rolls and scoring
+  - support two-player mode
+  depends_on:
+  - infra.logging
+
+- id: modules.yhatzee.routes
+  domain: modules
+  owner: modules
+  summary: Yhatzee Flask route handlers
+  entrypoints:
+  - src/actifix/modules/yhatzee/routes.py
+  contracts:
+  - handle HTTP requests for Yhatzee
+  - serve game interface
+  - manage player sessions
+  depends_on:
+  - infra.logging
+  - modules.yhatzee.game
 contracts:
 - id: contract.logging
   summary: All modules must log via centralized logging system with correlation IDs
