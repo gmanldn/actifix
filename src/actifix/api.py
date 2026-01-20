@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Optional, List, Dict
 
 try:
-    from flask import Flask, jsonify, request
+    from flask import Flask, jsonify, request, g
     from flask_cors import CORS
     FLASK_AVAILABLE = True
 except ImportError:
@@ -75,6 +75,7 @@ from .persistence.event_repo import get_event_repository, EventFilter
 from .persistence.ticket_cleanup import run_automatic_cleanup
 from .persistence.cleanup_config import get_cleanup_config
 from .config import get_config, set_config, load_config
+from .security.rate_limiter import RateLimitConfig, RateLimitError, get_rate_limiter
 from .ai_client import get_ai_client, resolve_provider_selection
 
 # Server start time for uptime calculation
@@ -84,6 +85,32 @@ MODULE_STATUS_SCHEMA_VERSION = "module-statuses.v1"
 MODULE_ACCESS_PUBLIC = "public"
 MODULE_ACCESS_LOCAL_ONLY = "local-only"
 MODULE_ACCESS_AUTH_REQUIRED = "auth-required"
+
+
+def _parse_module_rate_limit_overrides(raw: str) -> dict[str, dict[str, int]]:
+    if not raw:
+        return {}
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        record_error(
+            message=f"Invalid module rate limit overrides JSON: {exc}",
+            source="api.py:_parse_module_rate_limit_overrides",
+            priority=TicketPriority.P2,
+        )
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    overrides: dict[str, dict[str, int]] = {}
+    for key, value in data.items():
+        if not isinstance(value, dict):
+            continue
+        overrides[str(key)] = {
+            "calls_per_minute": int(value.get("calls_per_minute", 0) or 0),
+            "calls_per_hour": int(value.get("calls_per_hour", 0) or 0),
+            "calls_per_day": int(value.get("calls_per_day", 0) or 0),
+        }
+    return overrides
 
 
 def _default_module_status_payload() -> Dict[str, Dict[str, List[str]]]:
@@ -522,10 +549,32 @@ def create_app(
     app.config['API_HOST'] = host
     app.config['API_PORT'] = port
     status_file = get_actifix_paths(project_root=root).state_dir / "module_statuses.json"
+    config = load_config(project_root=root, fail_fast=False)
+    rate_limiter = get_rate_limiter()
+    module_rate_overrides = _parse_module_rate_limit_overrides(
+        config.module_rate_limit_overrides_json
+    )
+    module_rate_rules: dict[str, RateLimitConfig] = {}
     module_access_rules: dict[str, str] = {}
 
     def _register_module_access(module_name: str, access_rule: str) -> None:
         module_access_rules[module_name] = access_rule or MODULE_ACCESS_PUBLIC
+
+    def _register_module_rate_limit(module_name: str) -> None:
+        override = module_rate_overrides.get(module_name, {})
+        calls_per_minute = override.get("calls_per_minute") or config.module_rate_limit_per_minute
+        calls_per_hour = override.get("calls_per_hour") or config.module_rate_limit_per_hour
+        calls_per_day = override.get("calls_per_day") or config.module_rate_limit_per_day
+        provider_key = f"module:{module_name}"
+        limit_config = RateLimitConfig(
+            provider_name=provider_key,
+            calls_per_minute=calls_per_minute,
+            calls_per_hour=calls_per_hour,
+            calls_per_day=calls_per_day,
+            enabled=True,
+        )
+        rate_limiter.set_limit(provider_key, limit_config)
+        module_rate_rules[module_name] = limit_config
 
     try:
         from actifix.modules.yhatzee import create_blueprint as _create_yhatzee_blueprint
@@ -546,6 +595,7 @@ def create_app(
             yhatzee_blueprint = _create_yhatzee_blueprint(project_root=root, host=host, port=port)
             app.register_blueprint(yhatzee_blueprint)
             _register_module_access("yhatzee", _yhatzee_access_rule)
+            _register_module_rate_limit("yhatzee")
         except Exception as exc:
             record_error(
                 message=f"Yhatzee module registration failed: {exc}",
@@ -561,6 +611,7 @@ def create_app(
             superquiz_blueprint = _create_superquiz_blueprint(project_root=root, host=host, port=port)
             app.register_blueprint(superquiz_blueprint)
             _register_module_access("superquiz", _superquiz_access_rule)
+            _register_module_rate_limit("superquiz")
         except Exception as exc:
             record_error(
                 message=f"SuperQuiz module registration failed: {exc}",
@@ -595,6 +646,38 @@ def create_app(
                 return jsonify({"error": "Invalid token"}), 401
             return None
         return jsonify({"error": "Unsupported module access rule"}), 403
+
+    @app.before_request
+    def _enforce_module_rate_limit():
+        path = request.path or ""
+        if not path.startswith("/modules/"):
+            return None
+        parts = path.split("/")
+        if len(parts) < 3 or not parts[2]:
+            return None
+        module_name = parts[2]
+        limit_config = module_rate_rules.get(module_name)
+        if not limit_config:
+            return None
+        try:
+            rate_limiter.check_rate_limit(limit_config.provider_name)
+        except RateLimitError as exc:
+            record_error(
+                message=f"Module rate limit exceeded for {module_name}: {exc}",
+                source="api.py:_enforce_module_rate_limit",
+                priority=TicketPriority.P2,
+            )
+            return jsonify({"error": "Module rate limit exceeded"}), 429
+        g.module_rate_limit_provider = limit_config.provider_name
+        return None
+
+    @app.after_request
+    def _record_module_rate_limit(response):
+        provider = getattr(g, "module_rate_limit_provider", None)
+        if provider:
+            success = response.status_code < 400
+            rate_limiter.record_call(provider, success=success, error=None if success else response.status)
+        return response
 
     @app.route('/', methods=['GET'])
     def serve_index():

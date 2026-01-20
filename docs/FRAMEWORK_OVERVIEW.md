@@ -21,6 +21,7 @@ Actifix is a self-improving error management system that captures prioritized ti
 - Module error logs redact secrets before ticket persistence.
 - Module blueprints register in a sandbox; failures mark module status as error.
 - Module endpoints support access rules: public, local-only, auth-required.
+- Module endpoints are rate limited per module (default 60/min, 600/hour, 2000/day).
 
 ## Architecture primer
 Core modules and their roles:

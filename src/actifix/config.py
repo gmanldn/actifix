@@ -123,6 +123,12 @@ class ActifixConfig:
     # Health checks
     health_check_interval_seconds: float = 60.0
     stale_lock_timeout_seconds: float = 300.0
+
+    # Module rate limits (per-module)
+    module_rate_limit_per_minute: int = 60
+    module_rate_limit_per_hour: int = 600
+    module_rate_limit_per_day: int = 2000
+    module_rate_limit_overrides_json: str = ""
     
     # AI Integration
     ai_provider: str = "openrouter"  # OpenRouter for Mimo 2 with thinking
@@ -276,6 +282,19 @@ def load_config(
             _get_env_sanitized("ACTIFIX_STALE_LOCK_TIMEOUT", "", value_type="numeric"), 300.0
         ),
 
+        module_rate_limit_per_minute=_parse_int(
+            _get_env_sanitized("ACTIFIX_MODULE_RATE_LIMIT_PER_MINUTE", "", value_type="numeric"), 60
+        ),
+        module_rate_limit_per_hour=_parse_int(
+            _get_env_sanitized("ACTIFIX_MODULE_RATE_LIMIT_PER_HOUR", "", value_type="numeric"), 600
+        ),
+        module_rate_limit_per_day=_parse_int(
+            _get_env_sanitized("ACTIFIX_MODULE_RATE_LIMIT_PER_DAY", "", value_type="numeric"), 2000
+        ),
+        module_rate_limit_overrides_json=_get_env_sanitized(
+            "ACTIFIX_MODULE_RATE_LIMIT_OVERRIDES", "", value_type="string"
+        ),
+
         ai_provider=_get_env_sanitized("ACTIFIX_AI_PROVIDER", "mimo-flash-v2-free", value_type="alphanumeric"),
         ai_api_key=_get_env_sanitized("ACTIFIX_AI_API_KEY", "", value_type="string"),
         ai_model=_get_env_sanitized("ACTIFIX_AI_MODEL", "mimo-flash-v2-free", value_type="alphanumeric"),
@@ -355,6 +374,12 @@ def validate_config(config: ActifixConfig) -> list[str]:
         errors.append("Emergency ticket threshold must be positive")
     if config.emergency_window_minutes <= 0:
         errors.append("Emergency window minutes must be positive")
+    if config.module_rate_limit_per_minute <= 0:
+        errors.append("Module rate limit per minute must be positive")
+    if config.module_rate_limit_per_hour <= 0:
+        errors.append("Module rate limit per hour must be positive")
+    if config.module_rate_limit_per_day <= 0:
+        errors.append("Module rate limit per day must be positive")
 
     # Check timeouts are positive
     if config.test_timeout_seconds <= 0:
