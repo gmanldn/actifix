@@ -33,6 +33,7 @@ import atexit
 from pathlib import Path
 from typing import Optional
 
+from scripts.build_frontend import build_frontend
 ROOT = Path(__file__).resolve().parents[1]
 SRC_DIR = ROOT / "src"
 FRONTEND_DIR = ROOT / "actifix-frontend"
@@ -167,9 +168,20 @@ def ensure_scaffold() -> None:
         log_info(f"Project root: {paths.project_root}")
         log_info(f"State directory: {paths.state_dir}")
         log_info(f"Database: {db_path}")
+        _ensure_frontend_build(paths.project_root)
     except Exception as e:
         log_error(f"Failed to initialize Actifix: {e}")
         raise
+
+
+def _ensure_frontend_build(project_root: Path) -> None:
+    """Ensure the frontend bundle is built."""
+    log_info("Rebuilding frontend assets...")
+    try:
+        build_frontend(project_root)
+        log_success("Frontend assets ready")
+    except FileNotFoundError as exc:
+        log_warning(f"Frontend bundle skipped: {exc}")
 
 
 def is_port_in_use(port: int) -> bool:

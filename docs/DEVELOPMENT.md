@@ -141,6 +141,12 @@ Module execution should use a sanitized environment via `actifix.modules.get_mod
 Only allowlisted keys (plus `LC_`/`XDG_` prefixes) are exposed and sensitive names are excluded.
 Values are also redacted with `redact_secrets_from_text()` to avoid leaking secrets into tickets.
 
+## Frontend bundle builds
+`scripts/start.py` now invokes `scripts.build_frontend.build_frontend()` so the
+`actifix-frontend` sources are recopied into `actifix-frontend/dist/` every time the
+launcher runs. This ensures the Azure-style dashboard assets stay up-to-date before
+the API server and static host start; the built bundle is gitignored.
+
 ## Documentation workflow
 - Use `docs/FRAMEWORK_OVERVIEW.md` for release notes and feature narratives.
 - Update `docs/INDEX.md` any time sections move.
