@@ -33,8 +33,19 @@ import atexit
 from pathlib import Path
 from typing import Optional
 
+# Detect the repository root (pyproject marker) so we can import sibling packages reliably.
+_SCRIPT_DIR = Path(__file__).resolve().parent
+for _candidate in (_SCRIPT_DIR, *_SCRIPT_DIR.parents):
+    if (_candidate / "pyproject.toml").is_file():
+        ROOT = _candidate
+        break
+else:
+    ROOT = _SCRIPT_DIR.parent
+
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
 from scripts.build_frontend import build_frontend
-ROOT = Path(__file__).resolve().parents[1]
 SRC_DIR = ROOT / "src"
 FRONTEND_DIR = ROOT / "actifix-frontend"
 DEFAULT_FRONTEND_PORT = 8080
