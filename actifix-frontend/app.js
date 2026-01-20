@@ -139,12 +139,19 @@ const useFetch = (endpoint, interval = REFRESH_INTERVAL) => {
         const headers = buildAdminHeaders();
         const response = await fetch(`${API_BASE}${endpoint}`, { cache: 'no-store', headers });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const json = await response.json();
-        setData(json);
-        setError(null);
-        setLastUpdated(new Date());
+        const text = await response.text();
+        try {
+          const json = JSON.parse(text);
+          setData(json);
+          setError(null);
+          setLastUpdated(new Date());
+        } catch (parseErr) {
+          // Response is not JSON, likely an error page
+          throw new Error(`Invalid response from ${endpoint}: expected JSON`);
+        }
       } catch (err) {
         setError(err.message);
+        setData(null);
       } finally {
         setLoading(false);
       }
@@ -182,7 +189,13 @@ const useAuthenticatedFetch = () => {
         ...options
       });
 
-      const data = await response.json();
+      const text = await response.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        throw new Error(`Invalid response from ${endpoint}: expected JSON`);
+      }
 
       if (!response.ok) {
         throw new Error(data.error || `HTTP ${response.status}`);
@@ -208,7 +221,13 @@ const postJSON = async (endpoint, payload) => {
     headers,
     body: JSON.stringify(payload),
   });
-  const data = await response.json();
+  const text = await response.text();
+  let data;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    throw new Error(`Invalid response from ${endpoint}: expected JSON, got HTML or error page`);
+  }
   if (!response.ok) {
     throw new Error(data.message || data.error || `HTTP ${response.status}`);
   }
