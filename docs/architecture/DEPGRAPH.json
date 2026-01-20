@@ -330,6 +330,12 @@
       "domain": "modules",
       "owner": "modules",
       "label": "dev_assistant"
+    },
+    {
+      "id": "modules.artclass",
+      "domain": "modules",
+      "owner": "modules",
+      "label": "artclass"
     }
   ],
   "edges": [
@@ -952,6 +958,26 @@
       "from": "modules.dev_assistant",
       "to": "runtime.api",
       "reason": "modules.dev_assistant registers a blueprint on the runtime API server"
+    },
+    {
+      "from": "modules.artclass",
+      "to": "runtime.state",
+      "reason": "modules.artclass uses Actifix state paths"
+    },
+    {
+      "from": "modules.artclass",
+      "to": "infra.logging",
+      "reason": "modules.artclass logs events via infra.logging"
+    },
+    {
+      "from": "modules.artclass",
+      "to": "core.raise_af",
+      "reason": "modules.artclass records errors via core.raise_af"
+    },
+    {
+      "from": "modules.artclass",
+      "to": "runtime.api",
+      "reason": "modules.artclass registers a blueprint on the runtime API server"
     }
   ]
 }

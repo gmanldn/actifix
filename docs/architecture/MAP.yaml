@@ -983,6 +983,23 @@ modules:
   depends_on:
   - infra.logging
   - modules.yhatzee.game
+
+- id: modules.artclass
+  domain: modules
+  owner: modules
+  summary: Art teaching module with interactive React-based GUI
+  entrypoints:
+  - src/actifix/modules/artclass/__init__.py
+  contracts:
+  - expose the ArtClass GUI at /modules/artclass on the runtime API server
+  - provide interactive art instruction interface
+  - use Actifix logging and error capture interfaces from the shared runtime
+  depends_on:
+  - runtime.state
+  - infra.logging
+  - core.raise_af
+  - runtime.api
+
 contracts:
 - id: contract.logging
   summary: All modules must log via centralized logging system with correlation IDs
