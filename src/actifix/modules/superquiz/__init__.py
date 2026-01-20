@@ -6,7 +6,8 @@ import html
 import json
 import random
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Sequence, Tuple, TYPE_CHECKING, Union
+from typing import Dict, List, Optional, Sequence, Tuple, TYPE_CHECKING, Union
+from urllib.parse import quote
 from urllib.request import Request, urlopen
 
 from actifix.log_utils import log_event
@@ -32,6 +33,8 @@ CATEGORIES: Tuple[str, ...] = (
     "Nature",
     "Politics",
 )
+
+DIFFICULTIES: Tuple[str, ...] = ("easy", "medium", "hard")
 
 OPENTDB_CATEGORY_MAP: Dict[str, int] = {
     "General Knowledge": 9,
@@ -123,8 +126,71 @@ def _normalize_category(category: Optional[str]) -> Optional[str]:
     return None
 
 
-def _opentdb_questions(category: Optional[str], amount: int) -> List[Dict[str, object]]:
+def _normalize_difficulty(difficulty: Optional[str]) -> Optional[str]:
+    if difficulty is None:
+        return None
+    difficulty = difficulty.strip().lower()
+    if difficulty in DIFFICULTIES:
+        return difficulty
+    return None
+
+
+def _normalize_topic(topic: Optional[str]) -> Optional[str]:
+    if topic is None:
+        return None
+    topic = topic.strip()
+    if not topic:
+        return None
+    return topic
+
+
+def _matches_topic(question: Dict[str, object], topic: str) -> bool:
+    target = topic.lower()
+    haystack = f"{question.get('question', '')} {question.get('category', '')}"
+    return target in str(haystack).lower()
+
+
+def _apply_topic_filter(
+    questions: Sequence[Dict[str, object]],
+    topic: Optional[str],
+) -> Tuple[List[Dict[str, object]], bool]:
+    if not topic:
+        return list(questions), True
+    matched = [question for question in questions if _matches_topic(question, topic)]
+    if matched:
+        return matched, True
+    return list(questions), False
+
+
+def _apply_difficulty_filter(
+    questions: Sequence[Dict[str, object]],
+    difficulty: Optional[str],
+    amount: int,
+) -> Tuple[List[Dict[str, object]], bool]:
+    if not difficulty:
+        return list(questions), True
+    matching = [q for q in questions if q.get("difficulty") == difficulty]
+    unknown = [
+        q
+        for q in questions
+        if q.get("difficulty") in (None, "", "unknown")
+    ]
+    selected = matching[:amount]
+    if len(selected) < amount:
+        selected.extend(unknown[: max(0, amount - len(selected))])
+    if selected:
+        return selected, bool(matching)
+    return list(questions)[:amount], False
+
+
+def _opentdb_questions(
+    category: Optional[str],
+    amount: int,
+    difficulty: Optional[str] = None,
+) -> List[Dict[str, object]]:
     params = [f"amount={amount}", "type=multiple"]
+    if difficulty:
+        params.append(f"difficulty={difficulty}")
     if category and category != "Random":
         category_id = OPENTDB_CATEGORY_MAP.get(category)
         if category_id is not None:
@@ -137,6 +203,7 @@ def _opentdb_questions(category: Optional[str], amount: int) -> List[Dict[str, o
         question = html.unescape(str(item.get("question", ""))).strip()
         correct = html.unescape(str(item.get("correct_answer", ""))).strip()
         incorrect = [html.unescape(str(ans)).strip() for ans in item.get("incorrect_answers", [])]
+        item_difficulty = str(item.get("difficulty", difficulty or "unknown")).lower()
         if not question or not correct:
             continue
         normalized.append(
@@ -144,6 +211,7 @@ def _opentdb_questions(category: Optional[str], amount: int) -> List[Dict[str, o
                 "question": question,
                 "category": str(item.get("category", category or "")),
                 "source": "OpenTDB",
+                "difficulty": item_difficulty if item_difficulty else "unknown",
                 "answer": correct,
                 "options": _shuffle_options(correct, incorrect),
             }
@@ -151,12 +219,18 @@ def _opentdb_questions(category: Optional[str], amount: int) -> List[Dict[str, o
     return normalized
 
 
-def _trivia_api_questions(category: Optional[str], amount: int) -> List[Dict[str, object]]:
+def _trivia_api_questions(
+    category: Optional[str],
+    amount: int,
+    topic: Optional[str] = None,
+) -> List[Dict[str, object]]:
     params = [f"limit={amount}"]
     if category and category != "Random":
         slug = TRIVIA_API_CATEGORY_MAP.get(category)
         if slug:
             params.append(f"categories={slug}")
+    if topic:
+        params.append(f"search={quote(topic)}")
     url = f"https://the-trivia-api.com/api/questions?{'&'.join(params)}"
     data = _http_get_json(url)
     normalized = []
@@ -164,6 +238,7 @@ def _trivia_api_questions(category: Optional[str], amount: int) -> List[Dict[str
         question = str(item.get("question", "")).strip()
         correct = str(item.get("correctAnswer", "")).strip()
         incorrect = [str(ans).strip() for ans in item.get("incorrectAnswers", [])]
+        item_difficulty = str(item.get("difficulty", "unknown")).lower()
         if not question or not correct:
             continue
         normalized.append(
@@ -171,6 +246,7 @@ def _trivia_api_questions(category: Optional[str], amount: int) -> List[Dict[str
                 "question": question,
                 "category": str(item.get("category", category or "")),
                 "source": "The Trivia API",
+                "difficulty": item_difficulty if item_difficulty else "unknown",
                 "answer": correct,
                 "options": _shuffle_options(correct, incorrect),
             }
@@ -178,7 +254,11 @@ def _trivia_api_questions(category: Optional[str], amount: int) -> List[Dict[str
     return normalized
 
 
-def _willfry_questions(category: Optional[str], amount: int) -> List[Dict[str, object]]:
+def _willfry_questions(
+    category: Optional[str],
+    amount: int,
+    topic: Optional[str] = None,
+) -> List[Dict[str, object]]:
     params = [f"limit={amount}"]
     if category and category != "Random":
         slug = WILLFRY_CATEGORY_MAP.get(category)
@@ -198,6 +278,7 @@ def _willfry_questions(category: Optional[str], amount: int) -> List[Dict[str, o
                 "question": question,
                 "category": str(item.get("category", category or "")),
                 "source": "WillFry Trivia",
+                "difficulty": "unknown",
                 "answer": correct,
                 "options": _shuffle_options(correct, incorrect),
             }
@@ -207,9 +288,9 @@ def _willfry_questions(category: Optional[str], amount: int) -> List[Dict[str, o
 
 def _gather_questions(category: Optional[str], amount: int) -> List[Dict[str, object]]:
     sources = (
-        _opentdb_questions,
-        _trivia_api_questions,
-        _willfry_questions,
+        lambda count: _opentdb_questions(category, count),
+        lambda count: _trivia_api_questions(category, count),
+        lambda count: _willfry_questions(category, count),
     )
     per_source = max(1, amount // len(sources))
     remainder = amount - (per_source * len(sources))
@@ -218,9 +299,34 @@ def _gather_questions(category: Optional[str], amount: int) -> List[Dict[str, ob
         counts[idx] += 1
     combined: List[Dict[str, object]] = []
     for source, count in zip(sources, counts):
-        combined.extend(source(category, count))
+        combined.extend(source(count))
     random.shuffle(combined)
     return combined[:amount]
+
+
+def _gather_snap_questions(
+    topic: Optional[str],
+    difficulty: Optional[str],
+    amount: int,
+) -> Tuple[List[Dict[str, object]], bool, bool]:
+    sources = (
+        lambda count: _opentdb_questions(None, count, difficulty=difficulty),
+        lambda count: _trivia_api_questions(None, count, topic=topic),
+        lambda count: _willfry_questions(None, count, topic=topic),
+    )
+    per_source = max(1, amount // len(sources))
+    remainder = amount - (per_source * len(sources))
+    counts = [per_source] * len(sources)
+    for idx in range(remainder):
+        counts[idx] += 1
+    combined: List[Dict[str, object]] = []
+    for source, count in zip(sources, counts):
+        fetch_count = min(max(count * 3, count + 2), 20)
+        combined.extend(source(fetch_count))
+    random.shuffle(combined)
+    filtered, topic_matched = _apply_topic_filter(combined, topic)
+    filtered, difficulty_matched = _apply_difficulty_filter(filtered, difficulty, amount)
+    return filtered[:amount], topic_matched, difficulty_matched
 
 
 def _scoreboard(players: Sequence[Dict[str, object]]) -> List[Dict[str, object]]:
@@ -269,6 +375,40 @@ def create_blueprint(
                 record_error(
                     message=f"Failed to fetch SuperQuiz questions: {exc}",
                     source="modules/superquiz/__init__.py:api_questions",
+                    run_label="superquiz-gui",
+                    error_type=type(exc).__name__,
+                    priority=TicketPriority.P2,
+                )
+                raise
+
+        @blueprint.route("/api/snap", methods=["GET"])
+        def api_snap():
+            try:
+                raw_topic = request.args.get("topic")
+                raw_difficulty = request.args.get("difficulty")
+                topic = _normalize_topic(raw_topic)
+                difficulty = _normalize_difficulty(raw_difficulty)
+                count = request.args.get("count", type=int) or DEFAULT_QUESTIONS_PER_PLAYER
+                count = max(1, min(count, 60))
+                questions, topic_matched, difficulty_matched = _gather_snap_questions(
+                    topic,
+                    difficulty,
+                    count,
+                )
+                return jsonify(
+                    {
+                        "topic": topic or "",
+                        "difficulty": difficulty or "",
+                        "count": len(questions),
+                        "topic_matched": topic_matched,
+                        "difficulty_matched": difficulty_matched,
+                        "questions": questions,
+                    }
+                )
+            except Exception as exc:
+                record_error(
+                    message=f"Failed to fetch SuperQuiz snap questions: {exc}",
+                    source="modules/superquiz/__init__.py:api_snap",
                     run_label="superquiz-gui",
                     error_type=type(exc).__name__,
                     priority=TicketPriority.P2,
@@ -512,6 +652,14 @@ _HTML_PAGE = """<!doctype html>
     .players input {
       font-size: 15px;
     }
+    .hidden {
+      display: none;
+    }
+    .snap-fields {
+      display: grid;
+      gap: 12px;
+      margin-top: 16px;
+    }
     .play-area {
       display: none;
       margin-top: 30px;
@@ -645,21 +793,38 @@ _HTML_PAGE = """<!doctype html>
         </section>
 
         <section class="panel delay-2">
-          <h2>Choose a Category</h2>
-          <label for="category">Category</label>
-          <select id="category">
-            <option value="Random">Random</option>
-            <option value="General Knowledge">General Knowledge</option>
-            <option value="Science">Science</option>
-            <option value="History">History</option>
-            <option value="Geography">Geography</option>
-            <option value="Sports">Sports</option>
-            <option value="Entertainment">Entertainment</option>
-            <option value="Art & Literature">Art & Literature</option>
-            <option value="Technology">Technology</option>
-            <option value="Nature">Nature</option>
-            <option value="Politics">Politics</option>
+          <h2>Quiz Setup</h2>
+          <label for="mode">Mode</label>
+          <select id="mode">
+            <option value="category" selected>Category Quiz</option>
+            <option value="snap">Snap Quiz</option>
           </select>
+          <div id="category-fields">
+            <label for="category">Category</label>
+            <select id="category">
+              <option value="Random">Random</option>
+              <option value="General Knowledge">General Knowledge</option>
+              <option value="Science">Science</option>
+              <option value="History">History</option>
+              <option value="Geography">Geography</option>
+              <option value="Sports">Sports</option>
+              <option value="Entertainment">Entertainment</option>
+              <option value="Art & Literature">Art & Literature</option>
+              <option value="Technology">Technology</option>
+              <option value="Nature">Nature</option>
+              <option value="Politics">Politics</option>
+            </select>
+          </div>
+          <div id="snap-fields" class="snap-fields hidden">
+            <label for="topic">Topic</label>
+            <input id="topic" type="text" placeholder="e.g. Space, Jazz, Ocean life">
+            <label for="difficulty">Difficulty</label>
+            <select id="difficulty">
+              <option value="easy">Easy</option>
+              <option value="medium" selected>Medium</option>
+              <option value="hard">Hard</option>
+            </select>
+          </div>
           <div class="footer">
             <button class="button" id="start">Start Quiz</button>
             <button class="button secondary" id="reset">Reset</button>
@@ -689,7 +854,12 @@ _HTML_PAGE = """<!doctype html>
   <script>
     const playerCountEl = document.getElementById("player-count");
     const playersEl = document.getElementById("players");
+    const modeEl = document.getElementById("mode");
+    const categoryFields = document.getElementById("category-fields");
     const categoryEl = document.getElementById("category");
+    const snapFields = document.getElementById("snap-fields");
+    const topicEl = document.getElementById("topic");
+    const difficultyEl = document.getElementById("difficulty");
     const startBtn = document.getElementById("start");
     const resetBtn = document.getElementById("reset");
     const statusEl = document.getElementById("status");
@@ -761,16 +931,45 @@ _HTML_PAGE = """<!doctype html>
       return "";
     }
 
+    function toggleMode() {
+      const mode = modeEl.value;
+      if (mode === "snap") {
+        categoryFields.classList.add("hidden");
+        snapFields.classList.remove("hidden");
+      } else {
+        categoryFields.classList.remove("hidden");
+        snapFields.classList.add("hidden");
+      }
+      showStatus("");
+    }
+
     async function fetchQuestions() {
-      const category = categoryEl.value;
       const count = players.length * QUESTIONS_PER_PLAYER;
+      if (modeEl.value === "snap") {
+        const topic = topicEl.value.trim();
+        const difficulty = difficultyEl.value;
+        const url = `${basePath()}/api/snap?topic=${encodeURIComponent(topic)}&difficulty=${encodeURIComponent(difficulty)}&count=${count}`;
+        const response = await fetch(url, { cache: "no-store" });
+        if (!response.ok) {
+          throw new Error("Failed to load questions");
+        }
+        const data = await response.json();
+        let message = "";
+        if (!data.topic_matched) {
+          message = "Topic matches were limited, expanded to related questions.";
+        } else if (!data.difficulty_matched) {
+          message = "Difficulty matches were limited, mixed in more questions.";
+        }
+        return { questions: data.questions || [], message };
+      }
+      const category = categoryEl.value;
       const url = `${basePath()}/api/questions?category=${encodeURIComponent(category)}&count=${count}`;
       const response = await fetch(url, { cache: "no-store" });
       if (!response.ok) {
         throw new Error("Failed to load questions");
       }
       const data = await response.json();
-      return data.questions || [];
+      return { questions: data.questions || [], message: "" };
     }
 
     function showStatus(message) {
@@ -800,6 +999,10 @@ _HTML_PAGE = """<!doctype html>
         showStatus("Add a name for every player.");
         return false;
       }
+      if (modeEl.value === "snap" && !topicEl.value.trim()) {
+        showStatus("Add a topic for Snap Quiz mode.");
+        return false;
+      }
       players.forEach((player, idx) => {
         player.name = names[idx];
       });
@@ -824,7 +1027,9 @@ _HTML_PAGE = """<!doctype html>
       resultEl.textContent = "";
       const question = questions[currentIndex];
       const player = players[currentPlayerIndex];
-      turnMeta.textContent = `Round ${currentIndex + 1} | ${player.name}`;
+      const sourceText = question.source ? ` | ${question.source}` : "";
+      const difficultyText = question.difficulty ? ` | ${question.difficulty}` : "";
+      turnMeta.textContent = `Round ${currentIndex + 1} | ${player.name}${sourceText}${difficultyText}`;
       questionEl.textContent = question.question;
       answersEl.innerHTML = "";
       const options = question.options || [];
@@ -876,12 +1081,17 @@ _HTML_PAGE = """<!doctype html>
       playArea.classList.add("active");
       showStatus("Gathering questions...");
       try {
-        questions = await fetchQuestions();
+        const result = await fetchQuestions();
+        questions = result.questions;
         if (!questions.length) {
           showStatus("No questions returned. Try another category.");
           return;
         }
-        showStatus(`Loaded ${questions.length} questions.`);
+        if (result.message) {
+          showStatus(result.message);
+        } else {
+          showStatus(`Loaded ${questions.length} questions.`);
+        }
         renderQuestion();
       } catch (error) {
         showStatus("Question feed is offline. Try again in a moment.");
@@ -891,6 +1101,7 @@ _HTML_PAGE = """<!doctype html>
     playerCountEl.addEventListener("change", () => {
       buildPlayers();
     });
+    modeEl.addEventListener("change", toggleMode);
     startBtn.addEventListener("click", startGame);
     resetBtn.addEventListener("click", () => {
       buildPlayers();
@@ -898,6 +1109,7 @@ _HTML_PAGE = """<!doctype html>
     });
     nextBtn.addEventListener("click", nextQuestion);
 
+    toggleMode();
     buildPlayers();
     resetGame();
   </script>
