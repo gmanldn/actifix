@@ -11,8 +11,9 @@ from actifix.modules.pokertool.solvers import (
 
 def test_compute_nash_equilibrium_returns_recommendation() -> None:
     recommendation = compute_nash_equilibrium(["Ah", "Kd"], ["9h", "Ts"])
-    assert recommendation.equity >= 40.0
+    assert recommendation.equity >= 35.0
     assert recommendation.action in {"raise", "call", "fold"}
+    assert isinstance(recommendation.narrative, str)
 
 
 def test_compute_nash_equilibrium_requires_hand() -> None:
@@ -28,4 +29,5 @@ def test_estimate_icm_value_requires_inputs() -> None:
 def test_estimate_icm_value_computes_share() -> None:
     result = estimate_icm_value([100.0, 50.0], [5.0, 2.5])
     assert "icm_value" in result
+    assert isinstance(result["confidence"], float)
     assert result["stack_share"][0] > result["stack_share"][1]

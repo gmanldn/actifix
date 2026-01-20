@@ -14,6 +14,12 @@ const LOG_REFRESH_INTERVAL = 3000;
 const TICKET_REFRESH_INTERVAL = 4000;
 const TICKET_LIMIT = 250;
 
+// Authentication state
+const getAuthToken = () => localStorage.getItem('actifix_auth_token');
+const setAuthToken = (token) => localStorage.setItem('actifix_auth_token', token);
+const clearAuthToken = () => localStorage.removeItem('actifix_auth_token');
+const isAuthenticated = () => !!getAuthToken();
+
 const applyAssetVersion = () => {
   const version = window.ACTIFIX_ASSET_VERSION || '4';
   const link = document.querySelector('link[rel="stylesheet"]');
@@ -115,7 +121,16 @@ const useFetch = (endpoint, interval = REFRESH_INTERVAL) => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await fetch(`${API_BASE}${endpoint}`, { cache: 'no-store' });
+        const headers = {};
+        const token = getAuthToken();
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+        
+        const response = await fetch(`${API_BASE}${endpoint}`, { 
+          cache: 'no-store',
+          headers
+        });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const json = await response.json();
         setData(json);
@@ -134,6 +149,105 @@ const useFetch = (endpoint, interval = REFRESH_INTERVAL) => {
   }, [endpoint, interval]);
 
   return { data, loading, error, lastUpdated };
+};
+
+// Custom hook for authenticated POST requests
+const useAuthenticatedFetch = () => {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [result, setResult] = useState(null);
+
+  const execute = async (endpoint, options = {}) => {
+    setLoading(true);
+    setError(null);
+    setResult(null);
+
+    try {
+      const headers = {
+        'Content-Type': 'application/json',
+        ...options.headers
+      };
+      
+      const token = getAuthToken();
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
+      const response = await fetch(`${API_BASE}${endpoint}`, {
+        method: options.method || 'POST',
+        headers,
+        body: options.body ? JSON.stringify(options.body) : undefined,
+        ...options
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || `HTTP ${response.status}`);
+      }
+
+      setResult(data);
+      return data;
+    } catch (err) {
+      setError(err.message);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return { execute, loading, error, result };
+};
+
+const postJSON = async (endpoint, payload) => {
+  const headers = { 'Content-Type': 'application/json' };
+  const token = getAuthToken();
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  const response = await fetch(`${API_BASE}${endpoint}`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(payload),
+  });
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.message || data.error || `HTTP ${response.status}`);
+  }
+  return data;
+};
+
+const useEventStream = (endpoint) => {
+  const [updates, setUpdates] = useState([]);
+  const [latest, setLatest] = useState(null);
+  const [status, setStatus] = useState(null);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const source = new EventSource(`${API_BASE}${endpoint}`);
+    source.addEventListener('update', (event) => {
+      try {
+        const payload = JSON.parse(event.data);
+        setLatest(payload);
+        setUpdates((prev) => [...prev.slice(-5), payload]);
+      } catch (err) {
+        console.error('Invalid SSE payload', err);
+      }
+    });
+    source.addEventListener('status', (event) => {
+      try {
+        const payload = JSON.parse(event.data);
+        setStatus(payload);
+      } catch (err) {
+        console.error('Invalid SSE status', err);
+      }
+    });
+    source.onerror = () => {
+      setError('Detection stream disconnected.');
+      source.close();
+    };
+    return () => source.close();
+  }, [endpoint]);
+
+  return { updates, latest, status, error };
 };
 
 // ============================================================================
@@ -159,10 +273,10 @@ const navItems = [
   { id: 'overview', icon: '📊', label: 'Overview' },
   { id: 'tickets', icon: '🎫', label: 'Tickets' },
   { id: 'logs', icon: '📜', label: 'Logs' },
-  { id: 'system', icon: '⚙️', label: 'System' },
+  { id: 'system', icon: 'S', label: 'System' },
   { id: 'modules', icon: '🧩', label: 'Modules' },
   { id: 'ideas', icon: '💡', label: 'Ideas' },
-  { id: 'settings', icon: '🔧', label: 'Settings' },
+  { id: 'settings', icon: '⚙️', label: 'Settings' },
 ];
 
   return h('nav', { className: 'nav-rail' },
@@ -175,6 +289,7 @@ const navItems = [
             'nav-rail-item',
             activeView === item.id ? 'active' : '',
             item.id === 'logs' && logAlert ? 'flash' : '',
+            item.id === 'system' ? 'system-item' : '',
           ].join(' ').trim(),
           onClick: () => onViewChange(item.id),
           title: item.label
@@ -248,7 +363,7 @@ const FixToolbar = ({ onFix, isFixing, status }) => {
 };
 
 // Header Component
-const Header = ({ onFix, isFixing, fixStatus, theme, onToggleTheme }) => {
+const Header = ({ onFix, isFixing, fixStatus, theme, onToggleTheme, onLogout }) => {
   const [connected, setConnected] = useState(false);
   const [time, setTime] = useState(new Date().toLocaleTimeString());
   const { data: health } = useFetch('/health', REFRESH_INTERVAL);
@@ -259,7 +374,13 @@ const Header = ({ onFix, isFixing, fixStatus, theme, onToggleTheme }) => {
   useEffect(() => {
     const checkConnection = async () => {
       try {
-        const response = await fetch(`${API_BASE}/ping`);
+        const headers = {};
+        const token = getAuthToken();
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+        
+        const response = await fetch(`${API_BASE}/ping`, { headers });
         setConnected(response.ok);
       } catch {
         setConnected(false);
@@ -318,6 +439,20 @@ const Header = ({ onFix, isFixing, fixStatus, theme, onToggleTheme }) => {
           color: 'var(--text-primary)'
         }
       }, theme === 'dark' ? '☀️' : '🌙'),
+      h('button', {
+        onClick: onLogout,
+        title: 'Logout',
+        className: 'theme-toggle-btn',
+        style: {
+          background: 'transparent',
+          border: '1px solid var(--border)',
+          borderRadius: '999px',
+          padding: '4px 8px',
+          fontSize: '16px',
+          cursor: 'pointer',
+          color: 'var(--text-primary)'
+        }
+      }, '🚪'),
       h('span', { className: 'header-time' }, time)
     )
   );
@@ -341,6 +476,183 @@ const MetricTile = ({ label, value, subvalue, icon, color, trend }) => {
     h('div', { className: 'metric-tile-value', style: color ? { color } : {} }, value),
     subvalue && h('div', { className: 'metric-tile-subvalue' }, subvalue),
     trend && h('div', { className: 'metric-tile-trend' }, trend)
+  );
+};
+
+const PokerToolPanel = () => {
+  const { data: detectStatus } = useFetch('/modules/pokertool/api/detect/status', 6000);
+  const { updates, latest, status: streamStatus, error: streamError } = useEventStream('/modules/pokertool/api/detect/stream');
+
+  const [nashPayload, setNashPayload] = useState({ hand: 'Ah,Kd', board: 'Qs, Jh, 10d' });
+  const [nashResult, setNashResult] = useState(null);
+  const [nashLoading, setNashLoading] = useState(false);
+  const [nashError, setNashError] = useState('');
+
+  const [icmPayload, setIcmPayload] = useState({ stacks: '100,50', payouts: '5,2.5' });
+  const [icmResult, setIcmResult] = useState(null);
+  const [icmError, setIcmError] = useState('');
+
+  const [mlPayload, setMlPayload] = useState({ history: '[{"action":"raise","aggression":0.9}]', scores: '0.3,0.65,0.82' });
+  const [mlResult, setMlResult] = useState(null);
+  const [mlError, setMlError] = useState('');
+
+  const callNash = async () => {
+    setNashError('');
+    setNashLoading(true);
+    try {
+      const hand = nashPayload.hand.split(',').map((h) => h.trim()).filter(Boolean);
+      const board = nashPayload.board.split(',').map((h) => h.trim()).filter(Boolean);
+      const data = await postJSON('/modules/pokertool/api/solvers/nash', { hand, board });
+      setNashResult(data);
+    } catch (err) {
+      setNashError(err.message);
+    } finally {
+      setNashLoading(false);
+    }
+  };
+
+  const callIcm = async () => {
+    setIcmError('');
+    try {
+      const stacks = icmPayload.stacks.split(',').map((value) => parseFloat(value.trim())).filter(Boolean);
+      const payouts = icmPayload.payouts.split(',').map((value) => parseFloat(value.trim())).filter(Boolean);
+      const data = await postJSON('/modules/pokertool/api/solvers/icm', { stacks, payouts });
+      setIcmResult(data);
+    } catch (err) {
+      setIcmError(err.message);
+    }
+  };
+
+  const callMl = async (type) => {
+    setMlError('');
+    try {
+      if (type === 'opponent') {
+        const history = JSON.parse(mlPayload.history);
+        const data = await postJSON('/modules/pokertool/api/ml/opponent', { history });
+        setMlResult(data);
+      } else {
+        const scores = mlPayload.scores.split(',').map((value) => parseFloat(value.trim())).filter((value) => !Number.isNaN(value));
+        const data = await postJSON('/modules/pokertool/api/ml/learn', { scores });
+        setMlResult(data);
+      }
+    } catch (err) {
+      setMlError(err.message);
+    }
+  };
+
+  const detectionSummary = detectStatus || {};
+  const latestEvent = latest || {};
+
+  return h('div', { className: 'panel pokertool-panel' },
+    h('div', { className: 'panel-header' },
+      h('div', { className: 'panel-title' },
+        h('span', { className: 'panel-title-icon' }, '🃏'),
+        'PokerTool Insights'
+      ),
+      h('div', { className: 'panel-actions' },
+        streamError && h('span', { className: 'text-dim' }, streamError),
+        streamStatus && h('span', { className: 'poker-tag' }, streamStatus.active ? 'Streaming' : 'Idle')
+      )
+    ),
+    h('div', { className: 'poker-section detection' },
+      h('div', { className: 'poker-subheader' }, 'Detection'),
+      h('div', { className: 'poker-detection-row' },
+        h('div', { className: 'poker-detection-card' },
+          h('strong', null, 'Host'),
+          h('span', null, detectionSummary.host || '—'),
+          h('small', null, 'Port: ', detectionSummary.port || '—')
+        ),
+        h('div', { className: 'poker-detection-card' },
+          h('strong', null, 'Latest Action'),
+          h('span', null, latestEvent.table_state?.action || 'N/A'),
+          h('small', null, 'Confidence:', latestEvent.confidence ?? '—')
+        ),
+        h('div', { className: 'poker-detection-card' },
+          h('strong', null, 'Board'),
+          h('span', null, (latestEvent.table_state?.board || []).join(', ') || '—'),
+          h('small', null, `${streamStatus?.history_count ?? 0} snapshots`)
+        )
+      ),
+      h('div', { className: 'poker-detection-stream' },
+        updates.map((event, idx) =>
+          h('div', { key: `det-${idx}`, className: 'poker-detection-item' },
+            h('div', { className: 'poker-detection-item-header' },
+              h('span', null, `#${event.sequence}`),
+              h('span', null, formatTime(new Date(event.timestamp).toISOString()))
+            ),
+            h('div', null, event.table_state?.action || 'update'),
+            h('small', null, `Confidence: ${event.confidence ?? 0}`)
+          )
+        )
+      )
+    ),
+    h('div', { className: 'poker-section solvers' },
+      h('div', { className: 'poker-subheader' }, 'Solvers'),
+      h('div', { className: 'poker-solver-grid' },
+        h('div', { className: 'poker-solver-card' },
+          h('label', null, 'Hand'),
+          h('input', {
+            className: 'poker-input',
+            value: nashPayload.hand,
+            onChange: (e) => setNashPayload({ ...nashPayload, hand: e.target.value }),
+          }),
+          h('label', null, 'Board'),
+          h('input', {
+            className: 'poker-input',
+            value: nashPayload.board,
+            onChange: (e) => setNashPayload({ ...nashPayload, board: e.target.value }),
+          }),
+          h('button', { className: 'btn btn-small', onClick: callNash, disabled: nashLoading },
+            nashLoading ? 'Computing…' : 'Run Nash'
+          ),
+          nashError && h('span', { className: 'poker-error' }, nashError),
+          nashResult && h('p', { className: 'poker-result' }, `Action: ${nashResult.recommendation?.action}`)
+        ),
+        h('div', { className: 'poker-solver-card' },
+          h('label', null, 'Stacks'),
+          h('input', {
+            className: 'poker-input',
+            value: icmPayload.stacks,
+            onChange: (e) => setIcmPayload({ ...icmPayload, stacks: e.target.value }),
+          }),
+          h('label', null, 'Payouts'),
+          h('input', {
+            className: 'poker-input',
+            value: icmPayload.payouts,
+            onChange: (e) => setIcmPayload({ ...icmPayload, payouts: e.target.value }),
+          }),
+          h('button', { className: 'btn btn-small', onClick: callIcm }, 'Run ICM'),
+          icmError && h('span', { className: 'poker-error' }, icmError),
+          icmResult && h('p', { className: 'poker-result' }, `Value: ${icmResult.icm_value}`)
+        )
+      )
+    ),
+    h('div', { className: 'poker-section ml' },
+      h('div', { className: 'poker-subheader' }, 'ML Insights'),
+      h('div', { className: 'poker-ml-grid' },
+        h('div', { className: 'poker-ml-card' },
+          h('label', null, 'History (JSON)'),
+          h('textarea', {
+            className: 'poker-input',
+            value: mlPayload.history,
+            onChange: (e) => setMlPayload({ ...mlPayload, history: e.target.value }),
+            rows: 3,
+          }),
+          h('button', { className: 'btn btn-small', onClick: () => callMl('opponent') }, 'Opponent Model')
+        ),
+        h('div', { className: 'poker-ml-card' },
+          h('label', null, 'Score Stream'),
+          h('input', {
+            className: 'poker-input',
+            value: mlPayload.scores,
+            onChange: (e) => setMlPayload({ ...mlPayload, scores: e.target.value }),
+          }),
+          h('button', { className: 'btn btn-small', onClick: () => callMl('learn') }, 'Active Learning')
+        )
+      ),
+      mlError && h('span', { className: 'poker-error' }, mlError),
+      mlResult && h('p', { className: 'poker-result' }, mlResult.message || 'ML response received')
+    )
   );
 };
 
@@ -406,6 +718,8 @@ const OverviewView = () => {
       })
     ),
 
+    h(PokerToolPanel),
+
     // Recent Tickets Panel
     h('div', { className: 'panel' },
       h('div', { className: 'panel-header' },
@@ -450,6 +764,7 @@ const OverviewView = () => {
 // Tickets View Component
 const TicketsView = () => {
   const { data, loading, error, lastUpdated } = useFetch(`/tickets?limit=${TICKET_LIMIT}`, TICKET_REFRESH_INTERVAL);
+  const { execute: authenticatedFetch, loading: authLoading, error: authError } = useAuthenticatedFetch();
 
   const [selectedTicket, setSelectedTicket] = useState(null);
   const [modalLoading, setModalLoading] = useState(false);
@@ -459,7 +774,13 @@ const TicketsView = () => {
     setModalLoading(true);
     setModalError('');
     try {
-      const response = await fetch(`${API_BASE}/ticket/${ticketId}`);
+      const headers = {};
+      const token = getAuthToken();
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
+      const response = await fetch(`${API_BASE}/ticket/${ticketId}`, { headers });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const ticketData = await response.json();
       setSelectedTicket(ticketData);
@@ -481,12 +802,41 @@ const TicketsView = () => {
     ? lastUpdated.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
     : '—';
 
-  const renderTicketCard = (ticket, index) => {
+  const TicketCard = ({ ticket, index }) => {
     const priority = normalizePriority(ticket.priority);
+    const [isFixing, setIsFixing] = useState(false);
+    const [fixStatus, setFixStatus] = useState('');
+    
+    const handleFixTicket = async (e) => {
+      e.stopPropagation();
+      if (isFixing || ticket.status === 'completed') return;
+      
+      setIsFixing(true);
+      setFixStatus('Fixing...');
+      
+      try {
+        await authenticatedFetch('/fix-ticket', {
+          body: {
+            completion_notes: `Ticket ${ticket.ticket_id} fixed via dashboard fix button`,
+            test_steps: 'Manual fix via dashboard UI',
+            test_results: 'Fix applied successfully',
+            summary: `Resolved ${ticket.ticket_id} via dashboard fix`
+          }
+        });
+        
+        setFixStatus('✓ Fixed');
+        setTimeout(() => setFixStatus(''), 2000);
+      } catch (err) {
+        setFixStatus(`✗ ${err.message}`);
+        setTimeout(() => setFixStatus(''), 3000);
+      } finally {
+        setIsFixing(false);
+      }
+    };
+    
     return h('article', { 
       key: ticket.ticket_id || index, 
       className: `ticket-card ${ticket.status}`,
-      onClick: () => fetchTicket(ticket.ticket_id),
       style: { cursor: 'pointer' }
     },
       h('div', { className: 'ticket-card-header' },
@@ -499,8 +849,21 @@ const TicketsView = () => {
       h('div', { className: 'ticket-card-meta' },
         h('span', null, '📁 ', ticket.source || 'unknown'),
         h('span', null, '⏱ ', formatRelativeTime(ticket.created))
+      ),
+      ticket.status === 'open' && h('div', { className: 'ticket-card-actions' },
+        h('button', {
+          className: `btn-small fix-ticket-btn ${isFixing ? 'working' : ''}`,
+          onClick: handleFixTicket,
+          disabled: isFixing,
+          title: 'Fix this ticket'
+        }, isFixing ? 'Fixing...' : 'Fix'),
+        fixStatus && h('span', { className: 'fix-status-badge' }, fixStatus)
       )
     );
+  };
+
+  const renderTicketCard = (ticket, index) => {
+    return h(TicketCard, { ticket, index });
   };
 
   const renderModal = () => {
@@ -973,16 +1336,24 @@ const SettingsView = () => {
   const [aiApiKey, setAiApiKey] = useState('');
   const [aiModel, setAiModel] = useState('');
   const [aiEnabled, setAiEnabled] = useState(false);
+  const [adminPassword, setAdminPassword] = useState('');
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
   const { data: aiStatus } = useFetch('/ai-status', 8000);
   const { data: systemInfo } = useFetch('/system', 10000);
+  const { execute: authenticatedFetch } = useAuthenticatedFetch();
 
   // Load current settings
   useEffect(() => {
     const loadSettings = async () => {
       try {
-        const response = await fetch(`${API_BASE}/settings`);
+        const headers = {};
+        const token = getAuthToken();
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+        
+        const response = await fetch(`${API_BASE}/settings`, { headers });
         if (response.ok) {
           const data = await response.json();
           setAiProvider(data.ai_provider || 'mimo-flash-v2-free');
@@ -1002,26 +1373,17 @@ const SettingsView = () => {
     setMessage('');
 
     try {
-      const response = await fetch(`${API_BASE}/settings`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+      await authenticatedFetch('/settings', {
+        body: {
           ai_provider: aiProvider,
           ai_api_key: aiApiKey,
           ai_model: aiModel,
           ai_enabled: aiEnabled,
-        }),
+        }
       });
 
-      if (response.ok) {
-        setMessage('Settings saved successfully!');
-        setTimeout(() => setMessage(''), 3000);
-      } else {
-        const data = await response.json();
-        setMessage(`Error: ${data.error || 'Failed to save settings'}`);
-      }
+      setMessage('Settings saved successfully!');
+      setTimeout(() => setMessage(''), 3000);
     } catch (err) {
       setMessage(`Error: ${err.message}`);
     } finally {
@@ -1161,11 +1523,21 @@ const SettingsView = () => {
           }),
           h('label', { htmlFor: 'ai-enabled' }, 'Enable AI Integration')
         ),
+        h('div', { className: 'settings-field' },
+          h('label', { className: 'settings-label' }, 'Admin Password'),
+          h('input', {
+            type: 'password',
+            value: adminPassword,
+            onChange: (e) => setAdminPassword(e.target.value),
+            placeholder: 'Enter admin password to save settings',
+            className: 'settings-input',
+          })
+        ),
         h('div', { className: 'settings-actions' },
           h('button', {
             className: 'btn btn-primary',
             onClick: handleSave,
-            disabled: saving,
+            disabled: saving || !adminPassword,
           }, saving ? 'Saving...' : 'Save Settings'),
           message && h('span', {
             className: `settings-message ${message.includes('Error') ? 'error' : 'ok'}`,
@@ -1202,15 +1574,12 @@ const ModulesView = () => {
   const { data, loading, error } = useFetch(`/modules?key=${refreshKey}`, 15000);
   const [sortBy, setSortBy] = useState('name');
   const [sortDir, setSortDir] = useState('asc');
+  const { execute: authenticatedFetch } = useAuthenticatedFetch();
 
   const handleToggle = async (moduleId) => {
     try {
-      const response = await fetch(`${API_BASE}/modules/${moduleId}`, { method: 'POST' });
-      if (response.ok) {
-        setRefreshKey((rk) => rk + 1);
-      } else {
-        console.error('Toggle failed:', await response.text());
-      }
+      await authenticatedFetch(`/modules/${moduleId}`, { method: 'POST' });
+      setRefreshKey((rk) => rk + 1);
     } catch (e) {
       console.error('Toggle failed:', e);
     }
@@ -1299,31 +1668,22 @@ const ModulesView = () => {
 // Ideas View Component
 const IdeasView = () => {
   const [idea, setIdea] = useState('');
-  const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [errorMsg, setErrorMsg] = useState('');
+  const { execute: authenticatedFetch, loading, error } = useAuthenticatedFetch();
 
   const submitIdea = async () => {
     if (!idea.trim()) return;
-    setLoading(true);
     setErrorMsg('');
     setResult(null);
+    
     try {
-      const response = await fetch(`${API_BASE}/ideas`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ idea: idea.trim() })
+      const data = await authenticatedFetch('/ideas', {
+        body: { idea: idea.trim() }
       });
-      const data = await response.json();
-      if (response.ok) {
-        setResult(data);
-      } else {
-        setErrorMsg(data.error || 'Failed to generate ticket');
-      }
+      setResult(data);
     } catch (err) {
       setErrorMsg(err.message);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -1388,6 +1748,136 @@ Examples:
   );
 };
 
+// Login Component
+const LoginView = ({ onLogin }) => {
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [showCreateFirst, setShowCreateFirst] = useState(false);
+
+  const handleLogin = async () => {
+    if (!username || !password) {
+      setError('Please enter username and password');
+      return;
+    }
+    
+    setLoading(true);
+    setError('');
+
+    try {
+      const response = await fetch(`${API_BASE}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setAuthToken(data.token);
+        onLogin();
+      } else {
+        setError(data.error || 'Login failed');
+        // If no users exist, show create first user option
+        if (data.error && data.error.includes('no users exist')) {
+          setShowCreateFirst(true);
+        }
+      }
+    } catch (err) {
+      setError(`Connection error: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCreateFirstUser = async () => {
+    if (!username || !password) {
+      setError('Please enter username and password');
+      return;
+    }
+    
+    setLoading(true);
+    setError('');
+
+    try {
+      const response = await fetch(`${API_BASE}/auth/create-first-user`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setAuthToken(data.token);
+        onLogin();
+      } else {
+        setError(data.error || 'Failed to create user');
+      }
+    } catch (err) {
+      setError(`Connection error: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return h('div', { className: 'login-container' },
+    h('div', { className: 'login-card' },
+      h('div', { className: 'login-header' },
+        h('img', { src: './assets/pangolin.svg', alt: 'Actifix', className: 'login-logo' }),
+        h('h1', null, 'ACTIFIX'),
+        h('p', { className: 'login-subtitle' }, 'Secure Ticket Management System')
+      ),
+      
+      h('div', { className: 'login-form' },
+        h('div', { className: 'form-group' },
+          h('label', null, 'Username'),
+          h('input', {
+            type: 'text',
+            value: username,
+            onChange: (e) => setUsername(e.target.value),
+            placeholder: 'Enter username',
+            className: 'login-input',
+            disabled: loading
+          })
+        ),
+        
+        h('div', { className: 'form-group' },
+          h('label', null, 'Password'),
+          h('input', {
+            type: 'password',
+            value: password,
+            onChange: (e) => setPassword(e.target.value),
+            placeholder: 'Enter password',
+            className: 'login-input',
+            disabled: loading,
+            onKeyPress: (e) => e.key === 'Enter' && handleLogin()
+          })
+        ),
+
+        error && h('div', { className: 'login-error' }, error),
+
+        showCreateFirst ? h('div', { className: 'login-actions' },
+          h('button', {
+            onClick: handleCreateFirstUser,
+            disabled: loading,
+            className: 'btn btn-primary'
+          }, loading ? 'Creating...' : 'Create First Admin User'),
+          h('p', { className: 'login-help' }, 'No admin user exists yet. Create one to get started.')
+        ) : h('div', { className: 'login-actions' },
+          h('button', {
+            onClick: handleLogin,
+            disabled: loading,
+            className: 'btn btn-primary'
+          }, loading ? 'Logging in...' : 'Login'),
+          h('p', { className: 'login-help' }, 'Enter your admin credentials to access the dashboard')
+        )
+      )
+    )
+  );
+};
+
 // Main App Component
 const App = () => {
   const [activeView, setActiveView] = useState('overview');
@@ -1395,7 +1885,18 @@ const App = () => {
   const [fixStatus, setFixStatus] = useState('Ready to fix the next ticket');
   const [logAlert, setLogAlert] = useState(false);
   const [theme, setTheme] = useState('dark');
+  const [authenticated, setAuthenticated] = useState(isAuthenticated());
   const logFlashTimer = useRef(null);
+
+  const handleLogin = () => {
+    setAuthenticated(true);
+  };
+
+  const handleLogout = () => {
+    clearAuthToken();
+    setAuthenticated(false);
+    setActiveView('overview');
+  };
 
   useEffect(() => {
     const savedTheme = localStorage.getItem('actifix-theme') || 'dark';
@@ -1434,7 +1935,13 @@ const App = () => {
     setFixStatus('Checking tickets…');
     
     try {
-      const statsResp = await fetch(`${API_BASE}/tickets?limit=1`);
+      const headers = {};
+      const token = getAuthToken();
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
+      const statsResp = await fetch(`${API_BASE}/tickets?limit=1`, { headers });
       const statsData = await statsResp.json();
       if (!statsResp.ok || !statsData || (statsData.total_open || 0) <= 0) {
         setFixStatus('No open tickets to fix');
@@ -1451,8 +1958,15 @@ const App = () => {
     triggerLogFlash();
 
     try {
+      const headers = { 'Content-Type': 'application/json' };
+      const token = getAuthToken();
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
       const response = await fetch(`${API_BASE}/fix-ticket`, {
         method: 'POST',
+        headers,
       });
       const data = await response.json();
       if (!response.ok) {
@@ -1488,9 +2002,13 @@ const App = () => {
     }
   };
 
+  if (!authenticated) {
+    return h(LoginView, { onLogin: handleLogin });
+  }
+
   return h('div', { className: 'dashboard' },
     h(NavigationRail, { activeView, onViewChange: setActiveView, logAlert }),
-    h(Header, { onFix: handleFix, isFixing, fixStatus, theme, onToggleTheme: toggleTheme }),
+    h(Header, { onFix: handleFix, isFixing, fixStatus, theme, onToggleTheme: toggleTheme, onLogout: handleLogout }),
     h('main', { className: 'dashboard-content' },
       renderView()
     ),
