@@ -15,6 +15,22 @@ if TYPE_CHECKING:
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8090
 ACCESS_RULE = "local-only"
+MODULE_METADATA = {
+    "name": "modules.yhatzee",
+    "version": "1.0.0",
+    "description": "Two-player Yhatzee module with local GUI.",
+    "capabilities": {
+        "gui": True,
+        "health": True,
+    },
+    "data_access": {
+        "state_dir": True,
+    },
+    "network": {
+        "external_requests": False,
+    },
+    "permissions": ["logging", "fs_read"],
+}
 
 
 def _normalize_project_root(project_root: Optional[Union[str, Path]]) -> Optional[Path]:

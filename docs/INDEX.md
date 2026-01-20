@@ -7,6 +7,7 @@ This index keeps documentation discoverable and aligned with the Actifix workflo
 - **QUICKSTART** `QUICKSTART.md` - fastest path to running Actifix
 - **INSTALLATION** `INSTALLATION.md` - installation and configuration details
 - **FRAMEWORK OVERVIEW** [`FRAMEWORK_OVERVIEW.md#dashboard-panes`](FRAMEWORK_OVERVIEW.md#dashboard-panes) - architecture, dashboard panes (incl. new Ideas pane), release notes, roadmap
+- **MODULE METADATA + HEALTH** `FRAMEWORK_OVERVIEW.md#module-metadata-and-permissions` - module metadata schema and health aggregation.
 
 ## Operators and support
 - **MONITORING** `MONITORING.md` - health checks, metrics, and alerting

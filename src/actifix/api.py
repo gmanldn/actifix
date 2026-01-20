@@ -4,6 +4,7 @@ Actifix API Server - Flask-based REST API for frontend dashboard.
 Provides endpoints for health, stats, tickets, logs, and system information.
 """
 
+import importlib
 import json
 import logging
 import os
@@ -77,6 +78,7 @@ from .persistence.cleanup_config import get_cleanup_config
 from .config import get_config, set_config, load_config
 from .security.rate_limiter import RateLimitConfig, RateLimitError, get_rate_limiter
 from .log_utils import log_event
+from .plugins.permissions import PermissionRegistry
 from .ai_client import get_ai_client, resolve_provider_selection
 
 # Server start time for uptime calculation
@@ -86,6 +88,16 @@ MODULE_STATUS_SCHEMA_VERSION = "module-statuses.v1"
 MODULE_ACCESS_PUBLIC = "public"
 MODULE_ACCESS_LOCAL_ONLY = "local-only"
 MODULE_ACCESS_AUTH_REQUIRED = "auth-required"
+
+_MODULE_METADATA_REQUIRED_FIELDS = {
+    "name",
+    "version",
+    "description",
+    "capabilities",
+    "data_access",
+    "network",
+    "permissions",
+}
 
 
 def _parse_module_rate_limit_overrides(raw: str) -> dict[str, dict[str, int]]:
@@ -114,6 +126,53 @@ def _parse_module_rate_limit_overrides(raw: str) -> dict[str, dict[str, int]]:
     return overrides
 
 
+def _load_module_metadata(create_blueprint) -> tuple[Optional[str], Optional[dict]]:
+    module_path = getattr(create_blueprint, "__module__", "")
+    if not module_path:
+        return None, None
+    module = importlib.import_module(module_path)
+    return module_path, getattr(module, "MODULE_METADATA", None)
+
+
+def _validate_module_metadata(module_name: str, metadata: Optional[dict]) -> list[str]:
+    errors: list[str] = []
+    if not isinstance(metadata, dict):
+        return ["metadata_missing"]
+
+    missing = _MODULE_METADATA_REQUIRED_FIELDS - set(metadata.keys())
+    if missing:
+        errors.append(f"missing_fields: {sorted(missing)}")
+
+    name = metadata.get("name")
+    if not isinstance(name, str) or not name.strip():
+        errors.append("name_invalid")
+    elif name.strip() not in {module_name, f"modules.{module_name}"}:
+        errors.append("name_mismatch")
+
+    version = metadata.get("version")
+    if not isinstance(version, str) or not version.strip():
+        errors.append("version_invalid")
+
+    description = metadata.get("description")
+    if not isinstance(description, str) or not description.strip():
+        errors.append("description_invalid")
+
+    for key in ("capabilities", "data_access", "network"):
+        if not isinstance(metadata.get(key), dict):
+            errors.append(f"{key}_invalid")
+
+    permissions = metadata.get("permissions")
+    if not isinstance(permissions, list):
+        errors.append("permissions_invalid")
+    else:
+        valid_names = {perm.name for perm in PermissionRegistry.ALL_PERMISSIONS}
+        invalid = [name for name in permissions if name not in valid_names]
+        if invalid:
+            errors.append(f"permissions_unknown: {sorted(invalid)}")
+
+    return errors
+
+
 def _register_module_blueprint(
     app,
     module_name: str,
@@ -130,6 +189,22 @@ def _register_module_blueprint(
     """Register a module blueprint with consistent logging and guards."""
     expected_prefix = f"/modules/{module_name}"
     try:
+        module_path, metadata = _load_module_metadata(create_blueprint)
+        metadata_errors = _validate_module_metadata(module_name, metadata)
+        if metadata_errors:
+            record_error(
+                message=(
+                    f"Module metadata invalid for {module_name}: "
+                    f"{', '.join(metadata_errors)}"
+                ),
+                source="api.py:_register_module_blueprint",
+                run_label=f"{module_name}-gui",
+                error_type="ModuleMetadataError",
+                priority=TicketPriority.P2,
+            )
+            _mark_module_status(status_file, f"modules.{module_name}", "error")
+            return False
+
         blueprint = create_blueprint(project_root=project_root, host=host, port=port)
         blueprint_prefix = getattr(blueprint, "url_prefix", None)
         if blueprint_prefix is None:
@@ -145,7 +220,11 @@ def _register_module_blueprint(
         log_event(
             "MODULE_REGISTERED",
             f"Registered module blueprint: {module_name}",
-            extra={"module": module_name, "url_prefix": expected_prefix},
+            extra={
+                "module": module_name,
+                "url_prefix": expected_prefix,
+                "module_path": module_path,
+            },
             source="api.py:_register_module_blueprint",
         )
         return True

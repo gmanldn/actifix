@@ -48,6 +48,28 @@ Actifix supports multiple AI agents working **directly on `develop`** simultaneo
 
 Agents stay in sync through git; local isolation prevents data conflicts.
 
+## Module metadata and permissions
+Each module should expose `MODULE_METADATA` with capability hints and permission declarations.
+Required keys:
+- `name`, `version`, `description`
+- `capabilities` (dict)
+- `data_access` (dict)
+- `network` (dict)
+- `permissions` (list of permission names from `plugins.permissions.PermissionRegistry`)
+
+Example:
+```json
+{
+  "name": "modules.yhatzee",
+  "version": "1.0.0",
+  "description": "Two-player Yhatzee module with local GUI.",
+  "capabilities": {"gui": true, "health": true},
+  "data_access": {"state_dir": true},
+  "network": {"external_requests": false},
+  "permissions": ["logging", "fs_read"]
+}
+```
+
 ## Ticket lifecycle (high-level)
 1. Exception raised or manual capture call.
 2. Raise_AF captures context, deduplicates, and classifies priority.

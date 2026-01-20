@@ -21,6 +21,23 @@ DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8070
 DEFAULT_QUESTIONS_PER_PLAYER = 5
 ACCESS_RULE = "local-only"
+MODULE_METADATA = {
+    "name": "modules.superquiz",
+    "version": "1.0.0",
+    "description": "Multi-player SuperQuiz module with external trivia sources.",
+    "capabilities": {
+        "gui": True,
+        "health": True,
+        "trivia_sources": True,
+    },
+    "data_access": {
+        "state_dir": True,
+    },
+    "network": {
+        "external_requests": True,
+    },
+    "permissions": ["logging", "fs_read", "network_http"],
+}
 
 CATEGORIES: Tuple[str, ...] = (
     "General Knowledge",
