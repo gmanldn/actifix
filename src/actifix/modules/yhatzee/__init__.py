@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Optional, TYPE_CHECKING, Union
 
 from actifix.log_utils import log_event
-from actifix.raise_af import TicketPriority, record_error
+from actifix.raise_af import TicketPriority, record_error, redact_secrets_from_text
 from actifix.state_paths import get_actifix_paths
 
 if TYPE_CHECKING:
@@ -37,6 +37,24 @@ def _log_gui_init(project_root: Optional[Union[str, Path]], host: str, port: int
     )
 
 
+def _record_module_error(
+    message: str,
+    *,
+    source: str,
+    run_label: str,
+    error_type: str,
+    priority: TicketPriority,
+) -> None:
+    safe_message = redact_secrets_from_text(message)
+    record_error(
+        message=safe_message,
+        source=source,
+        run_label=run_label,
+        error_type=error_type,
+        priority=priority,
+    )
+
+
 def create_blueprint(
     project_root: Optional[Union[str, Path]] = None,
     host: str = DEFAULT_HOST,
@@ -60,7 +78,7 @@ def create_blueprint(
         _log_gui_init(project_root, host, port)
         return blueprint
     except Exception as exc:
-        record_error(
+        _record_module_error(
             message=f"Failed to create Yhatzee blueprint: {exc}",
             source="modules/yhatzee/__init__.py:create_blueprint",
             run_label="yhatzee-gui",
@@ -84,7 +102,7 @@ def create_app(
         app.register_blueprint(blueprint)
         return app
     except Exception as exc:
-        record_error(
+        _record_module_error(
             message=f"Failed to create Yhatzee GUI app: {exc}",
             source="modules/yhatzee/__init__.py:create_app",
             run_label="yhatzee-gui",
@@ -111,7 +129,7 @@ def run_gui(
         )
         app.run(host=host, port=port, debug=debug)
     except Exception as exc:
-        record_error(
+        _record_module_error(
             message=f"Failed to start Yhatzee GUI: {exc}",
             source="modules/yhatzee/__init__.py:run_gui",
             run_label="yhatzee-gui",

@@ -18,6 +18,7 @@ Actifix is a self-improving error management system that captures prioritized ti
 - Context capture (stack traces, file snippets, system state) with configurable limits.
 - Durable persistence backed by `data/actifix.db`, with fallback queue support.
 - Self-development mode to keep regressions visible during work.
+- Module error logs redact secrets before ticket persistence.
 
 ## Architecture primer
 Core modules and their roles:
