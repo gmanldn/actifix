@@ -38,7 +38,12 @@ _SAFE_ENV_KEYS = {
     "USER",
 }
 
-_SAFE_ENV_PREFIXES = ("LC_", "XDG_")
+_SAFE_ENV_PREFIXES = ("LC_", "XDG_", "ACTIFIX_")
+
+_ALWAYS_ALLOW_SENSITIVE_NAMED_KEYS = {
+    # This is a configuration toggle, not a secret value.
+    "ACTIFIX_SECRET_REDACTION",
+}
 
 _SENSITIVE_ENV_MARKERS = (
     "SECRET",
@@ -64,14 +69,16 @@ class ModuleContext:
 
 
 def _is_sensitive_env_key(key: str) -> bool:
+    if key in _ALWAYS_ALLOW_SENSITIVE_NAMED_KEYS:
+        return False
     upper_key = key.upper()
     return any(marker in upper_key for marker in _SENSITIVE_ENV_MARKERS)
 
 
-def _is_safe_env_key(key: str, allowlist: set[str]) -> bool:
-    if key in allowlist:
+def _is_safe_env_key(key_upper: str, allowlist_upper: set[str]) -> bool:
+    if key_upper in allowlist_upper:
         return True
-    return any(key.startswith(prefix) for prefix in _SAFE_ENV_PREFIXES)
+    return any(key_upper.startswith(prefix) for prefix in _SAFE_ENV_PREFIXES)
 
 
 def build_module_env(
@@ -85,13 +92,17 @@ def build_module_env(
     if extra_safe_keys:
         allowlist.update(str(key) for key in extra_safe_keys)
 
+    allowlist_upper = {key.upper() for key in allowlist}
+
     safe_env: dict[str, str] = {}
     for key, value in env.items():
-        if not _is_safe_env_key(key, allowlist):
+        key_str = str(key)
+        key_upper = key_str.upper()
+        if not _is_safe_env_key(key_upper, allowlist_upper):
             continue
-        if _is_sensitive_env_key(key):
+        if _is_sensitive_env_key(key_upper):
             continue
-        safe_env[key] = redact_secrets_from_text(str(value))
+        safe_env[key_str] = redact_secrets_from_text(str(value))
     return safe_env
 
 
