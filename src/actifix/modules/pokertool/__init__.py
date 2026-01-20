@@ -8,6 +8,7 @@ from typing import Optional, TYPE_CHECKING, Union
 from actifix.log_utils import log_event
 from actifix.raise_af import TicketPriority
 
+from .core import PokerToolAnalysisError, evaluate_hand
 from actifix.modules.base import ModuleBase
 
 if TYPE_CHECKING:
@@ -98,12 +99,39 @@ def create_blueprint(
 
         @blueprint.route("/api/analysis", methods=["POST"])
         def analysis() -> Response:
-            payload = request.get_json(silent=True) or {}
-            return jsonify(
-                _stub_response(
-                    "Analysis endpoint placeholder.",
-                    {"received": payload, "queued": 0},
+            payload = request.get_json(silent=True)
+            if not isinstance(payload, dict):
+                helper.record_module_error(
+                    message="Analysis endpoint requires a JSON payload.",
+                    source="modules.pokertool.__init__:analysis",
+                    error_type="PayloadError",
+                    priority=TicketPriority.P3,
                 )
+                return jsonify(
+                    {"status": "error", "message": "JSON body expected for analysis."}
+                ), 400
+            hand = payload.get("hand") or []
+            board = payload.get("board") or []
+            try:
+                analysis_result = evaluate_hand(hand, board)
+            except PokerToolAnalysisError as exc:
+                helper.record_module_error(
+                    message=f"Invalid analysis payload: {exc}",
+                    source="modules.pokertool.__init__:analysis",
+                    error_type=type(exc).__name__,
+                    priority=TicketPriority.P3,
+                )
+                return jsonify({"status": "error", "message": str(exc)}), 400
+            except Exception as exc:
+                helper.record_module_error(
+                    message=f"Unexpected analysis failure: {exc}",
+                    source="modules.pokertool.__init__:analysis",
+                    error_type=type(exc).__name__,
+                    priority=TicketPriority.P1,
+                )
+                raise
+            return jsonify(
+                _stub_response("Analysis payload processed.", {"analysis": analysis_result})
             )
 
         helper.log_gui_init(resolved_host, resolved_port, extra={"module": helper.module_id})
