@@ -296,6 +296,12 @@
       "label": "yhatzee"
     },
     {
+      "id": "modules.pokertool",
+      "domain": "modules",
+      "owner": "modules",
+      "label": "pokertool"
+    },
+    {
       "id": "modules.registry",
       "domain": "modules",
       "owner": "modules",
@@ -843,6 +849,26 @@
       "from": "modules.yhatzee",
       "to": "runtime.api",
       "reason": "modules.yhatzee registers a blueprint on the runtime API server"
+    },
+    {
+      "from": "modules.pokertool",
+      "to": "runtime.state",
+      "reason": "modules.pokertool uses Actifix state paths"
+    },
+    {
+      "from": "modules.pokertool",
+      "to": "infra.logging",
+      "reason": "modules.pokertool logs events via infra.logging"
+    },
+    {
+      "from": "modules.pokertool",
+      "to": "core.raise_af",
+      "reason": "modules.pokertool records errors via core.raise_af"
+    },
+    {
+      "from": "modules.pokertool",
+      "to": "runtime.api",
+      "reason": "modules.pokertool registers a blueprint on the runtime API server"
     },
     {
       "from": "modules.dev_assistant",

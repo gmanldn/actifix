@@ -899,6 +899,22 @@ modules:
   - modules.yhatzee.game
   - modules.yhatzee.routes
 
+- id: modules.pokertool
+  domain: modules
+  owner: modules
+  summary: Planned PokerTool integration exposing analysis, detection, and health endpoints
+  entrypoints:
+  - src/actifix/modules/pokertool/__init__.py
+  contracts:
+  - provide health and analysis stub endpoints under /modules/pokertool
+  - log module lifecycle events using centralized logging and RaiseAF helpers
+  - act as the future landing surface for PokerTool real-time analysis and detection systems
+  depends_on:
+  - runtime.state
+  - infra.logging
+  - core.raise_af
+  - runtime.api
+
 - id: modules.yhatzee.game
   domain: modules
   owner: modules
