@@ -392,6 +392,33 @@ def _verify_auth_token(token: str) -> bool:
         return False
 
 
+def _verify_admin_password(password: str) -> bool:
+    """Verify X-Admin-Password header against admin user."""
+    try:
+        from actifix.security.auth import get_user_manager
+        user_manager = get_user_manager()
+        # Try to authenticate as admin user with the password
+        user_id = user_manager.authenticate_user('admin', password)
+        return user_id is not None
+    except Exception:
+        return False
+
+
+def _check_auth(req) -> bool:
+    """Check if request is authenticated via Authorization header or X-Admin-Password."""
+    # First check for X-Admin-Password (simpler auth for local development)
+    admin_password = req.headers.get("X-Admin-Password", "")
+    if admin_password and _verify_admin_password(admin_password):
+        return True
+
+    # Fall back to standard token authentication
+    token = _extract_bearer_token(req)
+    if token and _verify_auth_token(token):
+        return True
+
+    return False
+
+
 def _fetch_module_health(app, module_name: str, timeout_sec: float = 2.0) -> dict:
     import concurrent.futures
     start = time.monotonic()
@@ -819,11 +846,8 @@ def create_app(
                 return None
             return jsonify({"error": "Module access restricted to local requests"}), 403
         if access_rule == MODULE_ACCESS_AUTH_REQUIRED:
-            token = _extract_bearer_token(request)
-            if not token:
+            if not _check_auth(request):
                 return jsonify({"error": "Authorization required"}), 401
-            if not _verify_auth_token(token):
-                return jsonify({"error": "Invalid token"}), 401
             return None
         return jsonify({"error": "Unsupported module access rule"}), 403
 
@@ -873,12 +897,8 @@ def create_app(
     def api_health():
         """Get comprehensive health check data."""
         # Check authentication
-        token = _extract_bearer_token(request)
-        if not token:
+        if not _check_auth(request):
             return jsonify({'error': 'Authorization required'}), 401
-        
-        if not _verify_auth_token(token):
-            return jsonify({'error': 'Invalid token'}), 401
         
         paths = get_actifix_paths(project_root=app.config['PROJECT_ROOT'])
         
@@ -948,12 +968,8 @@ def create_app(
     def api_version():
         """Return version metadata and git status for the dashboard."""
         # Check authentication
-        token = _extract_bearer_token(request)
-        if not token:
+        if not _check_auth(request):
             return jsonify({'error': 'Authorization required'}), 401
-        
-        if not _verify_auth_token(token):
-            return jsonify({'error': 'Invalid token'}), 401
         
         root = Path(app.config['PROJECT_ROOT'])
         info = _gather_version_info(root)
@@ -963,12 +979,8 @@ def create_app(
     def api_stats():
         """Get ticket statistics."""
         # Check authentication
-        token = _extract_bearer_token(request)
-        if not token:
+        if not _check_auth(request):
             return jsonify({'error': 'Authorization required'}), 401
-        
-        if not _verify_auth_token(token):
-            return jsonify({'error': 'Invalid token'}), 401
         
         paths = get_actifix_paths(project_root=app.config['PROJECT_ROOT'])
         stats = get_ticket_stats(paths)
@@ -986,12 +998,8 @@ def create_app(
     def api_tickets():
         """Get recent tickets list."""
         # Check authentication
-        token = _extract_bearer_token(request)
-        if not token:
+        if not _check_auth(request):
             return jsonify({'error': 'Authorization required'}), 401
-        
-        if not _verify_auth_token(token):
-            return jsonify({'error': 'Invalid token'}), 401
         
         paths = get_actifix_paths(project_root=app.config['PROJECT_ROOT'])
         limit = request.args.get('limit', 20, type=int)
@@ -1033,12 +1041,8 @@ def create_app(
     def api_ticket(ticket_id):
         """Get full ticket details by ID."""
         # Check authentication
-        token = _extract_bearer_token(request)
-        if not token:
+        if not _check_auth(request):
             return jsonify({'error': 'Authorization required'}), 401
-        
-        if not _verify_auth_token(token):
-            return jsonify({'error': 'Invalid token'}), 401
         
         paths = get_actifix_paths(project_root=app.config['PROJECT_ROOT'])
         from .persistence.ticket_repo import get_ticket_repository
@@ -1052,12 +1056,8 @@ def create_app(
     def api_fix_ticket():
         """Fix the highest priority open ticket with detailed logging."""
         # Check authentication
-        token = _extract_bearer_token(request)
-        if not token:
+        if not _check_auth(request):
             return jsonify({'error': 'Authorization required'}), 401
-        
-        if not _verify_auth_token(token):
-            return jsonify({'error': 'Invalid token'}), 401
         
         paths = get_actifix_paths(project_root=app.config['PROJECT_ROOT'])
 
@@ -1277,12 +1277,8 @@ def create_app(
     def api_modules():
         """List system/user modules from architecture catalog."""
         # Check authentication
-        token = _extract_bearer_token(request)
-        if not token:
+        if not _check_auth(request):
             return jsonify({'error': 'Authorization required'}), 401
-        
-        if not _verify_auth_token(token):
-            return jsonify({'error': 'Invalid token'}), 401
         
         modules = _load_modules(app.config['PROJECT_ROOT'])
         return jsonify(modules)
@@ -1291,12 +1287,8 @@ def create_app(
     def api_module_health(module_id):
         """Aggregate module health and status."""
         # Check authentication
-        token = _extract_bearer_token(request)
-        if not token:
+        if not _check_auth(request):
             return jsonify({'error': 'Authorization required'}), 401
-        
-        if not _verify_auth_token(token):
-            return jsonify({'error': 'Invalid token'}), 401
         
         module_name = module_id.split(".", 1)[1] if module_id.startswith("modules.") else module_id
         paths = get_actifix_paths(project_root=app.config['PROJECT_ROOT'])
@@ -1318,12 +1310,8 @@ def create_app(
     def api_toggle_module(module_id):
         """Toggle module status (enable/disable)."""
         # Check authentication
-        token = _extract_bearer_token(request)
-        if not token:
+        if not _check_auth(request):
             return jsonify({'error': 'Authorization required'}), 401
-        
-        if not _verify_auth_token(token):
-            return jsonify({'error': 'Invalid token'}), 401
         
         from actifix.state_paths import get_actifix_paths
 
@@ -1364,12 +1352,8 @@ def create_app(
     def api_ping():
         """Simple ping endpoint for connectivity check."""
         # Check authentication
-        token = _extract_bearer_token(request)
-        if not token:
+        if not _check_auth(request):
             return jsonify({'error': 'Authorization required'}), 401
-        
-        if not _verify_auth_token(token):
-            return jsonify({'error': 'Invalid token'}), 401
         
         return jsonify({
             'status': 'ok',
@@ -1380,12 +1364,8 @@ def create_app(
     def api_ai_status():
         """Return AI provider status, defaults, and recent feedback."""
         # Check authentication
-        token = _extract_bearer_token(request)
-        if not token:
+        if not _check_auth(request):
             return jsonify({'error': 'Authorization required'}), 401
-        
-        if not _verify_auth_token(token):
-            return jsonify({'error': 'Invalid token'}), 401
         
         try:
             config = load_config(fail_fast=False)
@@ -1413,12 +1393,8 @@ def create_app(
     def api_get_settings():
         """Get current AI settings (API key is masked for security)."""
         # Check authentication
-        token = _extract_bearer_token(request)
-        if not token:
+        if not _check_auth(request):
             return jsonify({'error': 'Authorization required'}), 401
-        
-        if not _verify_auth_token(token):
-            return jsonify({'error': 'Invalid token'}), 401
         
         config = load_config(fail_fast=False)
 
@@ -1441,12 +1417,8 @@ def create_app(
     def api_update_settings():
         """Update AI settings."""
         # Check authentication
-        token = _extract_bearer_token(request)
-        if not token:
+        if not _check_auth(request):
             return jsonify({'error': 'Authorization required'}), 401
-        
-        if not _verify_auth_token(token):
-            return jsonify({'error': 'Invalid token'}), 401
         
         try:
             data = request.get_json()
@@ -1490,12 +1462,8 @@ def create_app(
     def api_ideas():
         """Process user idea into AI-enriched ticket."""
         # Check authentication
-        token = _extract_bearer_token(request)
-        if not token:
+        if not _check_auth(request):
             return jsonify({'error': 'Authorization required'}), 401
-        
-        if not _verify_auth_token(token):
-            return jsonify({'error': 'Invalid token'}), 401
         
         try:
             data = request.get_json()
@@ -1565,12 +1533,8 @@ def create_app(
     def api_cleanup():
         """Run ticket cleanup with retention policies."""
         # Check authentication
-        token = _extract_bearer_token(request)
-        if not token:
+        if not _check_auth(request):
             return jsonify({'error': 'Authorization required'}), 401
-        
-        if not _verify_auth_token(token):
-            return jsonify({'error': 'Invalid token'}), 401
         
         try:
             data = request.get_json() or {}
@@ -1606,12 +1570,8 @@ def create_app(
     def api_cleanup_config():
         """Get cleanup configuration."""
         # Check authentication
-        token = _extract_bearer_token(request)
-        if not token:
+        if not _check_auth(request):
             return jsonify({'error': 'Authorization required'}), 401
-        
-        if not _verify_auth_token(token):
-            return jsonify({'error': 'Invalid token'}), 401
         
         try:
             config = get_cleanup_config()

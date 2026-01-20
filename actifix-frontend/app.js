@@ -168,16 +168,11 @@ const useAuthenticatedFetch = () => {
     setResult(null);
 
     try {
-      const headers = {
+      const headers = buildAdminHeaders({
         'Content-Type': 'application/json',
         ...options.headers
-      };
-      
-      const token = getAuthToken();
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-      
+      });
+
       const response = await fetch(`${API_BASE}${endpoint}`, {
         method: options.method || 'POST',
         headers,
@@ -186,7 +181,7 @@ const useAuthenticatedFetch = () => {
       });
 
       const data = await response.json();
-      
+
       if (!response.ok) {
         throw new Error(data.error || `HTTP ${response.status}`);
       }
@@ -205,9 +200,7 @@ const useAuthenticatedFetch = () => {
 };
 
 const postJSON = async (endpoint, payload) => {
-  const headers = { 'Content-Type': 'application/json' };
-  const token = getAuthToken();
-  if (token) headers['Authorization'] = `Bearer ${token}`;
+  const headers = buildAdminHeaders({ 'Content-Type': 'application/json' });
   const response = await fetch(`${API_BASE}${endpoint}`, {
     method: 'POST',
     headers,
@@ -379,11 +372,7 @@ const Header = ({ onFix, isFixing, fixStatus, theme, onToggleTheme, onLogout }) 
   useEffect(() => {
     const checkConnection = async () => {
       try {
-        const headers = {};
-        const token = getAuthToken();
-        if (token) {
-          headers['Authorization'] = `Bearer ${token}`;
-        }
+        const headers = buildAdminHeaders();
         
         const response = await fetch(`${API_BASE}/ping`, { headers });
         setConnected(response.ok);
@@ -779,12 +768,7 @@ const TicketsView = () => {
     setModalLoading(true);
     setModalError('');
     try {
-      const headers = {};
-      const token = getAuthToken();
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-      
+      const headers = buildAdminHeaders();
       const response = await fetch(`${API_BASE}/ticket/${ticketId}`, { headers });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const ticketData = await response.json();
@@ -1350,14 +1334,15 @@ const SettingsView = () => {
 
   // Load current settings
   useEffect(() => {
+    // Load stored admin password from localStorage
+    const storedPassword = getAdminPassword();
+    if (storedPassword) {
+      setAdminPassword(storedPassword);
+    }
+
     const loadSettings = async () => {
       try {
-        const headers = {};
-        const token = getAuthToken();
-        if (token) {
-          headers['Authorization'] = `Bearer ${token}`;
-        }
-        
+        const headers = buildAdminHeaders();
         const response = await fetch(`${API_BASE}/settings`, { headers });
         if (response.ok) {
           const data = await response.json();
@@ -1378,6 +1363,11 @@ const SettingsView = () => {
     setMessage('');
 
     try {
+      // Store admin password in localStorage for subsequent requests
+      if (adminPassword) {
+        setAdminPasswordInStorage(adminPassword);
+      }
+
       await authenticatedFetch('/settings', {
         body: {
           ai_provider: aiProvider,
@@ -1387,7 +1377,7 @@ const SettingsView = () => {
         }
       });
 
-      setMessage('Settings saved successfully!');
+      setMessage('Settings saved successfully! Admin password stored for this session.');
       setTimeout(() => setMessage(''), 3000);
     } catch (err) {
       setMessage(`Error: ${err.message}`);
@@ -1938,14 +1928,9 @@ const App = () => {
     if (isFixing) return;
     setIsFixing(true);
     setFixStatus('Checking tickets…');
-    
+
     try {
-      const headers = {};
-      const token = getAuthToken();
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-      
+      const headers = buildAdminHeaders();
       const statsResp = await fetch(`${API_BASE}/tickets?limit=1`, { headers });
       const statsData = await statsResp.json();
       if (!statsResp.ok || !statsData || (statsData.total_open || 0) <= 0) {
@@ -1963,11 +1948,7 @@ const App = () => {
     triggerLogFlash();
 
     try {
-      const headers = { 'Content-Type': 'application/json' };
-      const token = getAuthToken();
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
+      const headers = buildAdminHeaders({ 'Content-Type': 'application/json' });
       
       const response = await fetch(`${API_BASE}/fix-ticket`, {
         method: 'POST',
