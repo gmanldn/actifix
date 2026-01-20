@@ -4,8 +4,8 @@ import sys
 import pytest
 from pathlib import Path
 
-# Load performance tracking plugin
-pytest_plugins = ["pytest_plugins"]
+# Load performance tracking plugin within the ``test`` package
+pytest_plugins = ["test.pytest_plugins"]
 
 SLOW_TEST_PATTERNS = (
     "test_threading_barrier_debug.py",
@@ -170,7 +170,7 @@ def isolate_actifix_db(monkeypatch, tmp_path, request):
 @pytest.fixture(scope="session", autouse=True)
 def database_profiler_session():
     """Database profiler for the entire test session."""
-    from database_profiler import get_database_profiler
+    from test.database_profiler import get_database_profiler
 
     profiler = get_database_profiler()
     yield profiler
