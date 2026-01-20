@@ -105,6 +105,11 @@ Module enable/disable state lives in `.actifix/module_statuses.json` using a ver
 Writes must go through `atomic_write()` and the system will back up malformed JSON to
 `module_statuses.corrupt.json` before restoring defaults.
 
+## Module execution context
+Module execution should use a sanitized environment via `actifix.modules.get_module_context()`.
+Only allowlisted keys (plus `LC_`/`XDG_` prefixes) are exposed and sensitive names are excluded.
+Values are also redacted with `redact_secrets_from_text()` to avoid leaking secrets into tickets.
+
 ## Documentation workflow
 - Use `docs/FRAMEWORK_OVERVIEW.md` for release notes and feature narratives.
 - Update `docs/INDEX.md` any time sections move.
