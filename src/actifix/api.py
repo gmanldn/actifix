@@ -173,11 +173,6 @@ def _collect_ai_feedback(limit: int = 40) -> List[str]:
 
     return list(reversed(feedback))
 
-    system = [m for m in modules if (m.get("owner") or "").lower() in SYSTEM_OWNERS]
-    user = [m for m in modules if m not in system]
-
-    return {"system": system, "user": user}
-
 
 def _run_git_command(cmd: list[str], project_root: Path) -> Optional[str]:
     """Run git command and return stripped stdout or None on failure."""
@@ -310,7 +305,11 @@ def _parse_log_line(line: str) -> Optional[dict]:
     }
 
 
-def create_app(project_root: Optional[Path] = None) -> "Flask":
+def create_app(
+    project_root: Optional[Path] = None,
+    host: str = "127.0.0.1",
+    port: int = 5001,
+) -> "Flask":
     """
     Create and configure the Flask API application.
     
@@ -343,9 +342,30 @@ def create_app(project_root: Optional[Path] = None) -> "Flask":
     werkzeug_logger.setLevel(logging.ERROR)
     CORS(app)  # Enable CORS for frontend
     
-    # Store project root in app config
+    # Store project root and API binding info in app config
     app.config['PROJECT_ROOT'] = root
     app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0  # Disable static file caching in development
+    app.config['API_HOST'] = host
+    app.config['API_PORT'] = port
+
+    try:
+        from actifix.modules.yhatzee import create_blueprint as _create_yhatzee_blueprint
+    except ImportError:
+        _create_yhatzee_blueprint = None
+
+    if _create_yhatzee_blueprint:
+        try:
+            yhatzee_blueprint = _create_yhatzee_blueprint(project_root=root, host=host, port=port)
+            app.register_blueprint(yhatzee_blueprint)
+        except Exception as exc:
+            record_error(
+                message=f"Yhatzee module registration failed: {exc}",
+                source="api.py:create_app",
+                run_label="yhatzee-gui",
+                error_type=type(exc).__name__,
+                priority=TicketPriority.P2,
+            )
+
     
     @app.route('/', methods=['GET'])
     def serve_index():
@@ -975,7 +995,7 @@ def run_api_server(
         project_root: Optional project root path.
         debug: Enable debug mode.
     """
-    app = create_app(project_root)
+    app = create_app(project_root, host=host, port=port)
     app.run(host=host, port=port, debug=debug, threaded=True)
 
 
