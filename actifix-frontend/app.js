@@ -503,59 +503,7 @@ const TicketsView = () => {
     );
   };
 
-  return h('div', { className: 'panel tickets-board' },
-    h('div', { className: 'panel-header' },
-      h('div', { className: 'panel-title' },
-        h('span', { className: 'panel-title-icon' }, '🎫'),
-        'ALL TICKETS'
-      ),
-      h('div', { className: 'panel-actions' },
-        h('span', { className: 'tickets-live' },
-          h('span', { className: 'tickets-live-dot' }),
-          'Live',
-          h('span', { className: 'tickets-live-time' }, `Updated ${updatedLabel}`)
-        ),
-        h('span', { className: 'text-muted', style: { fontSize: '11px' } },
-          `${data?.total_open ?? 0} open • ${data?.total_completed ?? 0} completed`
-        )
-      )
-    ),
-    tickets.length > 0 ? h('div', { className: 'priority-lanes' },
-      PRIORITY_ORDER.map((priority) => {
-        const group = groupedTickets[priority];
-        const openTickets = group?.open || [];
-        const completedTickets = group?.completed || [];
-        const label = PRIORITY_LABELS[priority] || 'Priority';
-
-        return h('section', {
-          key: priority,
-          className: 'priority-lane',
-          'data-priority': priority,
-        },
-          h('div', { className: 'priority-lane-header' },
-            h('div', { className: 'priority-lane-title' },
-              h('span', { className: `priority-badge ${priority.toLowerCase()}` }, priority),
-              h('div', { className: 'priority-lane-label' }, label)
-            ),
-            h('div', { className: 'priority-lane-counts' },
-              h('span', { className: 'lane-count open' }, `${openTickets.length} open`),
-              h('span', { className: 'lane-count completed' }, `${completedTickets.length} done`)
-            )
-          ),
-          openTickets.length > 0
-            ? openTickets.map(renderTicketCard)
-            : h('div', { className: 'lane-empty' }, 'No open tickets'),
-          completedTickets.length > 0 && h('details', { className: 'lane-completed' },
-            h('summary', null, `Show ${completedTickets.length} completed`),
-            h('div', { className: 'lane-completed-list' },
-              completedTickets.map(renderTicketCard)
-            )
-          )
-        );
-      })
-    ) : h('div', { style: { padding: '24px', textAlign: 'center', color: 'var(--text-dim)' } }, 'No tickets found'),
-    renderModal()
-  );
+  const renderModal = () => {
     if (!selectedTicket && !modalLoading && !modalError) return null;
 
     const backdropStyle = {
@@ -709,6 +657,58 @@ const TicketsView = () => {
   };
 
   return h('div', { className: 'panel tickets-board' },
+    h('div', { className: 'panel-header' },
+      h('div', { className: 'panel-title' },
+        h('span', { className: 'panel-title-icon' }, '🎫'),
+        'ALL TICKETS'
+      ),
+      h('div', { className: 'panel-actions' },
+        h('span', { className: 'tickets-live' },
+          h('span', { className: 'tickets-live-dot' }),
+          'Live',
+          h('span', { className: 'tickets-live-time' }, `Updated ${updatedLabel}`)
+        ),
+        h('span', { className: 'text-muted', style: { fontSize: '11px' } },
+          `${data?.total_open ?? 0} open • ${data?.total_completed ?? 0} completed`
+        )
+      )
+    ),
+    tickets.length > 0 ? h('div', { className: 'priority-lanes' },
+      PRIORITY_ORDER.map((priority) => {
+        const group = groupedTickets[priority];
+        const openTickets = group?.open || [];
+        const completedTickets = group?.completed || [];
+        const label = PRIORITY_LABELS[priority] || 'Priority';
+
+        return h('section', {
+          key: priority,
+          className: 'priority-lane',
+          'data-priority': priority,
+        },
+          h('div', { className: 'priority-lane-header' },
+            h('div', { className: 'priority-lane-title' },
+              h('span', { className: `priority-badge ${priority.toLowerCase()}` }, priority),
+              h('div', { className: 'priority-lane-label' }, label)
+            ),
+            h('div', { className: 'priority-lane-counts' },
+              h('span', { className: 'lane-count open' }, `${openTickets.length} open`),
+              h('span', { className: 'lane-count completed' }, `${completedTickets.length} done`)
+            )
+          ),
+          openTickets.length > 0
+            ? openTickets.map(renderTicketCard)
+            : h('div', { className: 'lane-empty' }, 'No open tickets'),
+          completedTickets.length > 0 && h('details', { className: 'lane-completed' },
+            h('summary', null, `Show ${completedTickets.length} completed`),
+            h('div', { className: 'lane-completed-list' },
+              completedTickets.map(renderTicketCard)
+            )
+          )
+        );
+      })
+    ) : h('div', { style: { padding: '24px', textAlign: 'center', color: 'var(--text-dim)' } }, 'No tickets found'),
+    renderModal()
+  );
 };
 
 // Logs View Component

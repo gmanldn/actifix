@@ -1,4 +1,7 @@
+# -*- coding: cp1252 -*-
 import pytest
+import shutil
+import subprocess
 from pathlib import Path
 
 def test_index_html_contains_required_tags():
@@ -46,3 +49,13 @@ def test_app_js_nav_rail_cog():
     content = app_path.read_text(encoding="utf-8")
     assert "{ id: 'system', icon: '™', label: 'System' }" in content, "System cog icon regression"
     assert 'nav-rail-logo' in content, "AF pangolin.svg logo present"
+
+
+
+def test_app_js_valid_syntax():
+    node = shutil.which('node')
+    if not node:
+        pytest.skip('Node runtime is required for frontend syntax checks')
+    app_path = Path('actifix-frontend') / 'app.js'
+    result = subprocess.run([node, '--check', str(app_path)], capture_output=True, text=True)
+    assert result.returncode == 0, 'node --check failed:\n{}'.format(result.stderr)
