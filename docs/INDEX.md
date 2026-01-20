@@ -9,6 +9,7 @@ This index keeps documentation discoverable and aligned with the Actifix workflo
 - **FRAMEWORK OVERVIEW** [`FRAMEWORK_OVERVIEW.md#dashboard-panes`](FRAMEWORK_OVERVIEW.md#dashboard-panes) - architecture, dashboard panes (incl. new Ideas pane), release notes, roadmap
 - **MODULE CONFIGURATION** `FRAMEWORK_OVERVIEW.md#module-configuration` - module defaults and override schema
 - **MODULE METADATA + HEALTH** `FRAMEWORK_OVERVIEW.md#module-metadata-and-permissions` - module metadata schema and health aggregation.
+- **MODULE LIFECYCLE** `FRAMEWORK_OVERVIEW.md#module-lifecycle-and-helpers` - ModuleBase helpers, ModuleRegistry discovery, and status persistence.
 
 ## Operators and support
 - **MONITORING** `MONITORING.md` - health checks, metrics, and alerting

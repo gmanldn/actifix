@@ -70,6 +70,22 @@ Example:
 }
 ```
 
+## Module lifecycle and helpers
+
+Actifix now ships with a shared `ModuleBase` helper for any GUI module. It merges
+`MODULE_DEFAULTS` with `ACTIFIX_MODULE_CONFIG_OVERRIDES`, keeps sanitized
+Actifix paths handy, exposes a default health response, and centralizes `log_event` +
+`record_error` calls so every module records errors with a consistent run label
+(e.g., `superquiz-gui`).
+
+The API also walks every `modules.*` node declared in `docs/architecture/DEPGRAPH.json`
+via `ModuleRegistry`. The registry lazy-imports `actifix.modules.<name>`, persists
+enable/disable/error states inside `.actifix/module_statuses.json` (atomic writes,
+`module-statuses.v1` schema), and enforces lifecycle hooks (`module_register`,
+`module_unregister`). Disabled modules are skipped during startup and the registry
+drives the same state file that `python3 -m actifix.main modules enable/disable`
+updates so the CLI, launcher, and tests all read from one source of truth.
+
 ## Module configuration
 Module defaults come from Actifix config with optional overrides via `ACTIFIX_MODULE_CONFIG_OVERRIDES`.
 
