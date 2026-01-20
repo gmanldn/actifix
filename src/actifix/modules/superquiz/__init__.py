@@ -20,6 +20,7 @@ if TYPE_CHECKING:
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8070
 DEFAULT_QUESTIONS_PER_PLAYER = 5
+ACCESS_RULE = "local-only"
 
 CATEGORIES: Tuple[str, ...] = (
     "General Knowledge",

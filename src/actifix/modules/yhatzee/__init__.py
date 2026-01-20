@@ -14,6 +14,7 @@ if TYPE_CHECKING:
 
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8090
+ACCESS_RULE = "local-only"
 
 
 def _normalize_project_root(project_root: Optional[Union[str, Path]]) -> Optional[Path]:

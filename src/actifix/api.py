@@ -81,6 +81,9 @@ from .ai_client import get_ai_client, resolve_provider_selection
 SERVER_START_TIME = time.time()
 SYSTEM_OWNERS = {"runtime", "infra", "core", "persistence", "testing", "tooling"}
 MODULE_STATUS_SCHEMA_VERSION = "module-statuses.v1"
+MODULE_ACCESS_PUBLIC = "public"
+MODULE_ACCESS_LOCAL_ONLY = "local-only"
+MODULE_ACCESS_AUTH_REQUIRED = "auth-required"
 
 
 def _default_module_status_payload() -> Dict[str, Dict[str, List[str]]]:
@@ -211,6 +214,54 @@ def _read_module_status_payload(status_file: Path) -> Dict[str, Dict[str, List[s
         priority=TicketPriority.P2,
     )
     return default_payload
+
+
+def _is_local_request(req) -> bool:
+    address = req.remote_addr or ""
+    if address.startswith("127.") or address == "::1":
+        return True
+    for addr in req.access_route or []:
+        if addr.startswith("127.") or addr == "::1":
+            return True
+    return False
+
+
+def _extract_bearer_token(req) -> Optional[str]:
+    header = req.headers.get("Authorization", "")
+    if not header:
+        return None
+    parts = header.split(None, 1)
+    if len(parts) == 2 and parts[0].lower() == "bearer":
+        return parts[1].strip()
+    return header.strip()
+
+
+def _verify_auth_token(token: str) -> bool:
+    try:
+        from actifix.security.auth import get_token_manager, get_user_manager
+    except Exception as exc:
+        record_error(
+            message=f"Failed to load auth managers: {exc}",
+            source="api.py:_verify_auth_token",
+            priority=TicketPriority.P2,
+        )
+        return False
+
+    try:
+        token_manager = get_token_manager()
+        user_manager = get_user_manager()
+        user_id = token_manager.verify_token(token)
+        if not user_id:
+            return False
+        user = user_manager.get_user(user_id)
+        return user is not None and user.is_active
+    except Exception as exc:
+        record_error(
+            message=f"Auth token verification failed: {exc}",
+            source="api.py:_verify_auth_token",
+            priority=TicketPriority.P2,
+        )
+        return False
 
 
 def _is_system_domain(domain: Optional[str]) -> bool:
@@ -471,21 +522,30 @@ def create_app(
     app.config['API_HOST'] = host
     app.config['API_PORT'] = port
     status_file = get_actifix_paths(project_root=root).state_dir / "module_statuses.json"
+    module_access_rules: dict[str, str] = {}
+
+    def _register_module_access(module_name: str, access_rule: str) -> None:
+        module_access_rules[module_name] = access_rule or MODULE_ACCESS_PUBLIC
 
     try:
         from actifix.modules.yhatzee import create_blueprint as _create_yhatzee_blueprint
+        from actifix.modules.yhatzee import ACCESS_RULE as _yhatzee_access_rule
     except ImportError:
         _create_yhatzee_blueprint = None
+        _yhatzee_access_rule = MODULE_ACCESS_PUBLIC
 
     try:
         from actifix.modules.superquiz import create_blueprint as _create_superquiz_blueprint
+        from actifix.modules.superquiz import ACCESS_RULE as _superquiz_access_rule
     except ImportError:
         _create_superquiz_blueprint = None
+        _superquiz_access_rule = MODULE_ACCESS_PUBLIC
 
     if _create_yhatzee_blueprint:
         try:
             yhatzee_blueprint = _create_yhatzee_blueprint(project_root=root, host=host, port=port)
             app.register_blueprint(yhatzee_blueprint)
+            _register_module_access("yhatzee", _yhatzee_access_rule)
         except Exception as exc:
             record_error(
                 message=f"Yhatzee module registration failed: {exc}",
@@ -500,6 +560,7 @@ def create_app(
         try:
             superquiz_blueprint = _create_superquiz_blueprint(project_root=root, host=host, port=port)
             app.register_blueprint(superquiz_blueprint)
+            _register_module_access("superquiz", _superquiz_access_rule)
         except Exception as exc:
             record_error(
                 message=f"SuperQuiz module registration failed: {exc}",
@@ -510,7 +571,31 @@ def create_app(
             )
             _mark_module_status(status_file, "modules.superquiz", "error")
 
-    
+    @app.before_request
+    def _enforce_module_access():
+        path = request.path or ""
+        if not path.startswith("/modules/"):
+            return None
+        parts = path.split("/")
+        if len(parts) < 3 or not parts[2]:
+            return None
+        module_name = parts[2]
+        access_rule = module_access_rules.get(module_name, MODULE_ACCESS_PUBLIC)
+        if access_rule == MODULE_ACCESS_PUBLIC:
+            return None
+        if access_rule == MODULE_ACCESS_LOCAL_ONLY:
+            if _is_local_request(request):
+                return None
+            return jsonify({"error": "Module access restricted to local requests"}), 403
+        if access_rule == MODULE_ACCESS_AUTH_REQUIRED:
+            token = _extract_bearer_token(request)
+            if not token:
+                return jsonify({"error": "Authorization required"}), 401
+            if not _verify_auth_token(token):
+                return jsonify({"error": "Invalid token"}), 401
+            return None
+        return jsonify({"error": "Unsupported module access rule"}), 403
+
     @app.route('/', methods=['GET'])
     def serve_index():
         """Serve the dashboard frontend."""
