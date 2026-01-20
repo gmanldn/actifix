@@ -38,11 +38,14 @@ SRC_DIR = ROOT / "src"
 FRONTEND_DIR = ROOT / "actifix-frontend"
 DEFAULT_FRONTEND_PORT = 8080
 DEFAULT_API_PORT = 5001
+DEFAULT_YHATZEE_PORT = 8090
 VERSION_LINE_RE = re.compile(r'^version\s*=\s*["\'](?P<version>[^"\']+)["\']', re.MULTILINE)
 
 # Global singleton instances - only one of each can exist
 _API_SERVER_INSTANCE: Optional[threading.Thread] = None
 _API_SERVER_LOCK = threading.Lock()
+_YHATZEE_SERVER_INSTANCE: Optional[threading.Thread] = None
+_YHATZEE_SERVER_LOCK = threading.Lock()
 _FRONTEND_MANAGER_INSTANCE: Optional['FrontendManager'] = None
 _FRONTEND_LOCK = threading.Lock()
 
@@ -251,7 +254,7 @@ def cleanup_existing_instances() -> None:
         pass
 
     # Kill any http.server processes on our ports
-    for port in [DEFAULT_FRONTEND_PORT, DEFAULT_API_PORT]:
+    for port in [DEFAULT_FRONTEND_PORT, DEFAULT_API_PORT, DEFAULT_YHATZEE_PORT]:
         if is_port_in_use(port):
             log_warning(f"Port {port} is in use")
             kill_processes_on_port(port)
@@ -264,7 +267,7 @@ def cleanup_existing_instances() -> None:
         log_success("No existing instances found")
 
 
-def start_api_server(port: int, project_root: Path) -> threading.Thread:
+def start_api_server(port: int, project_root: Path, host: str = "127.0.0.1") -> threading.Thread:
     """Launch the API server in a background thread. Enforces singleton - only one instance can exist."""
     global _API_SERVER_INSTANCE
 
@@ -273,17 +276,17 @@ def start_api_server(port: int, project_root: Path) -> threading.Thread:
             log_warning("API server already running - refusing to start duplicate instance")
             return _API_SERVER_INSTANCE
 
-        log_info(f"Starting API server on port {port}...")
+        log_info(f"Starting API server on {host}:{port}...")
 
         def run_server():
             try:
                 from actifix.api import create_app
-                app = create_app(project_root)
-                log_success(f"API server initialized on http://127.0.0.1:{port}")
+                app = create_app(project_root, host=host, port=port)
+                log_success(f"API server initialized on http://{host}:{port}")
                 # Use werkzeug's run_simple for better control
                 from werkzeug.serving import run_simple
                 run_simple(
-                    '127.0.0.1',
+                    host,
                     port,
                     app,
                     use_reloader=False,
@@ -301,6 +304,37 @@ def start_api_server(port: int, project_root: Path) -> threading.Thread:
         _API_SERVER_INSTANCE = thread
         # Give the server a moment to start
         time.sleep(0.5)
+        return thread
+
+
+def start_yhatzee_server(port: int, project_root: Path, host: str = "127.0.0.1") -> threading.Thread:
+    """Launch the Yhatzee GUI server in a background thread."""
+    global _YHATZEE_SERVER_INSTANCE
+
+    with _YHATZEE_SERVER_LOCK:
+        if _YHATZEE_SERVER_INSTANCE is not None and _YHATZEE_SERVER_INSTANCE.is_alive():
+            log_warning("Yhatzee server already running - refusing to start duplicate instance")
+            return _YHATZEE_SERVER_INSTANCE
+
+        log_info(f"Starting Yhatzee GUI server on {host}:{port}...")
+
+        try:
+            from actifix.modules.yhatzee import run_gui
+        except ImportError as exc:
+            log_error("Yhatzee module requires Flask/Flask-CORS (install via pip install -e '.[web]')")
+            raise exc
+
+        def run_server():
+            try:
+                run_gui(host=host, port=port, project_root=project_root, debug=False)
+            except Exception as exc:
+                log_error(f"Yhatzee GUI server error: {exc}")
+
+        thread = threading.Thread(target=run_server, daemon=True)
+        thread.start()
+        _YHATZEE_SERVER_INSTANCE = thread
+        time.sleep(0.3)
+        log_success(f"Yhatzee GUI server running at http://{host}:{port}")
         return thread
 
 
@@ -484,6 +518,17 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
         help="Run health check after init and exit",
     )
     parser.add_argument(
+        "--yhatzee-port",
+        type=int,
+        default=DEFAULT_YHATZEE_PORT,
+        help=f"Port for the standalone Yhatzee GUI (default: {DEFAULT_YHATZEE_PORT})",
+    )
+    parser.add_argument(
+        "--no-yhatzee",
+        action="store_true",
+        help="Do not start the standalone Yhatzee GUI",
+    )
+    parser.add_argument(
         "--browser",
         action="store_true",
         default=False,
@@ -494,6 +539,18 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
         action="store_true",
         help="Do not start the API server",
     )
+    parser.add_argument(
+        "--run-duration",
+        type=float,
+        metavar="SECONDS",
+        help="Automatically stop after running for SECONDS (automation-friendly)",
+        default=None,
+    )
+    parser.add_argument(
+        "--detach",
+        action="store_true",
+        help="Start servers and exit immediately (detached mode for automation)",
+    )
     return parser.parse_args(argv)
 
 
@@ -501,13 +558,22 @@ def main(argv: Optional[list[str]] = None) -> int:
     """Main entry point with beautiful color-coded output."""
     args = parse_args(argv)
 
+    if args.run_duration is not None and args.run_duration <= 0:
+        log_error("--run-duration must be greater than zero")
+        return 1
+
     # Print startup banner
     print_banner("ACTIFIX STARTUP")
 
     # Step 0: Cleanup existing instances first
     cleanup_existing_instances()
 
-    total_steps = 5 if not args.no_api else 4
+    total_steps = 3
+    if not args.no_api:
+        total_steps += 1
+    if not args.no_yhatzee:
+        total_steps += 1
+    total_steps += 1  # frontend step
     current_step = 0
 
     # Step 1: Clean cache
@@ -569,27 +635,50 @@ def main(argv: Optional[list[str]] = None) -> int:
             log_error("Try manually: pkill -f 'start.py' or use --api-port <PORT>")
             return 1
 
+    if not args.no_yhatzee and is_port_in_use(args.yhatzee_port):
+        log_warning(f"Yhatzee port {args.yhatzee_port} still in use, forcing cleanup")
+        kill_processes_on_port(args.yhatzee_port)
+        time.sleep(0.5)
+
+        if is_port_in_use(args.yhatzee_port):
+            log_error(f"Could not free Yhatzee port {args.yhatzee_port}")
+            log_error("Try manually: pkill -f 'start.py' or use --yhatzee-port <PORT>")
+            return 1
+
     # Step 4: Start API server (if enabled)
     api_thread = None
     api_watchdog_thread = None
+    version_monitor_thread: Optional[threading.Thread] = None
+    yhatzee_thread: Optional[threading.Thread] = None
+    stop_event = threading.Event()
     if not args.no_api:
         current_step += 1
         log_step(current_step, total_steps, "Starting API server")
         try:
             api_thread = start_api_server(args.api_port, ROOT)
-            api_watchdog_thread = start_api_watchdog(args.api_port, ROOT)
+            api_watchdog_thread = start_api_watchdog(args.api_port, ROOT, stop_event=stop_event)
             log_success("API server + watchdog started")
         except Exception as e:
             log_error(f"Failed to start API server: {e}")
             return 1
 
-    # Step 5: Start frontend server
+    # Step 5: Start Yhatzee GUI
+    if not args.no_yhatzee:
+        current_step += 1
+        log_step(current_step, total_steps, "Starting Yhatzee GUI")
+        try:
+            yhatzee_thread = start_yhatzee_server(args.yhatzee_port, ROOT)
+        except Exception as e:
+            log_error(f"Failed to start Yhatzee GUI: {e}")
+            return 1
+
+    # Start frontend server
     current_step += 1
     log_step(current_step, total_steps, "Starting frontend server")
     try:
         frontend_manager = FrontendManager(args.frontend_port)
         frontend_manager.start()
-        start_version_monitor(frontend_manager, ROOT)
+        version_monitor_thread = start_version_monitor(frontend_manager, ROOT, stop_event=stop_event)
     except Exception as e:
         log_error(f"Failed to start frontend server: {e}")
         return 1
@@ -603,6 +692,9 @@ def main(argv: Optional[list[str]] = None) -> int:
     if not args.no_api:
         api_url = f"http://localhost:{args.api_port}/api/"
         print(f"{Color.BOLD}{Color.GREEN}API:{Color.RESET}       {Color.CYAN}{api_url}{Color.RESET}")
+    if not args.no_yhatzee:
+        yhatzee_url = f"http://localhost:{args.yhatzee_port}/"
+        print(f"{Color.BOLD}{Color.GREEN}Yhatzee:{Color.RESET}   {Color.CYAN}{yhatzee_url}{Color.RESET}")
 
     print()
 
@@ -618,20 +710,39 @@ def main(argv: Optional[list[str]] = None) -> int:
         log_info("Tip: Use --browser flag to auto-open browser")
 
     print()
+    
+    # Handle detached mode - exit immediately after starting servers
+    if args.detach:
+        log_success("All servers started in detached mode")
+        log_info("Servers will continue running in background")
+        log_info("Use 'pkill -f start.py' or kill processes on ports to stop")
+        return 0
+    
     print(f"{Color.YELLOW}Press Ctrl+C to stop all servers{Color.RESET}")
     print()
 
-    # Keep process alive
+    run_until = None
+    if args.run_duration is not None:
+        run_until = time.monotonic() + args.run_duration
+        log_info(f"Run duration set to {args.run_duration}s - launcher will stop automatically")
+
+    exit_code = 0
     try:
         while True:
             time.sleep(1.0)
             current_server = frontend_manager.get_process()
             if current_server and current_server.poll() is not None:
                 log_error("Frontend server stopped unexpectedly")
-                return current_server.returncode or 1
+                exit_code = current_server.returncode or 1
+                break
+            if run_until and time.monotonic() >= run_until:
+                log_info("Run duration reached - shutting down gracefully")
+                break
     except KeyboardInterrupt:
         print()
         log_info("Shutdown signal received...")
+    finally:
+        stop_event.set()
         log_info("Stopping servers...")
         current_server = frontend_manager.get_process()
         if current_server:
@@ -640,9 +751,14 @@ def main(argv: Optional[list[str]] = None) -> int:
                 current_server.wait(timeout=5)
             except subprocess.TimeoutExpired:
                 current_server.kill()
+        if api_watchdog_thread:
+            api_watchdog_thread.join(timeout=1)
+        if version_monitor_thread:
+            version_monitor_thread.join(timeout=1)
         log_success("All servers stopped")
         log_success("Goodbye!")
-        return 0
+
+    return exit_code
 
 
 if __name__ == "__main__":
