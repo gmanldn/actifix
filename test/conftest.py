@@ -170,7 +170,8 @@ def isolate_actifix_db(monkeypatch, tmp_path, request):
 @pytest.fixture(scope="session", autouse=True)
 def database_profiler_session():
     """Database profiler for the entire test session."""
-    from test.database_profiler import get_database_profiler
+    # Relative import avoids shadowing issues with the top-level `test` module/file.
+    from .database_profiler import get_database_profiler
 
     profiler = get_database_profiler()
     yield profiler
