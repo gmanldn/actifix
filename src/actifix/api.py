@@ -131,6 +131,29 @@ def _write_module_status_payload(status_file: Path, payload: Dict[str, object]) 
     atomic_write(status_file, json.dumps(payload, indent=2))
 
 
+def _mark_module_status(status_file: Path, module_id: str, status: str) -> None:
+    status_payload = _read_module_status_payload(status_file)
+    statuses = status_payload["statuses"]
+
+    for key in statuses:
+        if module_id in statuses[key]:
+            statuses[key].remove(module_id)
+
+    if status in statuses:
+        statuses[status].append(module_id)
+
+    status_payload["statuses"] = _normalize_module_statuses(statuses)
+    status_payload["schema_version"] = MODULE_STATUS_SCHEMA_VERSION
+    try:
+        _write_module_status_payload(status_file, status_payload)
+    except Exception as exc:
+        record_error(
+            message=f"Failed to persist module status for {module_id}: {exc}",
+            source="api.py:_mark_module_status",
+            priority=TicketPriority.P2,
+        )
+
+
 def _read_module_status_payload(status_file: Path) -> Dict[str, Dict[str, List[str]]]:
     default_payload = _default_module_status_payload()
     if not status_file.exists():
@@ -447,6 +470,7 @@ def create_app(
     app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0  # Disable static file caching in development
     app.config['API_HOST'] = host
     app.config['API_PORT'] = port
+    status_file = get_actifix_paths(project_root=root).state_dir / "module_statuses.json"
 
     try:
         from actifix.modules.yhatzee import create_blueprint as _create_yhatzee_blueprint
@@ -470,6 +494,7 @@ def create_app(
                 error_type=type(exc).__name__,
                 priority=TicketPriority.P2,
             )
+            _mark_module_status(status_file, "modules.yhatzee", "error")
 
     if _create_superquiz_blueprint:
         try:
@@ -483,6 +508,7 @@ def create_app(
                 error_type=type(exc).__name__,
                 priority=TicketPriority.P2,
             )
+            _mark_module_status(status_file, "modules.superquiz", "error")
 
     
     @app.route('/', methods=['GET'])
