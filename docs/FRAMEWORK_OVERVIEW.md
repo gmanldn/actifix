@@ -76,6 +76,21 @@ Example:
 3. Ticket stored in `data/actifix.db`.
 4. DoAF or CLI processes tickets, records completion evidence, and updates status.
 
+## Module health aggregation
+`GET /api/modules/<module_id>/health` returns the aggregated health response:
+```json
+{
+  "module": "yhatzee",
+  "module_id": "modules.yhatzee",
+  "module_status": "active",
+  "status": "ok",
+  "http_status": 200,
+  "elapsed_ms": 12,
+  "response": {"status": "ok"}
+}
+```
+Status values: `ok`, `missing`, `timeout`, `error`.
+
 ## Release notes and version history
 See `CHANGELOG.md` for full history. Recent highlights:
 

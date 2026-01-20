@@ -401,6 +401,66 @@ def _verify_auth_token(token: str) -> bool:
         )
         return False
 
+
+def _fetch_module_health(app, module_name: str, timeout_sec: float = 2.0) -> dict:
+    import concurrent.futures
+    start = time.monotonic()
+
+    def _call_health():
+        with app.test_client() as client:
+            return client.get(
+                f"/modules/{module_name}/health",
+                environ_base={"REMOTE_ADDR": "127.0.0.1"},
+            )
+
+    try:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(_call_health)
+            response = future.result(timeout=timeout_sec)
+    except concurrent.futures.TimeoutError:
+        record_error(
+            message=f"Module health check timed out for {module_name}",
+            source="api.py:_fetch_module_health",
+            priority=TicketPriority.P2,
+        )
+        return {
+            "module": module_name,
+            "status": "timeout",
+            "http_status": 504,
+            "elapsed_ms": int((time.monotonic() - start) * 1000),
+            "response": None,
+        }
+    except Exception as exc:
+        record_error(
+            message=f"Module health check failed for {module_name}: {exc}",
+            source="api.py:_fetch_module_health",
+            priority=TicketPriority.P2,
+        )
+        return {
+            "module": module_name,
+            "status": "error",
+            "http_status": 500,
+            "elapsed_ms": int((time.monotonic() - start) * 1000),
+            "response": None,
+        }
+
+    status_code = response.status_code
+    payload = response.get_json(silent=True)
+    if status_code == 404:
+        status = "missing"
+    elif status_code >= 400:
+        status = "error"
+    else:
+        status = "ok"
+
+    return {
+        "module": module_name,
+        "status": status,
+        "http_status": status_code,
+        "elapsed_ms": int((time.monotonic() - start) * 1000),
+        "response": payload,
+    }
+
     try:
         token_manager = get_token_manager()
         user_manager = get_user_manager()
@@ -1173,6 +1233,25 @@ def create_app(
         """List system/user modules from architecture catalog."""
         modules = _load_modules(app.config['PROJECT_ROOT'])
         return jsonify(modules)
+
+    @app.route('/api/modules/<module_id>/health', methods=['GET'])
+    def api_module_health(module_id):
+        """Aggregate module health and status."""
+        module_name = module_id.split(".", 1)[1] if module_id.startswith("modules.") else module_id
+        paths = get_actifix_paths(project_root=app.config['PROJECT_ROOT'])
+        status_payload = _read_module_status_payload(paths.state_dir / "module_statuses.json")
+        statuses = status_payload.get("statuses", {})
+        module_status = "active"
+        if f"modules.{module_name}" in statuses.get("disabled", []):
+            module_status = "disabled"
+        elif f"modules.{module_name}" in statuses.get("error", []):
+            module_status = "error"
+
+        result = _fetch_module_health(app, module_name)
+        result["module_id"] = module_id
+        result["module_status"] = module_status
+
+        return jsonify(result), result.get("http_status", 200)
 
     @app.route('/api/modules/<module_id>', methods=['POST'])
     def api_toggle_module(module_id):
