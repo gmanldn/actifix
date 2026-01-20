@@ -1,0 +1,2 @@
+[actifix.plugins]
+core = actifix.plugins.builtin:CorePlugin

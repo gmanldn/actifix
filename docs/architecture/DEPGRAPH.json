@@ -150,6 +150,7 @@
     {"from": "plugins.permissions", "to": "security.auth", "reason": "plugins.permissions depends on security.auth"},
     {"from": "modules.yhatzee", "to": "runtime.state", "reason": "modules.yhatzee uses Actifix state paths"},
     {"from": "modules.yhatzee", "to": "infra.logging", "reason": "modules.yhatzee logs events via infra.logging"},
-    {"from": "modules.yhatzee", "to": "core.raise_af", "reason": "modules.yhatzee records errors via core.raise_af"}
+    {"from": "modules.yhatzee", "to": "core.raise_af", "reason": "modules.yhatzee records errors via core.raise_af"},
+    {"from": "modules.yhatzee", "to": "runtime.api", "reason": "modules.yhatzee registers a blueprint on the runtime API server"}
   ]
 }

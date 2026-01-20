@@ -2,39 +2,86 @@
 
 from __future__ import annotations
 
-from typing import Optional
+from pathlib import Path
+from typing import Optional, TYPE_CHECKING, Union
 
 from actifix.log_utils import log_event
 from actifix.raise_af import TicketPriority, record_error
 from actifix.state_paths import get_actifix_paths
 
+if TYPE_CHECKING:
+    from flask import Blueprint
+
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8090
 
 
-def create_app(project_root: Optional[str] = None):
-    """Create the Flask app that serves the Yhatzee GUI."""
+def _normalize_project_root(project_root: Optional[Union[str, Path]]) -> Optional[Path]:
+    if project_root is None:
+        return None
+    return Path(project_root)
+
+
+def _log_gui_init(project_root: Optional[Union[str, Path]], host: str, port: int) -> None:
+    paths = get_actifix_paths(project_root=_normalize_project_root(project_root))
+    log_event(
+        "YHATZEE_GUI_INIT",
+        "Yhatzee GUI configured",
+        extra={
+            "host": host,
+            "port": port,
+            "state_dir": str(paths.state_dir),
+            "module": "modules.yhatzee",
+        },
+        source="modules.yhatzee.create_blueprint",
+    )
+
+
+def create_blueprint(
+    project_root: Optional[Union[str, Path]] = None,
+    host: str = DEFAULT_HOST,
+    port: int = DEFAULT_PORT,
+    url_prefix: Optional[str] = "/modules/yhatzee",
+) -> Blueprint:
+    """Create the Flask blueprint that serves the Yhatzee GUI."""
     try:
-        from flask import Flask, Response
+        from flask import Blueprint, Response  # Local import keeps Flask optional
 
-        paths = get_actifix_paths(project_root=project_root)
-        log_event(
-            "YHATZEE_GUI_INIT",
-            "Yhatzee GUI configured",
-            extra={"host": DEFAULT_HOST, "port": DEFAULT_PORT, "state_dir": str(paths.state_dir)},
-            source="modules.yhatzee.create_app",
-        )
+        blueprint = Blueprint("yhatzee", __name__, url_prefix=url_prefix)
 
-        app = Flask(__name__)
-
-        @app.route("/")
+        @blueprint.route("/")
         def index():
             return Response(_HTML_PAGE, mimetype="text/html")
 
-        @app.route("/health")
+        @blueprint.route("/health")
         def health():
             return {"status": "ok"}
 
+        _log_gui_init(project_root, host, port)
+        return blueprint
+    except Exception as exc:
+        record_error(
+            message=f"Failed to create Yhatzee blueprint: {exc}",
+            source="modules/yhatzee/__init__.py:create_blueprint",
+            run_label="yhatzee-gui",
+            error_type=type(exc).__name__,
+            priority=TicketPriority.P2,
+        )
+        raise
+
+
+def create_app(
+    project_root: Optional[Union[str, Path]] = None,
+    host: str = DEFAULT_HOST,
+    port: int = DEFAULT_PORT,
+) -> "Flask":
+    """Create the Flask app that serves the Yhatzee GUI."""
+    try:
+        from flask import Flask  # Local import to keep optional dependency optional
+
+        app = Flask(__name__)
+        blueprint = create_blueprint(project_root=project_root, host=host, port=port, url_prefix=None)
+        app.register_blueprint(blueprint)
         return app
     except Exception as exc:
         record_error(
@@ -50,16 +97,16 @@ def create_app(project_root: Optional[str] = None):
 def run_gui(
     host: str = DEFAULT_HOST,
     port: int = DEFAULT_PORT,
-    project_root: Optional[str] = None,
+    project_root: Optional[Union[str, Path]] = None,
     debug: bool = False,
 ) -> None:
     """Run the Yhatzee GUI on localhost."""
     try:
-        app = create_app(project_root=project_root)
+        app = create_app(project_root=project_root, host=host, port=port)
         log_event(
             "YHATZEE_GUI_START",
             f"Yhatzee GUI running at http://{host}:{port}",
-            extra={"host": host, "port": port},
+            extra={"host": host, "port": port, "module": "modules.yhatzee"},
             source="modules.yhatzee.run_gui",
         )
         app.run(host=host, port=port, debug=debug)

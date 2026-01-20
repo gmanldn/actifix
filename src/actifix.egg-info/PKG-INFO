@@ -1,0 +1,6 @@
+Metadata-Version: 2.4
+Name: actifix
+Version: 4.0.51
+Provides-Extra: web
+Requires-Dist: flask; extra == "web"
+Requires-Dist: flask-cors; extra == "web"

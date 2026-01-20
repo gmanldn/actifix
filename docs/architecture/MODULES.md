@@ -290,7 +290,7 @@ This document summarizes the modules in the Actifix architecture. Use `MAP.yaml`
 ## Modules
 
 ### modules.yhatzee
-- Summary: two-player Yhatzee game module with local GUI
+- Summary: two-player Yhatzee game module whose GUI is embedded in the dashboard API
 - Entrypoints: `src/actifix/modules/yhatzee/__init__.py`
-- Depends on: `runtime.state`, `infra.logging`, `core.raise_af`
-- Contracts: serve a local Yhatzee GUI on localhost:8090; use Actifix logging and error capture
+- Depends on: `runtime.state`, `infra.logging`, `core.raise_af`, `runtime.api`
+- Contracts: expose the two-player Yhatzee GUI at `/modules/yhatzee` on the runtime API server while continuing to use centralized logging and error capture

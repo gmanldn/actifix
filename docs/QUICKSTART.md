@@ -45,6 +45,9 @@ python3 scripts/start.py --no-api
 
 # Custom ports
 python3 scripts/start.py --frontend-port 8081 --api-port 5002
+
+# Auto-stop after a fixed duration (helpful for automation)
+python3 scripts/start.py --run-duration 30
 ```
 
 ## Capture your first error

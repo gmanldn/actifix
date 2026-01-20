@@ -166,6 +166,19 @@ class TestAPIEndpoints:
         assert 'uptime_seconds' in server
         assert 'start_time' in server
 
+    def test_yhatzee_module_page(self, test_client):
+        """Yhatzee module should render its HTML via the API."""
+        response = test_client.get('/modules/yhatzee/')
+        assert response.status_code == 200
+        assert b"Yhatzee" in response.data
+        assert b"Roll Dice" in response.data
+
+    def test_yhatzee_module_health(self, test_client):
+        """Yhatzee module health route should signal readiness."""
+        response = test_client.get('/modules/yhatzee/health')
+        assert response.status_code == 200
+        assert response.get_json() == {"status": "ok"}
+
 
 @pytest.mark.api
 @pytest.mark.skipif(not FLASK_AVAILABLE, reason="Flask not available")

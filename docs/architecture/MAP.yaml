@@ -611,16 +611,17 @@ modules:
 - id: modules.yhatzee
   domain: modules
   owner: modules
-  summary: Two-player Yhatzee game module with local GUI
+  summary: Two-player Yhatzee experience served via the dashboard API
   entrypoints:
   - src/actifix/modules/yhatzee/__init__.py
   contracts:
-  - serve a local Yhatzee GUI on localhost:8090
-  - use Actifix logging and error capture interfaces
+  - expose the two-player Yhatzee GUI at /modules/yhatzee on the runtime API server
+  - use Actifix logging and error capture interfaces from the shared runtime
   depends_on:
   - runtime.state
   - infra.logging
   - core.raise_af
+  - runtime.api
 contracts:
 - id: contract.logging
   summary: All modules must log via centralized logging system with correlation IDs
