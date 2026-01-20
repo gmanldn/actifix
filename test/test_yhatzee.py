@@ -27,4 +27,7 @@ def test_yhatzee_health_route():
 
     response = client.get("/health")
     assert response.status_code == 200
-    assert response.get_json() == {"status": "ok"}
+    data = response.get_json()
+    assert data["status"] == "ok"
+    assert data.get("module") == "yhatzee"
+    assert data.get("module_id") == "modules.yhatzee"

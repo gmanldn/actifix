@@ -134,7 +134,7 @@ class ActifixConfig:
     module_config_overrides_json: str = ""
     
     # AI Integration
-    ai_provider: str = "ollama"  # OpenRouter for Mimo 2 with thinking
+    ai_provider: str = ""  # Default to free alternative provider
     ai_api_key: str = ""  # Set your OPENROUTER_API_KEY environment variable
     ai_model: str = "qwen2.5-coder:7b-instruct"  # Mimo 2 via OpenRouter with thinking support
     ollama_model: str = "qwen2.5-coder:7b-instruct"  # Default Ollama model
@@ -301,7 +301,7 @@ def load_config(
             "ACTIFIX_MODULE_CONFIG_OVERRIDES", "", value_type="string"
         ),
 
-        ai_provider=_get_env_sanitized("ACTIFIX_AI_PROVIDER", "ollama", value_type="alphanumeric"),
+        ai_provider=_get_env_sanitized("ACTIFIX_AI_PROVIDER", "", value_type="alphanumeric"),
         ai_api_key=_get_env_sanitized("ACTIFIX_AI_API_KEY", "", value_type="string"),
         ai_model=_get_env_sanitized("ACTIFIX_AI_MODEL", "qwen2.5-coder:7b-instruct", value_type="string"),
         ollama_model=_get_env_sanitized("ACTIFIX_OLLAMA_MODEL", "qwen2.5-coder:7b-instruct", value_type="string"),

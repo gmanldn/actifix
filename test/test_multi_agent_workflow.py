@@ -44,4 +44,5 @@ def test_no_branch_conflicts_direct_develop(tmp_path):
     # No branches created; git clean
     result = subprocess.run(["git", "status", "--short"], capture_output=True, text=True)
     assert result.returncode == 0
-    assert "On branch develop" in subprocess.run(["git", "branch", "--show-current"], capture_output=True, text=True).stdout
+    branch_result = subprocess.run(["git", "branch", "--show-current"], capture_output=True, text=True)
+    assert branch_result.stdout.strip() == "develop"

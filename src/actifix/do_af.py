@@ -470,6 +470,7 @@ def process_next_ticket(
         extra={"priority": ticket.priority}
     )
 
+    release_lock = True
     try:
         if use_ai and not ai_handler:
             try:

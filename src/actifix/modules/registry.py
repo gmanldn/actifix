@@ -9,7 +9,8 @@ from pathlib import Path
 from threading import RLock
 from typing import Any, Mapping, Optional
 
-from actifix.log_utils import atomic_write, log_event
+from actifix import log_utils
+from actifix.log_utils import log_event
 from actifix.raise_af import TicketPriority, record_error
 from actifix.state_paths import get_actifix_paths
 
@@ -54,7 +55,7 @@ def _normalize_module_statuses(payload: object) -> dict[str, list[str]]:
 
 def _backup_corrupt_module_statuses(status_file: Path, raw_content: str) -> None:
     corrupt_path = status_file.with_suffix(".corrupt.json")
-    atomic_write(corrupt_path, raw_content)
+    log_utils.atomic_write(corrupt_path, raw_content)
 
 
 def _read_module_status_payload(status_file: Path) -> dict[str, Any]:
@@ -103,7 +104,7 @@ def _read_module_status_payload(status_file: Path) -> dict[str, Any]:
 
 
 def _write_module_status_payload(status_file: Path, payload: dict[str, Any]) -> None:
-    atomic_write(status_file, json.dumps(payload, indent=2))
+    log_utils.atomic_write(status_file, json.dumps(payload, indent=2))
 
 
 def _mark_module_status(status_file: Path, module_id: str, status: str) -> None:

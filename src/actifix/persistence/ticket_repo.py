@@ -119,7 +119,7 @@ from .database import (
 
 
 # DoS Prevention: Length limits for ticket fields
-MAX_MESSAGE_LENGTH = 10000  # Prevent extremely long error messages
+MAX_MESSAGE_LENGTH = 5000  # Maximum message length (aligned with default config)
 MAX_SOURCE_LENGTH = 500     # Prevent extremely long source file paths
 MAX_ERROR_TYPE_LENGTH = 200 # Error type names have reasonable bounds
 MAX_STACK_TRACE_LENGTH = 50000  # Stack traces can be large but not unlimited

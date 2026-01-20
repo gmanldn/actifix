@@ -16,6 +16,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional, List, Dict
 
+import yaml
+
 try:
     from flask import Flask, jsonify, request, g
     from flask_cors import CORS
@@ -136,6 +138,31 @@ def _parse_module_rate_limit_overrides(raw: str) -> dict[str, dict[str, int]]:
     return overrides
 
 
+def _parse_map_dependencies(project_root: Path) -> set[tuple[str, str]]:
+    """Parse MAP.yaml to build module dependency edges as a fallback."""
+    map_path = project_root / "docs" / "architecture" / "MAP.yaml"
+    if not map_path.exists():
+        return set()
+    try:
+        data = yaml.safe_load(map_path.read_text(encoding="utf-8"))
+        modules = data.get("modules", []) if isinstance(data, dict) else []
+        edges = set()
+        for module in modules:
+            module_id = module.get("id")
+            if not module_id:
+                continue
+            for dep in module.get("depends_on", []):
+                edges.add((module_id, dep))
+        return edges
+    except Exception as exc:
+        record_error(
+            message=f"Failed to parse MAP.yaml for dependencies: {exc}",
+            source="api.py:_parse_map_dependencies",
+            priority=TicketPriority.P2,
+        )
+        return set()
+
+
 def _load_module_metadata(create_blueprint) -> tuple[Optional[str], Optional[dict], Optional[object]]:
     module_path = getattr(create_blueprint, "__module__", "")
     if not module_path:
@@ -191,7 +218,7 @@ def _load_depgraph_edges(project_root: Path) -> set[tuple[str, str]]:
             source="api.py:_load_depgraph_edges",
             priority=TicketPriority.P2,
         )
-        return set()
+        return _parse_map_dependencies(project_root)
     try:
         data = json.loads(depgraph_path.read_text(encoding="utf-8"))
         edges = data.get("edges", []) if isinstance(data, dict) else []
@@ -202,7 +229,7 @@ def _load_depgraph_edges(project_root: Path) -> set[tuple[str, str]]:
             source="api.py:_load_depgraph_edges",
             priority=TicketPriority.P2,
         )
-        return set()
+        return _parse_map_dependencies(project_root)
 
 
 def _validate_module_dependencies(
@@ -214,6 +241,8 @@ def _validate_module_dependencies(
         return []
     if not isinstance(dependencies, list):
         return ["dependencies_invalid"]
+    if not depgraph_edges:
+        return []
     module_id = f"modules.{module_name}"
     missing = [dep for dep in dependencies if (module_id, dep) not in depgraph_edges]
     if missing:
@@ -404,22 +433,22 @@ def _verify_admin_password(password: str) -> bool:
         return False
 
 
-def _check_auth(req) -> bool:
-    """Check if request is authenticated via Authorization header or X-Admin-Password."""
-    # First check for X-Admin-Password (simpler auth for local development)
+def _auth_credentials_valid(req, allow_local: bool = True) -> bool:
+    """Check if request has valid admin password or token (local option)."""
     admin_password = req.headers.get("X-Admin-Password", "")
     if admin_password and _verify_admin_password(admin_password):
         return True
-
-    if _is_local_request(req):
+    if allow_local and _is_local_request(req):
         return True
-
-    # Fall back to standard token authentication
     token = _extract_bearer_token(req)
     if token and _verify_auth_token(token):
         return True
-
     return False
+
+
+def _check_auth(req) -> bool:
+    """Check if request is authenticated via Authorization header or X-Admin-Password."""
+    return _auth_credentials_valid(req, allow_local=True)
 
 
 def _fetch_module_health(app, module_name: str, timeout_sec: float = 2.0) -> dict:
@@ -496,8 +525,73 @@ def _is_system_domain(domain: Optional[str]) -> bool:
     }
 
 
+def _parse_modules_markdown(markdown_path: Path) -> List[Dict[str, str]]:
+    """Parse MODULES.md for module metadata fallback when DEPGRAPH is missing."""
+    if not markdown_path.exists():
+        return []
+
+    lines = [line.rstrip("\n") for line in markdown_path.read_text(encoding="utf-8").splitlines()]
+    current_domain = ""
+    modules: List[Dict[str, str]] = []
+    current_module: Dict[str, str] | None = None
+
+    def _finalize_module():
+        nonlocal current_module
+        if current_module:
+            modules.append(current_module)
+            current_module = None
+
+    def _start_module(name: str):
+        nonlocal current_module
+        if current_module:
+            modules.append(current_module)
+        current_module = {
+            "name": name.strip(),
+            "domain": current_domain,
+            "owner": "",
+            "summary": "",
+        }
+
+    def _peek_next_nonempty(start: int) -> str:
+        for j in range(start + 1, len(lines)):
+            if lines[j].strip():
+                return lines[j].strip()
+        return ""
+
+    for idx, raw_line in enumerate(lines):
+        line = raw_line.strip()
+        if not line:
+            continue
+
+        if line.startswith("## "):
+            next_line = _peek_next_nonempty(idx)
+            if next_line.startswith("**Domain:**"):
+                _start_module(line[3:].strip())
+            else:
+                current_domain = line[3:].strip().lower()
+        elif line.startswith("### "):
+            _start_module(line[4:].strip())
+        elif line.startswith("**Domain:**"):
+            value = line.split(":", 1)[1].strip().lower()
+            if current_module:
+                current_module["domain"] = value
+            else:
+                current_domain = value
+        elif line.startswith("**Owner:**"):
+            value = line.split(":", 1)[1].strip()
+            if current_module:
+                current_module["owner"] = value
+        elif line.startswith("**Summary:**") or line.startswith("- Summary:"):
+            value = line.split(":", 1)[1].strip()
+            if current_module:
+                current_module["summary"] = value
+
+    _finalize_module()
+    return modules
+
+
 def _load_modules(project_root: Path) -> Dict[str, List[Dict[str, str]]]:
-    """Load modules from canonical DEPGRAPH.json."""
+    """Load modules from canonical DEPGRAPH.json or MODULES.md fallback."""
     from actifix.state_paths import get_actifix_paths
     paths = get_actifix_paths(project_root=project_root)
     status_file = paths.state_dir / "module_statuses.json"
@@ -505,37 +599,47 @@ def _load_modules(project_root: Path) -> Dict[str, List[Dict[str, str]]]:
     status_payload = _read_module_status_payload(status_file)
     statuses = status_payload["statuses"]
 
-    def get_status(name):
+    def get_status(name: str) -> str:
         if name in statuses.get("disabled", []):
             return "disabled"
         if name in statuses.get("error", []):
             return "error"
         return "active"
-    
-    depgraph_path = project_root / "docs" / "architecture" / "DEPGRAPH.json"
-    if not depgraph_path.exists():
-        return {"system": [], "user": []}
 
-    try:
-        data = json.loads(depgraph_path.read_text(encoding="utf-8"))
-        nodes = data.get("nodes", [])
-    except Exception:
-        return {"system": [], "user": []}
+    depgraph_path = project_root / "docs" / "architecture" / "DEPGRAPH.json"
+    modules_data: List[Dict[str, str]] = []
+
+    if depgraph_path.exists():
+        try:
+            data = json.loads(depgraph_path.read_text(encoding="utf-8"))
+            nodes = data.get("nodes", [])
+            for node in nodes:
+                module_id = node["id"]
+                modules_data.append({
+                    "name": module_id,
+                    "domain": node.get("domain", ""),
+                    "owner": node.get("owner", ""),
+                    "summary": node.get("label", node["id"]),
+                    "status": get_status(module_id)
+                })
+        except Exception:
+            modules_data = []
+
+    if not modules_data:
+        fallback_modules = _parse_modules_markdown(project_root / "docs" / "architecture" / "MODULES.md")
+        for module in fallback_modules:
+            module_id = module["name"]
+            modules_data.append({
+                "name": module_id,
+                "domain": module.get("domain", ""),
+                "owner": module.get("owner", ""),
+                "summary": module.get("summary", module_id),
+                "status": get_status(module_id),
+            })
 
     system_domains = {"runtime", "infra", "core", "tooling", "security", "plugins", "persistence"}
-    modules = []
-    for node in nodes:
-        module_id = node["id"]
-        modules.append({
-            "name": module_id,
-            "domain": node.get("domain", ""),
-            "owner": node.get("owner", ""),
-            "summary": node.get("label", node["id"]),
-            "status": get_status(module_id)
-        })
-
-    system_modules = [m for m in modules if m["domain"] in system_domains]
-    user_modules = [m for m in modules if m["domain"] not in system_domains]
+    system_modules = [m for m in modules_data if m["domain"].lower() in system_domains]
+    user_modules = [m for m in modules_data if m["domain"].lower() not in system_domains]
     return {"system": system_modules, "user": user_modules}
 
 
@@ -849,7 +953,7 @@ def create_app(
                 return None
             return jsonify({"error": "Module access restricted to local requests"}), 403
         if access_rule == MODULE_ACCESS_AUTH_REQUIRED:
-            if not _check_auth(request):
+            if not _auth_credentials_valid(request, allow_local=False):
                 return jsonify({"error": "Authorization required"}), 401
             return None
         return jsonify({"error": "Unsupported module access rule"}), 403
