@@ -44,7 +44,7 @@ import re
 import subprocess
 import sys
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional, Union
 
@@ -53,12 +53,39 @@ import requests
 
 # Bump this constant to change the Actifix version.  It should follow
 # semantic versioning.  The UI version will mirror this version.
-NEW_VERSION = "4.0.49"
+NEW_VERSION = "5.0.0"
 
 # The Ollama model used for local coding assistance.  Change this
 # constant if you wish to use a different model (e.g.
 # "qwen2.5-coder:7b-instruct" or "yi-coder:9b-instruct").
 DEFAULT_MODEL = "qwen2.5-coder:7b-instruct"
+
+PACKAGE_MANAGERS = {
+    "apt-get": ["sudo", "apt-get", "install", "-y", "ollama"],
+    "dnf": ["sudo", "dnf", "install", "-y", "ollama"],
+    "pacman": ["sudo", "pacman", "-S", "--noconfirm", "ollama"],
+}
+
+
+def _detect_package_manager() -> Optional[str]:
+    """Return the first available package manager that may provide Ollama."""
+    for name in ("apt-get", "dnf", "pacman"):
+        if shutil.which(name):
+            return name
+    return None
+
+
+def _install_with_package_manager(manager: str) -> bool:
+    """Attempt to install Ollama via the detected package manager."""
+    cmd = PACKAGE_MANAGERS.get(manager)
+    if not cmd:
+        return False
+    try:
+        subprocess.run(cmd, check=True)
+        return True
+    except Exception as exc:
+        print(f"   • Failed to install via {manager}: {exc}")
+        return False
 
 
 def find_project_root() -> Path:
@@ -180,6 +207,7 @@ from typing import Optional, Union
 from pathlib import Path
 
 from actifix.modules.base import ModuleBase
+from actifix.modules.config import get_module_config
 from actifix.raise_af import TicketPriority
 
 # Defaults and metadata for the DevAssistant module
@@ -217,6 +245,18 @@ def _module_helper(project_root: Optional[Union[str, Path]] = None) -> ModuleBas
         project_root=project_root,
     )
 
+
+def _resolve_model(
+    helper: ModuleBase,
+    project_root: Optional[Union[str, Path]],
+    override: Optional[str],
+) -> str:
+    """Return the Ollama model name, using overrides or module config."""
+    if override:
+        return override
+    module_config = get_module_config(helper.module_key, helper.module_defaults, project_root=project_root)
+    return str(module_config.get("model") or MODULE_DEFAULTS["model"])
+
 def create_blueprint(
     project_root: Optional[Union[str, Path]] = None,
     model: Optional[str] = None,
@@ -240,7 +280,7 @@ def create_blueprint(
         from flask import Blueprint, request, jsonify
 
         blueprint = Blueprint("dev_assistant", __name__, url_prefix=url_prefix)
-        resolved_model = model or helper.config.get("model") or MODULE_DEFAULTS["model"]
+        resolved_model = _resolve_model(helper, project_root, model)
 
         @blueprint.route("/health")
         def health():
@@ -355,7 +395,13 @@ def ensure_ollama() -> None:
                       "Please download and install Ollama from https://ollama.com/download/windows before running the installer again.")
                 return
             else:
-                # Assume Linux or Unix; use the official script
+                manager = _detect_package_manager()
+                if manager:
+                    print(f"   • Detected package manager: {manager}; attempting install...")
+                    if _install_with_package_manager(manager):
+                        print("   • Ollama installed successfully via package manager.")
+                        return
+                    print("   • Falling back to official installer script.")
                 subprocess.run(
                     [
                         "bash",
@@ -547,21 +593,21 @@ def update_config(root: Path) -> None:
     # Replace ai_provider default
     updated = re.sub(
         r"(ai_provider\s*:\s*str\s*=\s*)\"[^\"]*\"",
-        r"\1\"ollama\"",
+        r'\1"ollama"',
         updated,
         count=1,
     )
     # Replace ai_model default
     updated = re.sub(
         r"(ai_model\s*:\s*str\s*=\s*)\"[^\"]*\"",
-        fr"\1\"{DEFAULT_MODEL}\"",
+        fr'\1"{DEFAULT_MODEL}"',
         updated,
         count=1,
     )
     # Replace ollama_model default
     updated = re.sub(
         r"(ollama_model\s*:\s*str\s*=\s*)\"[^\"]*\"",
-        fr"\1\"{DEFAULT_MODEL}\"",
+        fr'\1"{DEFAULT_MODEL}"',
         updated,
         count=1,
     )
@@ -575,9 +621,12 @@ def bump_python_version(root: Path) -> None:
     if not init_path.is_file():
         raise FileNotFoundError(f"Missing __init__.py at {init_path}")
     original = init_path.read_text(encoding="utf-8")
+    # Replace the existing __version__ assignment with the new version using a raw f-string.
+    # This avoids escaping quotes incorrectly (e.g. inserting backslashes), producing
+    # a valid Python string like __version__ = "4.0.49".
     updated = re.sub(
-        r"(__version__\s*=\s*)\"[^\"]*\"",
-        fr"\1\"{NEW_VERSION}\"",
+        r'(__version__\s*=\s*)"[^"]*"',
+        rf'\1"{NEW_VERSION}"',
         original,
         count=1,
     )
@@ -652,7 +701,10 @@ def update_depgraph(root: Path) -> None:
     data["nodes"] = nodes
     data["edges"] = edges
     meta = data.get("meta", {})
-    meta["generated_at"] = datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
+    # Use timezone-aware UTC timestamp; .isoformat() returns a string with '+00:00'
+    # which we replace with 'Z' for ISO 8601 compliance.
+    timestamp = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    meta["generated_at"] = timestamp
     data["meta"] = meta
     depgraph_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
 

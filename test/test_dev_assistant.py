@@ -59,4 +59,4 @@ def test_ollama_server_running():
         # It may return 404 if root path is not handled; any response means server is up
         assert resp.status_code in (200, 404), f"Unexpected status code: {resp.status_code}"
     except requests.RequestException as exc:
-        pytest.skip(f"Ollama server not reachable ({exc}); skipping dependent test")
+        pytest.fail(f"Failed to connect to Ollama server: {exc}")

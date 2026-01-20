@@ -63,6 +63,18 @@ def _module_helper(project_root: Optional[Union[str, Path]] = None) -> ModuleBas
         project_root=project_root,
     )
 
+
+def _resolve_model(
+    helper: ModuleBase,
+    project_root: Optional[Union[str, Path]],
+    override: Optional[str],
+) -> str:
+    """Return the Ollama model name, using overrides or module config."""
+    if override:
+        return override
+    module_config = get_module_config(helper.module_key, helper.module_defaults, project_root=project_root)
+    return str(module_config.get("model") or MODULE_DEFAULTS["model"])
+
 def create_blueprint(
     project_root: Optional[Union[str, Path]] = None,
     model: Optional[str] = None,
@@ -82,20 +94,11 @@ def create_blueprint(
         flask.Blueprint: The configured blueprint.
     """
     helper = _module_helper(project_root)
-    config = get_module_config(
-        helper.module_key,
-        helper.module_defaults,
-        project_root=project_root,
-    )
     try:
         from flask import Blueprint, request, jsonify
 
         blueprint = Blueprint("dev_assistant", __name__, url_prefix=url_prefix)
-        resolved_model = (
-            model
-            or config.get("model")
-            or MODULE_DEFAULTS["model"]
-        )
+        resolved_model = _resolve_model(helper, project_root, model)
 
         @blueprint.route("/health")
         def health():
