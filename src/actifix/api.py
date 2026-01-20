@@ -376,9 +376,16 @@ def _extract_bearer_token(req) -> Optional[str]:
 def _verify_auth_token(token: str) -> bool:
     try:
         from actifix.security.auth import get_token_manager, get_user_manager
+        token_manager = get_token_manager()
+        user_manager = get_user_manager()
+        user_id = token_manager.verify_token(token)
+        if not user_id:
+            return False
+        user = user_manager.get_user(user_id)
+        return user is not None and user.is_active
     except Exception as exc:
         record_error(
-            message=f"Failed to load auth managers: {exc}",
+            message=f"Auth token verification failed: {exc}",
             source="api.py:_verify_auth_token",
             priority=TicketPriority.P2,
         )
@@ -443,22 +450,6 @@ def _fetch_module_health(app, module_name: str, timeout_sec: float = 2.0) -> dic
         "elapsed_ms": int((time.monotonic() - start) * 1000),
         "response": payload,
     }
-
-    try:
-        token_manager = get_token_manager()
-        user_manager = get_user_manager()
-        user_id = token_manager.verify_token(token)
-        if not user_id:
-            return False
-        user = user_manager.get_user(user_id)
-        return user is not None and user.is_active
-    except Exception as exc:
-        record_error(
-            message=f"Auth token verification failed: {exc}",
-            source="api.py:_verify_auth_token",
-            priority=TicketPriority.P2,
-        )
-        return False
 
 
 def _is_system_domain(domain: Optional[str]) -> bool:
@@ -881,6 +872,14 @@ def create_app(
     @app.route('/api/health', methods=['GET'])
     def api_health():
         """Get comprehensive health check data."""
+        # Check authentication
+        token = _extract_bearer_token(request)
+        if not token:
+            return jsonify({'error': 'Authorization required'}), 401
+        
+        if not _verify_auth_token(token):
+            return jsonify({'error': 'Invalid token'}), 401
+        
         paths = get_actifix_paths(project_root=app.config['PROJECT_ROOT'])
         
         # Health summary
@@ -948,6 +947,14 @@ def create_app(
     @app.route('/api/version', methods=['GET'])
     def api_version():
         """Return version metadata and git status for the dashboard."""
+        # Check authentication
+        token = _extract_bearer_token(request)
+        if not token:
+            return jsonify({'error': 'Authorization required'}), 401
+        
+        if not _verify_auth_token(token):
+            return jsonify({'error': 'Invalid token'}), 401
+        
         root = Path(app.config['PROJECT_ROOT'])
         info = _gather_version_info(root)
         return jsonify(info)
@@ -955,6 +962,14 @@ def create_app(
     @app.route('/api/stats', methods=['GET'])
     def api_stats():
         """Get ticket statistics."""
+        # Check authentication
+        token = _extract_bearer_token(request)
+        if not token:
+            return jsonify({'error': 'Authorization required'}), 401
+        
+        if not _verify_auth_token(token):
+            return jsonify({'error': 'Invalid token'}), 401
+        
         paths = get_actifix_paths(project_root=app.config['PROJECT_ROOT'])
         stats = get_ticket_stats(paths)
         breaches = check_sla_breaches(paths)
@@ -970,6 +985,14 @@ def create_app(
     @app.route('/api/tickets', methods=['GET'])
     def api_tickets():
         """Get recent tickets list."""
+        # Check authentication
+        token = _extract_bearer_token(request)
+        if not token:
+            return jsonify({'error': 'Authorization required'}), 401
+        
+        if not _verify_auth_token(token):
+            return jsonify({'error': 'Invalid token'}), 401
+        
         paths = get_actifix_paths(project_root=app.config['PROJECT_ROOT'])
         limit = request.args.get('limit', 20, type=int)
 
@@ -1009,6 +1032,14 @@ def create_app(
     @app.route('/api/ticket/<ticket_id>', methods=['GET'])
     def api_ticket(ticket_id):
         """Get full ticket details by ID."""
+        # Check authentication
+        token = _extract_bearer_token(request)
+        if not token:
+            return jsonify({'error': 'Authorization required'}), 401
+        
+        if not _verify_auth_token(token):
+            return jsonify({'error': 'Invalid token'}), 401
+        
         paths = get_actifix_paths(project_root=app.config['PROJECT_ROOT'])
         from .persistence.ticket_repo import get_ticket_repository
         repo = get_ticket_repository()
@@ -1020,6 +1051,14 @@ def create_app(
     @app.route('/api/fix-ticket', methods=['POST'])
     def api_fix_ticket():
         """Fix the highest priority open ticket with detailed logging."""
+        # Check authentication
+        token = _extract_bearer_token(request)
+        if not token:
+            return jsonify({'error': 'Authorization required'}), 401
+        
+        if not _verify_auth_token(token):
+            return jsonify({'error': 'Invalid token'}), 401
+        
         paths = get_actifix_paths(project_root=app.config['PROJECT_ROOT'])
 
         # Enforce Raise_AF-only policy before modifying tickets
@@ -1237,12 +1276,28 @@ def create_app(
     @app.route('/api/modules', methods=['GET'])
     def api_modules():
         """List system/user modules from architecture catalog."""
+        # Check authentication
+        token = _extract_bearer_token(request)
+        if not token:
+            return jsonify({'error': 'Authorization required'}), 401
+        
+        if not _verify_auth_token(token):
+            return jsonify({'error': 'Invalid token'}), 401
+        
         modules = _load_modules(app.config['PROJECT_ROOT'])
         return jsonify(modules)
 
     @app.route('/api/modules/<module_id>/health', methods=['GET'])
     def api_module_health(module_id):
         """Aggregate module health and status."""
+        # Check authentication
+        token = _extract_bearer_token(request)
+        if not token:
+            return jsonify({'error': 'Authorization required'}), 401
+        
+        if not _verify_auth_token(token):
+            return jsonify({'error': 'Invalid token'}), 401
+        
         module_name = module_id.split(".", 1)[1] if module_id.startswith("modules.") else module_id
         paths = get_actifix_paths(project_root=app.config['PROJECT_ROOT'])
         status_payload = _read_module_status_payload(paths.state_dir / "module_statuses.json")
@@ -1262,6 +1317,14 @@ def create_app(
     @app.route('/api/modules/<module_id>', methods=['POST'])
     def api_toggle_module(module_id):
         """Toggle module status (enable/disable)."""
+        # Check authentication
+        token = _extract_bearer_token(request)
+        if not token:
+            return jsonify({'error': 'Authorization required'}), 401
+        
+        if not _verify_auth_token(token):
+            return jsonify({'error': 'Invalid token'}), 401
+        
         from actifix.state_paths import get_actifix_paths
 
         paths = get_actifix_paths(project_root=app.config['PROJECT_ROOT'])
@@ -1300,6 +1363,14 @@ def create_app(
     @app.route('/api/ping', methods=['GET'])
     def api_ping():
         """Simple ping endpoint for connectivity check."""
+        # Check authentication
+        token = _extract_bearer_token(request)
+        if not token:
+            return jsonify({'error': 'Authorization required'}), 401
+        
+        if not _verify_auth_token(token):
+            return jsonify({'error': 'Invalid token'}), 401
+        
         return jsonify({
             'status': 'ok',
             'timestamp': datetime.now(timezone.utc).isoformat(),
@@ -1308,6 +1379,14 @@ def create_app(
     @app.route('/api/ai-status', methods=['GET'])
     def api_ai_status():
         """Return AI provider status, defaults, and recent feedback."""
+        # Check authentication
+        token = _extract_bearer_token(request)
+        if not token:
+            return jsonify({'error': 'Authorization required'}), 401
+        
+        if not _verify_auth_token(token):
+            return jsonify({'error': 'Invalid token'}), 401
+        
         try:
             config = load_config(fail_fast=False)
             selection = resolve_provider_selection(config.ai_provider, config.ai_model)
@@ -1333,6 +1412,14 @@ def create_app(
     @app.route('/api/settings', methods=['GET'])
     def api_get_settings():
         """Get current AI settings (API key is masked for security)."""
+        # Check authentication
+        token = _extract_bearer_token(request)
+        if not token:
+            return jsonify({'error': 'Authorization required'}), 401
+        
+        if not _verify_auth_token(token):
+            return jsonify({'error': 'Invalid token'}), 401
+        
         config = load_config(fail_fast=False)
 
         api_key = config.ai_api_key
@@ -1353,6 +1440,14 @@ def create_app(
     @app.route('/api/settings', methods=['POST'])
     def api_update_settings():
         """Update AI settings."""
+        # Check authentication
+        token = _extract_bearer_token(request)
+        if not token:
+            return jsonify({'error': 'Authorization required'}), 401
+        
+        if not _verify_auth_token(token):
+            return jsonify({'error': 'Invalid token'}), 401
+        
         try:
             data = request.get_json()
 
@@ -1394,6 +1489,14 @@ def create_app(
     @app.route('/api/ideas', methods=['POST'])
     def api_ideas():
         """Process user idea into AI-enriched ticket."""
+        # Check authentication
+        token = _extract_bearer_token(request)
+        if not token:
+            return jsonify({'error': 'Authorization required'}), 401
+        
+        if not _verify_auth_token(token):
+            return jsonify({'error': 'Invalid token'}), 401
+        
         try:
             data = request.get_json()
             idea = data.get('idea', '').strip()
@@ -1461,6 +1564,14 @@ def create_app(
     @app.route('/api/cleanup', methods=['POST'])
     def api_cleanup():
         """Run ticket cleanup with retention policies."""
+        # Check authentication
+        token = _extract_bearer_token(request)
+        if not token:
+            return jsonify({'error': 'Authorization required'}), 401
+        
+        if not _verify_auth_token(token):
+            return jsonify({'error': 'Invalid token'}), 401
+        
         try:
             data = request.get_json() or {}
 
@@ -1494,6 +1605,14 @@ def create_app(
     @app.route('/api/cleanup/config', methods=['GET'])
     def api_cleanup_config():
         """Get cleanup configuration."""
+        # Check authentication
+        token = _extract_bearer_token(request)
+        if not token:
+            return jsonify({'error': 'Authorization required'}), 401
+        
+        if not _verify_auth_token(token):
+            return jsonify({'error': 'Invalid token'}), 401
+        
         try:
             config = get_cleanup_config()
             return jsonify({
@@ -1504,6 +1623,107 @@ def create_app(
             return jsonify({
                 'error': str(e)
             }), 500
+
+    @app.route('/api/auth/login', methods=['POST'])
+    def api_auth_login():
+        """Authenticate user and return token."""
+        try:
+            data = request.get_json()
+            if not data:
+                return jsonify({'error': 'No data provided'}), 400
+            
+            username = data.get('username', '').strip()
+            password = data.get('password', '')
+            
+            if not username or not password:
+                return jsonify({'error': 'Username and password required'}), 400
+            
+            from actifix.security.auth import get_user_manager
+            user_manager = get_user_manager()
+            
+            try:
+                user, token = user_manager.authenticate_user(username, password)
+                return jsonify({
+                    'success': True,
+                    'token': token,
+                    'user': {
+                        'user_id': user.user_id,
+                        'username': user.username,
+                        'roles': [r.value for r in user.roles],
+                        'is_active': user.is_active
+                    }
+                })
+            except Exception as auth_error:
+                return jsonify({'error': str(auth_error)}), 401
+        except Exception as e:
+            record_error(
+                message=f"Login failed: {e}",
+                source="api.py:api_auth_login",
+                priority=TicketPriority.P2,
+            )
+            return jsonify({'error': str(e)}), 500
+
+    @app.route('/api/auth/create-first-user', methods=['POST'])
+    def api_auth_create_first_user():
+        """Create first admin user if no users exist."""
+        try:
+            data = request.get_json()
+            if not data:
+                return jsonify({'error': 'No data provided'}), 400
+            
+            username = data.get('username', '').strip()
+            password = data.get('password', '')
+            
+            if not username or not password:
+                return jsonify({'error': 'Username and password required'}), 400
+            
+            from actifix.security.auth import get_user_manager, AuthRole
+            user_manager = get_user_manager()
+            
+            # Check if any users exist
+            try:
+                # Try to get any user to check if database exists
+                # This is a simplified check - in production you'd query the database
+                test_user = user_manager.get_user('admin')
+                if test_user:
+                    return jsonify({'error': 'Admin user already exists'}), 409
+            except:
+                pass  # No users exist yet
+            
+            # Create first admin user
+            try:
+                user = user_manager.create_user(
+                    user_id='admin',
+                    username=username,
+                    password=password,
+                    roles={AuthRole.ADMIN}
+                )
+                
+                # Generate token
+                from actifix.security.auth import get_token_manager
+                token_manager = get_token_manager()
+                _, token = token_manager.create_token(user.user_id)
+                
+                return jsonify({
+                    'success': True,
+                    'message': 'First admin user created successfully',
+                    'token': token,
+                    'user': {
+                        'user_id': user.user_id,
+                        'username': user.username,
+                        'roles': [r.value for r in user.roles],
+                        'is_active': user.is_active
+                    }
+                })
+            except Exception as create_error:
+                return jsonify({'error': f'Failed to create user: {create_error}'}), 500
+        except Exception as e:
+            record_error(
+                message=f"Create first user failed: {e}",
+                source="api.py:api_auth_create_first_user",
+                priority=TicketPriority.P2,
+            )
+            return jsonify({'error': str(e)}), 500
 
     return app
 

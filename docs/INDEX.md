@@ -14,6 +14,9 @@ This index keeps documentation discoverable and aligned with the Actifix workflo
 ## Operators and support
 - **MONITORING** `MONITORING.md` - health checks, metrics, and alerting
 - **TROUBLESHOOTING** `TROUBLESHOOTING.md` - common issues and fixes
+- **ADMIN AUTHENTICATION** `ADMIN_AUTHENTICATION.md` - admin user setup, password management, and authentication
+- **QUICK ADMIN SETUP** `QUICK_ADMIN_SETUP.md` - quick reference for admin authentication
+- **IMPLEMENTATION SUMMARY** `IMPLEMENTATION_SUMMARY.md` - admin authentication implementation details
 
 ## Development and testing
 - **DEVELOPMENT GUIDE** `DEVELOPMENT.md` - workflow, quality gates, ticket completion
