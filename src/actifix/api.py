@@ -353,6 +353,11 @@ def create_app(
     except ImportError:
         _create_yhatzee_blueprint = None
 
+    try:
+        from actifix.modules.superquiz import create_blueprint as _create_superquiz_blueprint
+    except ImportError:
+        _create_superquiz_blueprint = None
+
     if _create_yhatzee_blueprint:
         try:
             yhatzee_blueprint = _create_yhatzee_blueprint(project_root=root, host=host, port=port)
@@ -362,6 +367,19 @@ def create_app(
                 message=f"Yhatzee module registration failed: {exc}",
                 source="api.py:create_app",
                 run_label="yhatzee-gui",
+                error_type=type(exc).__name__,
+                priority=TicketPriority.P2,
+            )
+
+    if _create_superquiz_blueprint:
+        try:
+            superquiz_blueprint = _create_superquiz_blueprint(project_root=root, host=host, port=port)
+            app.register_blueprint(superquiz_blueprint)
+        except Exception as exc:
+            record_error(
+                message=f"SuperQuiz module registration failed: {exc}",
+                source="api.py:create_app",
+                run_label="superquiz-gui",
                 error_type=type(exc).__name__,
                 priority=TicketPriority.P2,
             )

@@ -608,6 +608,21 @@ modules:
   depends_on:
   - plugins.registry
   - plugins.protocol
+- id: modules.superquiz
+  domain: modules
+  owner: modules
+  summary: Multi-player quiz experience served via the dashboard API
+  entrypoints:
+  - src/actifix/modules/superquiz/__init__.py
+  contracts:
+  - expose the SuperQuiz GUI at /modules/superquiz on the runtime API server
+  - support 1 to 6 players with category selection and random mode
+  - use Actifix logging and error capture interfaces from the shared runtime
+  depends_on:
+  - runtime.state
+  - infra.logging
+  - core.raise_af
+  - runtime.api
 - id: modules.yhatzee
   domain: modules
   owner: modules

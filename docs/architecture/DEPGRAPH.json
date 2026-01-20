@@ -52,6 +52,7 @@
     {"id": "plugins.loader", "domain": "plugins", "owner": "plugins", "label": "loader"},
     {"id": "plugins.api", "domain": "plugins", "owner": "plugins", "label": "api"},
     {"id": "plugins.builtin", "domain": "plugins", "owner": "plugins", "label": "builtin"},
+    {"id": "modules.superquiz", "domain": "modules", "owner": "modules", "label": "superquiz"},
     {"id": "modules.yhatzee", "domain": "modules", "owner": "modules", "label": "yhatzee"}
   ],
   "edges": [
@@ -148,6 +149,10 @@
     {"from": "security.ticket_throttler", "to": "runtime.state", "reason": "security.ticket_throttler uses Actifix paths for throttle storage"},
     {"from": "plugins.permissions", "to": "plugins.protocol", "reason": "plugins.permissions depends on plugins.protocol"},
     {"from": "plugins.permissions", "to": "security.auth", "reason": "plugins.permissions depends on security.auth"},
+    {"from": "modules.superquiz", "to": "runtime.state", "reason": "modules.superquiz uses Actifix state paths"},
+    {"from": "modules.superquiz", "to": "infra.logging", "reason": "modules.superquiz logs events via infra.logging"},
+    {"from": "modules.superquiz", "to": "core.raise_af", "reason": "modules.superquiz records errors via core.raise_af"},
+    {"from": "modules.superquiz", "to": "runtime.api", "reason": "modules.superquiz registers a blueprint on the runtime API server"},
     {"from": "modules.yhatzee", "to": "runtime.state", "reason": "modules.yhatzee uses Actifix state paths"},
     {"from": "modules.yhatzee", "to": "infra.logging", "reason": "modules.yhatzee logs events via infra.logging"},
     {"from": "modules.yhatzee", "to": "core.raise_af", "reason": "modules.yhatzee records errors via core.raise_af"},

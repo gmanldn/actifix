@@ -1,0 +1,906 @@
+"""SuperQuiz module with a localhost GUI for multi-player quizzes."""
+
+from __future__ import annotations
+
+import html
+import json
+import random
+from pathlib import Path
+from typing import Dict, Iterable, List, Optional, Sequence, Tuple, TYPE_CHECKING, Union
+from urllib.request import Request, urlopen
+
+from actifix.log_utils import log_event
+from actifix.raise_af import TicketPriority, record_error
+from actifix.state_paths import get_actifix_paths
+
+if TYPE_CHECKING:
+    from flask import Blueprint
+
+DEFAULT_HOST = "127.0.0.1"
+DEFAULT_PORT = 8070
+DEFAULT_QUESTIONS_PER_PLAYER = 5
+
+CATEGORIES: Tuple[str, ...] = (
+    "General Knowledge",
+    "Science",
+    "History",
+    "Geography",
+    "Sports",
+    "Entertainment",
+    "Art & Literature",
+    "Technology",
+    "Nature",
+    "Politics",
+)
+
+OPENTDB_CATEGORY_MAP: Dict[str, int] = {
+    "General Knowledge": 9,
+    "Science": 17,
+    "History": 23,
+    "Geography": 22,
+    "Sports": 21,
+    "Entertainment": 11,
+    "Art & Literature": 25,
+    "Technology": 18,
+    "Nature": 17,
+    "Politics": 24,
+}
+
+TRIVIA_API_CATEGORY_MAP: Dict[str, str] = {
+    "General Knowledge": "general_knowledge",
+    "Science": "science",
+    "History": "history",
+    "Geography": "geography",
+    "Sports": "sport_and_leisure",
+    "Entertainment": "film_and_tv",
+    "Art & Literature": "arts_and_literature",
+    "Technology": "science",
+    "Nature": "science",
+    "Politics": "society_and_culture",
+}
+
+WILLFRY_CATEGORY_MAP: Dict[str, str] = {
+    "General Knowledge": "general_knowledge",
+    "Science": "science",
+    "History": "history",
+    "Geography": "geography",
+    "Sports": "sport_and_leisure",
+    "Entertainment": "film_and_tv",
+    "Art & Literature": "arts_and_literature",
+    "Technology": "science",
+    "Nature": "science",
+    "Politics": "society_and_culture",
+}
+
+USER_AGENT = "Actifix-SuperQuiz/1.0"
+
+
+def _normalize_project_root(project_root: Optional[Union[str, Path]]) -> Optional[Path]:
+    if project_root is None:
+        return None
+    return Path(project_root)
+
+
+def _log_gui_init(project_root: Optional[Union[str, Path]], host: str, port: int) -> None:
+    paths = get_actifix_paths(project_root=_normalize_project_root(project_root))
+    log_event(
+        "SUPERQUIZ_GUI_INIT",
+        "SuperQuiz GUI configured",
+        extra={
+            "host": host,
+            "port": port,
+            "state_dir": str(paths.state_dir),
+            "module": "modules.superquiz",
+        },
+        source="modules.superquiz.create_blueprint",
+    )
+
+
+def _http_get_json(url: str, timeout: int = 8) -> object:
+    request = Request(url, headers={"User-Agent": USER_AGENT})
+    with urlopen(request, timeout=timeout) as response:
+        payload = response.read()
+    return json.loads(payload.decode("utf-8"))
+
+
+def _shuffle_options(correct: str, incorrect: Sequence[str]) -> List[str]:
+    options = list(incorrect) + [correct]
+    random.shuffle(options)
+    return options
+
+
+def _normalize_category(category: Optional[str]) -> Optional[str]:
+    if category is None:
+        return None
+    category = category.strip()
+    if not category:
+        return None
+    if category.lower() == "random":
+        return "Random"
+    for name in CATEGORIES:
+        if name.lower() == category.lower():
+            return name
+    return None
+
+
+def _opentdb_questions(category: Optional[str], amount: int) -> List[Dict[str, object]]:
+    params = [f"amount={amount}", "type=multiple"]
+    if category and category != "Random":
+        category_id = OPENTDB_CATEGORY_MAP.get(category)
+        if category_id is not None:
+            params.append(f"category={category_id}")
+    url = f"https://opentdb.com/api.php?{'&'.join(params)}"
+    data = _http_get_json(url)
+    results = data.get("results", []) if isinstance(data, dict) else []
+    normalized = []
+    for item in results:
+        question = html.unescape(str(item.get("question", ""))).strip()
+        correct = html.unescape(str(item.get("correct_answer", ""))).strip()
+        incorrect = [html.unescape(str(ans)).strip() for ans in item.get("incorrect_answers", [])]
+        if not question or not correct:
+            continue
+        normalized.append(
+            {
+                "question": question,
+                "category": str(item.get("category", category or "")),
+                "source": "OpenTDB",
+                "answer": correct,
+                "options": _shuffle_options(correct, incorrect),
+            }
+        )
+    return normalized
+
+
+def _trivia_api_questions(category: Optional[str], amount: int) -> List[Dict[str, object]]:
+    params = [f"limit={amount}"]
+    if category and category != "Random":
+        slug = TRIVIA_API_CATEGORY_MAP.get(category)
+        if slug:
+            params.append(f"categories={slug}")
+    url = f"https://the-trivia-api.com/api/questions?{'&'.join(params)}"
+    data = _http_get_json(url)
+    normalized = []
+    for item in data if isinstance(data, list) else []:
+        question = str(item.get("question", "")).strip()
+        correct = str(item.get("correctAnswer", "")).strip()
+        incorrect = [str(ans).strip() for ans in item.get("incorrectAnswers", [])]
+        if not question or not correct:
+            continue
+        normalized.append(
+            {
+                "question": question,
+                "category": str(item.get("category", category or "")),
+                "source": "The Trivia API",
+                "answer": correct,
+                "options": _shuffle_options(correct, incorrect),
+            }
+        )
+    return normalized
+
+
+def _willfry_questions(category: Optional[str], amount: int) -> List[Dict[str, object]]:
+    params = [f"limit={amount}"]
+    if category and category != "Random":
+        slug = WILLFRY_CATEGORY_MAP.get(category)
+        if slug:
+            params.append(f"categories={slug}")
+    url = f"https://api.trivia.willfry.co.uk/questions?{'&'.join(params)}"
+    data = _http_get_json(url)
+    normalized = []
+    for item in data if isinstance(data, list) else []:
+        question = str(item.get("question", "")).strip()
+        correct = str(item.get("correctAnswer", "")).strip()
+        incorrect = [str(ans).strip() for ans in item.get("incorrectAnswers", [])]
+        if not question or not correct:
+            continue
+        normalized.append(
+            {
+                "question": question,
+                "category": str(item.get("category", category or "")),
+                "source": "WillFry Trivia",
+                "answer": correct,
+                "options": _shuffle_options(correct, incorrect),
+            }
+        )
+    return normalized
+
+
+def _gather_questions(category: Optional[str], amount: int) -> List[Dict[str, object]]:
+    sources = (
+        _opentdb_questions,
+        _trivia_api_questions,
+        _willfry_questions,
+    )
+    per_source = max(1, amount // len(sources))
+    remainder = amount - (per_source * len(sources))
+    counts = [per_source] * len(sources)
+    for idx in range(remainder):
+        counts[idx] += 1
+    combined: List[Dict[str, object]] = []
+    for source, count in zip(sources, counts):
+        combined.extend(source(category, count))
+    random.shuffle(combined)
+    return combined[:amount]
+
+
+def _scoreboard(players: Sequence[Dict[str, object]]) -> List[Dict[str, object]]:
+    return [
+        {"name": str(player["name"]), "score": int(player["score"])}
+        for player in players
+    ]
+
+
+def create_blueprint(
+    project_root: Optional[Union[str, Path]] = None,
+    host: str = DEFAULT_HOST,
+    port: int = DEFAULT_PORT,
+    url_prefix: Optional[str] = "/modules/superquiz",
+) -> Blueprint:
+    """Create the Flask blueprint that serves the SuperQuiz GUI."""
+    try:
+        from flask import Blueprint, Response, jsonify, request
+
+        blueprint = Blueprint("superquiz", __name__, url_prefix=url_prefix)
+
+        @blueprint.route("/")
+        def index():
+            return Response(_HTML_PAGE, mimetype="text/html")
+
+        @blueprint.route("/health")
+        def health():
+            return {"status": "ok"}
+
+        @blueprint.route("/api/questions", methods=["GET"])
+        def api_questions():
+            try:
+                raw_category = request.args.get("category")
+                category = _normalize_category(raw_category)
+                count = request.args.get("count", type=int) or DEFAULT_QUESTIONS_PER_PLAYER
+                count = max(1, min(count, 60))
+                questions = _gather_questions(category, count)
+                return jsonify(
+                    {
+                        "category": category or "Random",
+                        "count": len(questions),
+                        "questions": questions,
+                    }
+                )
+            except Exception as exc:
+                record_error(
+                    message=f"Failed to fetch SuperQuiz questions: {exc}",
+                    source="modules/superquiz/__init__.py:api_questions",
+                    run_label="superquiz-gui",
+                    error_type=type(exc).__name__,
+                    priority=TicketPriority.P2,
+                )
+                raise
+
+        _log_gui_init(project_root, host, port)
+        return blueprint
+    except Exception as exc:
+        record_error(
+            message=f"Failed to create SuperQuiz blueprint: {exc}",
+            source="modules/superquiz/__init__.py:create_blueprint",
+            run_label="superquiz-gui",
+            error_type=type(exc).__name__,
+            priority=TicketPriority.P2,
+        )
+        raise
+
+
+def create_app(
+    project_root: Optional[Union[str, Path]] = None,
+    host: str = DEFAULT_HOST,
+    port: int = DEFAULT_PORT,
+) -> "Flask":
+    """Create the Flask app that serves the SuperQuiz GUI."""
+    try:
+        from flask import Flask
+
+        app = Flask(__name__)
+        blueprint = create_blueprint(project_root=project_root, host=host, port=port, url_prefix=None)
+        app.register_blueprint(blueprint)
+        return app
+    except Exception as exc:
+        record_error(
+            message=f"Failed to create SuperQuiz GUI app: {exc}",
+            source="modules/superquiz/__init__.py:create_app",
+            run_label="superquiz-gui",
+            error_type=type(exc).__name__,
+            priority=TicketPriority.P2,
+        )
+        raise
+
+
+def run_gui(
+    host: str = DEFAULT_HOST,
+    port: int = DEFAULT_PORT,
+    project_root: Optional[Union[str, Path]] = None,
+    debug: bool = False,
+) -> None:
+    """Run the SuperQuiz GUI on localhost."""
+    try:
+        app = create_app(project_root=project_root, host=host, port=port)
+        log_event(
+            "SUPERQUIZ_GUI_START",
+            f"SuperQuiz GUI running at http://{host}:{port}",
+            extra={"host": host, "port": port, "module": "modules.superquiz"},
+            source="modules.superquiz.run_gui",
+        )
+        app.run(host=host, port=port, debug=debug)
+    except Exception as exc:
+        record_error(
+            message=f"Failed to start SuperQuiz GUI: {exc}",
+            source="modules/superquiz/__init__.py:run_gui",
+            run_label="superquiz-gui",
+            error_type=type(exc).__name__,
+            priority=TicketPriority.P1,
+        )
+        raise
+
+
+_HTML_PAGE = """<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SuperQuiz Module</title>
+  <style>
+    @import url("https://fonts.googleapis.com/css2?family=Oswald:wght@300;500;700&family=Crimson+Text:wght@400;600&display=swap");
+    :root {
+      color-scheme: light;
+      --bg: #f7f1e1;
+      --panel: #fff7e0;
+      --ink: #2b2017;
+      --accent: #f77f00;
+      --accent-2: #2a9d8f;
+      --accent-3: #e63946;
+      --muted: #6b5b4b;
+      --shadow: rgba(33, 21, 11, 0.15);
+      --glow: rgba(247, 127, 0, 0.25);
+    }
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      font-family: "Crimson Text", "Times New Roman", serif;
+      background: radial-gradient(circle at top, #fff5dc 0%, #f6e7c3 40%, #ecd7a5 100%);
+      color: var(--ink);
+      min-height: 100vh;
+    }
+    .stage {
+      position: relative;
+      overflow: hidden;
+      min-height: 100vh;
+      padding-bottom: 80px;
+    }
+    .stage::before,
+    .stage::after {
+      content: "";
+      position: absolute;
+      border-radius: 999px;
+      filter: blur(0);
+      opacity: 0.6;
+      z-index: 0;
+    }
+    .stage::before {
+      width: 320px;
+      height: 320px;
+      background: radial-gradient(circle at 30% 30%, #ffe8b0 0%, transparent 70%);
+      top: -100px;
+      right: -120px;
+    }
+    .stage::after {
+      width: 240px;
+      height: 240px;
+      background: radial-gradient(circle at 70% 70%, #c1f0e6 0%, transparent 70%);
+      bottom: -80px;
+      left: -60px;
+    }
+    .app {
+      position: relative;
+      z-index: 1;
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 48px 24px 32px;
+      animation: fadeIn 0.9s ease forwards;
+    }
+    header {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .title {
+      font-family: "Oswald", "Arial Narrow", sans-serif;
+      font-size: 56px;
+      text-transform: uppercase;
+      letter-spacing: 4px;
+      margin: 0;
+    }
+    .subtitle {
+      text-transform: uppercase;
+      letter-spacing: 3px;
+      font-size: 12px;
+      color: var(--muted);
+      font-family: "Oswald", sans-serif;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 22px;
+      margin-top: 32px;
+    }
+    .panel {
+      background: var(--panel);
+      border-radius: 24px;
+      padding: 24px;
+      box-shadow: 0 16px 30px var(--shadow);
+      border: 1px solid rgba(43, 32, 23, 0.08);
+      transform: translateY(10px);
+      opacity: 0;
+      animation: panelUp 0.8s ease forwards;
+    }
+    .panel.delay-1 {
+      animation-delay: 0.12s;
+    }
+    .panel.delay-2 {
+      animation-delay: 0.24s;
+    }
+    .panel h2 {
+      font-family: "Oswald", sans-serif;
+      font-size: 20px;
+      margin-top: 0;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+    label {
+      display: block;
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--muted);
+      margin-bottom: 8px;
+      font-family: "Oswald", sans-serif;
+    }
+    select,
+    input {
+      width: 100%;
+      padding: 12px 14px;
+      font-size: 16px;
+      border-radius: 12px;
+      border: 1px solid rgba(43, 32, 23, 0.2);
+      background: #fff;
+      color: var(--ink);
+    }
+    input:focus,
+    select:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--glow);
+    }
+    .button {
+      border: none;
+      background: linear-gradient(130deg, var(--accent), #ffb703);
+      color: #20120b;
+      font-family: "Oswald", sans-serif;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      padding: 12px 18px;
+      border-radius: 999px;
+      cursor: pointer;
+      font-size: 14px;
+      box-shadow: 0 10px 18px rgba(247, 127, 0, 0.3);
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+    .button.secondary {
+      background: linear-gradient(130deg, var(--accent-2), #9ae6b4);
+    }
+    .button:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+    .button:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 22px rgba(247, 127, 0, 0.35);
+    }
+    .players {
+      display: grid;
+      gap: 12px;
+    }
+    .players input {
+      font-size: 15px;
+    }
+    .play-area {
+      display: none;
+      margin-top: 30px;
+      gap: 20px;
+    }
+    .play-area.active {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+    }
+    .question {
+      font-size: 26px;
+      line-height: 1.3;
+      margin: 12px 0 18px;
+    }
+    .meta {
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      color: var(--muted);
+      margin-bottom: 10px;
+      font-family: "Oswald", sans-serif;
+    }
+    .answers {
+      display: grid;
+      gap: 12px;
+    }
+    .answer {
+      padding: 12px 14px;
+      border-radius: 14px;
+      border: 2px solid transparent;
+      background: #fff;
+      cursor: pointer;
+      font-size: 16px;
+      text-align: left;
+      transition: border-color 0.15s ease, transform 0.15s ease;
+    }
+    .answer:hover {
+      transform: translateY(-2px);
+      border-color: var(--accent);
+    }
+    .answer.correct {
+      border-color: var(--accent-2);
+      background: rgba(42, 157, 143, 0.15);
+    }
+    .answer.incorrect {
+      border-color: var(--accent-3);
+      background: rgba(230, 57, 70, 0.12);
+    }
+    .scoreboard {
+      display: grid;
+      gap: 10px;
+    }
+    .scorecard {
+      display: flex;
+      justify-content: space-between;
+      padding: 10px 12px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.7);
+      border: 1px solid rgba(43, 32, 23, 0.15);
+    }
+    .active-player {
+      font-weight: 600;
+      color: var(--accent-3);
+    }
+    .footer {
+      margin-top: 28px;
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .status {
+      font-size: 14px;
+      color: var(--muted);
+      min-height: 20px;
+    }
+    .result {
+      margin-top: 16px;
+      font-size: 18px;
+    }
+    @media (max-width: 900px) {
+      .title {
+        font-size: 42px;
+      }
+      .play-area.active {
+        grid-template-columns: 1fr;
+      }
+    }
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    @keyframes panelUp {
+      from {
+        opacity: 0;
+        transform: translateY(18px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="stage">
+    <div class="app">
+      <header>
+        <h1 class="title">SuperQuiz</h1>
+        <div class="subtitle">Fast rounds. Loud knowledge. 1 to 6 players.</div>
+      </header>
+
+      <div class="grid">
+        <section class="panel delay-1">
+          <h2>Set the Stage</h2>
+          <label for="player-count">Players</label>
+          <select id="player-count">
+            <option value="1">1 Player</option>
+            <option value="2" selected>2 Players</option>
+            <option value="3">3 Players</option>
+            <option value="4">4 Players</option>
+            <option value="5">5 Players</option>
+            <option value="6">6 Players</option>
+          </select>
+          <div class="players" id="players"></div>
+        </section>
+
+        <section class="panel delay-2">
+          <h2>Choose a Category</h2>
+          <label for="category">Category</label>
+          <select id="category">
+            <option value="Random">Random</option>
+            <option value="General Knowledge">General Knowledge</option>
+            <option value="Science">Science</option>
+            <option value="History">History</option>
+            <option value="Geography">Geography</option>
+            <option value="Sports">Sports</option>
+            <option value="Entertainment">Entertainment</option>
+            <option value="Art & Literature">Art & Literature</option>
+            <option value="Technology">Technology</option>
+            <option value="Nature">Nature</option>
+            <option value="Politics">Politics</option>
+          </select>
+          <div class="footer">
+            <button class="button" id="start">Start Quiz</button>
+            <button class="button secondary" id="reset">Reset</button>
+          </div>
+          <div class="status" id="status"></div>
+        </section>
+      </div>
+
+      <section class="play-area" id="play-area">
+        <div class="panel">
+          <div class="meta" id="turn-meta">Player</div>
+          <div class="question" id="question">Loading question...</div>
+          <div class="answers" id="answers"></div>
+          <div class="result" id="result"></div>
+          <div class="footer">
+            <button class="button" id="next" disabled>Next Question</button>
+          </div>
+        </div>
+        <div class="panel">
+          <h2>Scoreboard</h2>
+          <div class="scoreboard" id="scoreboard"></div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <script>
+    const playerCountEl = document.getElementById("player-count");
+    const playersEl = document.getElementById("players");
+    const categoryEl = document.getElementById("category");
+    const startBtn = document.getElementById("start");
+    const resetBtn = document.getElementById("reset");
+    const statusEl = document.getElementById("status");
+    const playArea = document.getElementById("play-area");
+    const questionEl = document.getElementById("question");
+    const answersEl = document.getElementById("answers");
+    const nextBtn = document.getElementById("next");
+    const turnMeta = document.getElementById("turn-meta");
+    const scoreboardEl = document.getElementById("scoreboard");
+    const resultEl = document.getElementById("result");
+
+    let players = [];
+    let questions = [];
+    let currentIndex = 0;
+    let currentPlayerIndex = 0;
+    let answered = false;
+
+    const QUESTIONS_PER_PLAYER = 5;
+
+    function renderPlayerInputs(count) {
+      playersEl.innerHTML = "";
+      for (let i = 0; i < count; i += 1) {
+        const input = document.createElement("input");
+        input.type = "text";
+        input.placeholder = `Player ${i + 1} name`;
+        input.value = players[i] ? players[i].name : "";
+        input.dataset.index = String(i);
+        input.addEventListener("input", (event) => {
+          const idx = Number(event.target.dataset.index);
+          if (!Number.isNaN(idx) && players[idx]) {
+            players[idx].name = event.target.value;
+          }
+        });
+        playersEl.appendChild(input);
+      }
+    }
+
+    function buildPlayers() {
+      const count = Number(playerCountEl.value);
+      players = [];
+      for (let i = 0; i < count; i += 1) {
+        players.push({ name: "", score: 0 });
+      }
+      renderPlayerInputs(count);
+    }
+
+    function updateScoreboard() {
+      scoreboardEl.innerHTML = "";
+      players.forEach((player, index) => {
+        const row = document.createElement("div");
+        row.className = "scorecard";
+        if (index === currentPlayerIndex) {
+          row.classList.add("active-player");
+        }
+        const name = document.createElement("span");
+        name.textContent = player.name || `Player ${index + 1}`;
+        const score = document.createElement("span");
+        score.textContent = String(player.score);
+        row.appendChild(name);
+        row.appendChild(score);
+        scoreboardEl.appendChild(row);
+      });
+    }
+
+    function basePath() {
+      if (window.location.pathname.includes("/modules/superquiz")) {
+        return "/modules/superquiz";
+      }
+      return "";
+    }
+
+    async function fetchQuestions() {
+      const category = categoryEl.value;
+      const count = players.length * QUESTIONS_PER_PLAYER;
+      const url = `${basePath()}/api/questions?category=${encodeURIComponent(category)}&count=${count}`;
+      const response = await fetch(url, { cache: "no-store" });
+      if (!response.ok) {
+        throw new Error("Failed to load questions");
+      }
+      const data = await response.json();
+      return data.questions || [];
+    }
+
+    function showStatus(message) {
+      statusEl.textContent = message;
+    }
+
+    function resetGame() {
+      questions = [];
+      currentIndex = 0;
+      currentPlayerIndex = 0;
+      answered = false;
+      players.forEach((player) => {
+        player.score = 0;
+      });
+      playArea.classList.remove("active");
+      questionEl.textContent = "";
+      answersEl.innerHTML = "";
+      resultEl.textContent = "";
+      nextBtn.disabled = true;
+      showStatus("");
+      updateScoreboard();
+    }
+
+    function validatePlayers() {
+      const names = Array.from(playersEl.querySelectorAll("input")).map((input) => input.value.trim());
+      if (names.some((name) => !name)) {
+        showStatus("Add a name for every player.");
+        return false;
+      }
+      players.forEach((player, idx) => {
+        player.name = names[idx];
+      });
+      return true;
+    }
+
+    function renderQuestion() {
+      if (!questions.length) {
+        showStatus("No questions available. Try another category.");
+        return;
+      }
+      if (currentIndex >= questions.length) {
+        showStatus("Quiz complete! Final scores locked in.");
+        questionEl.textContent = "Quiz complete.";
+        answersEl.innerHTML = "";
+        resultEl.textContent = "";
+        nextBtn.disabled = true;
+        return;
+      }
+      answered = false;
+      nextBtn.disabled = true;
+      resultEl.textContent = "";
+      const question = questions[currentIndex];
+      const player = players[currentPlayerIndex];
+      turnMeta.textContent = `Round ${currentIndex + 1} | ${player.name}`;
+      questionEl.textContent = question.question;
+      answersEl.innerHTML = "";
+      const options = question.options || [];
+      options.forEach((option) => {
+        const btn = document.createElement("button");
+        btn.className = "answer";
+        btn.textContent = option;
+        btn.addEventListener("click", () => handleAnswer(btn, option, question.answer));
+        answersEl.appendChild(btn);
+      });
+      updateScoreboard();
+    }
+
+    function handleAnswer(button, choice, correct) {
+      if (answered) {
+        return;
+      }
+      answered = true;
+      const buttons = answersEl.querySelectorAll("button");
+      buttons.forEach((btn) => {
+        if (btn.textContent === correct) {
+          btn.classList.add("correct");
+        } else if (btn.textContent === choice) {
+          btn.classList.add("incorrect");
+        }
+        btn.disabled = true;
+      });
+      if (choice === correct) {
+        players[currentPlayerIndex].score += 1;
+        resultEl.textContent = "Correct!";
+      } else {
+        resultEl.textContent = `Incorrect. Answer: ${correct}`;
+      }
+      updateScoreboard();
+      nextBtn.disabled = false;
+    }
+
+    function nextQuestion() {
+      currentIndex += 1;
+      currentPlayerIndex = (currentPlayerIndex + 1) % players.length;
+      renderQuestion();
+    }
+
+    async function startGame() {
+      if (!validatePlayers()) {
+        return;
+      }
+      resetGame();
+      playArea.classList.add("active");
+      showStatus("Gathering questions...");
+      try {
+        questions = await fetchQuestions();
+        if (!questions.length) {
+          showStatus("No questions returned. Try another category.");
+          return;
+        }
+        showStatus(`Loaded ${questions.length} questions.`);
+        renderQuestion();
+      } catch (error) {
+        showStatus("Question feed is offline. Try again in a moment.");
+      }
+    }
+
+    playerCountEl.addEventListener("change", () => {
+      buildPlayers();
+    });
+    startBtn.addEventListener("click", startGame);
+    resetBtn.addEventListener("click", () => {
+      buildPlayers();
+      resetGame();
+    });
+    nextBtn.addEventListener("click", nextQuestion);
+
+    buildPlayers();
+    resetGame();
+  </script>
+</body>
+</html>
+"""
