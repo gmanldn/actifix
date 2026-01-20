@@ -84,6 +84,14 @@ python3 -m actifix.main health
 python3 -m pytest test/test_architecture_validation.py -v
 ```
 
+## Module CLI
+Use the CLI to list and toggle modules:
+```bash
+python3 -m actifix.main modules list
+python3 -m actifix.main modules disable modules.yhatzee
+python3 -m actifix.main modules enable modules.yhatzee
+```
+
 ## Architecture updates
 If you add or move modules:
 1. Update `docs/architecture/MAP.yaml` and `docs/architecture/DEPGRAPH.json`.

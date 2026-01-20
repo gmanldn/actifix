@@ -12,7 +12,7 @@ from typing import Optional
 from .bootstrap import bootstrap, shutdown, ActifixContext
 from .config import load_config
 from .health import run_health_check
-from .raise_af import record_error, enforce_raise_af_only
+from .raise_af import record_error, enforce_raise_af_only, TicketPriority
 from .do_af import process_tickets, get_ticket_stats
 from .quarantine import list_quarantine, get_quarantine_count
 from .testing import TestRunner
@@ -139,6 +139,70 @@ def cmd_test(args: argparse.Namespace) -> int:
         return 0 if result.success else 1
 
 
+def _normalize_module_id(module_id: str) -> str:
+    if "." in module_id:
+        return module_id
+    return f"modules.{module_id}"
+
+
+def cmd_modules(args: argparse.Namespace) -> int:
+    """List or toggle module status."""
+    from .state_paths import get_actifix_paths
+    from .api import (
+        _load_modules,
+        _read_module_status_payload,
+        _write_module_status_payload,
+        _normalize_module_statuses,
+        MODULE_STATUS_SCHEMA_VERSION,
+    )
+
+    project_root = Path(args.project_root or Path.cwd())
+    paths = get_actifix_paths(project_root=project_root)
+    enforce_raise_af_only(paths)
+    status_file = paths.state_dir / "module_statuses.json"
+
+    try:
+        if args.modules_action == "list":
+            modules = _load_modules(project_root)
+            print("=== System Modules ===")
+            for module in modules.get("system", []):
+                print(f"{module['name']}: {module['status']}")
+            print("\n=== User Modules ===")
+            for module in modules.get("user", []):
+                print(f"{module['name']}: {module['status']}")
+            return 0
+
+        if not args.module_id:
+            raise ValueError("module_id is required for enable/disable actions")
+        module_id = _normalize_module_id(args.module_id)
+        status_payload = _read_module_status_payload(status_file)
+        statuses = status_payload["statuses"]
+        action = args.modules_action
+
+        for key in list(statuses.keys()):
+            if module_id in statuses[key]:
+                statuses[key].remove(module_id)
+
+        if action == "enable":
+            statuses["active"].append(module_id)
+        elif action == "disable":
+            statuses["disabled"].append(module_id)
+
+        status_payload["statuses"] = _normalize_module_statuses(statuses)
+        status_payload["schema_version"] = MODULE_STATUS_SCHEMA_VERSION
+        _write_module_status_payload(status_file, status_payload)
+        print(f"{module_id}: {action}d")
+        return 0
+    except Exception as exc:
+        record_error(
+            message=f"Module CLI failed ({args.modules_action}): {exc}",
+            source="main.py:cmd_modules",
+            error_type=type(exc).__name__,
+            priority=TicketPriority.P2,
+        )
+        raise
+
+
 def main(argv: Optional[list[str]] = None) -> int:
     """
     Main entrypoint for Actifix CLI.
@@ -202,6 +266,19 @@ def main(argv: Optional[list[str]] = None) -> int:
     
     # Test command
     test_parser = subparsers.add_parser("test", help="Run self-tests")
+
+    # Modules command
+    modules_parser = subparsers.add_parser("modules", help="Manage module status")
+    modules_parser.add_argument(
+        "modules_action",
+        choices=["list", "enable", "disable"],
+        help="Module action",
+    )
+    modules_parser.add_argument(
+        "module_id",
+        nargs="?",
+        help="Module identifier (e.g., modules.yhatzee)",
+    )
     
     args = parser.parse_args(argv)
     
@@ -218,6 +295,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         "stats": cmd_stats,
         "quarantine": cmd_quarantine,
         "test": cmd_test,
+        "modules": cmd_modules,
     }
     
     try:
