@@ -70,6 +70,22 @@ Example:
 }
 ```
 
+## Module configuration
+Module defaults come from Actifix config with optional overrides via `ACTIFIX_MODULE_CONFIG_OVERRIDES`.
+
+| Module | Default host | Default port | Override key |
+|--------|--------------|--------------|--------------|
+| yhatzee | 127.0.0.1 | 8090 | yhatzee |
+| superquiz | 127.0.0.1 | 8070 | superquiz |
+
+Override example:
+```json
+{
+  "yhatzee": {"port": 9101, "host": "127.0.0.2"},
+  "superquiz": {"port": 9103}
+}
+```
+
 ## Ticket lifecycle (high-level)
 1. Exception raised or manual capture call.
 2. Raise_AF captures context, deduplicates, and classifies priority.

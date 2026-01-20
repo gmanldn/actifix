@@ -6,14 +6,17 @@ from pathlib import Path
 from typing import Optional, TYPE_CHECKING, Union
 
 from actifix.log_utils import log_event
+from actifix.modules import get_module_config
 from actifix.raise_af import TicketPriority, record_error, redact_secrets_from_text
 from actifix.state_paths import get_actifix_paths
 
 if TYPE_CHECKING:
     from flask import Blueprint
 
-DEFAULT_HOST = "127.0.0.1"
-DEFAULT_PORT = 8090
+MODULE_DEFAULTS = {
+    "host": "127.0.0.1",
+    "port": 8090,
+}
 ACCESS_RULE = "local-only"
 MODULE_METADATA = {
     "name": "modules.yhatzee",
@@ -37,6 +40,21 @@ def _normalize_project_root(project_root: Optional[Union[str, Path]]) -> Optiona
     if project_root is None:
         return None
     return Path(project_root)
+
+
+def _resolve_module_config(
+    project_root: Optional[Union[str, Path]],
+    host: Optional[str],
+    port: Optional[int],
+) -> tuple[str, int]:
+    config = get_module_config(
+        "yhatzee",
+        MODULE_DEFAULTS,
+        project_root=str(project_root) if project_root else None,
+    )
+    resolved_host = host or str(config.get("host", MODULE_DEFAULTS["host"]))
+    resolved_port = port or int(config.get("port", MODULE_DEFAULTS["port"]))
+    return resolved_host, resolved_port
 
 
 def _log_gui_init(project_root: Optional[Union[str, Path]], host: str, port: int) -> None:
@@ -74,14 +92,15 @@ def _record_module_error(
 
 def create_blueprint(
     project_root: Optional[Union[str, Path]] = None,
-    host: str = DEFAULT_HOST,
-    port: int = DEFAULT_PORT,
+    host: Optional[str] = None,
+    port: Optional[int] = None,
     url_prefix: Optional[str] = "/modules/yhatzee",
 ) -> Blueprint:
     """Create the Flask blueprint that serves the Yhatzee GUI."""
     try:
         from flask import Blueprint, Response  # Local import keeps Flask optional
 
+        resolved_host, resolved_port = _resolve_module_config(project_root, host, port)
         blueprint = Blueprint("yhatzee", __name__, url_prefix=url_prefix)
 
         @blueprint.route("/")
@@ -92,7 +111,7 @@ def create_blueprint(
         def health():
             return {"status": "ok"}
 
-        _log_gui_init(project_root, host, port)
+        _log_gui_init(project_root, resolved_host, resolved_port)
         return blueprint
     except Exception as exc:
         _record_module_error(
@@ -107,8 +126,8 @@ def create_blueprint(
 
 def create_app(
     project_root: Optional[Union[str, Path]] = None,
-    host: str = DEFAULT_HOST,
-    port: int = DEFAULT_PORT,
+    host: Optional[str] = None,
+    port: Optional[int] = None,
 ) -> "Flask":
     """Create the Flask app that serves the Yhatzee GUI."""
     try:
@@ -130,21 +149,22 @@ def create_app(
 
 
 def run_gui(
-    host: str = DEFAULT_HOST,
-    port: int = DEFAULT_PORT,
+    host: Optional[str] = None,
+    port: Optional[int] = None,
     project_root: Optional[Union[str, Path]] = None,
     debug: bool = False,
 ) -> None:
     """Run the Yhatzee GUI on localhost."""
     try:
-        app = create_app(project_root=project_root, host=host, port=port)
+        resolved_host, resolved_port = _resolve_module_config(project_root, host, port)
+        app = create_app(project_root=project_root, host=resolved_host, port=resolved_port)
         log_event(
             "YHATZEE_GUI_START",
-            f"Yhatzee GUI running at http://{host}:{port}",
-            extra={"host": host, "port": port, "module": "modules.yhatzee"},
+            f"Yhatzee GUI running at http://{resolved_host}:{resolved_port}",
+            extra={"host": resolved_host, "port": resolved_port, "module": "modules.yhatzee"},
             source="modules.yhatzee.run_gui",
         )
-        app.run(host=host, port=port, debug=debug)
+        app.run(host=resolved_host, port=resolved_port, debug=debug)
     except Exception as exc:
         _record_module_error(
             message=f"Failed to start Yhatzee GUI: {exc}",

@@ -101,6 +101,10 @@ client = create_module_test_client("yhatzee", url_prefix=None)
 assert client.get("/health").status_code == 200
 ```
 
+## Module configuration
+Module defaults and overrides live in `docs/FRAMEWORK_OVERVIEW.md#module-configuration`.
+Set overrides via `ACTIFIX_MODULE_CONFIG_OVERRIDES` (JSON).
+
 ## Module registration
 Runtime API registration uses the helper in `src/actifix/api.py` to enforce
 consistent error handling and `/modules/<name>` prefixes. Keep module blueprints

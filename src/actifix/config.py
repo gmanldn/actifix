@@ -129,6 +129,9 @@ class ActifixConfig:
     module_rate_limit_per_hour: int = 600
     module_rate_limit_per_day: int = 2000
     module_rate_limit_overrides_json: str = ""
+
+    # Module config overrides (per-module)
+    module_config_overrides_json: str = ""
     
     # AI Integration
     ai_provider: str = "openrouter"  # OpenRouter for Mimo 2 with thinking
@@ -293,6 +296,9 @@ def load_config(
         ),
         module_rate_limit_overrides_json=_get_env_sanitized(
             "ACTIFIX_MODULE_RATE_LIMIT_OVERRIDES", "", value_type="string"
+        ),
+        module_config_overrides_json=_get_env_sanitized(
+            "ACTIFIX_MODULE_CONFIG_OVERRIDES", "", value_type="string"
         ),
 
         ai_provider=_get_env_sanitized("ACTIFIX_AI_PROVIDER", "mimo-flash-v2-free", value_type="alphanumeric"),
