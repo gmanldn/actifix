@@ -28,4 +28,5 @@ test/data/actifix.*
 test/data/*.db
 test/data/*.db-shm
 test/data/*.db-wal
+actifix-agent-*/
 actifix-frontend/dist/

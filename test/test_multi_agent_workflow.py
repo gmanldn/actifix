@@ -1,7 +1,6 @@
 """Integration tests for multi-agent workflow compatibility."""
-import os
 import subprocess
-import tempfile
+import shutil
 import gitignore_parser
 from pathlib import Path
 import pytest
@@ -23,21 +22,25 @@ def test_gitignore_excludes_binaries_and_data(project_root):
     assert gitignore("*.db")
     assert gitignore("actifix/quarantine/")
 
-def test_multiple_agents_no_conflicts(tmp_path):
+def test_multiple_agents_no_conflicts(project_root):
     """Simulate multiple agents with isolated dirs - no git conflicts."""
     agents = []
-    for i in range(3):
-        agent_dir = tmp_path / f"actifix-agent-{i}"
-        agent_dir.mkdir()
-        (agent_dir / "data").mkdir()
-        (agent_dir / "data" / "actifix.db").touch()
-        (agent_dir / ".actifix").mkdir()
-        agents.append(agent_dir)
+    try:
+        for i in range(3):
+            agent_dir = project_root / f"actifix-agent-{i}"
+            agent_dir.mkdir()
+            (agent_dir / "data").mkdir()
+            (agent_dir / "data" / "actifix.db").touch()
+            (agent_dir / ".actifix").mkdir()
+            agents.append(agent_dir)
     
-    # Simulate git status in project - no agent data tracked
-    project_gitignore = gitignore_parser.parse_gitignore(Path.cwd() / ".gitignore")
-    for agent in agents:
-        assert project_gitignore(str(agent)), f"Agent dir {agent} should be ignored"
+        # Simulate git status in project - no agent data tracked
+        project_gitignore = gitignore_parser.parse_gitignore(project_root / ".gitignore")
+        for agent in agents:
+            assert project_gitignore(str(agent)), f"Agent dir {agent} should be ignored"
+    finally:
+        for agent in agents:
+            shutil.rmtree(agent, ignore_errors=True)
 
 def test_no_branch_conflicts_direct_develop(tmp_path):
     """Verify workflow doesn't require branches - direct develop work."""
