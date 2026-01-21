@@ -1691,7 +1691,6 @@ const QuizView = () => {
   const [score, setScore] = useState(0);
   const [answered, setAnswered] = useState(false);
   const [category, setCategory] = useState('all');
-  const [difficulty, setDifficulty] = useState('medium');
 
   const quizData = {
     actifix: [
