@@ -315,7 +315,21 @@ def _gather_questions(category: Optional[str], amount: int) -> List[Dict[str, ob
         counts[idx] += 1
     combined: List[Dict[str, object]] = []
     for source, count in zip(sources, counts):
-        combined.extend(source(count))
+        try:
+            combined.extend(source(count))
+        except Exception:
+            # Silently skip this source if it fails; other sources will fill in
+            pass
+    # If we don't have enough questions, try to fetch more from working sources
+    if len(combined) < amount:
+        shortage = amount - len(combined)
+        for source in sources:
+            if len(combined) >= amount:
+                break
+            try:
+                combined.extend(source(shortage))
+            except Exception:
+                pass
     random.shuffle(combined)
     return combined[:amount]
 
@@ -338,7 +352,21 @@ def _gather_snap_questions(
     combined: List[Dict[str, object]] = []
     for source, count in zip(sources, counts):
         fetch_count = min(max(count * 3, count + 2), 20)
-        combined.extend(source(fetch_count))
+        try:
+            combined.extend(source(fetch_count))
+        except Exception:
+            # Silently skip this source if it fails; other sources will fill in
+            pass
+    # If we don't have enough questions, try to fetch more from working sources
+    if len(combined) < amount * 2:
+        shortage = (amount * 2) - len(combined)
+        for source in sources:
+            if len(combined) >= amount * 2:
+                break
+            try:
+                combined.extend(source(shortage))
+            except Exception:
+                pass
     random.shuffle(combined)
     filtered, topic_matched = _apply_topic_filter(combined, topic)
     filtered, difficulty_matched = _apply_difficulty_filter(filtered, difficulty, amount)
