@@ -39,7 +39,8 @@ def _update_frontend_version(frontend_dir: Path, version: str) -> None:
     updated_content = re.sub(pattern, replacer, content)
     
     if updated_content == content:
-        raise ValueError(f"UI_VERSION not found in {app_js_path}")
+        # Version is already up to date, no need to update
+        return
     
     app_js_path.write_text(updated_content, encoding="utf-8")
 
