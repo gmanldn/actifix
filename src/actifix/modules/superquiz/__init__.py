@@ -993,27 +993,37 @@ _HTML_PAGE = """<!doctype html>
         const topic = topicEl.value.trim();
         const difficulty = difficultyEl.value;
         const url = `${basePath()}/api/snap?topic=${encodeURIComponent(topic)}&difficulty=${encodeURIComponent(difficulty)}&count=${count}`;
-        const response = await fetch(url, { cache: "no-store" });
-        if (!response.ok) {
-          throw new Error("Failed to load questions");
+        try {
+          const response = await fetch(url, { cache: "no-store" });
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: Failed to load snap questions`);
+          }
+          const data = await response.json();
+          let message = "";
+          if (!data.topic_matched) {
+            message = "Topic matches were limited, expanded to related questions.";
+          } else if (!data.difficulty_matched) {
+            message = "Difficulty matches were limited, mixed in more questions.";
+          }
+          return { questions: data.questions || [], message };
+        } catch (err) {
+          console.error("Snap questions fetch error:", err);
+          throw new Error(`Snap Quiz API error: ${err.message}. Ensure the API server is running on port 5001.`);
         }
-        const data = await response.json();
-        let message = "";
-        if (!data.topic_matched) {
-          message = "Topic matches were limited, expanded to related questions.";
-        } else if (!data.difficulty_matched) {
-          message = "Difficulty matches were limited, mixed in more questions.";
-        }
-        return { questions: data.questions || [], message };
       }
       const category = categoryEl.value;
       const url = `${basePath()}/api/questions?category=${encodeURIComponent(category)}&count=${count}`;
-      const response = await fetch(url, { cache: "no-store" });
-      if (!response.ok) {
-        throw new Error("Failed to load questions");
+      try {
+        const response = await fetch(url, { cache: "no-store" });
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: Failed to load questions`);
+        }
+        const data = await response.json();
+        return { questions: data.questions || [], message: "" };
+      } catch (err) {
+        console.error("Questions fetch error:", err);
+        throw new Error(`Question API error: ${err.message}. Ensure the API server is running on port 5001.`);
       }
-      const data = await response.json();
-      return { questions: data.questions || [], message: "" };
     }
 
     function showStatus(message) {
@@ -1138,7 +1148,8 @@ _HTML_PAGE = """<!doctype html>
         }
         renderQuestion();
       } catch (error) {
-        showStatus("Question feed is offline. Try again in a moment.");
+        console.error("Game start error:", error);
+        showStatus(`Question feed error: ${error.message || "Unknown error"}`);
       }
     }
 

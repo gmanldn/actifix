@@ -564,6 +564,7 @@ def process_next_ticket(
                     ticket_id=ticket.ticket_id,
                     extra={"error": str(e)},
                 )
+                return None
         if ai_handler:
             try:
                 success = ai_handler(ticket)
@@ -591,8 +592,9 @@ def process_next_ticket(
                     ticket_id=ticket.ticket_id,
                     extra={"error": str(e)}
                 )
+                return None
 
-        return ticket
+        return None
     finally:
         if release_lock:
             repo.release_lock(ticket.ticket_id, lock_owner)
