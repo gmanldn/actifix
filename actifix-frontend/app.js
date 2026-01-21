@@ -2040,23 +2040,6 @@ const QuizView = () => {
           h('div', { className: 'quiz-category-desc' }, '20 questions - Full assessment')
         )
       ),
-      h('div', { className: 'quiz-difficulty-selector' },
-        h('div', { className: 'quiz-difficulty-label' }, 'Difficulty:'),
-        h('div', { className: 'quiz-difficulty-options' },
-          h('button', {
-            className: `quiz-difficulty-btn ${difficulty === 'easy' ? 'active' : ''}`,
-            onClick: () => setDifficulty('easy')
-          }, 'Easy'),
-          h('button', {
-            className: `quiz-difficulty-btn ${difficulty === 'medium' ? 'active' : ''}`,
-            onClick: () => setDifficulty('medium')
-          }, 'Medium'),
-          h('button', {
-            className: `quiz-difficulty-btn ${difficulty === 'hard' ? 'active' : ''}`,
-            onClick: () => setDifficulty('hard')
-          }, 'Hard')
-        )
-      )
     );
   }
 
