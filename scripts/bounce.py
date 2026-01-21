@@ -56,10 +56,29 @@ def main():
     else:
         print(" → No running Actifix processes detected.")
 
-    # Relaunch Actifix via start.py
-    print("Restarting Actifix backend via scripts/start.py...")
+    # Synchronize frontend version with project version
+    print("Synchronizing frontend version...")
     python = sys.executable or 'python3'
     root = Path(__file__).resolve().parents[1]
+    build_frontend_script = root / "scripts" / "build_frontend.py"
+    
+    try:
+        result = subprocess.run(
+            [python, str(build_frontend_script)],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        print(result.stdout.strip())
+    except subprocess.CalledProcessError as e:
+        print(f"Warning: Frontend version synchronization failed: {e}")
+        if e.stdout:
+            print(e.stdout)
+        if e.stderr:
+            print(e.stderr)
+
+    # Relaunch Actifix via start.py
+    print("Restarting Actifix backend via scripts/start.py...")
     start_script = root / "scripts" / "start.py"
     subprocess.Popen([python, str(start_script)])
     print(" → Actifix restart initiated.")
