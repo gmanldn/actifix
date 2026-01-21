@@ -86,8 +86,11 @@ def update_app_js(version):
     print(f"Updated {app_js_path}")
 
 
-def main():
-    """Main build function"""
+def build_frontend(project_root: Path = None):
+    """Build frontend - main entry point for imports."""
+    if project_root is None:
+        project_root = Path(__file__).parent.parent
+    
     print("=" * 60)
     print("Actifix Frontend Build - Version Synchronization")
     print("=" * 60)
@@ -102,6 +105,11 @@ def main():
     print("=" * 60)
     print(f" Frontend version synchronized to {version}")
     print("=" * 60)
+
+
+def main():
+    """Main build function"""
+    build_frontend()
 
 
 if __name__ == "__main__":
