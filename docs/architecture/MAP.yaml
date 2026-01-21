@@ -803,6 +803,22 @@ modules:
   - core.raise_af
   - runtime.api
 
+- id: modules.shootymcshoot
+  domain: modules
+  owner: modules
+  summary: ShootyMcShoot React hello world holding page on localhost:8040
+  entrypoints:
+  - src/actifix/modules/shootymcshoot/__init__.py
+  contracts:
+  - expose ShootyMcShoot GUI at /modules/shootymcshoot on the runtime API server
+  - React-powered holding page with health endpoint
+  - uses ModuleBase for logging/error capture
+  depends_on:
+  - runtime.state
+  - infra.logging
+  - core.raise_af
+  - runtime.api
+
 contracts:
 - id: contract.logging
   summary: All modules must log via centralized logging system with correlation IDs

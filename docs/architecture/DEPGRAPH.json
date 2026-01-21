@@ -357,6 +357,12 @@
       "domain": "modules",
       "owner": "modules",
       "label": "artclass"
+    },
+    {
+      "id": "modules.shootymcshoot",
+      "domain": "modules",
+      "owner": "modules",
+      "label": "shootymcshoot"
     }
   ],
   "edges": [
@@ -1044,6 +1050,26 @@
       "from": "modules.artclass",
       "to": "runtime.api",
       "reason": "modules.artclass depends on runtime.api"
+    },
+    {
+      "from": "modules.shootymcshoot",
+      "to": "runtime.state",
+      "reason": "modules.shootymcshoot depends on runtime.state"
+    },
+    {
+      "from": "modules.shootymcshoot",
+      "to": "infra.logging",
+      "reason": "modules.shootymcshoot depends on infra.logging"
+    },
+    {
+      "from": "modules.shootymcshoot",
+      "to": "core.raise_af",
+      "reason": "modules.shootymcshoot depends on core.raise_af"
+    },
+    {
+      "from": "modules.shootymcshoot",
+      "to": "runtime.api",
+      "reason": "modules.shootymcshoot depends on runtime.api"
     }
   ]
 }

@@ -909,6 +909,21 @@ def create_app(
             priority=TicketPriority.P2,
         )
 
+    _create_shootymcshoot_blueprint = None
+    _shootymcshoot_access_rule = MODULE_ACCESS_PUBLIC
+    try:
+        _, shootymcshoot_module, _ = module_registry.import_module("shootymcshoot")
+        _create_shootymcshoot_blueprint = getattr(shootymcshoot_module, "create_blueprint", None)
+        _shootymcshoot_access_rule = getattr(shootymcshoot_module, "ACCESS_RULE", MODULE_ACCESS_PUBLIC)
+    except ImportError:
+        pass
+    except Exception as exc:
+        record_error(
+            message=f"Failed to import shootymcshoot module: {exc}",
+            source="api.py:module_loader",
+            priority=TicketPriority.P2,
+        )
+
     if _create_yhatzee_blueprint:
         _register_module_blueprint(
             app,
@@ -935,6 +950,22 @@ def create_app(
             port=port,
             status_file=status_file,
             access_rule=_superquiz_access_rule,
+            register_access=_register_module_access,
+            register_rate_limit=_register_module_rate_limit,
+            depgraph_edges=depgraph_edges,
+            registry=module_registry,
+        )
+
+    if _create_shootymcshoot_blueprint:
+        _register_module_blueprint(
+            app,
+            "shootymcshoot",
+            _create_shootymcshoot_blueprint,
+            project_root=root,
+            host=host,
+            port=port,
+            status_file=status_file,
+            access_rule=_shootymcshoot_access_rule,
             register_access=_register_module_access,
             register_rate_limit=_register_module_rate_limit,
             depgraph_edges=depgraph_edges,

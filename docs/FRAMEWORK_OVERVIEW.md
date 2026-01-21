@@ -5,12 +5,12 @@ Actifix is a self-improving error management system that captures prioritized ti
 ## What Actifix provides
 
 **Dashboard Panes**:
-- =Ê **Overview**: Health metrics, recent tickets, system stats
-- <« **Tickets**: Priority lanes (P0-P4), ticket details modal
-- =Ü **Logs**: Live structured logs with filtering
-- ™ **System**: Resources, paths, git status, recent events
-- >é **Modules**: System/user modules with toggle controls
-- =¡ **Ideas**: Submit requests ’ AI generates actionable tickets
+- =ÃŠ **Overview**: Health metrics, recent tickets, system stats
+- <Â« **Tickets**: Priority lanes (P0-P4), ticket details modal
+- =Ãœ **Logs**: Live structured logs with filtering
+- â„¢ **System**: Resources, paths, git status, recent events
+- >Ã© **Modules**: System/user modules with toggle controls
+- =Â¡ **Ideas**: Submit requests â€™ AI generates actionable tickets
 - =' **Settings**: AI provider config, status, feedback log
 
 - Structured error capture with priority classification (P0-P4).
@@ -91,6 +91,7 @@ Module defaults come from Actifix config with optional overrides via `ACTIFIX_MO
 
 | Module | Default host | Default port | Override key |
 |--------|--------------|--------------|--------------|
+| shootymcshoot | 127.0.0.1 | 8040 | shootymcshoot |
 | yhatzee | 127.0.0.1 | 8090 | yhatzee |
 | superquiz | 127.0.0.1 | 8070 | superquiz |
 
@@ -130,7 +131,8 @@ See `CHANGELOG.md` for full history. Recent highlights:
 
 | Version | Highlights |
 |---------|------------|
-| **4.0.48** (2026-01-18) | **Ideas pane (=¡)**: Submit natural language feature requests/ideas via dashboard. AI analyzes and generates detailed tickets with priority, technical implementation details, success criteria, and remediation notes. Tickets created via `/api/ideas` ’ `ai_client.generate_fix()` ’ `record_error(source='gui_ideas')`. |
+| **4.0.49** (2026-01-21) | **ShootyMcShoot module**: React hello world holding page at `/modules/shootymcshoot` (127.0.0.1:8040). Follows ModuleBase pattern with metadata, health endpoint, local-only access. |
+| **4.0.48** (2026-01-18) | **Ideas pane (=Â¡)**: Submit natural language feature requests/ideas via dashboard. AI analyzes and generates detailed tickets with priority, technical implementation details, success criteria, and remediation notes. Tickets created via `/api/ideas` â€™ `ai_client.generate_fix()` â€™ `record_error(source='gui_ideas')`. |
 | **4.0.43** (2026-01-21) | Added OpenRouter Grok4 Fast support in AI provider options so the dashboard can pick the high-speed Grok4 endpoint when requested. |
 | **4.0.42** (2026-01-21) | Redesigned the settings panel with gradient cards, status chips, and richer AI/system context so configuration feels themed and informative. |
 | **4.0.41** (2026-01-21) | Added multi-agent workflow smoke tests to verify gitignore isolation, ignored agent directories, and develop-only flow, keeping binaries out. |
