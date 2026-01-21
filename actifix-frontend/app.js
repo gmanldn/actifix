@@ -1345,8 +1345,8 @@ const SystemView = () => {
         )
       ),
       h('ul', { className: 'health-list' },
-        ...((health.warnings || []).map(w => h('li', { className: 'health-warning' }, w))),
-        ...((health.errors || []).map(e => h('li', { className: 'health-error' }, e)))
+        health.warnings > 0 && h('li', { className: 'health-warning' }, `${health.warnings} warning(s) detected`),
+        health.errors > 0 && h('li', { className: 'health-error' }, `${health.errors} error(s) detected`)
       )
     )
   );
