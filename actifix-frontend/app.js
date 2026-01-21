@@ -134,7 +134,7 @@ const useFetch = (endpoint, interval = REFRESH_INTERVAL) => {
   const [lastUpdated, setLastUpdated] = useState(null);
 
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchData = async (retryCount = 0, maxRetries = 3) => {
       try {
         const headers = buildAdminHeaders();
         const response = await fetch(`${API_BASE}${endpoint}`, { cache: 'no-store', headers });
@@ -145,12 +145,23 @@ const useFetch = (endpoint, interval = REFRESH_INTERVAL) => {
           setData(json);
           setError(null);
           setLastUpdated(new Date());
+          return; // Success, no retry
         } catch (parseErr) {
           // Response is not JSON, likely an error page
           throw new Error(`Invalid response from ${endpoint}: expected JSON`);
         }
       } catch (err) {
-        setError(err.message);
+        // Detect network errors
+        let errorMsg = err.message;
+        if (err.name === 'TypeError' && (errorMsg.includes('fetch') || errorMsg.includes('Failed to fetch'))) {
+          errorMsg = 'Backend offline - API server not responding on port 5001. Run "python scripts/bounce.py" or "python scripts/start.py" to restart.';
+        } else if (retryCount < maxRetries) {
+          // Retry on network errors
+          const delay = Math.pow(2, retryCount) * 1000; // Exponential backoff
+          setTimeout(() => fetchData(retryCount + 1, maxRetries), delay);
+          return;
+        }
+        setError(errorMsg);
         setData(null);
       } finally {
         setLoading(false);
@@ -158,7 +169,7 @@ const useFetch = (endpoint, interval = REFRESH_INTERVAL) => {
     };
 
     fetchData();
-    const timer = setInterval(fetchData, interval);
+    const timer = setInterval(() => fetchData(0), interval);
     return () => clearInterval(timer);
   }, [endpoint, interval]);
 
