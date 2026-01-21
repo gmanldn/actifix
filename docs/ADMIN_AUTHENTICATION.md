@@ -4,11 +4,21 @@ This document explains how the admin authentication system works in Actifix and 
 
 ## Overview
 
+**Dashboard Access:**
+- Dashboard loads immediately without authentication (public read-only view)
+- Admin actions (fix tickets, settings, etc.) require admin password via modal
+
+**API Authentication:**
 Actifix uses a secure authentication system with:
 - **PBKDF2-HMAC-SHA256** password hashing with 100,000 iterations
 - **Role-based access control (RBAC)** with multiple roles
 - **JWT token-based authentication** for API access
 - **SQLite database** for storing user credentials and tokens
+
+**New Flow:**
+1. Dashboard boots instantly - view tickets, stats, logs without login
+2. Click admin actions → password modal → enter admin password → actions enabled
+3. Password stored in browser localStorage for session (cleared on logout)
 
 ## Admin User Setup
 

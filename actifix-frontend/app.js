@@ -2291,6 +2291,76 @@ const LoginView = ({ onLogin }) => {
   );
 };
 
+const LoginModal = ({ onClose, onSuccess }) => {
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleLogin = async () => {
+    if (!password) {
+      setError('Please enter the admin password');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+
+    try {
+      const response = await fetch(`${API_BASE}/api/auth/verify-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password })
+      });
+
+      const data = await response.json();
+
+      if (data.valid) {
+        setAdminPasswordInStorage(password);
+        onSuccess();
+        onClose();
+      } else {
+        setError(data.error || 'Invalid admin password');
+      }
+    } catch (err) {
+      setError(`Connection error: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return h('div', { className: 'login-modal-backdrop', onClick: onClose },
+    h('div', { className: 'login-modal', onClick: (e) => e.stopPropagation() },
+      h('div', { className: 'login-header' },
+        h('img', { src: './assets/pangolin.svg', alt: 'Actifix', className: 'login-logo-small' }),
+        h('h2', null, 'Admin Login')
+      ),
+      h('div', { className: 'login-form' },
+        h('input', {
+          type: 'password',
+          value: password,
+          onChange: (e) => setPassword(e.target.value),
+          placeholder: 'Enter admin password',
+          className: 'login-input',
+          disabled: loading,
+          onKeyPress: (e) => e.key === 'Enter' && handleLogin()
+        }),
+        error && h('div', { className: 'login-error' }, error),
+        h('div', { className: 'login-actions' },
+          h('button', {
+            onClick: handleLogin,
+            disabled: loading || !password,
+            className: 'btn btn-primary'
+          }, loading ? 'Authenticating...' : 'Login'),
+          h('button', {
+            onClick: onClose,
+            className: 'btn btn-secondary'
+          }, 'Cancel')
+        )
+      )
+    )
+  );
+};
+
 // Main App Component
 const App = () => {
   const [activeView, setActiveView] = useState('overview');
@@ -2298,18 +2368,21 @@ const App = () => {
   const [fixStatus, setFixStatus] = useState('Ready to fix the next ticket');
   const [logAlert, setLogAlert] = useState(false);
   const [theme, setTheme] = useState('dark');
-  const [authenticated, setAuthenticated] = useState(isAuthenticated());
+  const [hasPassword, setHasPassword] = useState(!!getAdminPassword());
+  const [showLoginModal, setShowLoginModal] = useState(false);
   const logFlashTimer = useRef(null);
-
-  const handleLogin = () => {
-    setAuthenticated(true);
-  };
 
   const handleLogout = () => {
     clearAuthToken();
-    setAuthenticated(false);
+    setHasPassword(false);
     setActiveView('overview');
   };
+
+  const handleLoginSuccess = () => {
+    setHasPassword(true);
+  };
+
+  const openLoginModal = () => setShowLoginModal(true);
 
   useEffect(() => {
     const savedTheme = localStorage.getItem('actifix-theme') || 'dark';
@@ -2346,7 +2419,7 @@ const App = () => {
   };
 
   const handleFix = async () => {
-    if (isFixing) return;
+    if (isFixing || !hasPassword) return;
     setIsFixing(true);
     setFixStatus('Checking tickets…');
 
@@ -2399,28 +2472,25 @@ const App = () => {
 
   const renderView = () => {
     switch (activeView) {
-      case 'tickets': return h(TicketsView);
+      case 'tickets': return h(TicketsView, { hasPassword });
       case 'quiz': return h(QuizView);
       case 'logs': return h(LogsView);
       case 'system': return h(SystemView);
-      case 'modules': return h(ModulesView);
-      case 'ideas': return h(IdeasView);
-      case 'settings': return h(SettingsView);
+      case 'modules': return h(ModulesView, { hasPassword });
+      case 'ideas': return h(IdeasView, { hasPassword });
+      case 'settings': return h(SettingsView, { hasPassword });
       default: return h(OverviewView);
     }
   };
 
-  if (!authenticated) {
-    return h(LoginView, { onLogin: handleLogin });
-  }
-
   return h('div', { className: 'dashboard' },
     h(NavigationRail, { activeView, onViewChange: setActiveView, logAlert }),
-    h(Header, { onFix: handleFix, isFixing, fixStatus, theme, onToggleTheme: toggleTheme, onLogout: handleLogout }),
+    h(Header, { onFix: handleFix, isFixing, fixStatus, theme, onToggleTheme: toggleTheme, onLogout: handleLogout, hasPassword, onLoginClick: openLoginModal }),
     h('main', { className: 'dashboard-content' },
       renderView()
     ),
-    h(Footer)
+    h(Footer),
+    showLoginModal && h(LoginModal, { onClose: () => setShowLoginModal(false), onSuccess: handleLoginSuccess })
   );
 };
 

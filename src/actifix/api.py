@@ -451,6 +451,11 @@ def _check_auth(req) -> bool:
     return _auth_credentials_valid(req, allow_local=True)
 
 
+def _require_auth(req) -> bool:
+    """Require credentials (no local bypass)."""
+    return _auth_credentials_valid(req, allow_local=False)
+
+
 def _fetch_module_health(app, module_name: str, timeout_sec: float = 2.0) -> dict:
     import concurrent.futures
     start = time.monotonic()
@@ -1193,9 +1198,9 @@ def create_app(
     @app.route('/api/fix-ticket', methods=['POST'])
     def api_fix_ticket():
         """Fix the highest priority open ticket with detailed logging."""
-        # Check authentication
-        if not _check_auth(request):
-            return jsonify({'error': 'Authorization required'}), 401
+        # Require authentication (no local bypass for mutations)
+        if not _require_auth(request):
+            return jsonify({'error': 'Authorization required (admin password)'}), 401
         
         paths = get_actifix_paths(project_root=app.config['PROJECT_ROOT'])
 
@@ -1447,9 +1452,9 @@ def create_app(
     @app.route('/api/modules/<module_id>', methods=['POST'])
     def api_toggle_module(module_id):
         """Toggle module status (enable/disable)."""
-        # Check authentication
-        if not _check_auth(request):
-            return jsonify({'error': 'Authorization required'}), 401
+        # Require authentication (no local bypass for mutations)
+        if not _require_auth(request):
+            return jsonify({'error': 'Authorization required (admin password)'}), 401
         
         from actifix.state_paths import get_actifix_paths
 
@@ -1554,9 +1559,9 @@ def create_app(
     @app.route('/api/settings', methods=['POST'])
     def api_update_settings():
         """Update AI settings."""
-        # Check authentication
-        if not _check_auth(request):
-            return jsonify({'error': 'Authorization required'}), 401
+        # Require authentication (no local bypass for mutations)
+        if not _require_auth(request):
+            return jsonify({'error': 'Authorization required (admin password)'}), 401
         
         try:
             data = request.get_json()
@@ -1599,9 +1604,9 @@ def create_app(
     @app.route('/api/ideas', methods=['POST'])
     def api_ideas():
         """Process user idea into AI-enriched ticket."""
-        # Check authentication
-        if not _check_auth(request):
-            return jsonify({'error': 'Authorization required'}), 401
+        # Require authentication (no local bypass for mutations)
+        if not _require_auth(request):
+            return jsonify({'error': 'Authorization required (admin password)'}), 401
         
         try:
             data = request.get_json()
@@ -1670,9 +1675,9 @@ def create_app(
     @app.route('/api/cleanup', methods=['POST'])
     def api_cleanup():
         """Run ticket cleanup with retention policies."""
-        # Check authentication
-        if not _check_auth(request):
-            return jsonify({'error': 'Authorization required'}), 401
+        # Require authentication (no local bypass for mutations)
+        if not _require_auth(request):
+            return jsonify({'error': 'Authorization required (admin password)'}), 401
         
         try:
             data = request.get_json() or {}
@@ -1822,6 +1827,20 @@ def create_app(
                 priority=TicketPriority.P2,
             )
             return jsonify({'error': str(e)}), 500
+
+
+    @app.route('/api/auth/verify-password', methods=['POST'])
+    def api_auth_verify_password():
+        """Test admin password validity."""
+        data = request.get_json() or {}
+        password = data.get('password', '')
+        if not password:
+            return jsonify({'valid': False, 'error': 'Password required'}), 400
+        
+        if _verify_admin_password(password):
+            return jsonify({'valid': True})
+        else:
+            return jsonify({'valid': False, 'error': 'Invalid password'}), 401
 
     return app
 
