@@ -53,7 +53,9 @@ DEFAULT_FRONTEND_PORT = 8080
 DEFAULT_API_PORT = 5001
 DEFAULT_YHATZEE_PORT = 8090
 DEFAULT_SUPERQUIZ_PORT = 8070
+DEFAULT_SHOOTY_PORT = 8040
 VERSION_LINE_RE = re.compile(r'^version\s*=\s*["\'](?P<version>[^"\']+)["\']', re.MULTILINE)
+
 
 # Global singleton instances - only one of each can exist
 _API_SERVER_INSTANCE: Optional[threading.Thread] = None
@@ -442,7 +444,39 @@ def start_superquiz_server(port: int, project_root: Path, host: str = "127.0.0.1
         return thread
 
 
+def start_shooty_server(port: int, project_root: Path, host: str = "127.0.0.1") -> threading.Thread:
+    """Launch the ShootyMcShoot GUI server in a background thread."""
+    global _SHOOTY_SERVER_INSTANCE
+
+    with _SHOOTY_SERVER_LOCK:
+        if _SHOOTY_SERVER_INSTANCE is not None and _SHOOTY_SERVER_INSTANCE.is_alive():
+            log_warning("ShootyMcShoot server already running - refusing to start duplicate instance")
+            return _SHOOTY_SERVER_INSTANCE
+
+        log_info(f"Starting ShootyMcShoot GUI server on {host}:{port}...")
+
+        try:
+            from actifix.modules.shootymcshoot import run_gui
+        except ImportError as exc:
+            log_error("ShootyMcShoot module requires Flask/Flask-CORS (install via pip install -e '.[web]')")
+            raise exc
+
+        def run_server():
+            try:
+                run_gui(host=host, port=port, project_root=project_root, debug=False)
+            except Exception as exc:
+                log_error(f"ShootyMcShoot GUI server error: {exc}")
+
+        thread = threading.Thread(target=run_server, daemon=True)
+        thread.start()
+        _SHOOTY_SERVER_INSTANCE = thread
+        time.sleep(0.3)
+        log_success(f"ShootyMcShoot GUI server running at http://{host}:{port}")
+        return thread
+
+
 def start_api_watchdog(api_port: int, project_root: Path, interval_seconds: float = 30.0, stop_event: Optional[threading.Event] = None) -> threading.Thread:
+
     """API watchdog: monitor port and auto-restart if down."""
     def watchdog_loop():
         while True:
@@ -644,11 +678,23 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
         help="Do not start the standalone SuperQuiz GUI",
     )
     parser.add_argument(
+        "--shooty-port",
+        type=int,
+        default=DEFAULT_SHOOTY_PORT,
+        help=f"Port for the standalone ShootyMcShoot GUI (default: {DEFAULT_SHOOTY_PORT})",
+    )
+    parser.add_argument(
+        "--no-shooty",
+        action="store_true",
+        help="Do not start the standalone ShootyMcShoot GUI",
+    )
+    parser.add_argument(
         "--browser",
         action="store_true",
         default=False,
         help="Open the browser automatically (disabled by default to prevent unwanted windows)",
     )
+
     parser.add_argument(
         "--no-api",
         action="store_true",
@@ -690,8 +736,13 @@ def main(argv: Optional[list[str]] = None) -> int:
         total_steps += 1
     if not args.no_superquiz:
         total_steps += 1
+    if not args.no_shooty:
+        total_steps += 1
     total_steps += 1  # frontend step
+
     current_step = 0
+
+
 
     # Step 1: Clean cache
     current_step += 1
@@ -836,7 +887,12 @@ def main(argv: Optional[list[str]] = None) -> int:
         superquiz_url = f"http://localhost:{args.superquiz_port}/"
         print(f"{Color.BOLD}{Color.GREEN}SuperQuiz:{Color.RESET} {Color.CYAN}{superquiz_url}{Color.RESET}")
 
+    if not args.no_shooty:
+        shooty_url = f"http://localhost:{args.shooty_port}/"
+        print(f"{Color.BOLD}{Color.GREEN}ShootyMcShoot:{Color.RESET} {Color.CYAN}{shooty_url}{Color.RESET}")
+
     print()
+
 
     # Optional: Open browser
     if args.browser:
