@@ -291,6 +291,7 @@ const NavigationRail = ({ activeView, onViewChange, logAlert }) => {
 const navItems = [
   { id: 'overview', icon: '📊', label: 'Overview' },
   { id: 'tickets', icon: '🎫', label: 'Tickets' },
+  { id: 'quiz', icon: '🎯', label: 'Quiz' },
   { id: 'logs', icon: '📜', label: 'Logs' },
   { id: 'system', icon: 'S', label: 'System' },
   { id: 'modules', icon: '🧩', label: 'Modules' },
@@ -1681,6 +1682,460 @@ const ModulesView = () => {
   );
 };
 
+// Quiz View Component
+const QuizView = () => {
+  const [currentQuiz, setCurrentQuiz] = useState(null);
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [selectedAnswer, setSelectedAnswer] = useState(null);
+  const [showResult, setShowResult] = useState(false);
+  const [score, setScore] = useState(0);
+  const [answered, setAnswered] = useState(false);
+  const [category, setCategory] = useState('all');
+
+  const quizData = {
+    actifix: [
+      {
+        question: "What is the primary purpose of the Actifix system?",
+        options: [
+          "To manage poker games",
+          "To track and fix software errors automatically",
+          "To monitor network traffic",
+          "To manage user authentication"
+        ],
+        correct: 1,
+        explanation: "Actifix is an error intelligence system that automatically tracks, prioritizes, and fixes software errors."
+      },
+      {
+        question: "What does P0 priority indicate in Actifix?",
+        options: [
+          "Low priority issues",
+          "Medium priority issues",
+          "Critical issues requiring immediate attention",
+          "Deferred issues"
+        ],
+        correct: 2,
+        explanation: "P0 is the highest priority level, indicating critical issues like crashes, data loss, or security vulnerabilities that require immediate attention (1 hour SLA)."
+      },
+      {
+        question: "Where is the canonical ticket database stored?",
+        options: [
+          "In memory only",
+          "In .actifix/ directory",
+          "In data/actifix.db",
+          "In a remote cloud database"
+        ],
+        correct: 2,
+        explanation: "The SQLite database at data/actifix.db is the single source of truth for all ticket data."
+      },
+      {
+        question: "What is the Raise_AF gate requirement?",
+        options: [
+          "No environment variable required",
+          "ACTIFIX_CHANGE_ORIGIN=raise_af must be set",
+          "Only git commits need it",
+          "It's optional for testing"
+        ],
+        correct: 1,
+        explanation: "All changes must set ACTIFIX_CHANGE_ORIGIN=raise_af before running Actifix or making changes."
+      },
+      {
+        question: "What does the duplicate_guard field prevent?",
+        options: [
+          "Multiple users from editing",
+          "Duplicate tickets from being created",
+          "File corruption",
+          "Database locks"
+        ],
+        correct: 1,
+        explanation: "The duplicate_guard field ensures the same error isn't logged multiple times, preventing ticket spam."
+      }
+    ],
+    python: [
+      {
+        question: "What is the correct way to handle exceptions in Actifix?",
+        options: [
+          "Try-except with pass",
+          "record_error() then re-raise",
+          "Ignore the error",
+          "Print to console only"
+        ],
+        correct: 1,
+        explanation: "Always use record_error() to capture the error, then re-raise it. Never suppress errors."
+      },
+      {
+        question: "Which module should NOT import higher-level modules?",
+        options: [
+          "bootstrap.py",
+          "raise_af.py",
+          "do_af.py",
+          "main.py"
+        ],
+        correct: 0,
+        explanation: "Lower layers cannot import higher layers. bootstrap.py is at the bottom of the dependency chain."
+      },
+      {
+        question: "What is the correct import for recording errors?",
+        options: [
+          "from actifix import record_error",
+          "from actifix.raise_af import record_error, TicketPriority",
+          "import raise_af",
+          "from raise_af import record_error"
+        ],
+        correct: 1,
+        explanation: "Use: from actifix.raise_af import record_error, TicketPriority"
+      },
+      {
+        question: "What should you use for atomic file writes?",
+        options: [
+          "open().write()",
+          "atomic_write()",
+          "file.write()",
+          "print()"
+        ],
+        correct: 1,
+        explanation: "Always use atomic_write() from actifix.log_utils for atomic file operations."
+      },
+      {
+        question: "What is the correct way to get Actifix paths?",
+        options: [
+          "os.path.join()",
+          "get_actifix_paths()",
+          "manual path construction",
+          "Pathlib only"
+        ],
+        correct: 1,
+        explanation: "Use get_actifix_paths() from actifix.state_paths to get canonical paths."
+      }
+    ],
+    git: [
+      {
+        question: "What is the correct commit message format?",
+        options: [
+          "Fixed bug in raise_af",
+          "feat(raise_af): add error taxonomy",
+          "Changes made",
+          "Update"
+        ],
+        correct: 1,
+        explanation: "Use format: type(scope): description. Types: feat|fix|refactor|test|docs|chore|perf"
+      },
+      {
+        question: "Which branch should you work on?",
+        options: [
+          "feature branches",
+          "develop",
+          "main",
+          "master"
+        ],
+        correct: 1,
+        explanation: "Work directly on develop with regular pushes. No per-change branches required."
+      },
+      {
+        question: "When should you commit?",
+        options: [
+          "Only at the end of the day",
+          "After every ticket",
+          "Never",
+          "Only when tests pass"
+        ],
+        correct: 1,
+        explanation: "Always commit after every ticket and push. This is a mandatory rule."
+      },
+      {
+        question: "What command increments the version?",
+        options: [
+          "git commit",
+          "Manual edit of pyproject.toml",
+          "Automatic after commit",
+          "npm version"
+        ],
+        correct: 1,
+        explanation: "Increment version in pyproject.toml after every commit."
+      },
+      {
+        question: "What is the correct git push command?",
+        options: [
+          "git push origin develop",
+          "git push",
+          "git push --all",
+          "git push origin main"
+        ],
+        correct: 0,
+        explanation: "Push to develop branch: git push origin develop"
+      }
+    ],
+    architecture: [
+      {
+        question: "What is the architecture graph file?",
+        options: [
+          "docs/ARCHITECTURE.md",
+          "docs/architecture/MAP.yaml",
+          "architecture.json",
+          "MAP.md"
+        ],
+        correct: 1,
+        explanation: "Always open docs/architecture/MAP.yaml and docs/architecture/DEPGRAPH.json before starting work."
+      },
+      {
+        question: "What is the dependency rule for modules?",
+        options: [
+          "Higher layers can import lower layers",
+          "Lower layers cannot import higher layers",
+          "All modules can import each other",
+          "Only main.py can import others"
+        ],
+        correct: 1,
+        explanation: "Dependency rule: Lower layers cannot import higher layers. bootstrap → state_paths → config → log_utils → persistence → raise_af → do_af → api → main"
+      },
+      {
+        question: "Where is the ticket database located?",
+        options: [
+          "In memory",
+          "In .actifix/",
+          "In data/actifix.db",
+          "In a remote server"
+        ],
+        correct: 2,
+        explanation: "The database at data/actifix.db is the single source of truth for all ticket data."
+      },
+      {
+        question: "What is the fallback queue location?",
+        options: [
+          "data/actifix.db",
+          ".actifix/actifix_fallback_queue.json",
+          "logs/fallback.json",
+          "tmp/queue.json"
+        ],
+        correct: 1,
+        explanation: "If main storage fails, errors queue to .actifix/actifix_fallback_queue.json and replay on recovery."
+      },
+      {
+        question: "What is the correct API for processing tickets?",
+        options: [
+          "actifix.process_tickets()",
+          "actifix.do_af.get_open_tickets()",
+          "actifix.main.process()",
+          "actifix.api.get_tickets()"
+        ],
+        correct: 1,
+        explanation: "Use: from actifix.do_af import get_open_tickets, mark_ticket_complete, get_ticket_stats"
+      }
+    ]
+  };
+
+  const allQuestions = [
+    ...quizData.actifix,
+    ...quizData.python,
+    ...quizData.git,
+    ...quizData.architecture
+  ];
+
+  const filteredQuestions = category === 'all' ? allQuestions : quizData[category];
+
+  const startQuiz = (quizCategory) => {
+    setCategory(quizCategory);
+    setCurrentQuiz(quizCategory);
+    setCurrentQuestionIndex(0);
+    setSelectedAnswer(null);
+    setShowResult(false);
+    setScore(0);
+    setAnswered(false);
+  };
+
+  const restartQuiz = () => {
+    setCurrentQuiz(null);
+    setCurrentQuestionIndex(0);
+    setSelectedAnswer(null);
+    setShowResult(false);
+    setScore(0);
+    setAnswered(false);
+  };
+
+  const handleAnswerSelect = (index) => {
+    if (answered) return;
+    setSelectedAnswer(index);
+  };
+
+  const submitAnswer = () => {
+    if (selectedAnswer === null) return;
+    
+    const currentQuestion = filteredQuestions[currentQuestionIndex];
+    const isCorrect = selectedAnswer === currentQuestion.correct;
+    
+    if (isCorrect) {
+      setScore(score + 1);
+    }
+    
+    setAnswered(true);
+  };
+
+  const nextQuestion = () => {
+    if (currentQuestionIndex < filteredQuestions.length - 1) {
+      setCurrentQuestionIndex(currentQuestionIndex + 1);
+      setSelectedAnswer(null);
+      setAnswered(false);
+    } else {
+      setShowResult(true);
+    }
+  };
+
+  const getScorePercentage = () => {
+    return Math.round((score / filteredQuestions.length) * 100);
+  };
+
+  const getScoreMessage = () => {
+    const percentage = getScorePercentage();
+    if (percentage === 100) return "Perfect! You're an Actifix expert! 🎉";
+    if (percentage >= 80) return "Excellent! Great knowledge! 🌟";
+    if (percentage >= 60) return "Good job! Keep learning! 📚";
+    if (percentage >= 40) return "Not bad! Review the docs! 📖";
+    return "Keep studying! You'll get there! 💪";
+  };
+
+  const getScoreColor = () => {
+    const percentage = getScorePercentage();
+    if (percentage >= 80) return '#10b981';
+    if (percentage >= 60) return '#f59e0b';
+    return '#ef4444';
+  };
+
+  if (!currentQuiz) {
+    return h('div', { className: 'panel' },
+      h('div', { className: 'panel-header' },
+        h('div', { className: 'panel-title' },
+          h('span', { className: 'panel-title-icon' }, '🎯'),
+          'ACTIFIX QUIZ'
+        ),
+        h('div', { className: 'panel-actions' },
+          h('span', { className: 'text-muted', style: { fontSize: '11px' } },
+            'Test your knowledge of Actifix, Python, Git & Architecture'
+          )
+        )
+      ),
+      h('div', { className: 'quiz-categories' },
+        h('div', { className: 'quiz-category-card', onClick: () => startQuiz('actifix') },
+          h('div', { className: 'quiz-category-icon' }, '🎫'),
+          h('div', { className: 'quiz-category-title' }, 'Actifix'),
+          h('div', { className: 'quiz-category-desc' }, '5 questions about the system')
+        ),
+        h('div', { className: 'quiz-category-card', onClick: () => startQuiz('python') },
+          h('div', { className: 'quiz-category-icon' }, '🐍'),
+          h('div', { className: 'quiz-category-title' }, 'Python'),
+          h('div', { className: 'quiz-category-desc' }, '5 questions about Python best practices')
+        ),
+        h('div', { className: 'quiz-category-card', onClick: () => startQuiz('git') },
+          h('div', { className: 'quiz-category-icon' }, '🐙'),
+          h('div', { className: 'quiz-category-title' }, 'Git'),
+          h('div', { className: 'quiz-category-desc' }, '5 questions about Git workflow')
+        ),
+        h('div', { className: 'quiz-category-card', onClick: () => startQuiz('architecture') },
+          h('div', { className: 'quiz-category-icon' }, '🏗️'),
+          h('div', { className: 'quiz-category-title' }, 'Architecture'),
+          h('div', { className: 'quiz-category-desc' }, '5 questions about system architecture')
+        ),
+        h('div', { className: 'quiz-category-card', onClick: () => startQuiz('all') },
+          h('div', { className: 'quiz-category-icon' }, '🎯'),
+          h('div', { className: 'quiz-category-title' }, 'All Categories'),
+          h('div', { className: 'quiz-category-desc' }, '20 questions - Full assessment')
+        )
+      )
+    );
+  }
+
+  if (showResult) {
+    const percentage = getScorePercentage();
+    const color = getScoreColor();
+    
+    return h('div', { className: 'panel' },
+      h('div', { className: 'panel-header' },
+        h('div', { className: 'panel-title' },
+          h('span', { className: 'panel-title-icon' }, '📊'),
+          'QUIZ RESULTS'
+        )
+      ),
+      h('div', { className: 'quiz-result' },
+        h('div', { className: 'quiz-result-score', style: { color } },
+          h('div', { className: 'quiz-result-percentage' }, `${percentage}%`),
+          h('div', { className: 'quiz-result-text' }, getScoreMessage())
+        ),
+        h('div', { className: 'quiz-result-details' },
+          h('div', { className: 'quiz-result-stat' },
+            h('span', { className: 'quiz-result-label' }, 'Correct:'),
+            h('span', { className: 'quiz-result-value' }, score)
+          ),
+          h('div', { className: 'quiz-result-stat' },
+            h('span', { className: 'quiz-result-label' }, 'Total:'),
+            h('span', { className: 'quiz-result-value' }, filteredQuestions.length)
+          ),
+          h('div', { className: 'quiz-result-stat' },
+            h('span', { className: 'quiz-result-label' }, 'Category:'),
+            h('span', { className: 'quiz-result-value' }, category === 'all' ? 'All Categories' : category.charAt(0).toUpperCase() + category.slice(1))
+          )
+        ),
+        h('div', { className: 'quiz-result-actions' },
+          h('button', { className: 'btn btn-primary', onClick: restartQuiz }, 'Take Another Quiz'),
+          h('button', { className: 'btn', onClick: () => startQuiz(category) }, 'Retry This Quiz')
+        )
+      )
+    );
+  }
+
+  const currentQuestion = filteredQuestions[currentQuestionIndex];
+  const progress = ((currentQuestionIndex + 1) / filteredQuestions.length) * 100;
+
+  return h('div', { className: 'panel' },
+    h('div', { className: 'panel-header' },
+      h('div', { className: 'panel-title' },
+        h('span', { className: 'panel-title-icon' }, '🎯'),
+        `${category === 'all' ? 'All Categories' : category.charAt(0).toUpperCase() + category.slice(1)} Quiz`
+      ),
+      h('div', { className: 'panel-actions' },
+        h('span', { className: 'text-muted', style: { fontSize: '11px' } },
+          `Question ${currentQuestionIndex + 1} of ${filteredQuestions.length}`
+        )
+      )
+    ),
+    h('div', { className: 'quiz-progress' },
+      h('div', { className: 'quiz-progress-bar', style: { width: `${progress}%` } })
+    ),
+    h('div', { className: 'quiz-question' },
+      h('div', { className: 'quiz-question-text' }, currentQuestion.question),
+      h('div', { className: 'quiz-options' },
+        currentQuestion.options.map((option, index) =>
+          h('div', {
+            key: index,
+            className: [
+              'quiz-option',
+              selectedAnswer === index ? 'selected' : '',
+              answered && index === currentQuestion.correct ? 'correct' : '',
+              answered && selectedAnswer === index && index !== currentQuestion.correct ? 'incorrect' : ''
+            ].join(' '),
+            onClick: () => handleAnswerSelect(index)
+          },
+            h('div', { className: 'quiz-option-letter' }, String.fromCharCode(65 + index)),
+            h('div', { className: 'quiz-option-text' }, option)
+          )
+        )
+      ),
+      answered && h('div', { className: 'quiz-explanation' },
+        h('div', { className: 'quiz-explanation-label' }, 'Explanation:'),
+        h('div', { className: 'quiz-explanation-text' }, currentQuestion.explanation)
+      ),
+      h('div', { className: 'quiz-actions' },
+        !answered && h('button', {
+          className: 'btn btn-primary',
+          onClick: submitAnswer,
+          disabled: selectedAnswer === null
+        }, 'Submit Answer'),
+        answered && h('button', {
+          className: 'btn btn-primary',
+          onClick: nextQuestion
+        }, currentQuestionIndex < filteredQuestions.length - 1 ? 'Next Question' : 'See Results')
+      )
+    )
+  );
+};
+
 // Ideas View Component
 const IdeasView = () => {
   const [idea, setIdea] = useState('');
@@ -1942,6 +2397,7 @@ const App = () => {
   const renderView = () => {
     switch (activeView) {
       case 'tickets': return h(TicketsView);
+      case 'quiz': return h(QuizView);
       case 'logs': return h(LogsView);
       case 'system': return h(SystemView);
       case 'modules': return h(ModulesView);
