@@ -8,7 +8,7 @@ const { useState, useEffect, useRef, createElement: h } = React;
 
 // API Configuration
 const API_BASE = 'http://localhost:5001/api';
-const UI_VERSION = '5.0.0';
+const UI_VERSION = '5.0.50';
 const REFRESH_INTERVAL = 5000;
 const LOG_REFRESH_INTERVAL = 3000;
 const TICKET_REFRESH_INTERVAL = 4000;
@@ -1842,7 +1842,7 @@ const App = () => {
   const [isFixing, setIsFixing] = useState(false);
   const [fixStatus, setFixStatus] = useState('Ready to fix the next ticket');
   const [logAlert, setLogAlert] = useState(false);
-  const [theme, setTheme] = useState('dark');
+  const [theme, setTheme] = useState('portal');
   const [authenticated, setAuthenticated] = useState(isAuthenticated());
   const logFlashTimer = useRef(null);
 
@@ -1857,13 +1857,13 @@ const App = () => {
   };
 
   useEffect(() => {
-    const savedTheme = localStorage.getItem('actifix-theme') || 'dark';
+    const savedTheme = localStorage.getItem('actifix-theme') || 'portal';
     setTheme(savedTheme);
     document.documentElement.dataset.theme = savedTheme;
   }, []);
 
   const toggleTheme = () => {
-    const newTheme = theme === 'dark' ? 'azure' : 'dark';
+    const newTheme = theme === 'portal' ? 'azure' : 'portal';
     setTheme(newTheme);
     localStorage.setItem('actifix-theme', newTheme);
     document.documentElement.dataset.theme = newTheme;
