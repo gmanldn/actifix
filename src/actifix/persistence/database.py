@@ -77,6 +77,10 @@ def _validate_database_file_permissions(resolved_db_path: Path) -> None:
     """
     Ensure the database file is not world-readable or world-writable.
     """
+    import os
+    if os.name == 'nt':
+        # On Windows, ACLs handle permissions; skip Unix mode check
+        return
     try:
         if resolved_db_path.exists():
             stat_info = resolved_db_path.stat()
