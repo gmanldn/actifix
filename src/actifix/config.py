@@ -305,7 +305,7 @@ def load_config(
         ai_api_key=_get_env_sanitized("ACTIFIX_AI_API_KEY", "", value_type="string"),
         ai_model=_get_env_sanitized("ACTIFIX_AI_MODEL", "qwen2.5-coder:7b-instruct", value_type="string"),
         ollama_model=_get_env_sanitized("ACTIFIX_OLLAMA_MODEL", "qwen2.5-coder:7b-instruct", value_type="string"),
-        ai_enabled=_parse_bool(_get_env_sanitized("ACTIFIX_AI_ENABLED", "0", value_type="boolean")),
+        ai_enabled=_parse_bool(_get_env_sanitized("ACTIFIX_AI_ENABLED", "1", value_type="boolean")),
     )
     
     # Validate configuration
