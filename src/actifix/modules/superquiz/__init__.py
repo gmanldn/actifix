@@ -24,7 +24,7 @@ MODULE_DEFAULTS = {
     "host": "127.0.0.1",
     "port": 8070,
 }
-DEFAULT_QUESTIONS_PER_PLAYER = 5
+DEFAULT_QUESTIONS_PER_PLAYER = 20
 ACCESS_RULE = "local-only"
 MODULE_METADATA = {
     "name": "modules.superquiz",
@@ -187,6 +187,42 @@ FUNTRIVIA_CATEGORY_MAP: Dict[str, str] = {
 }
 
 QUIZAPI_CATEGORY_MAP: Dict[str, str] = {
+    "General Knowledge": "general",
+    "Science": "science",
+    "History": "history",
+    "Geography": "geography",
+    "Sports": "sports",
+    "Entertainment": "entertainment",
+    "Art & Literature": "arts",
+    "Technology": "technology",
+    "Nature": "nature",
+    "Politics": "politics",
+    "Music": "music",
+    "Movies": "movies",
+    "Literature": "literature",
+    "Mythology": "mythology",
+    "Animals": "animals",
+}
+
+TRIVIA_DB_CATEGORY_MAP: Dict[str, str] = {
+    "General Knowledge": "general",
+    "Science": "science",
+    "History": "history",
+    "Geography": "geography",
+    "Sports": "sports",
+    "Entertainment": "entertainment",
+    "Art & Literature": "arts",
+    "Technology": "technology",
+    "Nature": "nature",
+    "Politics": "politics",
+    "Music": "music",
+    "Movies": "movies",
+    "Literature": "literature",
+    "Mythology": "mythology",
+    "Animals": "animals",
+}
+
+QUIZME_CATEGORY_MAP: Dict[str, str] = {
     "General Knowledge": "general",
     "Science": "science",
     "History": "history",
@@ -554,6 +590,76 @@ def _quizapi_questions(
     return normalized
 
 
+def _trivia_db_questions(
+    category: Optional[str],
+    amount: int,
+    topic: Optional[str] = None,
+) -> List[Dict[str, object]]:
+    """Trivia DB - Another trivia API source."""
+    params = [f"limit={amount}"]
+    if category and category != "Random":
+        slug = TRIVIA_DB_CATEGORY_MAP.get(category)
+        if slug:
+            params.append(f"categories={slug}")
+    if topic:
+        params.append(f"search={quote(topic)}")
+    url = f"https://the-trivia-db.com/api/v1/trivia?{'&'.join(params)}"
+    data = _http_get_json(url)
+    normalized = []
+    for item in data if isinstance(data, list) else []:
+        question = str(item.get("question", "")).strip()
+        correct = str(item.get("correct_answer", "")).strip()
+        incorrect = [str(ans).strip() for ans in item.get("incorrect_answers", [])]
+        if not question or not correct:
+            continue
+        normalized.append(
+            {
+                "question": question,
+                "category": str(item.get("category", category or "")),
+                "source": "Trivia DB",
+                "difficulty": str(item.get("difficulty", "unknown")).lower(),
+                "answer": correct,
+                "options": _shuffle_options(correct, incorrect),
+            }
+        )
+    return normalized
+
+
+def _quizme_questions(
+    category: Optional[str],
+    amount: int,
+    topic: Optional[str] = None,
+) -> List[Dict[str, object]]:
+    """QuizMe API - Modern trivia source."""
+    params = [f"limit={amount}"]
+    if category and category != "Random":
+        slug = QUIZME_CATEGORY_MAP.get(category)
+        if slug:
+            params.append(f"category={slug}")
+    if topic:
+        params.append(f"search={quote(topic)}")
+    url = f"https://quizme-api.com/api/v1/questions?{'&'.join(params)}"
+    data = _http_get_json(url)
+    normalized = []
+    for item in data if isinstance(data, list) else []:
+        question = str(item.get("question", "")).strip()
+        correct = str(item.get("correct_answer", "")).strip()
+        incorrect = [str(ans).strip() for ans in item.get("incorrect_answers", [])]
+        if not question or not correct:
+            continue
+        normalized.append(
+            {
+                "question": question,
+                "category": str(item.get("category", category or "")),
+                "source": "QuizMe",
+                "difficulty": str(item.get("difficulty", "unknown")).lower(),
+                "answer": correct,
+                "options": _shuffle_options(correct, incorrect),
+            }
+        )
+    return normalized
+
+
 def _generate_incorrect_answers(correct_answer: str) -> List[str]:
     """Generate plausible incorrect answers when API doesn't provide them."""
     # Simple variations of the correct answer
@@ -756,6 +862,8 @@ def _gather_questions(
         ("JService", lambda count: _jservice_questions(category, count, topic=topic)),
         ("FunTrivia", lambda count: _funtrivia_questions(category, count, topic=topic)),
         ("QuizAPI", lambda count: _quizapi_questions(category, count, topic=topic)),
+        ("Trivia DB", lambda count: _trivia_db_questions(category, count, topic=topic)),
+        ("QuizMe", lambda count: _quizme_questions(category, count, topic=topic)),
         ("Numbers API", lambda count: _numbers_questions(category, count, difficulty=difficulty, topic=topic)),
         ("Useless Facts API", lambda count: _uselessfacts_questions(category, count, difficulty=difficulty, topic=topic)),
         ("Local", lambda count: _local_questions(category, count, difficulty=difficulty, topic=topic)),
@@ -841,6 +949,8 @@ def _gather_snap_questions(
         ("JService", lambda count: _jservice_questions(None, count, topic=topic)),
         ("FunTrivia", lambda count: _funtrivia_questions(None, count, topic=topic)),
         ("QuizAPI", lambda count: _quizapi_questions(None, count, topic=topic)),
+        ("Trivia DB", lambda count: _trivia_db_questions(None, count, topic=topic)),
+        ("QuizMe", lambda count: _quizme_questions(None, count, topic=topic)),
         ("Numbers API", lambda count: _numbers_questions(None, count, difficulty=difficulty, topic=topic)),
         ("Useless Facts API", lambda count: _uselessfacts_questions(None, count, difficulty=difficulty, topic=topic)),
         ("Local", lambda count: _local_questions(None, count, difficulty=difficulty, topic=topic)),
@@ -1580,7 +1690,7 @@ _HTML_PAGE = """<!doctype html>
     <div class="app">
       <header>
         <h1 class="title">SuperQuiz Enhanced</h1>
-        <div class="subtitle">10 Sources · Timed & Snap · Custom & Local · Elimination · Dark Mode</div>
+        <div class="subtitle">12 Sources · Timed & Snap · Custom & Local · Elimination · Dark Mode</div>
         <button id="toggle-dark" class="button tertiary" style="align-self:flex-start; max-width:160px;">Toggle Dark</button>
       </header>
 
@@ -1678,6 +1788,8 @@ _HTML_PAGE = """<!doctype html>
               <label><input type="checkbox" value="JService" checked> JService</label>
               <label><input type="checkbox" value="FunTrivia" checked> FunTrivia</label>
               <label><input type="checkbox" value="QuizAPI" checked> QuizAPI</label>
+              <label><input type="checkbox" value="Trivia DB" checked> Trivia DB</label>
+              <label><input type="checkbox" value="QuizMe" checked> QuizMe</label>
               <label><input type="checkbox" value="Numbers API" checked> Numbers API</label>
               <label><input type="checkbox" value="Useless Facts API" checked> Useless Facts</label>
               <label><input type="checkbox" value="Local" checked> Local</label>
@@ -1694,7 +1806,7 @@ _HTML_PAGE = """<!doctype html>
         <section class="panel delay-3">
           <h2>Question Sources</h2>
           <div style="font-size: 13px; line-height: 1.6;">
-            <p><strong>10 Sources Active:</strong></p>
+            <p><strong>12 Sources Active:</strong></p>
             <ul style="margin: 0; padding-left: 20px;">
               <li>OpenTDB</li>
               <li>The Trivia API</li>
@@ -1703,6 +1815,8 @@ _HTML_PAGE = """<!doctype html>
               <li>JService (Jeopardy)</li>
               <li>FunTrivia</li>
               <li>QuizAPI</li>
+              <li>Trivia DB</li>
+              <li>QuizMe</li>
               <li>Numbers API</li>
               <li>Useless Facts API</li>
               <li>Local Questions</li>
