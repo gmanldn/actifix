@@ -67,7 +67,7 @@ The frontend displays the version in the header via the `VersionBadge` component
 - **Consistent versioning**: UI and API always show the same version
 
 ## Testing
-All three versions are now synchronized at `5.0.50`:
-- Frontend `UI_VERSION`: 5.0.50
-- Backend `__version__`: 5.0.50
-- `pyproject.toml`: 5.0.50
+All three versions are now synchronized at `5.0.53`:
+- Frontend `UI_VERSION`: 5.0.53
+- Backend `__version__`: 5.0.53
+- `pyproject.toml`: 5.0.53

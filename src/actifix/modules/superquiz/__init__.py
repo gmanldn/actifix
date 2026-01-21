@@ -1763,12 +1763,6 @@ _HTML_PAGE = """<!doctype html>
           <div id="timed-fields" class="snap-fields hidden">
             <label for="time-limit">Time per Question (seconds)</label>
             <input id="time-limit" type="number" value="15" min="5" max="60">
-            <label for="timed-difficulty">Difficulty</label>
-            <select id="timed-difficulty">
-              <option value="easy">Easy</option>
-              <option value="medium" selected>Medium</option>
-              <option value="hard">Hard</option>
-            </select>
           </div>
           
           <div id="custom-fields" class="snap-fields hidden">
@@ -1859,7 +1853,6 @@ _HTML_PAGE = """<!doctype html>
     const difficultyEl = document.getElementById("difficulty");
     const timedFields = document.getElementById("timed-fields");
     const timeLimitEl = document.getElementById("time-limit");
-    const timedDifficultyEl = document.getElementById("timed-difficulty");
     const customFields = document.getElementById("custom-fields");
     const customFileEl = document.getElementById("custom-file");
     const customJsonEl = document.getElementById("custom-json");
@@ -2028,7 +2021,7 @@ _HTML_PAGE = """<!doctype html>
           throw new Error(`Snap Quiz API error: ${err.message}. Ensure the API server is running on port 5001.`);
         }
       } else if (mode === "timed") {
-        const difficulty = timedDifficultyEl.value;
+        const difficulty = difficultyEl.value;
         const url = `${basePath()}/api/snap?difficulty=${encodeURIComponent(difficulty)}&count=${count}${sourcesParam}`;
         try {
           const response = await fetch(url, { cache: "no-store" });
