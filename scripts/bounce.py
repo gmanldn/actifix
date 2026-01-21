@@ -10,6 +10,7 @@ import os
 import signal
 import subprocess
 import sys
+import platform
 from pathlib import Path
 
 # Environment variable required by Actifix change gate
@@ -20,21 +21,36 @@ def _find_pids(pattern):
     """
     Return a list of PIDs whose command line matches the given pattern.
     """
-    try:
-        output = subprocess.check_output(['pgrep', '-f', pattern])
-    except subprocess.CalledProcessError:
+    system = platform.system()
+    if system in ('Linux', 'Darwin'):
+        try:
+            output = subprocess.check_output(['pgrep', '-f', pattern])
+            return [int(line.strip()) for line in output.decode('ascii').splitlines() if line.strip()]
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            return []
+    elif system == 'Windows':
+        try:
+            ps_cmd = f'Get-WmiObject Win32_Process | Where-Object {{ $_.CommandLine -match "{pattern}" }} | Select-Object -ExpandProperty ProcessId'
+            output = subprocess.check_output(['powershell.exe', '-Command', ps_cmd], text=True)
+            return [int(pid.strip()) for pid in output.splitlines() if pid.strip().isdigit()]
+        except (subprocess.CalledProcessError, FileNotFoundError, ValueError):
+            return []
+    else:
         return []
-    return [int(p) for p in output.split()]
 
 
 def _kill_pids(pids):
     """
-    Send SIGTERM to each PID in the list.
+    Cross-platform kill of processes by PID.
     """
+    system = platform.system()
     for pid in pids:
         try:
-            os.kill(pid, signal.SIGTERM)
-        except ProcessLookupError:
+            if system == "Windows":
+                subprocess.check_output(["taskkill", "/F", "/PID", str(pid)], stderr=subprocess.STDOUT)
+            else:
+                os.kill(pid, signal.SIGTERM)
+        except (subprocess.CalledProcessError, OSError, ProcessLookupError):
             pass
 
 
