@@ -17,7 +17,7 @@ def get_version_from_pyproject():
         print(f"Error: {pyproject_path} not found")
         sys.exit(1)
     
-    content = pyproject_path.read_text()
+    content = pyproject_path.read_text(encoding='utf-8')
     
     # Match version = "x.x.x" pattern
     match = re.search(r'version\s*=\s*"([^"]+)"', content)
@@ -38,7 +38,7 @@ def update_index_html(version):
         print(f"Warning: {index_path} not found, skipping index.html update")
         return
     
-    content = index_path.read_text()
+    content = index_path.read_text(encoding='utf-8')
     
     # Update ACTIFIX_ASSET_VERSION
     content = re.sub(
@@ -61,7 +61,7 @@ def update_index_html(version):
         content
     )
     
-    index_path.write_text(content)
+    index_path.write_text(content, encoding='utf-8')
     print(f"Updated {index_path}")
 
 
@@ -73,7 +73,7 @@ def update_app_js(version):
         print(f"Warning: {app_js_path} not found, skipping app.js update")
         return
     
-    content = app_js_path.read_text()
+    content = app_js_path.read_text(encoding='utf-8')
     
     # Update UI_VERSION constant
     content = re.sub(
@@ -82,7 +82,7 @@ def update_app_js(version):
         content
     )
     
-    app_js_path.write_text(content)
+    app_js_path.write_text(content, encoding='utf-8')
     print(f"Updated {app_js_path}")
 
 
