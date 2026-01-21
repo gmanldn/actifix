@@ -1691,6 +1691,7 @@ const QuizView = () => {
   const [score, setScore] = useState(0);
   const [answered, setAnswered] = useState(false);
   const [category, setCategory] = useState('all');
+  const [difficulty, setDifficulty] = useState('medium');
 
   const quizData = {
     actifix: [
@@ -2037,6 +2038,23 @@ const QuizView = () => {
           h('div', { className: 'quiz-category-icon' }, '🎯'),
           h('div', { className: 'quiz-category-title' }, 'All Categories'),
           h('div', { className: 'quiz-category-desc' }, '20 questions - Full assessment')
+        )
+      ),
+      h('div', { className: 'quiz-difficulty-selector' },
+        h('div', { className: 'quiz-difficulty-label' }, 'Difficulty:'),
+        h('div', { className: 'quiz-difficulty-options' },
+          h('button', {
+            className: `quiz-difficulty-btn ${difficulty === 'easy' ? 'active' : ''}`,
+            onClick: () => setDifficulty('easy')
+          }, 'Easy'),
+          h('button', {
+            className: `quiz-difficulty-btn ${difficulty === 'medium' ? 'active' : ''}`,
+            onClick: () => setDifficulty('medium')
+          }, 'Medium'),
+          h('button', {
+            className: `quiz-difficulty-btn ${difficulty === 'hard' ? 'active' : ''}`,
+            onClick: () => setDifficulty('hard')
+          }, 'Hard')
         )
       )
     );
