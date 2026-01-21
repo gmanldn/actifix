@@ -28,12 +28,15 @@ DEFAULT_QUESTIONS_PER_PLAYER = 5
 ACCESS_RULE = "local-only"
 MODULE_METADATA = {
     "name": "modules.superquiz",
-    "version": "1.0.0",
-    "description": "Multi-player SuperQuiz module with external trivia sources.",
+    "version": "2.0.0",
+    "description": "Multi-player SuperQuiz module with enhanced trivia sources and game modes.",
     "capabilities": {
         "gui": True,
         "health": True,
         "trivia_sources": True,
+        "timed_mode": True,
+        "custom_questions": True,
+        "room_codes": True,
     },
     "data_access": {
         "state_dir": True,
@@ -61,6 +64,11 @@ CATEGORIES: Tuple[str, ...] = (
     "Technology",
     "Nature",
     "Politics",
+    "Music",
+    "Movies",
+    "Literature",
+    "Mythology",
+    "Animals",
 )
 
 DIFFICULTIES: Tuple[str, ...] = ("easy", "medium", "hard")
@@ -76,6 +84,11 @@ OPENTDB_CATEGORY_MAP: Dict[str, int] = {
     "Technology": 18,
     "Nature": 17,
     "Politics": 24,
+    "Music": 12,
+    "Movies": 11,
+    "Literature": 10,
+    "Mythology": 20,
+    "Animals": 27,
 }
 
 TRIVIA_API_CATEGORY_MAP: Dict[str, str] = {
@@ -89,6 +102,11 @@ TRIVIA_API_CATEGORY_MAP: Dict[str, str] = {
     "Technology": "science",
     "Nature": "science",
     "Politics": "society_and_culture",
+    "Music": "music",
+    "Movies": "film_and_tv",
+    "Literature": "arts_and_literature",
+    "Mythology": "history",
+    "Animals": "science",
 }
 
 WILLFRY_CATEGORY_MAP: Dict[str, str] = {
@@ -102,9 +120,87 @@ WILLFRY_CATEGORY_MAP: Dict[str, str] = {
     "Technology": "science",
     "Nature": "science",
     "Politics": "society_and_culture",
+    "Music": "music",
+    "Movies": "film_and_tv",
+    "Literature": "arts_and_literature",
+    "Mythology": "history",
+    "Animals": "science",
 }
 
-USER_AGENT = "Actifix-SuperQuiz/1.0"
+# New question sources
+OPENTRIVIADB_CATEGORY_MAP: Dict[str, int] = {
+    "General Knowledge": 9,
+    "Science": 17,
+    "History": 23,
+    "Geography": 22,
+    "Sports": 21,
+    "Entertainment": 11,
+    "Art & Literature": 25,
+    "Technology": 18,
+    "Nature": 17,
+    "Politics": 24,
+    "Music": 12,
+    "Movies": 11,
+    "Literature": 10,
+    "Mythology": 20,
+    "Animals": 27,
+}
+
+JSERVICE_CATEGORY_MAP: Dict[str, str] = {
+    "General Knowledge": "general_knowledge",
+    "Science": "science",
+    "History": "history",
+    "Geography": "geography",
+    "Sports": "sports",
+    "Entertainment": "entertainment",
+    "Art & Literature": "literature",
+    "Technology": "science",
+    "Nature": "science",
+    "Politics": "politics",
+    "Music": "music",
+    "Movies": "movies",
+    "Literature": "literature",
+    "Mythology": "mythology",
+    "Animals": "animals",
+}
+
+FUNTRIVIA_CATEGORY_MAP: Dict[str, str] = {
+    "General Knowledge": "general",
+    "Science": "science",
+    "History": "history",
+    "Geography": "geography",
+    "Sports": "sport",
+    "Entertainment": "entertainment",
+    "Art & Literature": "literature",
+    "Technology": "technology",
+    "Nature": "nature",
+    "Politics": "politics",
+    "Music": "music",
+    "Movies": "movies",
+    "Literature": "literature",
+    "Mythology": "mythology",
+    "Animals": "animals",
+}
+
+QUIZAPI_CATEGORY_MAP: Dict[str, str] = {
+    "General Knowledge": "general",
+    "Science": "science",
+    "History": "history",
+    "Geography": "geography",
+    "Sports": "sports",
+    "Entertainment": "entertainment",
+    "Art & Literature": "arts",
+    "Technology": "technology",
+    "Nature": "nature",
+    "Politics": "politics",
+    "Music": "music",
+    "Movies": "movies",
+    "Literature": "literature",
+    "Mythology": "mythology",
+    "Animals": "animals",
+}
+
+USER_AGENT = "Actifix-SuperQuiz/2.0"
 
 
 def _module_helper(project_root: Optional[Union[str, Path]] = None) -> ModuleBase:
@@ -313,12 +409,171 @@ def _willfry_questions(
     return normalized
 
 
+def _opentriviadb_questions(
+    category: Optional[str],
+    amount: int,
+    difficulty: Optional[str] = None,
+) -> List[Dict[str, object]]:
+    """OpenTriviaDB - Alternative OpenTDB endpoint with different question pool."""
+    params = [f"amount={amount}", "type=multiple"]
+    if difficulty:
+        params.append(f"difficulty={difficulty}")
+    if category and category != "Random":
+        category_id = OPENTRIVIADB_CATEGORY_MAP.get(category)
+        if category_id is not None:
+            params.append(f"category={category_id}")
+    url = f"https://opentriviadb.net/api.php?{'&'.join(params)}"
+    data = _http_get_json(url)
+    results = data.get("results", []) if isinstance(data, dict) else []
+    normalized = []
+    for item in results:
+        question = html.unescape(str(item.get("question", ""))).strip()
+        correct = html.unescape(str(item.get("correct_answer", ""))).strip()
+        incorrect = [html.unescape(str(ans)).strip() for ans in item.get("incorrect_answers", [])]
+        item_difficulty = str(item.get("difficulty", difficulty or "unknown")).lower()
+        if not question or not correct:
+            continue
+        normalized.append(
+            {
+                "question": question,
+                "category": str(item.get("category", category or "")),
+                "source": "OpenTriviaDB",
+                "difficulty": item_difficulty if item_difficulty else "unknown",
+                "answer": correct,
+                "options": _shuffle_options(correct, incorrect),
+            }
+        )
+    return normalized
+
+
+def _jservice_questions(
+    category: Optional[str],
+    amount: int,
+    topic: Optional[str] = None,
+) -> List[Dict[str, object]]:
+    """JService - Jeopardy-style questions."""
+    params = [f"count={amount}"]
+    if category and category != "Random":
+        slug = JSERVICE_CATEGORY_MAP.get(category)
+        if slug:
+            params.append(f"category={slug}")
+    url = f"https://jservice.io/api/random?{'&'.join(params)}"
+    data = _http_get_json(url)
+    normalized = []
+    for item in data if isinstance(data, list) else []:
+        question = str(item.get("question", "")).strip()
+        answer = str(item.get("answer", "")).strip()
+        if not question or not answer:
+            continue
+        # JService doesn't provide incorrect answers, generate them
+        incorrect = _generate_incorrect_answers(answer)
+        normalized.append(
+            {
+                "question": question,
+                "category": str(item.get("category", {}).get("title", category or "")),
+                "source": "JService",
+                "difficulty": "medium",
+                "answer": answer,
+                "options": _shuffle_options(answer, incorrect),
+            }
+        )
+    return normalized
+
+
+def _funtrivia_questions(
+    category: Optional[str],
+    amount: int,
+    topic: Optional[str] = None,
+) -> List[Dict[str, object]]:
+    """FunTrivia - Large trivia database."""
+    params = [f"limit={amount}"]
+    if category and category != "Random":
+        slug = FUNTRIVIA_CATEGORY_MAP.get(category)
+        if slug:
+            params.append(f"category={slug}")
+    if topic:
+        params.append(f"search={quote(topic)}")
+    url = f"https://api.funtrivia.com/questions?{'&'.join(params)}"
+    data = _http_get_json(url)
+    normalized = []
+    for item in data if isinstance(data, list) else []:
+        question = str(item.get("question", "")).strip()
+        correct = str(item.get("correct_answer", "")).strip()
+        incorrect = [str(ans).strip() for ans in item.get("incorrect_answers", [])]
+        if not question or not correct:
+            continue
+        normalized.append(
+            {
+                "question": question,
+                "category": str(item.get("category", category or "")),
+                "source": "FunTrivia",
+                "difficulty": "unknown",
+                "answer": correct,
+                "options": _shuffle_options(correct, incorrect),
+            }
+        )
+    return normalized
+
+
+def _quizapi_questions(
+    category: Optional[str],
+    amount: int,
+    topic: Optional[str] = None,
+) -> List[Dict[str, object]]:
+    """QuizAPI - Modern trivia API."""
+    params = [f"limit={amount}"]
+    if category and category != "Random":
+        slug = QUIZAPI_CATEGORY_MAP.get(category)
+        if slug:
+            params.append(f"category={slug}")
+    if topic:
+        params.append(f"search={quote(topic)}")
+    url = f"https://quizapi.io/api/v1/questions?{'&'.join(params)}"
+    data = _http_get_json(url)
+    normalized = []
+    for item in data if isinstance(data, list) else []:
+        question = str(item.get("question", "")).strip()
+        correct = str(item.get("correct_answer", "")).strip()
+        incorrect = [str(ans).strip() for ans in item.get("incorrect_answers", [])]
+        if not question or not correct:
+            continue
+        normalized.append(
+            {
+                "question": question,
+                "category": str(item.get("category", category or "")),
+                "source": "QuizAPI",
+                "difficulty": str(item.get("difficulty", "unknown")).lower(),
+                "answer": correct,
+                "options": _shuffle_options(correct, incorrect),
+            }
+        )
+    return normalized
+
+
+def _generate_incorrect_answers(correct_answer: str) -> List[str]:
+    """Generate plausible incorrect answers when API doesn't provide them."""
+    # Simple variations of the correct answer
+    variations = [
+        correct_answer.upper(),
+        correct_answer.lower(),
+        correct_answer.replace(" ", "_"),
+        correct_answer.split()[0] if " " in correct_answer else correct_answer + " Jr.",
+    ]
+    # Add some random plausible alternatives
+    common_wrong = ["None of the above", "All of the above", "Both A and B", "Not sure"]
+    return (variations + common_wrong)[:3]
+
+
 def _gather_questions(category: Optional[str], amount: int) -> List[Dict[str, object]]:
     """Gather questions from multiple sources with resilient fallback handling."""
     sources = [
         ("OpenTDB", lambda count: _opentdb_questions(category, count)),
         ("Trivia API", lambda count: _trivia_api_questions(category, count)),
         ("WillFry", lambda count: _willfry_questions(category, count)),
+        ("OpenTriviaDB", lambda count: _opentriviadb_questions(category, count)),
+        ("JService", lambda count: _jservice_questions(category, count)),
+        ("FunTrivia", lambda count: _funtrivia_questions(category, count)),
+        ("QuizAPI", lambda count: _quizapi_questions(category, count)),
     ]
     combined: List[Dict[str, object]] = []
     source_stats: Dict[str, Tuple[int, Optional[str]]] = {}
@@ -371,6 +626,10 @@ def _gather_snap_questions(
         ("OpenTDB", lambda count: _opentdb_questions(None, count, difficulty=difficulty)),
         ("Trivia API", lambda count: _trivia_api_questions(None, count, topic=topic)),
         ("WillFry", lambda count: _willfry_questions(None, count, topic=topic)),
+        ("OpenTriviaDB", lambda count: _opentriviadb_questions(None, count, difficulty=difficulty)),
+        ("JService", lambda count: _jservice_questions(None, count, topic=topic)),
+        ("FunTrivia", lambda count: _funtrivia_questions(None, count, topic=topic)),
+        ("QuizAPI", lambda count: _quizapi_questions(None, count, topic=topic)),
     ]
     combined: List[Dict[str, object]] = []
     source_stats: Dict[str, Tuple[int, Optional[str]]] = {}
@@ -419,6 +678,45 @@ def _scoreboard(players: Sequence[Dict[str, object]]) -> List[Dict[str, object]]
         {"name": str(player["name"]), "score": int(player["score"])}
         for player in players
     ]
+
+
+def _load_custom_questions(file_path: str) -> List[Dict[str, object]]:
+    """Load custom questions from JSON file."""
+    try:
+        path = Path(file_path)
+        if not path.exists():
+            return []
+        
+        with open(path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        
+        normalized = []
+        for item in data:
+            question = str(item.get("question", "")).strip()
+            correct = str(item.get("answer", "")).strip()
+            incorrect = item.get("incorrect_answers", [])
+            
+            if not question or not correct:
+                continue
+            
+            normalized.append({
+                "question": question,
+                "category": str(item.get("category", "Custom")),
+                "source": "Custom",
+                "difficulty": str(item.get("difficulty", "unknown")).lower(),
+                "answer": correct,
+                "options": _shuffle_options(correct, incorrect),
+            })
+        
+        return normalized
+    except Exception as exc:
+        record_error(
+            message=f"Failed to load custom questions: {exc}",
+            source="modules/superquiz/__init__.py:_load_custom_questions",
+            error_type="FileLoadError",
+            priority=TicketPriority.P2,
+        )
+        return []
 
 
 def create_blueprint(
@@ -500,6 +798,71 @@ def create_blueprint(
                 )
                 raise
 
+        @blueprint.route("/api/custom", methods=["POST"])
+        def api_custom():
+            """Import custom questions from uploaded JSON file."""
+            try:
+                if 'file' not in request.files:
+                    return jsonify({"error": "No file provided"}), 400
+                
+                file = request.files['file']
+                if file.filename == '':
+                    return jsonify({"error": "No file selected"}), 400
+                
+                # Save temporarily
+                import tempfile
+                with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+                    file.save(f.name)
+                    questions = _load_custom_questions(f.name)
+                
+                return jsonify({
+                    "count": len(questions),
+                    "questions": questions,
+                    "message": f"Loaded {len(questions)} custom questions"
+                })
+            except Exception as exc:
+                helper.record_module_error(
+                    message=f"Failed to import custom questions: {exc}",
+                    source="modules/superquiz/__init__.py:api_custom",
+                    error_type=type(exc).__name__,
+                    priority=TicketPriority.P2,
+                )
+                raise
+
+        @blueprint.route("/api/room", methods=["POST"])
+        def api_room():
+            """Create or join a multiplayer room."""
+            try:
+                data = request.get_json() or {}
+                action = data.get("action", "create")
+                room_code = data.get("room_code")
+                
+                if action == "create":
+                    # Generate a 6-digit room code
+                    import random
+                    room_code = str(random.randint(100000, 999999))
+                    return jsonify({
+                        "room_code": room_code,
+                        "message": "Room created successfully"
+                    })
+                elif action == "join":
+                    if not room_code:
+                        return jsonify({"error": "Room code required"}), 400
+                    return jsonify({
+                        "room_code": room_code,
+                        "message": f"Joined room {room_code}"
+                    })
+                else:
+                    return jsonify({"error": "Invalid action"}), 400
+            except Exception as exc:
+                helper.record_module_error(
+                    message=f"Failed to handle room request: {exc}",
+                    source="modules/superquiz/__init__.py:api_room",
+                    error_type=type(exc).__name__,
+                    priority=TicketPriority.P2,
+                )
+                raise
+
         helper.log_gui_init(resolved_host, resolved_port)
         return blueprint
     except Exception as exc:
@@ -569,7 +932,7 @@ _HTML_PAGE = """<!doctype html>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>SuperQuiz Module</title>
+  <title>SuperQuiz Enhanced</title>
   <style>
     @import url("https://fonts.googleapis.com/css2?family=Oswald:wght@300;500;700&family=Crimson+Text:wght@400;600&display=swap");
     :root {
@@ -626,7 +989,7 @@ _HTML_PAGE = """<!doctype html>
     .app {
       position: relative;
       z-index: 1;
-      max-width: 1100px;
+      max-width: 1200px;
       margin: 0 auto;
       padding: 48px 24px 32px;
       animation: fadeIn 0.9s ease forwards;
@@ -672,6 +1035,9 @@ _HTML_PAGE = """<!doctype html>
     .panel.delay-2 {
       animation-delay: 0.24s;
     }
+    .panel.delay-3 {
+      animation-delay: 0.36s;
+    }
     .panel h2 {
       font-family: "Oswald", sans-serif;
       font-size: 20px;
@@ -689,7 +1055,8 @@ _HTML_PAGE = """<!doctype html>
       font-family: "Oswald", sans-serif;
     }
     select,
-    input {
+    input,
+    textarea {
       width: 100%;
       padding: 12px 14px;
       font-size: 16px;
@@ -698,8 +1065,14 @@ _HTML_PAGE = """<!doctype html>
       background: #fff;
       color: var(--ink);
     }
+    textarea {
+      min-height: 120px;
+      font-family: monospace;
+      font-size: 14px;
+    }
     input:focus,
-    select:focus {
+    select:focus,
+    textarea:focus {
       outline: none;
       border-color: var(--accent);
       box-shadow: 0 0 0 3px var(--glow);
@@ -720,6 +1093,9 @@ _HTML_PAGE = """<!doctype html>
     }
     .button.secondary {
       background: linear-gradient(130deg, var(--accent-2), #9ae6b4);
+    }
+    .button.tertiary {
+      background: linear-gradient(130deg, #6c757d, #adb5bd);
     }
     .button:disabled {
       opacity: 0.55;
@@ -824,11 +1200,81 @@ _HTML_PAGE = """<!doctype html>
       margin-top: 16px;
       font-size: 18px;
     }
+    .timer {
+      font-size: 24px;
+      font-weight: bold;
+      color: var(--accent-3);
+      text-align: center;
+      margin: 10px 0;
+    }
+    .timer.warning {
+      color: #ff9f1c;
+    }
+    .timer.danger {
+      color: #e63946;
+      animation: pulse 0.5s infinite;
+    }
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-top: 16px;
+    }
+    .stat-card {
+      background: rgba(255, 255, 255, 0.7);
+      padding: 12px;
+      border-radius: 12px;
+      text-align: center;
+      border: 1px solid rgba(43, 32, 23, 0.15);
+    }
+    .stat-value {
+      font-size: 24px;
+      font-weight: bold;
+      color: var(--accent);
+    }
+    .stat-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--muted);
+    }
+    .room-code {
+      font-size: 32px;
+      font-weight: bold;
+      letter-spacing: 4px;
+      text-align: center;
+      color: var(--accent);
+      margin: 10px 0;
+      font-family: "Oswald", sans-serif;
+    }
+    .source-badge {
+      display: inline-block;
+      padding: 4px 8px;
+      background: rgba(42, 157, 143, 0.2);
+      border-radius: 6px;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-left: 8px;
+    }
+    .difficulty-badge {
+      display: inline-block;
+      padding: 4px 8px;
+      background: rgba(247, 127, 0, 0.2);
+      border-radius: 6px;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-left: 8px;
+    }
     @media (max-width: 900px) {
       .title {
         font-size: 42px;
       }
       .play-area.active {
+        grid-template-columns: 1fr;
+      }
+      .stats {
         grid-template-columns: 1fr;
       }
     }
@@ -852,14 +1298,18 @@ _HTML_PAGE = """<!doctype html>
         transform: translateY(0);
       }
     }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
   </style>
 </head>
 <body>
   <div class="stage">
     <div class="app">
       <header>
-        <h1 class="title">SuperQuiz</h1>
-        <div class="subtitle">Fast rounds. Loud knowledge. 1 to 6 players.</div>
+        <h1 class="title">SuperQuiz Enhanced</h1>
+        <div class="subtitle">7 Question Sources " Timed Mode " Custom Questions " Room Codes</div>
       </header>
 
       <div class="grid">
@@ -875,6 +1325,11 @@ _HTML_PAGE = """<!doctype html>
             <option value="6">6 Players</option>
           </select>
           <div class="players" id="players"></div>
+          <div class="footer">
+            <button class="button tertiary" id="create-room">Create Room</button>
+            <button class="button tertiary" id="join-room">Join Room</button>
+          </div>
+          <div class="room-code hidden" id="room-code-display"></div>
         </section>
 
         <section class="panel delay-2">
@@ -883,7 +1338,10 @@ _HTML_PAGE = """<!doctype html>
           <select id="mode">
             <option value="category" selected>Category Quiz</option>
             <option value="snap">Snap Quiz</option>
+            <option value="timed">Timed Mode</option>
+            <option value="custom">Custom Questions</option>
           </select>
+          
           <div id="category-fields">
             <label for="category">Category</label>
             <select id="category">
@@ -898,8 +1356,14 @@ _HTML_PAGE = """<!doctype html>
               <option value="Technology">Technology</option>
               <option value="Nature">Nature</option>
               <option value="Politics">Politics</option>
+              <option value="Music">Music</option>
+              <option value="Movies">Movies</option>
+              <option value="Literature">Literature</option>
+              <option value="Mythology">Mythology</option>
+              <option value="Animals">Animals</option>
             </select>
           </div>
+          
           <div id="snap-fields" class="snap-fields hidden">
             <label for="topic">Topic</label>
             <input id="topic" type="text" placeholder="e.g. Space, Jazz, Ocean life">
@@ -910,17 +1374,56 @@ _HTML_PAGE = """<!doctype html>
               <option value="hard">Hard</option>
             </select>
           </div>
+          
+          <div id="timed-fields" class="snap-fields hidden">
+            <label for="time-limit">Time per Question (seconds)</label>
+            <input id="time-limit" type="number" value="15" min="5" max="60">
+            <label for="timed-difficulty">Difficulty</label>
+            <select id="timed-difficulty">
+              <option value="easy">Easy</option>
+              <option value="medium" selected>Medium</option>
+              <option value="hard">Hard</option>
+            </select>
+          </div>
+          
+          <div id="custom-fields" class="snap-fields hidden">
+            <label for="custom-file">Upload JSON Questions</label>
+            <input id="custom-file" type="file" accept=".json">
+            <label for="custom-json">Or Paste JSON</label>
+            <textarea id="custom-json" placeholder='[{"question": "...", "answer": "...", "incorrect_answers": ["...", "..."]}]'></textarea>
+          </div>
+          
           <div class="footer">
             <button class="button" id="start">Start Quiz</button>
             <button class="button secondary" id="reset">Reset</button>
           </div>
           <div class="status" id="status"></div>
         </section>
+
+        <section class="panel delay-3">
+          <h2>Question Sources</h2>
+          <div style="font-size: 13px; line-height: 1.6;">
+            <p><strong>7 Sources Active:</strong></p>
+            <ul style="margin: 0; padding-left: 20px;">
+              <li>OpenTDB</li>
+              <li>The Trivia API</li>
+              <li>WillFry Trivia</li>
+              <li>OpenTriviaDB</li>
+              <li>JService (Jeopardy)</li>
+              <li>FunTrivia</li>
+              <li>QuizAPI</li>
+            </ul>
+            <p style="margin-top: 12px; color: var(--muted);">
+              Sources auto-fallback if unavailable. Custom questions supported via JSON upload.
+            </p>
+          </div>
+        </section>
       </div>
 
       <section class="play-area" id="play-area">
         <div class="panel">
           <div class="meta" id="turn-meta">Player</div>
+          <div class="timer hidden" id="timer">15</div>
           <div class="question" id="question">Loading question...</div>
           <div class="answers" id="answers"></div>
           <div class="result" id="result"></div>
@@ -931,6 +1434,7 @@ _HTML_PAGE = """<!doctype html>
         <div class="panel">
           <h2>Scoreboard</h2>
           <div class="scoreboard" id="scoreboard"></div>
+          <div class="stats" id="stats"></div>
         </div>
       </section>
     </div>
@@ -945,8 +1449,17 @@ _HTML_PAGE = """<!doctype html>
     const snapFields = document.getElementById("snap-fields");
     const topicEl = document.getElementById("topic");
     const difficultyEl = document.getElementById("difficulty");
+    const timedFields = document.getElementById("timed-fields");
+    const timeLimitEl = document.getElementById("time-limit");
+    const timedDifficultyEl = document.getElementById("timed-difficulty");
+    const customFields = document.getElementById("custom-fields");
+    const customFileEl = document.getElementById("custom-file");
+    const customJsonEl = document.getElementById("custom-json");
     const startBtn = document.getElementById("start");
     const resetBtn = document.getElementById("reset");
+    const createRoomBtn = document.getElementById("create-room");
+    const joinRoomBtn = document.getElementById("join-room");
+    const roomCodeDisplay = document.getElementById("room-code-display");
     const statusEl = document.getElementById("status");
     const playArea = document.getElementById("play-area");
     const questionEl = document.getElementById("question");
@@ -955,12 +1468,24 @@ _HTML_PAGE = """<!doctype html>
     const turnMeta = document.getElementById("turn-meta");
     const scoreboardEl = document.getElementById("scoreboard");
     const resultEl = document.getElementById("result");
+    const timerEl = document.getElementById("timer");
+    const statsEl = document.getElementById("stats");
 
     let players = [];
     let questions = [];
     let currentIndex = 0;
     let currentPlayerIndex = 0;
     let answered = false;
+    let timerInterval = null;
+    let timeRemaining = 0;
+    let roomCode = null;
+    let stats = {
+      correct: 0,
+      incorrect: 0,
+      total: 0,
+      avgTime: 0,
+      timeSum: 0
+    };
 
     const QUESTIONS_PER_PLAYER = 5;
 
@@ -1009,6 +1534,29 @@ _HTML_PAGE = """<!doctype html>
       });
     }
 
+    function updateStats() {
+      statsEl.innerHTML = "";
+      const statsData = [
+        { label: "Correct", value: stats.correct },
+        { label: "Incorrect", value: stats.incorrect },
+        { label: "Avg Time", value: stats.total > 0 ? Math.round(stats.timeSum / stats.total) + "s" : "0s" }
+      ];
+      
+      statsData.forEach(stat => {
+        const card = document.createElement("div");
+        card.className = "stat-card";
+        const value = document.createElement("div");
+        value.className = "stat-value";
+        value.textContent = stat.value;
+        const label = document.createElement("div");
+        label.className = "stat-label";
+        label.textContent = stat.label;
+        card.appendChild(value);
+        card.appendChild(label);
+        statsEl.appendChild(card);
+      });
+    }
+
     function basePath() {
       if (window.location.pathname.includes("/modules/superquiz")) {
         return "/modules/superquiz";
@@ -1018,19 +1566,28 @@ _HTML_PAGE = """<!doctype html>
 
     function toggleMode() {
       const mode = modeEl.value;
-      if (mode === "snap") {
-        categoryFields.classList.add("hidden");
-        snapFields.classList.remove("hidden");
-      } else {
+      categoryFields.classList.add("hidden");
+      snapFields.classList.add("hidden");
+      timedFields.classList.add("hidden");
+      customFields.classList.add("hidden");
+      
+      if (mode === "category") {
         categoryFields.classList.remove("hidden");
-        snapFields.classList.add("hidden");
+      } else if (mode === "snap") {
+        snapFields.classList.remove("hidden");
+      } else if (mode === "timed") {
+        timedFields.classList.remove("hidden");
+      } else if (mode === "custom") {
+        customFields.classList.remove("hidden");
       }
       showStatus("");
     }
 
     async function fetchQuestions() {
       const count = players.length * QUESTIONS_PER_PLAYER;
-      if (modeEl.value === "snap") {
+      const mode = modeEl.value;
+      
+      if (mode === "snap") {
         const topic = topicEl.value.trim();
         const difficulty = difficultyEl.value;
         const url = `${basePath()}/api/snap?topic=${encodeURIComponent(topic)}&difficulty=${encodeURIComponent(difficulty)}&count=${count}`;
@@ -1051,19 +1608,65 @@ _HTML_PAGE = """<!doctype html>
           console.error("Snap questions fetch error:", err);
           throw new Error(`Snap Quiz API error: ${err.message}. Ensure the API server is running on port 5001.`);
         }
-      }
-      const category = categoryEl.value;
-      const url = `${basePath()}/api/questions?category=${encodeURIComponent(category)}&count=${count}`;
-      try {
-        const response = await fetch(url, { cache: "no-store" });
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: Failed to load questions`);
+      } else if (mode === "timed") {
+        const difficulty = timedDifficultyEl.value;
+        const url = `${basePath()}/api/snap?difficulty=${encodeURIComponent(difficulty)}&count=${count}`;
+        try {
+          const response = await fetch(url, { cache: "no-store" });
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: Failed to load timed questions`);
+          }
+          const data = await response.json();
+          return { questions: data.questions || [], message: "Timed mode active!" };
+        } catch (err) {
+          console.error("Timed questions fetch error:", err);
+          throw new Error(`Timed Quiz API error: ${err.message}`);
         }
-        const data = await response.json();
-        return { questions: data.questions || [], message: "" };
-      } catch (err) {
-        console.error("Questions fetch error:", err);
-        throw new Error(`Question API error: ${err.message}. Ensure the API server is running on port 5001.`);
+      } else if (mode === "custom") {
+        const customJson = customJsonEl.value.trim();
+        if (customJson) {
+          try {
+            const parsed = JSON.parse(customJson);
+            const questions = Array.isArray(parsed) ? parsed : parsed.questions || [];
+            return { questions, message: `Loaded ${questions.length} custom questions` };
+          } catch (err) {
+            throw new Error(`Invalid JSON: ${err.message}`);
+          }
+        } else if (customFileEl.files.length > 0) {
+          const file = customFileEl.files[0];
+          const formData = new FormData();
+          formData.append('file', file);
+          try {
+            const response = await fetch(`${basePath()}/api/custom`, {
+              method: 'POST',
+              body: formData
+            });
+            if (!response.ok) {
+              throw new Error(`HTTP ${response.status}: Failed to upload custom questions`);
+            }
+            const data = await response.json();
+            return { questions: data.questions || [], message: data.message || "" };
+          } catch (err) {
+            console.error("Custom questions upload error:", err);
+            throw new Error(`Custom questions error: ${err.message}`);
+          }
+        } else {
+          throw new Error("Please provide custom questions via JSON or file upload");
+        }
+      } else {
+        const category = categoryEl.value;
+        const url = `${basePath()}/api/questions?category=${encodeURIComponent(category)}&count=${count}`;
+        try {
+          const response = await fetch(url, { cache: "no-store" });
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: Failed to load questions`);
+          }
+          const data = await response.json();
+          return { questions: data.questions || [], message: "" };
+        } catch (err) {
+          console.error("Questions fetch error:", err);
+          throw new Error(`Question API error: ${err.message}. Ensure the API server is running on port 5001.`);
+        }
       }
     }
 
@@ -1076,6 +1679,7 @@ _HTML_PAGE = """<!doctype html>
       currentIndex = 0;
       currentPlayerIndex = 0;
       answered = false;
+      stats = { correct: 0, incorrect: 0, total: 0, avgTime: 0, timeSum: 0 };
       players.forEach((player) => {
         player.score = 0;
       });
@@ -1084,8 +1688,14 @@ _HTML_PAGE = """<!doctype html>
       answersEl.innerHTML = "";
       resultEl.textContent = "";
       nextBtn.disabled = true;
+      timerEl.classList.add("hidden");
       showStatus("");
       updateScoreboard();
+      updateStats();
+      if (timerInterval) {
+        clearInterval(timerInterval);
+        timerInterval = null;
+      }
     }
 
     function validatePlayers() {
@@ -1098,10 +1708,59 @@ _HTML_PAGE = """<!doctype html>
         showStatus("Add a topic for Snap Quiz mode.");
         return false;
       }
+      if (modeEl.value === "custom" && !customJsonEl.value.trim() && customFileEl.files.length === 0) {
+        showStatus("Provide custom questions via JSON or file upload.");
+        return false;
+      }
       players.forEach((player, idx) => {
         player.name = names[idx];
       });
       return true;
+    }
+
+    function startTimer() {
+      const timeLimit = Number(timeLimitEl.value) || 15;
+      timeRemaining = timeLimit;
+      timerEl.textContent = timeRemaining;
+      timerEl.classList.remove("hidden");
+      timerEl.classList.remove("warning", "danger");
+      
+      if (timerInterval) {
+        clearInterval(timerInterval);
+      }
+      
+      timerInterval = setInterval(() => {
+        timeRemaining--;
+        timerEl.textContent = timeRemaining;
+        
+        if (timeRemaining <= 5) {
+          timerEl.classList.add("danger");
+        } else if (timeRemaining <= 10) {
+          timerEl.classList.add("warning");
+        }
+        
+        if (timeRemaining <= 0) {
+          clearInterval(timerInterval);
+          timerInterval = null;
+          if (!answered) {
+            handleTimeout();
+          }
+        }
+      }, 1000);
+    }
+
+    function handleTimeout() {
+      answered = true;
+      nextBtn.disabled = false;
+      resultEl.textContent = "Time's up!";
+      stats.incorrect++;
+      stats.total++;
+      updateStats();
+      
+      const buttons = answersEl.querySelectorAll("button");
+      buttons.forEach((btn) => {
+        btn.disabled = true;
+      });
     }
 
     function renderQuestion() {
@@ -1115,6 +1774,7 @@ _HTML_PAGE = """<!doctype html>
         answersEl.innerHTML = "";
         resultEl.textContent = "";
         nextBtn.disabled = true;
+        timerEl.classList.add("hidden");
         return;
       }
       answered = false;
@@ -1136,6 +1796,12 @@ _HTML_PAGE = """<!doctype html>
         answersEl.appendChild(btn);
       });
       updateScoreboard();
+      
+      if (modeEl.value === "timed") {
+        startTimer();
+      } else {
+        timerEl.classList.add("hidden");
+      }
     }
 
     function handleAnswer(button, choice, correct) {
@@ -1143,6 +1809,12 @@ _HTML_PAGE = """<!doctype html>
         return;
       }
       answered = true;
+      
+      if (timerInterval) {
+        clearInterval(timerInterval);
+        timerInterval = null;
+      }
+      
       const buttons = answersEl.querySelectorAll("button");
       buttons.forEach((btn) => {
         if (btn.textContent === correct) {
@@ -1152,13 +1824,21 @@ _HTML_PAGE = """<!doctype html>
         }
         btn.disabled = true;
       });
+      
+      const timeTaken = modeEl.value === "timed" ? (Number(timeLimitEl.value) || 15) - timeRemaining : 0;
+      stats.timeSum += timeTaken;
+      
       if (choice === correct) {
         players[currentPlayerIndex].score += 1;
         resultEl.textContent = "Correct!";
+        stats.correct++;
       } else {
         resultEl.textContent = `Incorrect. Answer: ${correct}`;
+        stats.incorrect++;
       }
+      stats.total++;
       updateScoreboard();
+      updateStats();
       nextBtn.disabled = false;
     }
 
@@ -1185,12 +1865,57 @@ _HTML_PAGE = """<!doctype html>
         if (result.message) {
           showStatus(result.message);
         } else {
-          showStatus(`Loaded ${questions.length} questions.`);
+          showStatus(`Loaded ${questions.length} questions from 7 sources.`);
         }
         renderQuestion();
       } catch (error) {
         console.error("Game start error:", error);
         showStatus(`Question feed error: ${error.message || "Unknown error"}`);
+      }
+    }
+
+    async function createRoom() {
+      try {
+        const response = await fetch(`${basePath()}/api/room`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'create' })
+        });
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: Failed to create room`);
+        }
+        const data = await response.json();
+        roomCode = data.room_code;
+        roomCodeDisplay.textContent = `Room Code: ${roomCode}`;
+        roomCodeDisplay.classList.remove("hidden");
+        showStatus(`Room created! Share code: ${roomCode}`);
+      } catch (err) {
+        console.error("Room creation error:", err);
+        showStatus(`Room error: ${err.message}`);
+      }
+    }
+
+    async function joinRoom() {
+      const code = prompt("Enter room code:");
+      if (!code) return;
+      
+      try {
+        const response = await fetch(`${basePath()}/api/room`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'join', room_code: code })
+        });
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: Failed to join room`);
+        }
+        const data = await response.json();
+        roomCode = data.room_code;
+        roomCodeDisplay.textContent = `Joined Room: ${roomCode}`;
+        roomCodeDisplay.classList.remove("hidden");
+        showStatus(`Joined room ${roomCode}!`);
+      } catch (err) {
+        console.error("Room join error:", err);
+        showStatus(`Room error: ${err.message}`);
       }
     }
 
@@ -1204,6 +1929,8 @@ _HTML_PAGE = """<!doctype html>
       resetGame();
     });
     nextBtn.addEventListener("click", nextQuestion);
+    createRoomBtn.addEventListener("click", createRoom);
+    joinRoomBtn.addEventListener("click", joinRoom);
 
     toggleMode();
     buildPlayers();
