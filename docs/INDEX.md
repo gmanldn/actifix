@@ -17,6 +17,7 @@ This index keeps documentation discoverable and aligned with the Actifix workflo
 - **ADMIN AUTHENTICATION** `ADMIN_AUTHENTICATION.md` - admin user setup, password management, and authentication
 - **QUICK ADMIN SETUP** `QUICK_ADMIN_SETUP.md` - quick reference for admin authentication
 - **IMPLEMENTATION SUMMARY** `IMPLEMENTATION_SUMMARY.md` - admin authentication implementation details
+- **VERSION SYNC SOLUTION** `VERSION_SYNC_SOLUTION.md` - UI/API version synchronization and build process
 
 ## Development and testing
 - **DEVELOPMENT GUIDE** `DEVELOPMENT.md` - workflow, quality gates, ticket completion
