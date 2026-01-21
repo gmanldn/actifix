@@ -29,6 +29,7 @@ import threading
 import time
 import webbrowser
 import signal
+import platform
 import atexit
 from pathlib import Path
 from typing import Optional
@@ -212,18 +213,41 @@ def start_frontend(port: int) -> subprocess.Popen:
 
 def kill_processes_on_port(port: int) -> None:
     """Terminate any processes listening on the given TCP port."""
-    try:
-        result = subprocess.run(["lsof", "-ti", f"tcp:{port}"], capture_output=True, text=True)
-        pids = [pid for pid in result.stdout.splitlines() if pid.strip()]
-        if pids:
-            log_warning(f"Found {len(pids)} stale process(es) on port {port}")
-        for pid in pids:
-            if pid.isdigit():
-                log_info(f"Terminating process {pid}...")
-                os.kill(int(pid), signal.SIGTERM)
-                log_success(f"Terminated process {pid}")
-    except Exception as e:
-        log_error(f"Failed to kill processes on port {port}: {e}")
+    system = platform.system()
+    pids = []
+    if system == "Windows":
+        try:
+            ps_cmd = f'Get-NetTCPConnection -LocalPort {port} -State Listen | Select-Object -ExpandProperty OwningProcess'
+            output = subprocess.check_output(["powershell.exe", "-Command", ps_cmd], text=True, stderr=subprocess.STDOUT, timeout=10)
+            pids = [line.strip() for line in output.splitlines() if line.strip().isdigit()]
+        except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired) as e:
+            log_warning(f"Windows port query for port {port} failed: {e}")
+            return
+    else:
+        try:
+            result = subprocess.run(["lsof", "-tiTCP:{}".format(port)], capture_output=True, text=True, timeout=10)
+            pids = [pid.strip() for pid in result.stdout.splitlines() if pid.strip()]
+        except (FileNotFoundError, subprocess.TimeoutExpired, subprocess.CalledProcessError) as e:
+            log_warning(f"Unix port query for port {port} failed: {e}")
+            return
+    if not pids:
+        return
+    log_warning(f"Found {len(pids)} stale process(es) on port {port}")
+    killed = 0
+    for pid_str in pids:
+        try:
+            if system == "Windows":
+                subprocess.check_output(["taskkill", "/F", "/PID", pid_str], stderr=subprocess.STDOUT, timeout=10)
+                log_info(f"Terminated Windows PID {pid_str}")
+            else:
+                pid = int(pid_str)
+                os.kill(pid, signal.SIGTERM)
+                log_info(f"Signaled Unix PID {pid}")
+            killed += 1
+        except Exception as e:
+            log_warning(f"Failed to terminate PID {pid_str}: {e}")
+    if killed > 0:
+        log_success(f"Terminated {killed} process(es)")
 
 
 def cleanup_existing_instances() -> None:
