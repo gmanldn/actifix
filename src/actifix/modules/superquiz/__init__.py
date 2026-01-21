@@ -5,13 +5,15 @@ from __future__ import annotations
 import html
 import json
 import random
+import ssl
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Tuple, TYPE_CHECKING, Union
 from urllib.parse import quote
 from urllib.request import Request, urlopen
+from urllib.error import URLError
 
 from actifix.log_utils import log_event
-from actifix.raise_af import TicketPriority
+from actifix.raise_af import TicketPriority, record_error
 
 from actifix.modules.base import ModuleBase
 
@@ -116,10 +118,19 @@ def _module_helper(project_root: Optional[Union[str, Path]] = None) -> ModuleBas
 
 
 def _http_get_json(url: str, timeout: int = 8) -> object:
+    """Fetch JSON from URL with SSL certificate verification disabled for resilience."""
     request = Request(url, headers={"User-Agent": USER_AGENT})
-    with urlopen(request, timeout=timeout) as response:
-        payload = response.read()
-    return json.loads(payload.decode("utf-8"))
+    try:
+        # Create SSL context that doesn't verify certificates (for resilience)
+        ssl_context = ssl.create_default_context()
+        ssl_context.check_hostname = False
+        ssl_context.verify_mode = ssl.CERT_NONE
+        with urlopen(request, timeout=timeout, context=ssl_context) as response:
+            payload = response.read()
+        return json.loads(payload.decode("utf-8"))
+    except (URLError, TimeoutError, json.JSONDecodeError) as exc:
+        # Log but don't raise - let caller handle fallback
+        raise URLError(f"Failed to fetch from {url}: {exc}") from exc
 
 
 def _shuffle_options(correct: str, incorrect: Sequence[str]) -> List[str]:
@@ -303,33 +314,49 @@ def _willfry_questions(
 
 
 def _gather_questions(category: Optional[str], amount: int) -> List[Dict[str, object]]:
-    sources = (
-        lambda count: _opentdb_questions(category, count),
-        lambda count: _trivia_api_questions(category, count),
-        lambda count: _willfry_questions(category, count),
-    )
-    per_source = max(1, amount // len(sources))
-    remainder = amount - (per_source * len(sources))
-    counts = [per_source] * len(sources)
-    for idx in range(remainder):
-        counts[idx] += 1
+    """Gather questions from multiple sources with resilient fallback handling."""
+    sources = [
+        ("OpenTDB", lambda count: _opentdb_questions(category, count)),
+        ("Trivia API", lambda count: _trivia_api_questions(category, count)),
+        ("WillFry", lambda count: _willfry_questions(category, count)),
+    ]
     combined: List[Dict[str, object]] = []
-    for source, count in zip(sources, counts):
+    source_stats: Dict[str, Tuple[int, Optional[str]]] = {}
+    
+    # Try each source with resilient fallback
+    per_source = max(1, amount // len(sources))
+    for source_name, source_func in sources:
         try:
-            combined.extend(source(count))
-        except Exception:
-            # Silently skip this source if it fails; other sources will fill in
-            pass
+            fetched = source_func(per_source)
+            combined.extend(fetched)
+            source_stats[source_name] = (len(fetched), None)
+        except Exception as exc:
+            source_stats[source_name] = (0, str(exc))
+            # Silently continue to next source
+    
     # If we don't have enough questions, try to fetch more from working sources
     if len(combined) < amount:
         shortage = amount - len(combined)
-        for source in sources:
+        for source_name, source_func in sources:
             if len(combined) >= amount:
                 break
             try:
-                combined.extend(source(shortage))
+                fetched = source_func(shortage)
+                combined.extend(fetched)
             except Exception:
+                # Already tracked failure, continue
                 pass
+    
+    # Log quality metric if any sources failed
+    if any(err for _, (_, err) in source_stats.items() if err):
+        failed_sources = [name for name, (_, err) in source_stats.items() if err]
+        record_error(
+            message=f"Some question sources failed during gather: {', '.join(failed_sources)}. Served {len(combined)} questions from working sources.",
+            source="modules/superquiz/__init__.py:_gather_questions",
+            error_type="PartialFailure",
+            priority=TicketPriority.P2,
+        )
+    
     random.shuffle(combined)
     return combined[:amount]
 
@@ -339,34 +366,48 @@ def _gather_snap_questions(
     difficulty: Optional[str],
     amount: int,
 ) -> Tuple[List[Dict[str, object]], bool, bool]:
-    sources = (
-        lambda count: _opentdb_questions(None, count, difficulty=difficulty),
-        lambda count: _trivia_api_questions(None, count, topic=topic),
-        lambda count: _willfry_questions(None, count, topic=topic),
-    )
-    per_source = max(1, amount // len(sources))
-    remainder = amount - (per_source * len(sources))
-    counts = [per_source] * len(sources)
-    for idx in range(remainder):
-        counts[idx] += 1
+    """Gather snap questions with resilient fallback and filtering."""
+    sources = [
+        ("OpenTDB", lambda count: _opentdb_questions(None, count, difficulty=difficulty)),
+        ("Trivia API", lambda count: _trivia_api_questions(None, count, topic=topic)),
+        ("WillFry", lambda count: _willfry_questions(None, count, topic=topic)),
+    ]
     combined: List[Dict[str, object]] = []
-    for source, count in zip(sources, counts):
-        fetch_count = min(max(count * 3, count + 2), 20)
+    source_stats: Dict[str, Tuple[int, Optional[str]]] = {}
+    
+    per_source = max(1, amount // len(sources))
+    for source_name, source_func in sources:
+        fetch_count = min(max(per_source * 3, per_source + 2), 20)
         try:
-            combined.extend(source(fetch_count))
-        except Exception:
-            # Silently skip this source if it fails; other sources will fill in
-            pass
+            fetched = source_func(fetch_count)
+            combined.extend(fetched)
+            source_stats[source_name] = (len(fetched), None)
+        except Exception as exc:
+            source_stats[source_name] = (0, str(exc))
+            # Silently continue to next source
+    
     # If we don't have enough questions, try to fetch more from working sources
     if len(combined) < amount * 2:
         shortage = (amount * 2) - len(combined)
-        for source in sources:
+        for source_name, source_func in sources:
             if len(combined) >= amount * 2:
                 break
             try:
-                combined.extend(source(shortage))
+                fetched = source_func(shortage)
+                combined.extend(fetched)
             except Exception:
                 pass
+    
+    # Log quality metric if any sources failed
+    if any(err for _, (_, err) in source_stats.items() if err):
+        failed_sources = [name for name, (_, err) in source_stats.items() if err]
+        record_error(
+            message=f"Some snap question sources failed: {', '.join(failed_sources)}. Served {len(combined)} questions with filters from working sources.",
+            source="modules/superquiz/__init__.py:_gather_snap_questions",
+            error_type="PartialFailure",
+            priority=TicketPriority.P2,
+        )
+    
     random.shuffle(combined)
     filtered, topic_matched = _apply_topic_filter(combined, topic)
     filtered, difficulty_matched = _apply_difficulty_filter(filtered, difficulty, amount)
