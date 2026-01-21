@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Optional, Union
+from typing import Optional, Union, TYPE_CHECKING
 
 from actifix.log_utils import log_event
 from actifix.raise_af import TicketPriority
