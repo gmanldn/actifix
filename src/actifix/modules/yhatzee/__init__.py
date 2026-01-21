@@ -352,6 +352,35 @@ _HTML_PAGE = """<!doctype html>
       font-size: 13px;
       margin-top: 8px;
     }
+
+    /* Enhanced scorecard styles */
+    tr.upper-row td {
+      background: rgba(220, 240, 235, 0.4);
+    }
+    tr.lower-row td {
+      background: rgba(255, 248, 220, 0.3);
+    }
+    .upper-total-row, .bonus-row {
+      font-weight: bold;
+      font-size: 15px;
+      background: linear-gradient(135deg, var(--panel), #fff8e1);
+    }
+    .line-separator td {
+      border: none;
+      height: 16px;
+      background: linear-gradient(to right, transparent 30%, var(--accent) 50%, transparent 70%);
+      padding: 0;
+    }
+    .section-header td {
+      text-align: center !important;
+      font-weight: bold !important;
+      padding: 12px 8px !important;
+      background: linear-gradient(135deg, #f3ecdb, #e8d9b5) !important;
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+      font-size: 13px;
+      color: var(--accent) !important;
+    }
   </style>
 </head>
 <body>
@@ -394,7 +423,7 @@ _HTML_PAGE = """<!doctype html>
 
     <section class="card" style="margin-top: 18px;">
       <h2>Score Sheet</h2>
-      <div class="note">Select a category for the current player to lock in a score.</div>
+      <div class="note">Upper section (Ones-Sixes subtotal &ge;63 pts) awards 35 bonus. Below: fixed scores. Select category for current player.</div>
       <table id="scoreTable">
         <thead>
           <tr>
@@ -428,6 +457,10 @@ _HTML_PAGE = """<!doctype html>
       { id: "yhatzee", label: "Yhatzee", score: dice => hasOfKind(dice, 5) ? 50 : 0 },
       { id: "chance", label: "Chance", score: dice => sum(dice) }
     ];
+
+    const UPPER_THRESHOLD = 63;
+    const BONUS_VALUE = 35;
+    const upperCategoryIds = ['ones', 'twos', 'threes', 'fours', 'fives', 'sixes'];
 
     const state = {
       players: ["Player 1", "Player 2"],
@@ -496,6 +529,23 @@ _HTML_PAGE = """<!doctype html>
         acc[value] = (acc[value] || 0) + 1;
         return acc;
       }, {});
+    }
+
+    function getUpperSum(playerIndex) {
+      return upperCategoryIds.reduce((sum, id) => sum + (state.scores[playerIndex][id] || 0), 0);
+    }
+
+    function getBonus(playerIndex) {
+      return getUpperSum(playerIndex) >= UPPER_THRESHOLD ? BONUS_VALUE : 0;
+    }
+
+    function getLowerSum(playerIndex) {
+      const lowerIds = categories.slice(6).map(cat => cat.id);
+      return lowerIds.reduce((sum, id) => sum + (state.scores[playerIndex][id] || 0), 0);
+    }
+
+    function getGrandTotal(playerIndex) {
+      return getUpperSum(playerIndex) + getBonus(playerIndex) + getLowerSum(playerIndex);
     }
 
     function rollDice() {
@@ -592,13 +642,109 @@ _HTML_PAGE = """<!doctype html>
 
     function renderScoreboard() {
       scoreTableBody.innerHTML = "";
-      categories.forEach(category => {
-        const row = document.createElement("tr");
+
+      // Upper section header
+      let row = document.createElement("tr");
+      row.className = "section-header";
+      let catCell = document.createElement("td");
+      catCell.colSpan = 3;
+      catCell.textContent = "UPPER SECTION";
+      row.appendChild(catCell);
+      scoreTableBody.appendChild(row);
+
+      // Upper categories
+      upperCategoryIds.forEach(id => {
+        const category = categories.find(c => c.id === id);
+        const roww = document.createElement("tr");
+        roww.className = "upper-row";
         const nameCell = document.createElement("td");
         nameCell.className = "category";
         nameCell.textContent = category.label;
-        row.appendChild(nameCell);
+        roww.appendChild(nameCell);
+        state.scores.forEach((scores, playerIndex) => {
+          const cell = document.createElement("td");
+          const scoreValue = scores[id];
+          if (scoreValue !== null) {
+            cell.textContent = scoreValue;
+          } else {
+            const button = document.createElement("button");
+            button.className = "score-btn";
+            const preview = state.started ? category.score(state.dice) : "-";
+            button.textContent = `Score ${preview}`;
+            button.disabled = !state.started || playerIndex !== state.currentPlayer;
+            button.addEventListener("click", () => scoreCategory(id));
+            cell.appendChild(button);
+          }
+          roww.appendChild(cell);
+        });
+        scoreTableBody.appendChild(roww);
+      });
 
+      // Upper total
+      row = document.createElement("tr");
+      row.className = "upper-total-row";
+      catCell = document.createElement("td");
+      catCell.className = "category";
+      catCell.textContent = "Upper Total";
+      row.appendChild(catCell);
+      [0,1].forEach(playerIndex => {
+        const cell = document.createElement("td");
+        cell.textContent = getUpperSum(playerIndex);
+        row.appendChild(cell);
+      });
+      scoreTableBody.appendChild(row);
+
+      // Line separator
+      row = document.createElement("tr");
+      row.className = "line-separator";
+      const lineCat = document.createElement("td");
+      lineCat.textContent = "──────────";
+      lineCat.colSpan = 1;
+      row.appendChild(lineCat);
+      const lineP1 = document.createElement("td");
+      row.appendChild(lineP1);
+      const lineP2 = document.createElement("td");
+      row.appendChild(lineP2);
+      scoreTableBody.appendChild(row);
+
+      // Bonus row
+      row = document.createElement("tr");
+      row.className = "bonus-row";
+      catCell = document.createElement("td");
+      catCell.className = "category";
+      catCell.textContent = "BONUS";
+      row.appendChild(catCell);
+      [0,1].forEach(playerIndex => {
+        const cell = document.createElement("td");
+        const bonus = getBonus(playerIndex);
+        const upper = getUpperSum(playerIndex);
+        if (bonus > 0) {
+          cell.innerHTML = '35 <span style="color:green;font-weight:bold;">✓ Achieved</span>';
+        } else {
+          const needed = UPPER_THRESHOLD - upper;
+          cell.innerHTML = `0 <span style="color:orange;">(need ${needed})</span>`;
+        }
+        row.appendChild(cell);
+      });
+      scoreTableBody.appendChild(row);
+
+      // Lower section header
+      row = document.createElement("tr");
+      row.className = "section-header";
+      catCell = document.createElement("td");
+      catCell.colSpan = 3;
+      catCell.textContent = "LOWER SECTION";
+      row.appendChild(catCell);
+      scoreTableBody.appendChild(row);
+
+      // Lower categories
+      categories.slice(6).forEach(category => {
+        const roww = document.createElement("tr");
+        roww.className = "lower-row";
+        const nameCell = document.createElement("td");
+        nameCell.className = "category";
+        nameCell.textContent = category.label;
+        roww.appendChild(nameCell);
         state.scores.forEach((scores, playerIndex) => {
           const cell = document.createElement("td");
           const scoreValue = scores[category.id];
@@ -613,18 +759,16 @@ _HTML_PAGE = """<!doctype html>
             button.addEventListener("click", () => scoreCategory(category.id));
             cell.appendChild(button);
           }
-          row.appendChild(cell);
+          roww.appendChild(cell);
         });
-        scoreTableBody.appendChild(row);
+        scoreTableBody.appendChild(roww);
       });
     }
 
     function updateTotals() {
-      const totalScores = state.scores.map(scoreMap => {
-        return Object.values(scoreMap).reduce((acc, value) => acc + (value || 0), 0);
-      });
-      totalOne.textContent = `${state.players[0]} Total: ${totalScores[0]}`;
-      totalTwo.textContent = `${state.players[1]} Total: ${totalScores[1]}`;
+      const grandTotals = [getGrandTotal(0), getGrandTotal(1)];
+      totalOne.textContent = `${state.players[0]} Grand Total: ${grandTotals[0]}`;
+      totalTwo.textContent = `${state.players[1]} Grand Total: ${grandTotals[1]}`;
     }
 
     function renderStatus() {
