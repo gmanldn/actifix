@@ -443,7 +443,7 @@ const Header = ({ onFix, isFixing, fixStatus, theme, onToggleTheme, onLogout }) 
       h(VersionBadge),
       h('button', {
         onClick: onToggleTheme,
-        title: `Switch to ${theme === 'dark' ? 'Azure light' : 'Dark'} theme`,
+        title: `Switch to ${theme === 'dark' ? 'Portal light' : theme === 'portal' ? 'Azure light' : 'Dark'} theme`,
         className: 'theme-toggle-btn',
         style: {
           background: 'transparent',
@@ -2297,7 +2297,7 @@ const App = () => {
   const [isFixing, setIsFixing] = useState(false);
   const [fixStatus, setFixStatus] = useState('Ready to fix the next ticket');
   const [logAlert, setLogAlert] = useState(false);
-  const [theme, setTheme] = useState('portal');
+  const [theme, setTheme] = useState('dark');
   const [authenticated, setAuthenticated] = useState(isAuthenticated());
   const logFlashTimer = useRef(null);
 
@@ -2312,13 +2312,16 @@ const App = () => {
   };
 
   useEffect(() => {
-    const savedTheme = localStorage.getItem('actifix-theme') || 'portal';
+    const savedTheme = localStorage.getItem('actifix-theme') || 'dark';
     setTheme(savedTheme);
     document.documentElement.dataset.theme = savedTheme;
   }, []);
 
   const toggleTheme = () => {
-    const newTheme = theme === 'portal' ? 'azure' : 'portal';
+    const themeOrder = ['dark', 'portal', 'azure'];
+    const currentIndex = themeOrder.indexOf(theme);
+    const nextIndex = (currentIndex + 1) % themeOrder.length;
+    const newTheme = themeOrder[nextIndex];
     setTheme(newTheme);
     localStorage.setItem('actifix-theme', newTheme);
     document.documentElement.dataset.theme = newTheme;

@@ -28,7 +28,8 @@ DEFAULT_QUESTIONS_PER_PLAYER = 5
 ACCESS_RULE = "local-only"
 MODULE_METADATA = {
     "name": "modules.superquiz",
-    "version": "2.0.0",
+    # Bump version to reflect added features (custom sources, topic/difficulty filters, elimination & dark modes)
+    "version": "2.1.0",
     "description": "Multi-player SuperQuiz module with enhanced trivia sources and game modes.",
     "capabilities": {
         "gui": True,
@@ -69,6 +70,9 @@ CATEGORIES: Tuple[str, ...] = (
     "Literature",
     "Mythology",
     "Animals",
+    # Additional categories for new question sources
+    "Numbers",
+    "Random Facts",
 )
 
 DIFFICULTIES: Tuple[str, ...] = ("easy", "medium", "hard")
@@ -200,7 +204,7 @@ QUIZAPI_CATEGORY_MAP: Dict[str, str] = {
     "Animals": "animals",
 }
 
-USER_AGENT = "Actifix-SuperQuiz/2.0"
+USER_AGENT = "Actifix-SuperQuiz/2.1"
 
 
 def _module_helper(project_root: Optional[Union[str, Path]] = None) -> ModuleBase:
@@ -563,24 +567,224 @@ def _generate_incorrect_answers(correct_answer: str) -> List[str]:
     common_wrong = ["None of the above", "All of the above", "Both A and B", "Not sure"]
     return (variations + common_wrong)[:3]
 
+# ---------------------------------------------------------------------------
+# New trivia source implementations
+# ---------------------------------------------------------------------------
 
-def _gather_questions(category: Optional[str], amount: int) -> List[Dict[str, object]]:
-    """Gather questions from multiple sources with resilient fallback handling."""
-    sources = [
-        ("OpenTDB", lambda count: _opentdb_questions(category, count)),
-        ("Trivia API", lambda count: _trivia_api_questions(category, count)),
-        ("WillFry", lambda count: _willfry_questions(category, count)),
-        ("OpenTriviaDB", lambda count: _opentriviadb_questions(category, count)),
-        ("JService", lambda count: _jservice_questions(category, count)),
-        ("FunTrivia", lambda count: _funtrivia_questions(category, count)),
-        ("QuizAPI", lambda count: _quizapi_questions(category, count)),
+def _numbers_questions(
+    category: Optional[str],
+    amount: int,
+    difficulty: Optional[str] = None,
+    topic: Optional[str] = None,
+) -> List[Dict[str, object]]:
+    """
+    Retrieve random numeric trivia facts from the Numbers API.
+
+    Each question asks the player to identify the correct statement among several
+    numeric trivia facts. Since the Numbers API only returns a single fact per
+    request, this function makes multiple calls to assemble a multiple choice
+    question with one correct fact and a few plausible distractors.
+
+    The Numbers API has been documented to provide interesting trivia about
+    numbers via endpoints like /random/trivia?json【333602443728674†L99-L115】.
+    """
+    normalized: List[Dict[str, object]] = []
+    for _ in range(max(0, int(amount))):
+        try:
+            # Correct fact
+            data = _http_get_json("http://numbersapi.com/random/trivia?json")
+            fact = str(data.get("text", "")).strip()
+            if not fact:
+                continue
+            # Gather incorrect facts
+            incorrect: List[str] = []
+            attempts = 0
+            while len(incorrect) < 3 and attempts < 6:
+                attempts += 1
+                try:
+                    other = _http_get_json("http://numbersapi.com/random/trivia?json")
+                    other_fact = str(other.get("text", "")).strip()
+                    if other_fact and other_fact != fact and other_fact not in incorrect:
+                        incorrect.append(other_fact)
+                except Exception:
+                    continue
+            # If we didn't get enough distractors, pad with generic wrong statements
+            while len(incorrect) < 3:
+                generic = f"{random.randint(1, 9999)} is the year this quiz was created."
+                if generic != fact and generic not in incorrect:
+                    incorrect.append(generic)
+            normalized.append(
+                {
+                    "question": "Which of these number facts is true?",
+                    "category": "Numbers",
+                    "source": "Numbers API",
+                    "difficulty": "unknown",
+                    "answer": fact,
+                    "options": _shuffle_options(fact, incorrect),
+                }
+            )
+        except Exception:
+            continue
+    return normalized
+
+
+def _uselessfacts_questions(
+    category: Optional[str],
+    amount: int,
+    difficulty: Optional[str] = None,
+    topic: Optional[str] = None,
+) -> List[Dict[str, object]]:
+    """
+    Retrieve random useless facts from the Useless Facts API.
+
+    The Useless Facts API provides random trivia facts via GET /api/v2/facts/random【191617076171357†L8-L19】.
+    Since these facts are statements without a natural multiple choice structure,
+    each question uses the fact itself as a true/false proposition.
+    """
+    normalized: List[Dict[str, object]] = []
+    for _ in range(max(0, int(amount))):
+        try:
+            data = _http_get_json("https://uselessfacts.jsph.pl/api/v2/facts/random?language=en")
+            fact = str(data.get("text", "")).strip()
+            if not fact:
+                continue
+            correct = "True"
+            incorrect = ["False", "Maybe", "Unsure"]
+            normalized.append(
+                {
+                    "question": fact,
+                    "category": "Random Facts",
+                    "source": "Useless Facts API",
+                    "difficulty": "easy",
+                    "answer": correct,
+                    "options": _shuffle_options(correct, incorrect),
+                }
+            )
+        except Exception:
+            continue
+    return normalized
+
+
+_LOCAL_QUESTIONS_CACHE: Optional[List[Dict[str, object]]] = None
+
+
+def _local_questions(
+    category: Optional[str],
+    amount: int,
+    difficulty: Optional[str] = None,
+    topic: Optional[str] = None,
+) -> List[Dict[str, object]]:
+    """
+    Pull questions from the bundled questions_local.json file.
+
+    This offers an offline fallback for when network sources are unavailable or
+    when players prefer a local question set.
+    """
+    global _LOCAL_QUESTIONS_CACHE
+    try:
+        # Load and cache local questions
+        if _LOCAL_QUESTIONS_CACHE is None:
+            local_path = Path(__file__).resolve().parent / "questions_local.json"
+            if local_path.exists():
+                with open(local_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                cache: List[Dict[str, object]] = []
+                if isinstance(data, list):
+                    for item in data:
+                        q = str(item.get("question", "")).strip()
+                        a = str(item.get("answer", "")).strip()
+                        inc = item.get("incorrect_answers", [])
+                        cat = str(item.get("category", "Custom"))
+                        diff = str(item.get("difficulty", "unknown")).lower()
+                        if not q or not a:
+                            continue
+                        cache.append(
+                            {
+                                "question": q,
+                                "category": cat,
+                                "source": "Local",
+                                "difficulty": diff if diff else "unknown",
+                                "answer": a,
+                                "options": _shuffle_options(a, inc),
+                            }
+                        )
+                _LOCAL_QUESTIONS_CACHE = cache
+            else:
+                _LOCAL_QUESTIONS_CACHE = []
+        pool = _LOCAL_QUESTIONS_CACHE or []
+        # Filter by category and difficulty/topic if provided
+        filtered = pool
+        if category and category != "Random":
+            filtered = [q for q in filtered if q.get("category") == category]
+        if difficulty:
+            temp = [q for q in filtered if q.get("difficulty") == difficulty]
+            if temp:
+                filtered = temp
+        if topic:
+            temp = [q for q in filtered if _matches_topic(q, topic)]
+            if temp:
+                filtered = temp
+        random.shuffle(filtered)
+        return filtered[:amount]
+    except Exception:
+        return []
+
+
+def _gather_questions(
+    category: Optional[str],
+    amount: int,
+    difficulty: Optional[str] = None,
+    topic: Optional[str] = None,
+    sources: Optional[Sequence[str]] = None,
+) -> List[Dict[str, object]]:
+    """
+    Gather questions from multiple sources with resilient fallback handling.
+
+    Parameters:
+        category: Desired category or None for random.
+        amount: Number of questions requested.
+        difficulty: Optional difficulty filter.
+        topic: Optional search term filter.
+        sources: Optional list of source names to include (case-insensitive).
+    """
+    # Build the full source list with names matching those presented to users.
+    all_sources: List[Tuple[str, callable]] = [
+        ("OpenTDB", lambda count: _opentdb_questions(category, count, difficulty=difficulty)),
+        ("Trivia API", lambda count: _trivia_api_questions(category, count, topic=topic)),
+        ("WillFry", lambda count: _willfry_questions(category, count, topic=topic)),
+        ("OpenTriviaDB", lambda count: _opentriviadb_questions(category, count, difficulty=difficulty)),
+        ("JService", lambda count: _jservice_questions(category, count, topic=topic)),
+        ("FunTrivia", lambda count: _funtrivia_questions(category, count, topic=topic)),
+        ("QuizAPI", lambda count: _quizapi_questions(category, count, topic=topic)),
+        ("Numbers API", lambda count: _numbers_questions(category, count, difficulty=difficulty, topic=topic)),
+        ("Useless Facts API", lambda count: _uselessfacts_questions(category, count, difficulty=difficulty, topic=topic)),
+        ("Local", lambda count: _local_questions(category, count, difficulty=difficulty, topic=topic)),
     ]
+    # Normalise requested sources for comparison
+    selected_sources = None
+    if sources:
+        norm: List[str] = []
+        for s in sources:
+            s_norm = str(s or "").lower().replace(" ", "").replace("-", "")
+            if s_norm:
+                norm.append(s_norm)
+        selected_sources = set(norm)
+    # Filter sources if requested
+    active_sources: List[Tuple[str, callable]] = []
+    for name, func in all_sources:
+        if selected_sources is not None:
+            key = name.lower().replace(" ", "").replace("-", "")
+            if key not in selected_sources:
+                continue
+        active_sources.append((name, func))
+    if not active_sources:
+        active_sources = all_sources
     combined: List[Dict[str, object]] = []
     source_stats: Dict[str, Tuple[int, Optional[str]]] = {}
-    
+
     # Try each source with resilient fallback
-    per_source = max(1, amount // len(sources))
-    for source_name, source_func in sources:
+    per_source = max(1, amount // len(active_sources))
+    for source_name, source_func in active_sources:
         try:
             fetched = source_func(per_source)
             combined.extend(fetched)
@@ -588,11 +792,11 @@ def _gather_questions(category: Optional[str], amount: int) -> List[Dict[str, ob
         except Exception as exc:
             source_stats[source_name] = (0, str(exc))
             # Silently continue to next source
-    
+
     # If we don't have enough questions, try to fetch more from working sources
     if len(combined) < amount:
         shortage = amount - len(combined)
-        for source_name, source_func in sources:
+        for source_name, source_func in active_sources:
             if len(combined) >= amount:
                 break
             try:
@@ -601,7 +805,7 @@ def _gather_questions(category: Optional[str], amount: int) -> List[Dict[str, ob
             except Exception:
                 # Already tracked failure, continue
                 pass
-    
+
     # Log quality metric if any sources failed
     if any(err for _, (_, err) in source_stats.items() if err):
         failed_sources = [name for name, (_, err) in source_stats.items() if err]
@@ -611,7 +815,7 @@ def _gather_questions(category: Optional[str], amount: int) -> List[Dict[str, ob
             error_type="PartialFailure",
             priority=TicketPriority.P2,
         )
-    
+
     random.shuffle(combined)
     return combined[:amount]
 
@@ -620,9 +824,16 @@ def _gather_snap_questions(
     topic: Optional[str],
     difficulty: Optional[str],
     amount: int,
+    sources: Optional[Sequence[str]] = None,
 ) -> Tuple[List[Dict[str, object]], bool, bool]:
-    """Gather snap questions with resilient fallback and filtering."""
-    sources = [
+    """
+    Gather snap questions with resilient fallback and filtering.
+
+    Snap mode searches across multiple sources for questions matching a topic
+    and/or difficulty. The amount parameter controls how many questions are
+    ultimately returned.
+    """
+    all_sources: List[Tuple[str, callable]] = [
         ("OpenTDB", lambda count: _opentdb_questions(None, count, difficulty=difficulty)),
         ("Trivia API", lambda count: _trivia_api_questions(None, count, topic=topic)),
         ("WillFry", lambda count: _willfry_questions(None, count, topic=topic)),
@@ -630,12 +841,33 @@ def _gather_snap_questions(
         ("JService", lambda count: _jservice_questions(None, count, topic=topic)),
         ("FunTrivia", lambda count: _funtrivia_questions(None, count, topic=topic)),
         ("QuizAPI", lambda count: _quizapi_questions(None, count, topic=topic)),
+        ("Numbers API", lambda count: _numbers_questions(None, count, difficulty=difficulty, topic=topic)),
+        ("Useless Facts API", lambda count: _uselessfacts_questions(None, count, difficulty=difficulty, topic=topic)),
+        ("Local", lambda count: _local_questions(None, count, difficulty=difficulty, topic=topic)),
     ]
+    selected_sources = None
+    if sources:
+        norm: List[str] = []
+        for s in sources:
+            s_norm = str(s or "").lower().replace(" ", "").replace("-", "")
+            if s_norm:
+                norm.append(s_norm)
+        selected_sources = set(norm)
+    active_sources: List[Tuple[str, callable]] = []
+    for name, func in all_sources:
+        if selected_sources is not None:
+            key = name.lower().replace(" ", "").replace("-", "")
+            if key not in selected_sources:
+                continue
+        active_sources.append((name, func))
+    if not active_sources:
+        active_sources = all_sources
     combined: List[Dict[str, object]] = []
     source_stats: Dict[str, Tuple[int, Optional[str]]] = {}
-    
-    per_source = max(1, amount // len(sources))
-    for source_name, source_func in sources:
+
+    per_source = max(1, amount // len(active_sources))
+    for source_name, source_func in active_sources:
+        # Fetch more from snap sources since we apply filtering below
         fetch_count = min(max(per_source * 3, per_source + 2), 20)
         try:
             fetched = source_func(fetch_count)
@@ -644,11 +876,11 @@ def _gather_snap_questions(
         except Exception as exc:
             source_stats[source_name] = (0, str(exc))
             # Silently continue to next source
-    
+
     # If we don't have enough questions, try to fetch more from working sources
     if len(combined) < amount * 2:
         shortage = (amount * 2) - len(combined)
-        for source_name, source_func in sources:
+        for source_name, source_func in active_sources:
             if len(combined) >= amount * 2:
                 break
             try:
@@ -656,7 +888,7 @@ def _gather_snap_questions(
                 combined.extend(fetched)
             except Exception:
                 pass
-    
+
     # Log quality metric if any sources failed
     if any(err for _, (_, err) in source_stats.items() if err):
         failed_sources = [name for name, (_, err) in source_stats.items() if err]
@@ -666,7 +898,7 @@ def _gather_snap_questions(
             error_type="PartialFailure",
             priority=TicketPriority.P2,
         )
-    
+
     random.shuffle(combined)
     filtered, topic_matched = _apply_topic_filter(combined, topic)
     filtered, difficulty_matched = _apply_difficulty_filter(filtered, difficulty, amount)
@@ -746,9 +978,24 @@ def create_blueprint(
             try:
                 raw_category = request.args.get("category")
                 category = _normalize_category(raw_category)
+                # Additional optional parameters
+                raw_difficulty = request.args.get("difficulty")
+                difficulty = _normalize_difficulty(raw_difficulty)
+                raw_topic = request.args.get("topic")
+                topic = _normalize_topic(raw_topic)
+                sources_param = request.args.get("sources")
+                selected_sources = None
+                if sources_param:
+                    selected_sources = [s for s in sources_param.split(",") if s.strip()]
                 count = request.args.get("count", type=int) or DEFAULT_QUESTIONS_PER_PLAYER
                 count = max(1, min(count, 60))
-                questions = _gather_questions(category, count)
+                questions = _gather_questions(
+                    category,
+                    count,
+                    difficulty=difficulty,
+                    topic=topic,
+                    sources=selected_sources,
+                )
                 return jsonify(
                     {
                         "category": category or "Random",
@@ -772,12 +1019,17 @@ def create_blueprint(
                 raw_difficulty = request.args.get("difficulty")
                 topic = _normalize_topic(raw_topic)
                 difficulty = _normalize_difficulty(raw_difficulty)
+                sources_param = request.args.get("sources")
+                selected_sources = None
+                if sources_param:
+                    selected_sources = [s for s in sources_param.split(",") if s.strip()]
                 count = request.args.get("count", type=int) or DEFAULT_QUESTIONS_PER_PLAYER
                 count = max(1, min(count, 60))
                 questions, topic_matched, difficulty_matched = _gather_snap_questions(
                     topic,
                     difficulty,
                     count,
+                    sources=selected_sources,
                 )
                 return jsonify(
                     {
@@ -1302,6 +1554,25 @@ _HTML_PAGE = """<!doctype html>
       0%, 100% { opacity: 1; }
       50% { opacity: 0.5; }
     }
+    /* Dark mode variables */
+    body.dark {
+      --bg: #1a1a1a;
+      --panel: #222;
+      --ink: #f8f8f8;
+      --accent: #ffb703;
+      --accent-2: #80ced7;
+      --accent-3: #e63946;
+      --muted: #a0a0a0;
+      --shadow: rgba(0, 0, 0, 0.5);
+      --glow: rgba(255, 183, 3, 0.25);
+      background: radial-gradient(circle at top, #2c2c2c 0%, #1f1f1f 40%, #161616 100%);
+      color: var(--ink);
+    }
+    /* Eliminated player style */
+    .scorecard.eliminated span:first-child {
+      text-decoration: line-through;
+      opacity: 0.6;
+    }
   </style>
 </head>
 <body>
@@ -1309,7 +1580,8 @@ _HTML_PAGE = """<!doctype html>
     <div class="app">
       <header>
         <h1 class="title">SuperQuiz Enhanced</h1>
-        <div class="subtitle">7 Question Sources " Timed Mode " Custom Questions " Room Codes</div>
+        <div class="subtitle">10 Sources · Timed & Snap · Custom & Local · Elimination · Dark Mode</div>
+        <button id="toggle-dark" class="button tertiary" style="align-self:flex-start; max-width:160px;">Toggle Dark</button>
       </header>
 
       <div class="grid">
@@ -1325,6 +1597,8 @@ _HTML_PAGE = """<!doctype html>
             <option value="6">6 Players</option>
           </select>
           <div class="players" id="players"></div>
+          <label for="questions-count">Questions per Player</label>
+          <input id="questions-count" type="number" value="5" min="1" max="20">
           <div class="footer">
             <button class="button tertiary" id="create-room">Create Room</button>
             <button class="button tertiary" id="join-room">Join Room</button>
@@ -1340,6 +1614,7 @@ _HTML_PAGE = """<!doctype html>
             <option value="snap">Snap Quiz</option>
             <option value="timed">Timed Mode</option>
             <option value="custom">Custom Questions</option>
+            <option value="elimination">Elimination Mode</option>
           </select>
           
           <div id="category-fields">
@@ -1392,6 +1667,22 @@ _HTML_PAGE = """<!doctype html>
             <label for="custom-json">Or Paste JSON</label>
             <textarea id="custom-json" placeholder='[{"question": "...", "answer": "...", "incorrect_answers": ["...", "..."]}]'></textarea>
           </div>
+
+          <div id="sources-fields" class="snap-fields">
+            <label>Question Sources</label>
+            <div id="source-options" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:6px;">
+              <label><input type="checkbox" value="OpenTDB" checked> OpenTDB</label>
+              <label><input type="checkbox" value="Trivia API" checked> Trivia API</label>
+              <label><input type="checkbox" value="WillFry" checked> WillFry</label>
+              <label><input type="checkbox" value="OpenTriviaDB" checked> OpenTriviaDB</label>
+              <label><input type="checkbox" value="JService" checked> JService</label>
+              <label><input type="checkbox" value="FunTrivia" checked> FunTrivia</label>
+              <label><input type="checkbox" value="QuizAPI" checked> QuizAPI</label>
+              <label><input type="checkbox" value="Numbers API" checked> Numbers API</label>
+              <label><input type="checkbox" value="Useless Facts API" checked> Useless Facts</label>
+              <label><input type="checkbox" value="Local" checked> Local</label>
+            </div>
+          </div>
           
           <div class="footer">
             <button class="button" id="start">Start Quiz</button>
@@ -1403,7 +1694,7 @@ _HTML_PAGE = """<!doctype html>
         <section class="panel delay-3">
           <h2>Question Sources</h2>
           <div style="font-size: 13px; line-height: 1.6;">
-            <p><strong>7 Sources Active:</strong></p>
+            <p><strong>10 Sources Active:</strong></p>
             <ul style="margin: 0; padding-left: 20px;">
               <li>OpenTDB</li>
               <li>The Trivia API</li>
@@ -1412,6 +1703,9 @@ _HTML_PAGE = """<!doctype html>
               <li>JService (Jeopardy)</li>
               <li>FunTrivia</li>
               <li>QuizAPI</li>
+              <li>Numbers API</li>
+              <li>Useless Facts API</li>
+              <li>Local Questions</li>
             </ul>
             <p style="margin-top: 12px; color: var(--muted);">
               Sources auto-fallback if unavailable. Custom questions supported via JSON upload.
@@ -1470,6 +1764,9 @@ _HTML_PAGE = """<!doctype html>
     const resultEl = document.getElementById("result");
     const timerEl = document.getElementById("timer");
     const statsEl = document.getElementById("stats");
+    const questionsCountEl = document.getElementById("questions-count");
+    const sourceOptionsEl = document.getElementById("source-options");
+    const darkBtn = document.getElementById("toggle-dark");
 
     let players = [];
     let questions = [];
@@ -1486,8 +1783,8 @@ _HTML_PAGE = """<!doctype html>
       avgTime: 0,
       timeSum: 0
     };
-
-    const QUESTIONS_PER_PLAYER = 5;
+    // Track elimination mode and dynamic questions per player
+    let eliminationMode = false;
 
     function renderPlayerInputs(count) {
       playersEl.innerHTML = "";
@@ -1511,7 +1808,7 @@ _HTML_PAGE = """<!doctype html>
       const count = Number(playerCountEl.value);
       players = [];
       for (let i = 0; i < count; i += 1) {
-        players.push({ name: "", score: 0 });
+        players.push({ name: "", score: 0, eliminated: false });
       }
       renderPlayerInputs(count);
     }
@@ -1523,6 +1820,9 @@ _HTML_PAGE = """<!doctype html>
         row.className = "scorecard";
         if (index === currentPlayerIndex) {
           row.classList.add("active-player");
+        }
+        if (player.eliminated) {
+          row.classList.add("eliminated");
         }
         const name = document.createElement("span");
         name.textContent = player.name || `Player ${index + 1}`;
@@ -1571,7 +1871,8 @@ _HTML_PAGE = """<!doctype html>
       timedFields.classList.add("hidden");
       customFields.classList.add("hidden");
       
-      if (mode === "category") {
+      eliminationMode = (mode === "elimination");
+      if (mode === "category" || mode === "elimination") {
         categoryFields.classList.remove("hidden");
       } else if (mode === "snap") {
         snapFields.classList.remove("hidden");
@@ -1584,13 +1885,17 @@ _HTML_PAGE = """<!doctype html>
     }
 
     async function fetchQuestions() {
-      const count = players.length * QUESTIONS_PER_PLAYER;
+      const per = Number(questionsCountEl.value) || 5;
+      const count = players.length * per;
       const mode = modeEl.value;
+      // Collect selected sources
+      const sourcesList = Array.from(sourceOptionsEl.querySelectorAll('input:checked')).map(el => el.value);
+      const sourcesParam = sourcesList.length > 0 ? `&sources=${encodeURIComponent(sourcesList.join(','))}` : "";
       
       if (mode === "snap") {
         const topic = topicEl.value.trim();
         const difficulty = difficultyEl.value;
-        const url = `${basePath()}/api/snap?topic=${encodeURIComponent(topic)}&difficulty=${encodeURIComponent(difficulty)}&count=${count}`;
+        const url = `${basePath()}/api/snap?topic=${encodeURIComponent(topic)}&difficulty=${encodeURIComponent(difficulty)}&count=${count}${sourcesParam}`;
         try {
           const response = await fetch(url, { cache: "no-store" });
           if (!response.ok) {
@@ -1610,7 +1915,7 @@ _HTML_PAGE = """<!doctype html>
         }
       } else if (mode === "timed") {
         const difficulty = timedDifficultyEl.value;
-        const url = `${basePath()}/api/snap?difficulty=${encodeURIComponent(difficulty)}&count=${count}`;
+        const url = `${basePath()}/api/snap?difficulty=${encodeURIComponent(difficulty)}&count=${count}${sourcesParam}`;
         try {
           const response = await fetch(url, { cache: "no-store" });
           if (!response.ok) {
@@ -1655,7 +1960,7 @@ _HTML_PAGE = """<!doctype html>
         }
       } else {
         const category = categoryEl.value;
-        const url = `${basePath()}/api/questions?category=${encodeURIComponent(category)}&count=${count}`;
+        const url = `${basePath()}/api/questions?category=${encodeURIComponent(category)}&count=${count}${sourcesParam}`;
         try {
           const response = await fetch(url, { cache: "no-store" });
           if (!response.ok) {
@@ -1682,6 +1987,7 @@ _HTML_PAGE = """<!doctype html>
       stats = { correct: 0, incorrect: 0, total: 0, avgTime: 0, timeSum: 0 };
       players.forEach((player) => {
         player.score = 0;
+        player.eliminated = false;
       });
       playArea.classList.remove("active");
       questionEl.textContent = "";
@@ -1829,22 +2135,54 @@ _HTML_PAGE = """<!doctype html>
       stats.timeSum += timeTaken;
       
       if (choice === correct) {
-        players[currentPlayerIndex].score += 1;
+        if (!players[currentPlayerIndex].eliminated) {
+          players[currentPlayerIndex].score += 1;
+        }
         resultEl.textContent = "Correct!";
         stats.correct++;
       } else {
         resultEl.textContent = `Incorrect. Answer: ${correct}`;
         stats.incorrect++;
+        if (eliminationMode) {
+          players[currentPlayerIndex].eliminated = true;
+          resultEl.textContent += " Eliminated!";
+        }
       }
       stats.total++;
       updateScoreboard();
       updateStats();
       nextBtn.disabled = false;
+      // If elimination mode and one or zero players remain, end game early
+      if (eliminationMode) {
+        const activePlayers = players.filter((p) => !p.eliminated);
+        if (activePlayers.length <= 1) {
+          nextBtn.disabled = true;
+          questionEl.textContent = "";
+          answersEl.innerHTML = "";
+          timerEl.classList.add("hidden");
+          playArea.classList.add("active");
+          if (activePlayers.length === 1) {
+            showStatus(`Winner: ${activePlayers[0].name || "Player"}!`);
+          } else {
+            showStatus("No winner - all players eliminated.");
+          }
+          return;
+        }
+      }
     }
 
     function nextQuestion() {
-      currentIndex += 1;
-      currentPlayerIndex = (currentPlayerIndex + 1) % players.length;
+    currentIndex += 1;
+      // Advance to the next active player. In elimination mode skip eliminated players.
+      if (eliminationMode) {
+        let attempts = players.length;
+        do {
+          currentPlayerIndex = (currentPlayerIndex + 1) % players.length;
+          attempts--;
+        } while (players[currentPlayerIndex].eliminated && attempts > 0);
+      } else {
+        currentPlayerIndex = (currentPlayerIndex + 1) % players.length;
+      }
       renderQuestion();
     }
 
@@ -1855,6 +2193,7 @@ _HTML_PAGE = """<!doctype html>
       resetGame();
       playArea.classList.add("active");
       showStatus("Gathering questions...");
+      eliminationMode = (modeEl.value === "elimination");
       try {
         const result = await fetchQuestions();
         questions = result.questions;
@@ -1865,7 +2204,8 @@ _HTML_PAGE = """<!doctype html>
         if (result.message) {
           showStatus(result.message);
         } else {
-          showStatus(`Loaded ${questions.length} questions from 7 sources.`);
+          const numSources = Array.from(sourceOptionsEl.querySelectorAll('input:checked')).length;
+          showStatus(`Loaded ${questions.length} questions from ${numSources} source${numSources !== 1 ? 's' : ''}.`);
         }
         renderQuestion();
       } catch (error) {
@@ -1931,6 +2271,11 @@ _HTML_PAGE = """<!doctype html>
     nextBtn.addEventListener("click", nextQuestion);
     createRoomBtn.addEventListener("click", createRoom);
     joinRoomBtn.addEventListener("click", joinRoom);
+
+    // Toggle dark mode on button click by adding/removing the 'dark' class on the body element
+    darkBtn.addEventListener("click", () => {
+      document.body.classList.toggle("dark");
+    });
 
     toggleMode();
     buildPlayers();
