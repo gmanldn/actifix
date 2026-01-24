@@ -363,6 +363,12 @@
       "domain": "modules",
       "owner": "modules",
       "label": "shootymcshoot"
+    },
+    {
+      "id": "modules.hollogram",
+      "domain": "modules",
+      "owner": "modules",
+      "label": "hollogram"
     }
   ],
   "edges": [
@@ -1070,6 +1076,41 @@
       "from": "modules.shootymcshoot",
       "to": "runtime.api",
       "reason": "modules.shootymcshoot depends on runtime.api"
+    },
+    {
+      "from": "modules.hollogram",
+      "to": "modules.base",
+      "reason": "modules.hollogram depends on modules.base"
+    },
+    {
+      "from": "modules.hollogram",
+      "to": "modules.config",
+      "reason": "modules.hollogram depends on modules.config"
+    },
+    {
+      "from": "modules.hollogram",
+      "to": "runtime.state",
+      "reason": "modules.hollogram depends on runtime.state"
+    },
+    {
+      "from": "modules.hollogram",
+      "to": "infra.logging",
+      "reason": "modules.hollogram depends on infra.logging"
+    },
+    {
+      "from": "modules.hollogram",
+      "to": "core.raise_af",
+      "reason": "modules.hollogram depends on core.raise_af"
+    },
+    {
+      "from": "modules.hollogram",
+      "to": "runtime.api",
+      "reason": "modules.hollogram depends on runtime.api"
+    },
+    {
+      "from": "modules.hollogram",
+      "to": "core.ai_client",
+      "reason": "modules.hollogram depends on core.ai_client"
     }
   ]
 }
