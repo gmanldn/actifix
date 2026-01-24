@@ -94,6 +94,7 @@ Module defaults come from Actifix config with optional overrides via `ACTIFIX_MO
 | shootymcshoot | 127.0.0.1 | 8040 | shootymcshoot |
 | yhatzee | 127.0.0.1 | 8090 | yhatzee |
 | superquiz | 127.0.0.1 | 8070 | superquiz |
+| pokertool | 127.0.0.1 | 8060 | pokertool |
 
 Override example:
 ```json
@@ -102,6 +103,8 @@ Override example:
   "superquiz": {"port": 9103}
 }
 ```
+
+Launching `scripts/start.py` now brings the PokerTool service online alongside the other modules. Use `--pokertool-port` to move it off `127.0.0.1:8060` or `--no-pokertool` to skip it when you only need the frontend/API stack. The module writes a `POKERTOOL_SERVICE_START` event to Actifix’s structured log repository so you can verify the service published a heartbeat while the launcher is running.
 
 The launcher now starts the standalone SuperQuiz GUI on its configured host/port (default `127.0.0.1:8070`) and probes `/health` to validate Flask and related dependencies before reporting the endpoint alongside the dashboard, backend, and Yhatzee servers. Use `--superquiz-port` to adjust the binding or `--no-superquiz` to skip the extra GUI when you do not need it.
 

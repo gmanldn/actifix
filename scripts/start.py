@@ -54,6 +54,7 @@ DEFAULT_API_PORT = 5001
 DEFAULT_YHATZEE_PORT = 8090
 DEFAULT_SUPERQUIZ_PORT = 8070
 DEFAULT_SHOOTY_PORT = 8040
+DEFAULT_POKERTOOL_PORT = 8060
 VERSION_LINE_RE = re.compile(r'^version\s*=\s*["\'](?P<version>[^"\']+)["\']', re.MULTILINE)
 
 
@@ -66,6 +67,8 @@ _SUPERQUIZ_SERVER_INSTANCE: Optional[threading.Thread] = None
 _SUPERQUIZ_SERVER_LOCK = threading.Lock()
 _FRONTEND_MANAGER_INSTANCE: Optional['FrontendManager'] = None
 _FRONTEND_LOCK = threading.Lock()
+_POKERTOOL_THREAD: Optional[threading.Thread] = None
+_POKERTOOL_LOCK = threading.Lock()
 
 # ANSI Color codes for terminal output
 class Color:
@@ -306,7 +309,14 @@ def cleanup_existing_instances() -> None:
         pass
 
     # Kill any http.server processes on our ports
-    for port in [DEFAULT_FRONTEND_PORT, DEFAULT_API_PORT, DEFAULT_YHATZEE_PORT, DEFAULT_SUPERQUIZ_PORT]:
+    for port in [
+        DEFAULT_FRONTEND_PORT,
+        DEFAULT_API_PORT,
+        DEFAULT_YHATZEE_PORT,
+        DEFAULT_SUPERQUIZ_PORT,
+        DEFAULT_SHOOTY_PORT,
+        DEFAULT_POKERTOOL_PORT,
+    ]:
         if is_port_in_use(port):
             log_warning(f"Port {port} is in use")
             kill_processes_on_port(port)
@@ -472,6 +482,37 @@ def start_shooty_server(port: int, project_root: Path, host: str = "127.0.0.1") 
         _SHOOTY_SERVER_INSTANCE = thread
         time.sleep(0.3)
         log_success(f"ShootyMcShoot GUI server running at http://{host}:{port}")
+        return thread
+
+
+def start_pokertool_service(port: int, project_root: Path, host: str = "127.0.0.1") -> threading.Thread:
+    """Launch the PokerTool service in a background thread."""
+    global _POKERTOOL_THREAD
+
+    with _POKERTOOL_LOCK:
+        if _POKERTOOL_THREAD is not None and _POKERTOOL_THREAD.is_alive():
+            log_warning("PokerTool service already running - refusing to start duplicate instance")
+            return _POKERTOOL_THREAD
+
+        log_info(f"Starting PokerTool service on {host}:{port}...")
+
+        try:
+            from actifix.modules.pokertool import run_service
+        except ImportError as exc:
+            log_error("PokerTool module requires Flask/Flask-CORS (install via pip install -e '.[web]')")
+            raise exc
+
+        def run_service_thread() -> None:
+            try:
+                run_service(host=host, port=port, project_root=project_root, debug=False)
+            except Exception as exc:
+                log_error(f"PokerTool service error: {exc}")
+
+        thread = threading.Thread(target=run_service_thread, daemon=True)
+        thread.start()
+        _POKERTOOL_THREAD = thread
+        time.sleep(0.3)
+        log_success(f"PokerTool service running at http://{host}:{port}")
         return thread
 
 
@@ -689,6 +730,17 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
         help="Do not start the standalone ShootyMcShoot GUI",
     )
     parser.add_argument(
+        "--pokertool-port",
+        type=int,
+        default=DEFAULT_POKERTOOL_PORT,
+        help=f"Port for the standalone PokerTool service (default: {DEFAULT_POKERTOOL_PORT})",
+    )
+    parser.add_argument(
+        "--no-pokertool",
+        action="store_true",
+        help="Do not start the standalone PokerTool service",
+    )
+    parser.add_argument(
         "--browser",
         action="store_true",
         default=False,
@@ -737,6 +789,8 @@ def main(argv: Optional[list[str]] = None) -> int:
     if not args.no_superquiz:
         total_steps += 1
     if not args.no_shooty:
+        total_steps += 1
+    if not args.no_pokertool:
         total_steps += 1
     total_steps += 1  # frontend step
 
@@ -823,12 +877,23 @@ def main(argv: Optional[list[str]] = None) -> int:
             log_error("Try manually: pkill -f 'start.py' or use --superquiz-port <PORT>")
             return 1
 
+    if not args.no_pokertool and is_port_in_use(args.pokertool_port):
+        log_warning(f"PokerTool port {args.pokertool_port} still in use, forcing cleanup")
+        kill_processes_on_port(args.pokertool_port)
+        time.sleep(0.5)
+
+        if is_port_in_use(args.pokertool_port):
+            log_error(f"Could not free PokerTool port {args.pokertool_port}")
+            log_error("Try manually: pkill -f 'start.py' or use --pokertool-port <PORT>")
+            return 1
+
     # Step 4: Start API server (if enabled)
     api_thread = None
     api_watchdog_thread = None
     version_monitor_thread: Optional[threading.Thread] = None
     yhatzee_thread: Optional[threading.Thread] = None
     superquiz_thread: Optional[threading.Thread] = None
+    pokertool_thread: Optional[threading.Thread] = None
     stop_event = threading.Event()
     if not args.no_api:
         current_step += 1
@@ -858,6 +923,15 @@ def main(argv: Optional[list[str]] = None) -> int:
             superquiz_thread = start_superquiz_server(args.superquiz_port, ROOT)
         except Exception as e:
             log_error(f"Failed to start SuperQuiz GUI: {e}")
+            return 1
+
+    if not args.no_pokertool:
+        current_step += 1
+        log_step(current_step, total_steps, "Starting PokerTool service")
+        try:
+            pokertool_thread = start_pokertool_service(args.pokertool_port, ROOT)
+        except Exception as e:
+            log_error(f"Failed to start PokerTool service: {e}")
             return 1
 
     # Start frontend server
@@ -890,6 +964,10 @@ def main(argv: Optional[list[str]] = None) -> int:
     if not args.no_shooty:
         shooty_url = f"http://localhost:{args.shooty_port}/"
         print(f"{Color.BOLD}{Color.GREEN}ShootyMcShoot:{Color.RESET} {Color.CYAN}{shooty_url}{Color.RESET}")
+
+    if not args.no_pokertool:
+        pokertool_url = f"http://localhost:{args.pokertool_port}/"
+        print(f"{Color.BOLD}{Color.GREEN}PokerTool:{Color.RESET} {Color.CYAN}{pokertool_url}{Color.RESET}")
 
     print()
 
