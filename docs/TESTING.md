@@ -1,6 +1,6 @@
 # Actifix Testing Guide
 
-Actifix testing is a two-stage flow: system checks via the Actifix test runner and pytest for the full suite. Tests are categorized by markers, not directories.
+Actifix testing is a two-stage flow: system checks via the Actifix test runner and pytest for the full suite. `python3 test.py` is the canonical entry point; it runs the system suite, kicks off pytest, and captures artifactory so you should prefer it to invoking pytest directly. Tests are categorized by markers, not directories.
 
 ## Quick commands
 ```bash
@@ -10,8 +10,8 @@ python3 test.py --coverage
 # Fast coverage (skip slow/integration tests)
 python3 test.py --fast-coverage
 
-# Quick pytest pass
-python3 -m pytest test/ -m "not slow"
+# Quick pytest pass (pattern filters are forwarded to pytest by the runner)
+python3 test.py --pattern "not slow"
 ```
 
 ## Test runner overview
@@ -44,5 +44,5 @@ See `docs/TEST_MARKERS_GUIDE.md` for detailed usage.
 2. Run `python3 test.py --coverage` before commit.
 3. Validate architecture if you touched module boundaries:
    ```bash
-   python3 -m pytest test/test_architecture_validation.py -v
+   python3 test.py --pattern architecture_validation
    ```

@@ -803,6 +803,25 @@ modules:
   - core.raise_af
   - runtime.api
 
+- id: modules.hollogram
+  domain: modules
+  owner: modules
+  summary: AI-powered medical research assistant with disclaimer, research, and history endpoints
+  entrypoints:
+  - src/actifix/modules/hollogram/__init__.py
+  contracts:
+  - expose /health, /disclaimer, /topics, /research, /history, and /history/<id> routes under /modules/hollogram
+  - log lifecycle metadata and errors through ModuleBase helpers and raise_af tickets
+  - keep research history in state-backed storage and enforce the local-only access rule
+  depends_on:
+  - runtime.state
+  - infra.logging
+  - core.raise_af
+  - runtime.api
+  - core.ai_client
+  - modules.base
+  - modules.config
+
 - id: modules.shootymcshoot
   domain: modules
   owner: modules

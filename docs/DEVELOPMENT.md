@@ -74,14 +74,14 @@ python3 test.py --coverage
 python3 test.py --fast-coverage
 
 # Quick pytest run
-python3 -m pytest test/ -m "not slow"
+python3 test.py --pattern "not slow"
 ```
 
 Other checks:
 ```bash
 python3 -m actifix.main test
 python3 -m actifix.main health
-python3 -m pytest test/test_architecture_validation.py -v
+python3 test.py --pattern architecture_validation
 ```
 
 ## Module CLI
