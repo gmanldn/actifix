@@ -185,6 +185,28 @@ def check_no_binaries(staged_files):
     print("✓ No disallowed binary files staged")
     return True
 
+def check_version_bumped_for_commit(staged_files) -> bool:
+    """Enforce version bump policy: every commit must include a pyproject.toml bump.
+
+    This keeps a single canonical version source (pyproject.toml) and guarantees
+    the frontend cache-busting version changes whenever features change.
+    """
+    if not staged_files or staged_files == [""]:
+        return True
+
+    staged_set = set(staged_files)
+    if "pyproject.toml" in staged_set:
+        return True
+
+    # If anything besides pyproject.toml is being committed, require a version bump.
+    other_files = [p for p in staged_files if p and p != "pyproject.toml"]
+    if other_files:
+        print("✗ Version bump required: pyproject.toml is not staged.")
+        print("  - Policy: increment pyproject.toml version after every commit")
+        print("  - Fix: update pyproject.toml version and re-stage it (git add pyproject.toml)")
+        return False
+    return True
+
 def main():
     """Main pre-commit hook logic."""
     staged_files = get_staged_files()
@@ -195,6 +217,9 @@ def main():
 
     print("→ Scanning for leaked secrets...")
     if not scan_secrets_in_staged_files():
+        return 1
+
+    if not check_version_bumped_for_commit(staged_files):
         return 1
 
     if not check_version_consistency():

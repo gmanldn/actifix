@@ -223,6 +223,13 @@ def test_actual_production_files_have_correct_version():
     finally:
         os.chdir(original_cwd)
     
+    # Backend should not carry a hardcoded semver string; the canonical version is pyproject.toml.
+    init_py = project_root / "src" / "actifix" / "__init__.py"
+    if init_py.exists():
+        content = init_py.read_text(encoding="utf-8")
+        assert "__version__ = _resolve_version()" in content
+        assert not re.search(r'__version__\s*=\s*["\']\d+\.\d+\.\d+["\']', content)
+
     # Check actifix-frontend/app.js (uses single quotes for UI_VERSION)
     app_js = project_root / "actifix-frontend" / "app.js"
     if app_js.exists():
