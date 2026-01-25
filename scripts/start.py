@@ -415,15 +415,36 @@ def _probe_http_status(url: str, timeout: float = 1.5) -> tuple[bool, int, str]:
         return False, 0, str(exc)
 
 
+def _wait_for_api_ready(host: str, port: int, timeout: float = 5.0) -> bool:
+    """Wait until the API responds to a lightweight request."""
+    deadline = time.monotonic() + timeout
+    url = f"http://{host}:{port}/api/health"
+    while time.monotonic() < deadline:
+        ok, status, _ = _probe_http_status(url, timeout=1.0)
+        if ok and status == 200:
+            return True
+        time.sleep(0.2)
+    return False
+
+
 def announce_api_modules(host: str, port: int) -> None:
     """Print and record which API modules are reachable."""
     base = f"http://{host}:{port}"
     log_info("API module availability:")
     from actifix.agent_voice import record_agent_voice
 
+    if not _wait_for_api_ready(host, port, timeout=5.0):
+        log_warning("API did not become ready in time; module status may be incomplete.")
+
     for name, path in API_MODULE_HEALTH_PATHS.items():
         url = f"{base}{path}"
-        ok, status, err = _probe_http_status(url)
+        # Retry briefly: API thread may have started but not yet accepted connections.
+        ok, status, err = False, 0, ""
+        for _ in range(10):
+            ok, status, err = _probe_http_status(url)
+            if ok:
+                break
+            time.sleep(0.2)
         if ok and status == 200:
             log_success(f"{name}: OK ({url})")
             record_agent_voice(
