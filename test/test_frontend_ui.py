@@ -59,3 +59,12 @@ def test_app_js_valid_syntax():
     app_path = Path('actifix-frontend') / 'app.js'
     result = subprocess.run([node, '--check', str(app_path)], capture_output=True, text=True)
     assert result.returncode == 0, 'node --check failed:\n{}'.format(result.stderr)
+
+
+def test_app_js_ticket_card_dispatches_ticket_details():
+    """Guard that ticket cards call fetchTicket so the modal can open."""
+    app_path = Path("actifix-frontend") / "app.js"
+    content = app_path.read_text(encoding="utf-8")
+    assert "const fetchTicket" in content, "fetchTicket helper missing"
+    assert "onSelect: () => fetchTicket(ticket.ticket_id)" in content, "ticket cards not wired to fetchTicket"
+    assert "role: 'button'" in content, "ticket cards missing accessible button role"
