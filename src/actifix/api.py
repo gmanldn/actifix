@@ -1411,6 +1411,60 @@ def create_app(
         response.headers["Content-Type"] = "text/plain; version=0.0.4"
         return response
 
+    @app.route('/api/metrics/json', methods=['GET'])
+    def api_metrics_json():
+        """Export metrics as JSON for tool integration."""
+        # Check authentication
+        if not _check_auth(request):
+            return jsonify({'error': 'Authorization required'}), 401
+
+        try:
+            paths = get_actifix_paths(project_root=app.config['PROJECT_ROOT'])
+            health = get_health(paths)
+
+            # Extract stats from health details
+            stats = health.details.get("stats", {})
+            by_priority = stats.get("by_priority", {})
+
+            # Build comprehensive metrics object
+            metrics = {
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "version": __version__,
+                "health_status": health.status,
+                "healthy": health.healthy,
+                "tickets": {
+                    "total": stats.get("total", 0),
+                    "open": stats.get("open", 0),
+                    "in_progress": stats.get("in_progress", 0),
+                    "completed": stats.get("completed", 0),
+                    "by_priority": {
+                        "P0": by_priority.get("P0", 0),
+                        "P1": by_priority.get("P1", 0),
+                        "P2": by_priority.get("P2", 0),
+                        "P3": by_priority.get("P3", 0),
+                        "P4": by_priority.get("P4", 0),
+                    },
+                    "sla_breaches": health.sla_breaches,
+                },
+                "system": {
+                    "platform": platform.system(),
+                    "python_version": platform.python_version(),
+                    "warnings": health.warnings,
+                    "errors": health.errors,
+                },
+            }
+
+            return jsonify(metrics)
+
+        except Exception as exc:
+            record_error(
+                message=f"JSON metrics export failed: {exc}",
+                source="api.py:api_metrics_json",
+                error_type=type(exc).__name__,
+                priority=TicketPriority.P2,
+            )
+            return jsonify({'error': 'Failed to export metrics'}), 500
+
     @app.route('/api/status/export', methods=['GET'])
     def api_status_export():
         """Export a status snapshot for sharing."""
