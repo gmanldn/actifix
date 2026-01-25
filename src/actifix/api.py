@@ -691,14 +691,40 @@ def _parse_modules_markdown(markdown_path: Path) -> List[Dict[str, str]]:
     return modules
 
 
+def _load_architecture_details(project_root: Path) -> Dict[str, dict]:
+    """Load detailed architecture information from MAP.yaml."""
+    map_path = project_root / "docs" / "architecture" / "MAP.yaml"
+    details = {}
+
+    if map_path.exists():
+        try:
+            map_data = yaml.safe_load(map_path.read_text(encoding="utf-8"))
+            modules = map_data.get("modules", [])
+            for module in modules:
+                module_id = module.get("id")
+                if module_id:
+                    details[module_id] = {
+                        "entrypoints": module.get("entrypoints", []),
+                        "depends_on": module.get("depends_on", []),
+                        "contracts": module.get("contracts", []),
+                    }
+        except Exception:
+            pass
+
+    return details
+
+
 def _load_modules(project_root: Path) -> Dict[str, List[Dict[str, str]]]:
-    """Load modules from canonical DEPGRAPH.json or MODULES.md fallback."""
+    """Load modules from canonical DEPGRAPH.json or MODULES.md fallback with detailed metadata."""
     from actifix.state_paths import get_actifix_paths
     paths = get_actifix_paths(project_root=project_root)
     status_file = paths.state_dir / "module_statuses.json"
 
     status_payload = _read_module_status_payload(status_file)
     statuses = status_payload["statuses"]
+
+    # Load detailed architecture information
+    arch_details = _load_architecture_details(project_root)
 
     def get_status(name: str) -> str:
         if name in statuses.get("disabled", []):
@@ -716,14 +742,21 @@ def _load_modules(project_root: Path) -> Dict[str, List[Dict[str, str]]]:
             nodes = data.get("nodes", [])
             for node in nodes:
                 module_id = node["id"]
-                modules_data.append({
+                module_entry = {
                     "name": module_id,
                     "domain": node.get("domain", ""),
                     "owner": node.get("owner", ""),
                     "summary": node.get("label", node["id"]),
                     "status": get_status(module_id),
                     "version": "unknown",
-                })
+                }
+                # Add detailed architecture information
+                if module_id in arch_details:
+                    details = arch_details[module_id]
+                    module_entry["entrypoints"] = details.get("entrypoints", [])
+                    module_entry["dependencies"] = details.get("depends_on", [])
+                    module_entry["contracts"] = details.get("contracts", [])
+                modules_data.append(module_entry)
         except Exception:
             modules_data = []
 
@@ -731,14 +764,21 @@ def _load_modules(project_root: Path) -> Dict[str, List[Dict[str, str]]]:
         fallback_modules = _parse_modules_markdown(project_root / "docs" / "architecture" / "MODULES.md")
         for module in fallback_modules:
             module_id = module["name"]
-            modules_data.append({
+            module_entry = {
                 "name": module_id,
                 "domain": module.get("domain", ""),
                 "owner": module.get("owner", ""),
                 "summary": module.get("summary", module_id),
                 "status": get_status(module_id),
                 "version": "unknown",
-            })
+            }
+            # Add detailed architecture information if available
+            if module_id in arch_details:
+                details = arch_details[module_id]
+                module_entry["entrypoints"] = details.get("entrypoints", [])
+                module_entry["dependencies"] = details.get("depends_on", [])
+                module_entry["contracts"] = details.get("contracts", [])
+            modules_data.append(module_entry)
 
     system_domains = {"runtime", "infra", "core", "tooling", "security", "plugins", "persistence"}
     system_modules = [m for m in modules_data if m["domain"].lower() in system_domains]
