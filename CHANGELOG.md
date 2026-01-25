@@ -13,6 +13,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [6.0.25] - 2026-01-25
+
+### Added
+- Tests covering background DoAF agent fallback completion and AgentVoice logging
+
 ## [6.0.24] - 2026-01-25
 
 ### Added
