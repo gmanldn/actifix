@@ -1375,6 +1375,19 @@ _HTML_PAGE = """<!doctype html>
       color: var(--muted);
       font-family: "Oswald", sans-serif;
     }
+    .port-display {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      color: var(--accent-2);
+      margin-top: 4px;
+      font-family: "Oswald", sans-serif;
+      font-weight: 600;
+    }
+    .port-display span {
+      color: var(--ink);
+      font-weight: 700;
+    }
     .grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
@@ -1688,11 +1701,12 @@ _HTML_PAGE = """<!doctype html>
 <body>
   <div class="stage">
     <div class="app">
-      <header>
-        <h1 class="title">SuperQuiz Enhanced</h1>
-        <div class="subtitle">12 Sources · Timed & Snap · Custom & Local · Elimination · Dark Mode</div>
-        <button id="toggle-dark" class="button tertiary" style="align-self:flex-start; max-width:160px;">Toggle Dark</button>
-      </header>
+    <header>
+      <h1 class="title">SuperQuiz Enhanced</h1>
+      <div class="subtitle">12 Sources · Timed & Snap · Custom & Local · Elimination · Dark Mode</div>
+      <div class="port-display" id="portDisplay">Running on port <span id="portValue">8070</span></div>
+      <button id="toggle-dark" class="button tertiary" style="align-self:flex-start; max-width:160px;">Toggle Dark</button>
+    </header>
 
       <div class="grid">
         <section class="panel delay-1">

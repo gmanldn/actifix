@@ -188,6 +188,19 @@ _HTML_PAGE = """<!doctype html>
       letter-spacing: 3px;
       color: var(--muted);
     }
+    .port-display {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      color: var(--accent-2);
+      margin-top: 4px;
+      font-family: "Oswald", sans-serif;
+      font-weight: 600;
+    }
+    .port-display span {
+      color: var(--ink);
+      font-weight: 700;
+    }
     h2 {
       font-family: "Copperplate", "Palatino Linotype", "Book Antiqua", "Palatino", serif;
       font-size: 20px;
@@ -389,6 +402,7 @@ _HTML_PAGE = """<!doctype html>
       <div>
         <div class="subtitle">Actifix Module</div>
         <h1>Yhatzee</h1>
+        <div class="port-display" id="portDisplay">Running on port <span id="portValue">8090</span></div>
       </div>
       <button id="resetBtn" class="button secondary">Reset Game</button>
     </header>

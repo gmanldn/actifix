@@ -277,7 +277,9 @@ def _validate_module_dependencies(
     if not isinstance(dependencies, list):
         return ["dependencies_invalid"]
     if not depgraph_edges:
-        return []
+        # If we cannot validate against the canonical dependency graph, treat this as
+        # a validation failure. Otherwise modules can silently bypass edge checks.
+        return [f"missing_edges: {sorted([str(dep) for dep in dependencies])}"]
     module_id = f"modules.{module_name}"
     missing = [dep for dep in dependencies if (module_id, dep) not in depgraph_edges]
     if missing:

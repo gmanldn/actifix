@@ -68,13 +68,16 @@ mark_ticket_complete(
 Common commands:
 ```bash
 # Full test cycle with Actifix system tests + pytest
+python3 test.py
+
+# Coverage cycle (still avoids the heaviest suites unless you ask for --full)
 python3 test.py --coverage
 
-# Fast coverage (skip slow tests)
+# Fast coverage (skip slow/integration tests)
 python3 test.py --fast-coverage
 
-# Quick pytest run
-python3 test.py --pattern "not slow"
+# Full pytest suite (includes slow/hanging tests; may take a long time)
+python3 test.py --full
 ```
 
 Other checks:
