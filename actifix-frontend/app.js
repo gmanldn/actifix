@@ -8,7 +8,7 @@ const { useState, useEffect, useRef, createElement: h } = React;
 
 // API Configuration
 const API_BASE = 'http://localhost:5001/api';
-const UI_VERSION = '7.0.12';
+const UI_VERSION = '7.0.13';
 const REFRESH_INTERVAL = 5000;
 const LOG_REFRESH_INTERVAL = 3000;
 const TICKET_REFRESH_INTERVAL = 4000;
@@ -802,6 +802,8 @@ const TicketsView = () => {
   const [searchTerm, setSearchTerm] = useState('');
 
   const fetchTicket = async (ticketId) => {
+    if (!ticketId) return;
+    setSelectedTicket(null);
     setModalLoading(true);
     setModalError('');
     try {
@@ -851,14 +853,14 @@ const TicketsView = () => {
     { key: 'completed', label: 'Completed' },
   ];
 
-  const TicketCard = ({ ticket, index }) => {
-    const priority = normalizePriority(ticket.priority);
-    const [isFixing, setIsFixing] = useState(false);
-    const [fixStatus, setFixStatus] = useState('');
-    
-    const handleFixTicket = async (e) => {
-      e.stopPropagation();
-      if (isFixing || ticket.status === 'completed') return;
+    const TicketCard = ({ ticket, index, onSelect }) => {
+      const priority = normalizePriority(ticket.priority);
+      const [isFixing, setIsFixing] = useState(false);
+      const [fixStatus, setFixStatus] = useState('');
+      
+      const handleFixTicket = async (e) => {
+        e.stopPropagation();
+        if (isFixing || ticket.status === 'completed') return;
       
       setIsFixing(true);
       setFixStatus('Fixing...');
@@ -883,10 +885,28 @@ const TicketsView = () => {
       }
     };
     
+    const handleCardClick = () => {
+      if (typeof onSelect === 'function') {
+        onSelect();
+      }
+    };
+
+    const handleCardKeyDown = (event) => {
+      if (!onSelect) return;
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        onSelect();
+      }
+    };
+
     return h('article', { 
       key: ticket.ticket_id || index, 
       className: `ticket-card ${ticket.status}`,
-      style: { cursor: 'pointer' }
+      style: { cursor: 'pointer' },
+      role: 'button',
+      tabIndex: 0,
+      onClick: handleCardClick,
+      onKeyDown: handleCardKeyDown
     },
       h('div', { className: 'ticket-card-header' },
         h('span', { className: `priority-badge ${priority.toLowerCase()}` }, priority),
@@ -951,9 +971,13 @@ const TicketsView = () => {
     )
   );
 
-  const renderTicketCard = (ticket, index) => {
-    return h(TicketCard, { ticket, index });
-  };
+    const renderTicketCard = (ticket, index) => {
+      return h(TicketCard, {
+        ticket,
+        index,
+        onSelect: () => fetchTicket(ticket.ticket_id)
+      });
+    };
 
   const renderModal = () => {
     if (!selectedTicket && !modalLoading && !modalError) return null;
