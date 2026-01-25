@@ -57,6 +57,13 @@ DEFAULT_SHOOTY_PORT = 8040
 DEFAULT_POKERTOOL_PORT = 8060
 VERSION_LINE_RE = re.compile(r'^version\s*=\s*["\'](?P<version>[^"\']+)["\']', re.MULTILINE)
 
+# Optional API modules we want to surface in startup output.
+API_MODULE_HEALTH_PATHS = {
+    "Hollogram": "/modules/hollogram/health",
+    # Note: url_prefix for this module uses a hyphen.
+    "Dev_Assistant": "/modules/dev-assistant/health",
+}
+
 
 # Global singleton instances - only one of each can exist
 _API_SERVER_INSTANCE: Optional[threading.Thread] = None
@@ -395,6 +402,52 @@ def start_api_server(port: int, project_root: Path, host: str = "127.0.0.1") -> 
             extra={"host": host, "port": port},
         )
         return thread
+
+
+def _probe_http_status(url: str, timeout: float = 1.5) -> tuple[bool, int, str]:
+    """Return (ok, status_code, error_text) for a URL."""
+    try:
+        from urllib.request import urlopen
+
+        with urlopen(url, timeout=timeout) as response:
+            return True, int(getattr(response, "status", 200)), ""
+    except Exception as exc:
+        return False, 0, str(exc)
+
+
+def announce_api_modules(host: str, port: int) -> None:
+    """Print and record which API modules are reachable."""
+    base = f"http://{host}:{port}"
+    log_info("API module availability:")
+    from actifix.agent_voice import record_agent_voice
+
+    for name, path in API_MODULE_HEALTH_PATHS.items():
+        url = f"{base}{path}"
+        ok, status, err = _probe_http_status(url)
+        if ok and status == 200:
+            log_success(f"{name}: OK ({url})")
+            record_agent_voice(
+                f"{name} module available",
+                agent_id="scripts/start.py",
+                run_label="start",
+                extra={"module": name, "url": url, "status": status},
+            )
+            continue
+
+        if status:
+            log_warning(f"{name}: HTTP {status} ({url})")
+        else:
+            log_warning(f"{name}: unreachable ({url}) - {err}")
+        hint = None
+        if name == "Dev_Assistant":
+            hint = "If missing, install 'requests' and restart."
+            log_info(hint)
+        record_agent_voice(
+            f"{name} module not available",
+            agent_id="scripts/start.py",
+            run_label="start",
+            extra={"module": name, "url": url, "status": status, "error": err, "hint": hint},
+        )
 
 
 def start_yhatzee_server(port: int, project_root: Path, host: str = "127.0.0.1") -> threading.Thread:
@@ -970,6 +1023,8 @@ def main(argv: Optional[list[str]] = None) -> int:
             api_thread = start_api_server(args.api_port, ROOT)
             api_watchdog_thread = start_api_watchdog(args.api_port, ROOT, stop_event=stop_event)
             log_success("API server + watchdog started")
+            # Surface important API-hosted modules in the terminal so users can find them quickly.
+            announce_api_modules("127.0.0.1", args.api_port)
         except Exception as e:
             log_error(f"Failed to start API server: {e}")
             return 1
