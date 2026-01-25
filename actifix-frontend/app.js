@@ -8,7 +8,7 @@ const { useState, useEffect, useRef, createElement: h } = React;
 
 // API Configuration
 const API_BASE = 'http://localhost:5001/api';
-const UI_VERSION = '6.0.9';
+const UI_VERSION = '6.0.10';
 const REFRESH_INTERVAL = 5000;
 const LOG_REFRESH_INTERVAL = 3000;
 const TICKET_REFRESH_INTERVAL = 4000;
