@@ -39,3 +39,22 @@ def test_metric_tiles_use_updated_layout():
     assert "gap: var(--spacing-sm)" in content
     assert "min-height: 160px" in content
     assert "metric-tile-tag" in content
+
+
+def test_ticket_filters_have_compact_styles():
+    """Ticket filter bar styles should reference the shared chips and search field."""
+    content = BASE_CSS_PATH.read_text(encoding="utf-8")
+    assert "tickets-filter-bar" in content
+    assert ".filter-chip" in content
+    assert "filter-search" in content
+
+
+def test_logs_view_additional_controls_present():
+    """Logs view should expose the new summary grid, chip filters, and helper tokens."""
+    content = BASE_CSS_PATH.read_text(encoding="utf-8")
+    assert ".log-summary-grid" in content
+    assert ".log-summary-card" in content
+    assert ".log-chips" in content
+    assert ".log-chip" in content
+    assert "log-controls-actions" in content
+    assert "log-updated-label" in content

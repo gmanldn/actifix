@@ -13,6 +13,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [6.0.31] - 2026-01-25
+
+### Added
+- Ticket filter bar (priority/status/search) so dashboard lanes can be scoped client-side
+- Log summary grid + severity chips with updated metadata and helper tokens in the compact log view
+
+### Changed
+- Frontend UI_VERSION aligned with backend (6.0.31) and assets rebuilt
+
 ## [6.0.25] - 2026-01-25
 
 ### Added

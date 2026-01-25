@@ -8,7 +8,7 @@ const { useState, useEffect, useRef, createElement: h } = React;
 
 // API Configuration
 const API_BASE = 'http://localhost:5001/api';
-const UI_VERSION = '6.0.28';
+const UI_VERSION = '6.0.31';
 const REFRESH_INTERVAL = 5000;
 const LOG_REFRESH_INTERVAL = 3000;
 const TICKET_REFRESH_INTERVAL = 4000;
@@ -797,6 +797,9 @@ const TicketsView = () => {
   const [selectedTicket, setSelectedTicket] = useState(null);
   const [modalLoading, setModalLoading] = useState(false);
   const [modalError, setModalError] = useState('');
+  const [priorityFilter, setPriorityFilter] = useState('All');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [searchTerm, setSearchTerm] = useState('');
 
   const fetchTicket = async (ticketId) => {
     setModalLoading(true);
@@ -820,10 +823,33 @@ const TicketsView = () => {
   if (error) return h(ErrorDisplay, { message: error });
 
   const tickets = data?.tickets || [];
-  const groupedTickets = groupTicketsByPriority(tickets);
+  const searchTermNormalized = searchTerm.trim().toLowerCase();
+  const filteredTickets = tickets.filter((ticket) => {
+    const tokenPriority = normalizePriority(ticket.priority);
+    if (priorityFilter !== 'All' && tokenPriority !== priorityFilter) {
+      return false;
+    }
+    if (statusFilter !== 'all' && ticket.status !== statusFilter) {
+      return false;
+    }
+    if (searchTermNormalized) {
+      const haystack = `${ticket.ticket_id || ''} ${ticket.error_type || ''} ${ticket.message || ''}`.toLowerCase();
+      if (!haystack.includes(searchTermNormalized)) {
+        return false;
+      }
+    }
+    return true;
+  });
+  const groupedTickets = groupTicketsByPriority(filteredTickets);
   const updatedLabel = lastUpdated
     ? lastUpdated.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
     : '—';
+  const priorityOptions = ['All', 'P0', 'P1', 'P2', 'P3', 'P4'];
+  const statusOptions = [
+    { key: 'all', label: 'All' },
+    { key: 'open', label: 'Open' },
+    { key: 'completed', label: 'Completed' },
+  ];
 
   const TicketCard = ({ ticket, index }) => {
     const priority = normalizePriority(ticket.priority);
@@ -884,6 +910,46 @@ const TicketsView = () => {
       )
     );
   };
+
+  const renderFiltersBar = () => h('div', { className: 'tickets-filter-bar' },
+    h('div', { className: 'filter-groups' },
+      h('div', { className: 'filter-group' },
+        h('span', { className: 'filter-label' }, 'Priority'),
+        priorityOptions.map((option) =>
+          h('button', {
+            key: option,
+            type: 'button',
+            className: `filter-chip ${priorityFilter === option ? 'active' : ''}`,
+            onClick: () => setPriorityFilter(option),
+          }, option)
+        )
+      ),
+      h('div', { className: 'filter-group' },
+        h('span', { className: 'filter-label' }, 'Status'),
+        statusOptions.map((option) =>
+          h('button', {
+            key: option.key,
+            type: 'button',
+            className: `filter-chip ${statusFilter === option.key ? 'active' : ''}`,
+            onClick: () => setStatusFilter(option.key),
+          }, option.label)
+        )
+      )
+    ),
+    h('div', { className: 'filter-search-wrapper' },
+      h('input', {
+        type: 'search',
+        className: 'filter-search',
+        placeholder: 'Search tickets…',
+        value: searchTerm,
+        onChange: (e) => setSearchTerm(e.target.value),
+        'aria-label': 'Search tickets',
+      })
+    ),
+    h('div', { className: 'filter-meta' },
+      `Updated ${updatedLabel} • Showing ${filteredTickets.length} of ${tickets.length} tickets`
+    )
+  );
 
   const renderTicketCard = (ticket, index) => {
     return h(TicketCard, { ticket, index });
@@ -1059,7 +1125,8 @@ const TicketsView = () => {
         )
       )
     ),
-    tickets.length > 0 ? h('div', { className: 'priority-lanes' },
+    renderFiltersBar(),
+    filteredTickets.length > 0 ? h('div', { className: 'priority-lanes' },
       PRIORITY_ORDER.map((priority) => {
         const group = groupedTickets[priority];
         const openTickets = group?.open || [];
@@ -1102,9 +1169,10 @@ const LogsView = () => {
   const [logType, setLogType] = useState('audit');
   const [autoScroll, setAutoScroll] = useState(true);
   const [filter, setFilter] = useState('');
+  const [severityFilter, setSeverityFilter] = useState('all');
   const logContainerRef = useRef(null);
 
-  const { data, loading, error } = useFetch(`/logs?type=${logType}&lines=300`, LOG_REFRESH_INTERVAL);
+  const { data, loading, error, lastUpdated } = useFetch(`/logs?type=${logType}&lines=300`, LOG_REFRESH_INTERVAL);
 
   useEffect(() => {
     if (autoScroll && logContainerRef.current) {
@@ -1119,16 +1187,70 @@ const LogsView = () => {
     { id: 'setup', label: 'Setup' },
   ];
 
-  const filteredLogs = data?.content?.filter(log => {
-    if (!filter) return true;
-    return log.text.toLowerCase().includes(filter.toLowerCase());
-  }) || [];
+  const logEntries = data?.content || [];
+  const normalizedFilter = filter.toLowerCase();
+  const severityLevels = [
+    { id: 'all', label: 'All', color: '#9ca3ff' },
+    { id: 'error', label: 'Errors', color: '#f87171' },
+    { id: 'warning', label: 'Warnings', color: '#fbbf24' },
+    { id: 'info', label: 'Info', color: '#38bdf8' },
+    { id: 'audit', label: 'Audit', color: '#34d399' },
+  ];
+
+  const severityCounts = logEntries.reduce((acc, log) => {
+    const level = (log.level || log.event || 'info').toLowerCase();
+    acc.all += 1;
+    if (level.includes('error')) {
+      acc.error += 1;
+    } else if (level.includes('warn')) {
+      acc.warning += 1;
+    } else if (level === 'audit' || log.event === 'audit') {
+      acc.audit += 1;
+    } else if (level.includes('info')) {
+      acc.info += 1;
+    } else {
+      acc.info += 1;
+    }
+    return acc;
+  }, { all: 0, error: 0, warning: 0, info: 0, audit: 0 });
+
+  const severityMatches = (logLevel) => {
+    if (severityFilter === 'all') return true;
+    const normalized = (logLevel || 'info').toLowerCase();
+    if (severityFilter === 'audit') {
+      return normalized === 'audit' || logLevel === 'audit';
+    }
+    return normalized.includes(severityFilter);
+  };
+
+  const filteredLogs = logEntries
+    .filter((log) => severityMatches(log.level || log.event))
+    .filter((log) => {
+      if (!normalizedFilter) return true;
+      return (log.text || '').toLowerCase().includes(normalizedFilter);
+    });
+
+  const updatedLabel = lastUpdated
+    ? `Updated ${formatTime(lastUpdated.toISOString())}`
+    : 'Updated —';
 
   return h('div', { className: 'panel' },
     h('div', { className: 'panel-header' },
       h('div', { className: 'panel-title' },
         h('span', { className: 'panel-title-icon' }, '📜'),
         'LIVE LOGS'
+      )
+    ),
+    h('div', { className: 'log-summary-grid' },
+      severityLevels.map((level) =>
+        h('div', { key: level.id, className: 'log-summary-card' },
+          h('span', { className: 'log-summary-label' }, level.label),
+          h('strong', {
+            className: 'log-summary-value',
+            style: { color: level.color }
+          }, (severityCounts[level.id] ?? 0).toString()),
+          h('span', { className: 'log-summary-meta' }, `${level.id === 'all' ? logEntries.length : (severityCounts[level.id] ?? 0)} entries`)
+        )
       )
     ),
     h('div', { className: 'log-controls' },
@@ -1141,7 +1263,17 @@ const LogsView = () => {
           }, type.label)
         )
       ),
-      h('div', { style: { display: 'flex', gap: '8px', alignItems: 'center' } },
+      h('div', { className: 'log-chips' },
+        severityLevels.map(level =>
+          h('button', {
+            key: level.id,
+            type: 'button',
+            className: `log-chip ${severityFilter === level.id ? 'active' : ''}`,
+            onClick: () => setSeverityFilter(level.id)
+          }, level.label)
+        )
+      ),
+      h('div', { className: 'log-controls-actions' },
         h('input', {
           type: 'text',
           className: 'log-filter',
@@ -1154,6 +1286,7 @@ const LogsView = () => {
           onClick: () => setAutoScroll(!autoScroll),
           title: autoScroll ? 'Auto-scroll ON' : 'Auto-scroll OFF'
         }, autoScroll ? '▼' : '▽'),
+        h('span', { className: 'log-updated-label' }, updatedLabel),
         h('span', { className: 'text-dim', style: { fontSize: '10px' } },
           `${filteredLogs.length}/${data?.total_lines || 0}`
         )

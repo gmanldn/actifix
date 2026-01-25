@@ -810,6 +810,73 @@ h1, h2, h3, h4, h5, h6, .panel-title, .metric-label {
   gap: var(--spacing-md);
 }
 
+.tickets-filter-bar {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) 0 var(--spacing-xs);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  margin-bottom: var(--spacing-sm);
+}
+
+.filter-groups {
+  display: flex;
+  gap: var(--spacing-md);
+  flex-wrap: wrap;
+}
+
+.filter-group {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  flex-wrap: wrap;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.filter-label {
+  font-weight: var(--font-weight-medium);
+  letter-spacing: 0.05em;
+}
+
+.filter-chip {
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.filter-chip.active {
+  border-color: var(--border);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-primary);
+}
+
+.filter-search-wrapper {
+  align-self: center;
+}
+
+.filter-search {
+  width: 100%;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+}
+
+.filter-meta {
+  align-self: center;
+  font-size: var(--text-sm);
+  color: var(--text-dim);
+  text-align: right;
+}
+
 .ticket-item {
   background: transparent;
   border: 1px solid var(--border);
@@ -1147,16 +1214,52 @@ h1, h2, h3, h4, h5, h6, .panel-title, .metric-label {
 /* COMPACT LOG VIEWER */
 .log-controls {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--spacing-md);
+  flex-direction: column;
+  gap: var(--spacing-sm);
   margin-bottom: var(--spacing-md);
-  flex-wrap: wrap;
+}
+
+.log-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-sm);
+}
+
+.log-summary-card {
+  padding: var(--spacing-sm);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.02);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-height: 80px;
+}
+
+.log-summary-label {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  font-weight: var(--font-weight-medium);
+}
+
+.log-summary-value {
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.log-summary-meta {
+  font-size: 11px;
+  color: var(--text-muted);
 }
 
 .log-tabs {
   display: flex;
   gap: var(--spacing-xs);
+  flex-wrap: wrap;
 }
 
 .log-tab {
@@ -1171,6 +1274,32 @@ h1, h2, h3, h4, h5, h6, .panel-title, .metric-label {
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.06em;
+}
+
+.log-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs);
+}
+
+.log-chip {
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.log-chip.active {
+  border-color: var(--border-hover);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-primary);
 }
 
 .log-tab:hover {
@@ -1197,6 +1326,21 @@ h1, h2, h3, h4, h5, h6, .panel-title, .metric-label {
 .log-filter:focus {
   outline: none;
   border-color: var(--accent);
+}
+
+.log-controls-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.log-updated-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  font-family: var(--font-family-mono);
 }
 
 .log-container {
