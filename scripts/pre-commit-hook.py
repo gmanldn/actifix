@@ -14,6 +14,8 @@ import sys
 from pathlib import Path
 import re
 
+REPO_ROOT = Path(__file__).resolve().parents[1]
+
 def get_staged_files():
     """Get list of staged files."""
     result = subprocess.run(
@@ -78,45 +80,91 @@ def _read_version_from_pyproject(pyproject_path: Path) -> str | None:
     match = re.search(r'^version\\s*=\\s*\"([^\"]+)\"', content, re.MULTILINE)
     return match.group(1) if match else None
 
-def _read_version_from_init(init_path: Path) -> str | None:
-    content = init_path.read_text(encoding="utf-8")
-    match = re.search(r'^__version__\\s*=\\s*\"([^\"]+)\"', content, re.MULTILINE)
-    return match.group(1) if match else None
-
 def _read_asset_version(index_path: Path) -> str | None:
     content = index_path.read_text(encoding="utf-8")
     match = re.search(r'ACTIFIX_ASSET_VERSION\\s*=\\s*\"([^\"]+)\"', content)
     return match.group(1) if match else None
 
+def _read_ui_version(app_path: Path) -> str | None:
+    content = app_path.read_text(encoding="utf-8")
+    # Support either quote style, allow whitespace, and avoid being overly strict.
+    match = re.search(r"\\bconst\\s+UI_VERSION\\s*=\\s*['\\\"]([^'\\\"]+)['\\\"]\\s*;", content)
+    return match.group(1) if match else None
+
+
+def _run_frontend_sync() -> bool:
+    """Attempt to sync frontend version constants to pyproject.toml."""
+    result = subprocess.run(
+        [sys.executable, str(REPO_ROOT / "scripts" / "build_frontend.py")],
+        cwd=str(REPO_ROOT),
+    )
+    return result.returncode == 0
+
+
+def _stage_frontend_version_files() -> None:
+    """Stage the version-controlled frontend files that must match pyproject.toml."""
+    paths = [
+        REPO_ROOT / "actifix-frontend" / "index.html",
+        REPO_ROOT / "actifix-frontend" / "app.js",
+    ]
+    existing = [str(p) for p in paths if p.exists()]
+    if existing:
+        subprocess.run(["git", "add", *existing], cwd=str(REPO_ROOT))
+
+
+def scan_secrets_in_staged_files() -> bool:
+    """Run the Actifix secrets scanner against staged files (abort commit on leaks)."""
+    try:
+        sys.path.insert(0, str(REPO_ROOT / "src"))
+        from actifix.security import scan_git_staged_files, format_scan_results
+
+        matches = scan_git_staged_files()
+        if matches:
+            print("✗ Secrets detected in staged files!")
+            print(format_scan_results(matches))
+            return False
+        print("✓ No secrets detected")
+        return True
+    except Exception as exc:
+        # Don't silently allow potential leaks.
+        print(f"✗ Secrets scan failed: {exc}")
+        return False
+
+
 def check_version_consistency() -> bool:
     """Ensure project versions are consistent before commit."""
-    repo_root = Path(__file__).resolve().parents[1]
-    pyproject = repo_root / "pyproject.toml"
-    init_file = repo_root / "src" / "actifix" / "__init__.py"
-    frontend_index = repo_root / "actifix-frontend" / "index.html"
+    pyproject = REPO_ROOT / "pyproject.toml"
+    frontend_index = REPO_ROOT / "actifix-frontend" / "index.html"
+    frontend_app = REPO_ROOT / "actifix-frontend" / "app.js"
 
-    if not pyproject.exists() or not init_file.exists():
+    if not pyproject.exists():
         return True
 
     pyproject_version = _read_version_from_pyproject(pyproject)
-    init_version = _read_version_from_init(init_file)
     asset_version = _read_asset_version(frontend_index) if frontend_index.exists() else None
+    ui_version = _read_ui_version(frontend_app) if frontend_app.exists() else None
 
     mismatches = []
     if not pyproject_version:
         mismatches.append("pyproject.toml version missing")
-    if not init_version:
-        mismatches.append("src/actifix/__init__.py __version__ missing")
-    if pyproject_version and init_version and pyproject_version != init_version:
-        mismatches.append(f"pyproject.toml ({pyproject_version}) != __init__.py ({init_version})")
+    if frontend_app.exists() and not ui_version:
+        mismatches.append("actifix-frontend/app.js UI_VERSION missing")
     if asset_version and pyproject_version and asset_version != pyproject_version:
         mismatches.append(f"actifix-frontend/index.html ({asset_version}) != pyproject.toml ({pyproject_version})")
+    if ui_version and pyproject_version and ui_version != pyproject_version:
+        mismatches.append(f"actifix-frontend/app.js ({ui_version}) != pyproject.toml ({pyproject_version})")
 
     if mismatches:
         print("✗ Version mismatch detected:")
         for issue in mismatches:
             print(f"  - {issue}")
-        return False
+        print("→ Attempting automatic frontend version sync...")
+        if not _run_frontend_sync():
+            print("✗ Frontend sync failed")
+            return False
+        _stage_frontend_version_files()
+        # Re-check after sync/staging.
+        return check_version_consistency()
 
     print("✓ Version consistency check passed")
     return True
@@ -144,6 +192,10 @@ def main():
     if not staged_files or staged_files == [""]:
         print("✓ No staged files - skipping pre-commit tests")
         return 0
+
+    print("→ Scanning for leaked secrets...")
+    if not scan_secrets_in_staged_files():
+        return 1
 
     if not check_version_consistency():
         return 1
