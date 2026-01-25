@@ -22,6 +22,7 @@ Always follow the actifix rules.
 Always commit after every ticket and push.
 Never reinvent the wheel, check if a system is already in the codebase. Use that. 
 Be reluctant to make new scripts or entire new systems unless you've checked for existing code.
+10. **Screenscan is mandatory**: `modules.screenscan` must remain **always-on**. Do not disable it via module CLI/statuses. Changes must keep screenscan health + tests green (ring-buffer retention + worker thread liveness). If screen capture is unsupported (headless/permissions), the module must still stay up and report degraded with actionable remediation, and errors must be recorded via Raise_AF (deduped) plus AgentVoice (best-effort) without ever persisting image bytes into tickets/logs.
 
 ```bash
 # Commit convention

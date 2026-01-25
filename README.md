@@ -12,6 +12,15 @@ Actifix captures, prioritizes, and deduplicates production errors. Tickets inclu
 - AI-ready tickets: stack traces, file context, system state, remediation notes.
 - Self-development mode: the framework can ticket its own regressions.
 - Durable persistence: atomic writes, fallback queues, and database-first storage.
+- Always-on context: the `modules.screenscan` module keeps a last-minute screenshot ring buffer for debugging UI/app behavior.
+
+## Screenscan module (mandatory)
+`modules.screenscan` is a **critical, always-on** module. It captures screenshots **2x per second** (configurable), stores them in an **optimized SQLite ring-buffer table**, and retains **only the last minute** of frames (no unbounded growth). Performance is critical: capture+persist runs in a **worker thread** and must never block API request handling.
+
+Enforcement:
+- System health **must** include `modules.screenscan` and will be treated as degraded/failed when screenscan is not running (unless explicitly allowed for headless/test).
+- The module must be covered by tests (ring-buffer correctness + worker lifecycle) and must stay green.
+- Screenshots are sensitive: do not write image bytes into logs, AgentVoice, or Raise_AF ticket context.
 
 ## Quickstart
 1. Clone and enter the repo:
@@ -34,6 +43,7 @@ Actifix captures, prioritizes, and deduplicates production errors. Tickets inclu
    ```bash
    python3 -m actifix.main health
    ```
+   Verify that `modules.screenscan` is present in the output.
 5. Read the docs index for deeper guides:
    ```text
    docs/INDEX.md
