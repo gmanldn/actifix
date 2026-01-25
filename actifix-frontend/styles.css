@@ -284,6 +284,11 @@ body {
   border-color: var(--accent);
 }
 
+.nav-rail-item.system-item {
+  font-size: 24px;
+  font-weight: 700;
+}
+
 /* MAIN CONTENT */
 .dashboard {
   min-height: 100vh;
@@ -307,7 +312,7 @@ body {
 
 /* MODERN METRIC TILES */
 .metric-tile {
-  background: var(--bg-panel);
+  background: transparent;
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   padding: var(--spacing-md);
@@ -377,7 +382,7 @@ body {
 
 /* MODERN PANELS */
 .panel {
-  background: rgba(18, 18, 18, 0.9);
+  background: transparent;
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   padding: var(--spacing-lg);
@@ -416,7 +421,7 @@ body {
 
 /* SETTINGS */
 .settings-panel {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(12, 12, 12, 0.95));
+  background: transparent;
   border-radius: var(--radius-md);
   border: 1px solid rgba(255, 255, 255, 0.1);
   padding: var(--spacing-md);
@@ -445,7 +450,7 @@ body {
 }
 
 .settings-card {
-  background: rgba(13, 13, 13, 0.95);
+  background: transparent;
   border-radius: var(--radius-md);
   border: 1px solid rgba(255, 255, 255, 0.08);
   padding: var(--spacing-md);
@@ -482,7 +487,7 @@ body {
   padding: 8px 10px;
   border-radius: var(--radius-md);
   border: 1px solid var(--border);
-  background: rgba(18, 18, 18, 0.95);
+  background: transparent;
   color: var(--text-primary);
   font-size: 12px;
 }
@@ -604,7 +609,7 @@ body {
   padding: 10px;
   border-radius: var(--radius-md);
   border: 1px solid var(--border);
-  background: rgba(10, 10, 10, 0.95);
+  background: transparent;
   color: var(--text-muted);
   font-family: 'IBM Plex Mono', monospace;
   font-size: 11px;
@@ -703,7 +708,7 @@ body {
   color: var(--text-dim);
   border-radius: var(--radius-md);
   border: 1px dashed rgba(255, 255, 255, 0.15);
-  background: rgba(12, 12, 12, 0.8);
+  background: transparent;
   font-size: 11px;
 }
 
@@ -715,7 +720,7 @@ body {
 }
 
 .ticket-item {
-  background: rgba(18, 18, 18, 0.8);
+  background: transparent;
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   padding: var(--spacing-md);
@@ -791,7 +796,7 @@ body {
 
 /* PRIORITY LANES */
 .tickets-board {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(10, 10, 10, 0.4));
+  background: transparent;
 }
 
 .tickets-live {
@@ -830,7 +835,7 @@ body {
 
 .priority-lane {
   --lane-accent: #6b7280;
-  background: rgba(14, 14, 14, 0.85);
+  background: transparent;
   border-radius: var(--radius-lg);
   border: 1px solid var(--border);
   padding: var(--spacing-md);
@@ -907,7 +912,7 @@ body {
   text-align: center;
   font-size: 12px;
   color: var(--text-dim);
-  background: rgba(15, 23, 42, 0.6);
+  background: transparent;
   border-radius: var(--radius-md);
   border: 1px dashed rgba(255, 255, 255, 0.08);
 }
@@ -915,7 +920,7 @@ body {
 .ticket-card {
   position: relative;
   z-index: 1;
-  background: rgba(12, 12, 12, 0.92);
+  background: transparent;
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-left: 3px solid var(--lane-accent);
   border-radius: var(--radius-md);
@@ -961,6 +966,55 @@ body {
   gap: var(--spacing-sm);
   font-size: 10px;
   color: var(--text-dim);
+}
+
+.ticket-card-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-xs);
+  padding-top: var(--spacing-xs);
+  border-top: 1px dashed rgba(255, 255, 255, 0.08);
+}
+
+.fix-ticket-btn {
+  padding: 4px 10px;
+  background: var(--accent);
+  color: #0b0b0b;
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.fix-ticket-btn:hover {
+  background: #ffffff;
+  border-color: #ffffff;
+}
+
+.fix-ticket-btn.working {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.fix-ticket-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.fix-status-badge {
+  font-size: 9px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: var(--text-primary);
+  font-family: 'IBM Plex Mono', monospace;
 }
 
 .lane-completed {
@@ -1037,7 +1091,7 @@ body {
 
 .log-filter {
   padding: 6px 12px;
-  background: rgba(18, 18, 18, 0.9);
+  background: transparent;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   color: var(--text-primary);
@@ -1051,7 +1105,7 @@ body {
 }
 
 .log-container {
-  background: var(--bg-secondary);
+  background: transparent;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   padding: var(--spacing-md);
@@ -1145,7 +1199,7 @@ body {
 }
 
 .stat-card {
-  background: var(--bg-panel);
+  background: transparent;
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   padding: var(--spacing-lg);
@@ -1189,6 +1243,116 @@ body {
   color: var(--text-dim);
   opacity: 0.6;
   z-index: 50;
+}
+
+.pokertool-panel {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: transparent;
+  margin-top: var(--spacing-lg);
+}
+
+.poker-section {
+  padding: var(--spacing-lg) var(--spacing-xl);
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.poker-section:first-of-type {
+  border-top: none;
+}
+
+.poker-subheader {
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.poker-detection-row {
+  display: flex;
+  gap: var(--spacing-md);
+  flex-wrap: wrap;
+}
+
+.poker-detection-card {
+  flex: 1;
+  min-width: 150px;
+  padding: var(--spacing-md);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-md);
+  background: transparent;
+}
+
+.poker-detection-stream {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: var(--spacing-sm);
+}
+
+.poker-detection-item {
+  padding: var(--spacing-sm);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  font-size: 12px;
+}
+
+.poker-detection-item-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: var(--spacing-xs);
+  color: var(--text-muted);
+}
+
+.poker-solver-grid,
+.poker-ml-grid {
+  display: grid;
+  gap: var(--spacing-md);
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.poker-solver-card,
+.poker-ml-card {
+  padding: var(--spacing-md);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-md);
+  background: transparent;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.poker-input {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-sm);
+  padding: var(--spacing-sm);
+  color: var(--text-primary);
+  font-family: 'IBM Plex Mono', monospace;
+}
+
+.poker-input:focus {
+  outline: 1px solid var(--accent);
+}
+
+.poker-error {
+  color: #f87171;
+  font-size: 11px;
+}
+
+.poker-result {
+  font-size: 13px;
+  color: #6ee7b7;
+}
+
+.poker-tag {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  text-transform: uppercase;
+  border: 1px solid rgba(255, 255, 255, 0.3);
 }
 
 /* BUTTONS */
@@ -1325,6 +1489,245 @@ body {
   white-space: nowrap;
 }
 
+/* Quiz Styles */
+.quiz-categories {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--spacing-md);
+  padding: var(--spacing-md);
+}
+
+.quiz-category-card {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-lg);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  min-height: 140px;
+  justify-content: center;
+}
+
+.quiz-category-card:hover {
+  background: var(--bg-panel-hover);
+  border-color: var(--border-hover);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-sm);
+}
+
+.quiz-category-icon {
+  font-size: 32px;
+  margin-bottom: var(--spacing-xs);
+}
+
+.quiz-category-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.quiz-category-desc {
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.quiz-progress {
+  height: 4px;
+  background: var(--bg-panel);
+  border-radius: 2px;
+  overflow: hidden;
+  margin: var(--spacing-md);
+  margin-top: 0;
+}
+
+.quiz-progress-bar {
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.3s ease;
+}
+
+.quiz-question {
+  padding: var(--spacing-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+}
+
+.quiz-question-text {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.5;
+}
+
+.quiz-options {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.quiz-option {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-md);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  gap: var(--spacing-md);
+  align-items: flex-start;
+}
+
+.quiz-option:hover {
+  background: var(--bg-panel-hover);
+  border-color: var(--border-hover);
+}
+
+.quiz-option.selected {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+.quiz-option.correct {
+  background: rgba(16, 185, 129, 0.1);
+  border-color: #10b981;
+  color: #10b981;
+}
+
+.quiz-option.incorrect {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: #ef4444;
+  color: #ef4444;
+}
+
+.quiz-option-letter {
+  font-family: 'IBM Plex Mono', monospace;
+  font-weight: 600;
+  font-size: 14px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--bg-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+.quiz-option.selected .quiz-option-letter,
+.quiz-option.correct .quiz-option-letter,
+.quiz-option.incorrect .quiz-option-letter {
+  background: currentColor;
+  color: var(--bg-secondary);
+}
+
+.quiz-option-text {
+  flex: 1;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.quiz-explanation {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.quiz-explanation-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+
+.quiz-explanation-text {
+  font-size: 13px;
+  color: var(--text-primary);
+  line-height: 1.5;
+}
+
+.quiz-actions {
+  display: flex;
+  gap: var(--spacing-md);
+  justify-content: flex-end;
+}
+
+.quiz-result {
+  padding: var(--spacing-xl);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xl);
+  align-items: center;
+  text-align: center;
+}
+
+.quiz-result-score {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.quiz-result-percentage {
+  font-size: 48px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.quiz-result-text {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.quiz-result-details {
+  display: flex;
+  gap: var(--spacing-lg);
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.quiz-result-stat {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-md) var(--spacing-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  min-width: 120px;
+}
+
+.quiz-result-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+
+.quiz-result-value {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.quiz-result-actions {
+  display: flex;
+  gap: var(--spacing-md);
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
 /* Azure Light Theme */
 [data-theme="azure"] {
   --bg-primary: #f0f8ff;
@@ -1351,4 +1754,230 @@ body {
 
 [data-theme="azure"] body {
   background: linear-gradient(135deg, #f0f8ff 0%, #e0f2fe 50%, #f0f8ff 100%);
+}
+
+/* LOGIN VIEW STYLES */
+.login-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background: inherit;
+  width: 100%;
+}
+
+.login-card {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-xl);
+  width: 100%;
+  max-width: 380px;
+  box-shadow: var(--shadow-md);
+}
+
+.login-header {
+  text-align: center;
+  margin-bottom: var(--spacing-lg);
+}
+
+.login-logo {
+  width: 64px;
+  height: 64px;
+  margin-bottom: var(--spacing-md);
+  opacity: 0.9;
+}
+
+.login-header h1 {
+  font-size: 28px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: var(--spacing-sm);
+  letter-spacing: 2px;
+}
+
+.login-subtitle {
+  color: var(--text-muted);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.form-group label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.login-input {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  font-size: 13px;
+  color: var(--text-primary);
+  font-family: inherit;
+  transition: all var(--transition);
+}
+
+.login-input:focus {
+  outline: none;
+  border-color: var(--border-hover);
+  background: var(--bg-panel-hover);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.login-input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.login-error {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: var(--radius-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  color: #ef4444;
+  font-size: 12px;
+}
+
+.login-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  margin-top: var(--spacing-md);
+}
+
+.login-actions .btn {
+  padding: 10px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--transition);
+  border: none;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+  color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.login-help {
+  color: var(--text-muted);
+  font-size: 12px;
+  text-align: center;
+  margin: 0;
+}
+
+/* =====================================================================
+ * Portal Light Theme – Azure‑inspired (added by apply_portal_theme.sh)
+ *
+ * This theme transforms the existing dark UI into a clean and modern
+ * interface reminiscent of the Microsoft Azure portal. Colours are
+ * light and neutral with a bold azure accent, panels are white with
+ * subtle shadows, and the header and navigation are clearly defined.
+ */
+
+[data-theme="portal"] {
+  /* Base colours */
+  --bg-primary: #f5f5f5;          /* page background */
+  --bg-secondary: #ffffff;        /* panels and nav rail */
+  --bg-panel: #ffffff;            /* metric tiles */
+  --bg-panel-hover: #f0f8ff;      /* hover state for tiles */
+  --accent: #0078d4;              /* primary azure accent */
+  --accent-soft: rgba(0, 120, 212, 0.1); /* subtle accent for hovers */
+  --accent-muted: #0a62a4;        /* darker accent for borders/indicators */
+  --text-primary: #0f1a2d;        /* dark text */
+  --text-muted: #4b5563;          /* medium text */
+  --text-dim: #6b7280;            /* dim text */
+  --border: rgba(0, 0, 0, 0.08);  /* light borders */
+  --border-hover: rgba(0, 0, 0, 0.15);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.07);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+/* Override the body background and font for the portal theme. Without
+ * this override the default dashboard uses a dark radial gradient. We
+ * choose a simple light gradient and use Segoe UI to mirror Azure’s
+ * typographic choices. */
+[data-theme="portal"] body {
+  background: linear-gradient(180deg, #f5f5f5 0%, #ffffff 100%);
+  font-family: 'Segoe UI', Tahoma, sans-serif;
+}
+
+/* Header adopts the accent colour and white text */
+[data-theme="portal"] .dashboard-header {
+  background: var(--accent);
+  color: #ffffff;
+  border-bottom: none;
+}
+[data-theme="portal"] .dashboard-header .header-title h1,
+[data-theme="portal"] .dashboard-header .header-subtitle,
+[data-theme="portal"] .dashboard-header .header-time,
+[data-theme="portal"] .dashboard-header .connection-status {
+  color: #ffffff;
+}
+[data-theme="portal"] .connection-status {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+/* Navigation rail is white with azure highlights */
+[data-theme="portal"] .nav-rail {
+  background: var(--bg-secondary);
+  border-right: 1px solid #d0d7de;
+}
+[data-theme="portal"] .nav-rail-item {
+  color: #4b5563;
+}
+[data-theme="portal"] .nav-rail-item:hover {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+[data-theme="portal"] .nav-rail-item.active {
+  background: var(--accent);
+  color: #ffffff;
+}
+
+/* Tiles adopt a white background with subtle shadows */
+[data-theme="portal"] .metric-tile {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Buttons use the accent colour with white text */
+[data-theme="portal"] .fix-button {
+  background: var(--accent);
+  color: #ffffff;
+}
+[data-theme="portal"] .fix-button:hover {
+  background: #005ea2; /* darker azure on hover */
 }

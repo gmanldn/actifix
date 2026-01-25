@@ -16,6 +16,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional, List, Dict
 
+import yaml
+
 try:
     from flask import Flask, jsonify, request, g
     from flask_cors import CORS
@@ -25,25 +27,33 @@ except ImportError:
     Flask = None
     CORS = None
 
+try:
+    from flask_socketio import SocketIO, emit
+    SOCKETIO_AVAILABLE = True
+except ImportError:
+    SOCKETIO_AVAILABLE = False
+    SocketIO = None
+    emit = None
+
 
 def _ensure_web_dependencies() -> bool:
     """
     Ensure Flask dependencies are installed. Auto-install if missing.
-    
+
     Returns:
         True if dependencies are available, False otherwise.
     """
-    global FLASK_AVAILABLE, Flask, CORS
+    global FLASK_AVAILABLE, SOCKETIO_AVAILABLE, Flask, CORS, SocketIO, emit
 
-    if FLASK_AVAILABLE:
+    if FLASK_AVAILABLE and SOCKETIO_AVAILABLE:
         return True
 
     print("Flask dependencies not found. Installing...")
-    print("Running: pip install flask flask-cors")
+    print("Running: pip install flask flask-cors flask-socketio")
 
     try:
         result = subprocess.run(
-            [sys.executable, "-m", "pip", "install", "flask", "flask-cors"],
+            [sys.executable, "-m", "pip", "install", "flask", "flask-cors", "flask-socketio"],
             capture_output=True,
             text=True,
             check=True,
@@ -51,7 +61,9 @@ def _ensure_web_dependencies() -> bool:
         print("✓ Successfully installed Flask dependencies")
         from flask import Flask, jsonify, request
         from flask_cors import CORS
+        from flask_socketio import SocketIO, emit
         FLASK_AVAILABLE = True
+        SOCKETIO_AVAILABLE = True
         return True
     except subprocess.CalledProcessError as e:
         print(f"✗ Failed to install Flask dependencies: {e}")
@@ -94,6 +106,31 @@ from .modules.registry import (
 # Server start time for uptime calculation
 SERVER_START_TIME = time.time()
 SYSTEM_OWNERS = {"runtime", "infra", "core", "persistence", "testing", "tooling"}
+
+# Global SocketIO instance for real-time updates
+_socketio_instance: Optional["SocketIO"] = None
+
+
+def get_socketio() -> Optional["SocketIO"]:
+    """Get the global SocketIO instance."""
+    return _socketio_instance
+
+
+def emit_ticket_event(event_type: str, ticket_data: dict) -> None:
+    """
+    Emit a ticket event to all connected WebSocket clients.
+
+    Args:
+        event_type: Type of event ('ticket_created', 'ticket_updated', 'ticket_completed', 'ticket_deleted')
+        ticket_data: Ticket data to broadcast
+    """
+    socketio = get_socketio()
+    if socketio is None:
+        return
+    try:
+        socketio.emit(event_type, ticket_data, namespace="/tickets")
+    except Exception:
+        pass  # Silently ignore WebSocket errors
 MODULE_STATUS_SCHEMA_VERSION = "module-statuses.v1"
 MODULE_ACCESS_PUBLIC = "public"
 MODULE_ACCESS_LOCAL_ONLY = "local-only"
@@ -134,6 +171,31 @@ def _parse_module_rate_limit_overrides(raw: str) -> dict[str, dict[str, int]]:
             "calls_per_day": int(value.get("calls_per_day", 0) or 0),
         }
     return overrides
+
+
+def _parse_map_dependencies(project_root: Path) -> set[tuple[str, str]]:
+    """Parse MAP.yaml to build module dependency edges as a fallback."""
+    map_path = project_root / "docs" / "architecture" / "MAP.yaml"
+    if not map_path.exists():
+        return set()
+    try:
+        data = yaml.safe_load(map_path.read_text(encoding="utf-8"))
+        modules = data.get("modules", []) if isinstance(data, dict) else []
+        edges = set()
+        for module in modules:
+            module_id = module.get("id")
+            if not module_id:
+                continue
+            for dep in module.get("depends_on", []):
+                edges.add((module_id, dep))
+        return edges
+    except Exception as exc:
+        record_error(
+            message=f"Failed to parse MAP.yaml for dependencies: {exc}",
+            source="api.py:_parse_map_dependencies",
+            priority=TicketPriority.P2,
+        )
+        return set()
 
 
 def _load_module_metadata(create_blueprint) -> tuple[Optional[str], Optional[dict], Optional[object]]:
@@ -191,7 +253,7 @@ def _load_depgraph_edges(project_root: Path) -> set[tuple[str, str]]:
             source="api.py:_load_depgraph_edges",
             priority=TicketPriority.P2,
         )
-        return set()
+        return _parse_map_dependencies(project_root)
     try:
         data = json.loads(depgraph_path.read_text(encoding="utf-8"))
         edges = data.get("edges", []) if isinstance(data, dict) else []
@@ -202,7 +264,7 @@ def _load_depgraph_edges(project_root: Path) -> set[tuple[str, str]]:
             source="api.py:_load_depgraph_edges",
             priority=TicketPriority.P2,
         )
-        return set()
+        return _parse_map_dependencies(project_root)
 
 
 def _validate_module_dependencies(
@@ -214,6 +276,10 @@ def _validate_module_dependencies(
         return []
     if not isinstance(dependencies, list):
         return ["dependencies_invalid"]
+    if not depgraph_edges:
+        # If we cannot validate against the canonical dependency graph, treat this as
+        # a validation failure. Otherwise modules can silently bypass edge checks.
+        return [f"missing_edges: {sorted([str(dep) for dep in dependencies])}"]
     module_id = f"modules.{module_name}"
     missing = [dep for dep in dependencies if (module_id, dep) not in depgraph_edges]
     if missing:
@@ -279,10 +345,10 @@ def _register_module_blueprint(
             return False
 
         dependencies = getattr(module, "MODULE_DEPENDENCIES", [])
-        dependency_errors = (
-            _validate_module_dependencies(module_name, dependencies, depgraph_edges)
-            if depgraph_edges
-            else []
+        dependency_errors = _validate_module_dependencies(
+            module_name,
+            dependencies,
+            depgraph_edges,
         )
         if dependency_errors:
             record_error(
@@ -376,13 +442,55 @@ def _extract_bearer_token(req) -> Optional[str]:
 def _verify_auth_token(token: str) -> bool:
     try:
         from actifix.security.auth import get_token_manager, get_user_manager
+        token_manager = get_token_manager()
+        user_manager = get_user_manager()
+        user_id = token_manager.verify_token(token)
+        if not user_id:
+            return False
+        user = user_manager.get_user(user_id)
+        return user is not None and user.is_active
     except Exception as exc:
         record_error(
-            message=f"Failed to load auth managers: {exc}",
+            message=f"Auth token verification failed: {exc}",
             source="api.py:_verify_auth_token",
             priority=TicketPriority.P2,
         )
         return False
+
+
+def _verify_admin_password(password: str) -> bool:
+    """Verify X-Admin-Password header against admin user."""
+    try:
+        from actifix.security.auth import get_user_manager
+        user_manager = get_user_manager()
+        # Try to authenticate as admin user with the password
+        user_id = user_manager.authenticate_user('admin', password)
+        return user_id is not None
+    except Exception:
+        return False
+
+
+def _auth_credentials_valid(req, allow_local: bool = True) -> bool:
+    """Check if request has valid admin password or token (local option)."""
+    admin_password = req.headers.get("X-Admin-Password", "")
+    if admin_password and _verify_admin_password(admin_password):
+        return True
+    if allow_local and _is_local_request(req):
+        return True
+    token = _extract_bearer_token(req)
+    if token and _verify_auth_token(token):
+        return True
+    return False
+
+
+def _check_auth(req) -> bool:
+    """Check if request is authenticated via Authorization header or X-Admin-Password."""
+    return _auth_credentials_valid(req, allow_local=True)
+
+
+def _require_auth(req) -> bool:
+    """Require credentials (no local bypass)."""
+    return _auth_credentials_valid(req, allow_local=False)
 
 
 def _fetch_module_health(app, module_name: str, timeout_sec: float = 2.0) -> dict:
@@ -444,22 +552,6 @@ def _fetch_module_health(app, module_name: str, timeout_sec: float = 2.0) -> dic
         "response": payload,
     }
 
-    try:
-        token_manager = get_token_manager()
-        user_manager = get_user_manager()
-        user_id = token_manager.verify_token(token)
-        if not user_id:
-            return False
-        user = user_manager.get_user(user_id)
-        return user is not None and user.is_active
-    except Exception as exc:
-        record_error(
-            message=f"Auth token verification failed: {exc}",
-            source="api.py:_verify_auth_token",
-            priority=TicketPriority.P2,
-        )
-        return False
-
 
 def _is_system_domain(domain: Optional[str]) -> bool:
     """Decide whether a module belongs to the system catalog."""
@@ -475,8 +567,73 @@ def _is_system_domain(domain: Optional[str]) -> bool:
     }
 
 
+def _parse_modules_markdown(markdown_path: Path) -> List[Dict[str, str]]:
+    """Parse MODULES.md for module metadata fallback when DEPGRAPH is missing."""
+    if not markdown_path.exists():
+        return []
+
+    lines = [line.rstrip("\n") for line in markdown_path.read_text(encoding="utf-8").splitlines()]
+    current_domain = ""
+    modules: List[Dict[str, str]] = []
+    current_module: Dict[str, str] | None = None
+
+    def _finalize_module():
+        nonlocal current_module
+        if current_module:
+            modules.append(current_module)
+            current_module = None
+
+    def _start_module(name: str):
+        nonlocal current_module
+        if current_module:
+            modules.append(current_module)
+        current_module = {
+            "name": name.strip(),
+            "domain": current_domain,
+            "owner": "",
+            "summary": "",
+        }
+
+    def _peek_next_nonempty(start: int) -> str:
+        for j in range(start + 1, len(lines)):
+            if lines[j].strip():
+                return lines[j].strip()
+        return ""
+
+    for idx, raw_line in enumerate(lines):
+        line = raw_line.strip()
+        if not line:
+            continue
+
+        if line.startswith("## "):
+            next_line = _peek_next_nonempty(idx)
+            if next_line.startswith("**Domain:**"):
+                _start_module(line[3:].strip())
+            else:
+                current_domain = line[3:].strip().lower()
+        elif line.startswith("### "):
+            _start_module(line[4:].strip())
+        elif line.startswith("**Domain:**"):
+            value = line.split(":", 1)[1].strip().lower()
+            if current_module:
+                current_module["domain"] = value
+            else:
+                current_domain = value
+        elif line.startswith("**Owner:**"):
+            value = line.split(":", 1)[1].strip()
+            if current_module:
+                current_module["owner"] = value
+        elif line.startswith("**Summary:**") or line.startswith("- Summary:"):
+            value = line.split(":", 1)[1].strip()
+            if current_module:
+                current_module["summary"] = value
+
+    _finalize_module()
+    return modules
+
+
 def _load_modules(project_root: Path) -> Dict[str, List[Dict[str, str]]]:
-    """Load modules from canonical DEPGRAPH.json."""
+    """Load modules from canonical DEPGRAPH.json or MODULES.md fallback."""
     from actifix.state_paths import get_actifix_paths
     paths = get_actifix_paths(project_root=project_root)
     status_file = paths.state_dir / "module_statuses.json"
@@ -484,37 +641,47 @@ def _load_modules(project_root: Path) -> Dict[str, List[Dict[str, str]]]:
     status_payload = _read_module_status_payload(status_file)
     statuses = status_payload["statuses"]
 
-    def get_status(name):
+    def get_status(name: str) -> str:
         if name in statuses.get("disabled", []):
             return "disabled"
         if name in statuses.get("error", []):
             return "error"
         return "active"
-    
-    depgraph_path = project_root / "docs" / "architecture" / "DEPGRAPH.json"
-    if not depgraph_path.exists():
-        return {"system": [], "user": []}
 
-    try:
-        data = json.loads(depgraph_path.read_text(encoding="utf-8"))
-        nodes = data.get("nodes", [])
-    except Exception:
-        return {"system": [], "user": []}
+    depgraph_path = project_root / "docs" / "architecture" / "DEPGRAPH.json"
+    modules_data: List[Dict[str, str]] = []
+
+    if depgraph_path.exists():
+        try:
+            data = json.loads(depgraph_path.read_text(encoding="utf-8"))
+            nodes = data.get("nodes", [])
+            for node in nodes:
+                module_id = node["id"]
+                modules_data.append({
+                    "name": module_id,
+                    "domain": node.get("domain", ""),
+                    "owner": node.get("owner", ""),
+                    "summary": node.get("label", node["id"]),
+                    "status": get_status(module_id)
+                })
+        except Exception:
+            modules_data = []
+
+    if not modules_data:
+        fallback_modules = _parse_modules_markdown(project_root / "docs" / "architecture" / "MODULES.md")
+        for module in fallback_modules:
+            module_id = module["name"]
+            modules_data.append({
+                "name": module_id,
+                "domain": module.get("domain", ""),
+                "owner": module.get("owner", ""),
+                "summary": module.get("summary", module_id),
+                "status": get_status(module_id),
+            })
 
     system_domains = {"runtime", "infra", "core", "tooling", "security", "plugins", "persistence"}
-    modules = []
-    for node in nodes:
-        module_id = node["id"]
-        modules.append({
-            "name": module_id,
-            "domain": node.get("domain", ""),
-            "owner": node.get("owner", ""),
-            "summary": node.get("label", node["id"]),
-            "status": get_status(module_id)
-        })
-
-    system_modules = [m for m in modules if m["domain"] in system_domains]
-    user_modules = [m for m in modules if m["domain"] not in system_domains]
+    system_modules = [m for m in modules_data if m["domain"].lower() in system_domains]
+    user_modules = [m for m in modules_data if m["domain"].lower() not in system_domains]
     return {"system": system_modules, "user": user_modules}
 
 
@@ -712,7 +879,31 @@ def create_app(
     werkzeug_logger = logging.getLogger('werkzeug')
     werkzeug_logger.setLevel(logging.ERROR)
     CORS(app)  # Enable CORS for frontend
-    
+
+    # Initialize SocketIO for real-time WebSocket updates
+    global _socketio_instance
+    socketio = None
+    if SOCKETIO_AVAILABLE:
+        from flask_socketio import SocketIO
+        socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
+        _socketio_instance = socketio
+        app.extensions["socketio"] = socketio
+
+        @socketio.on("connect", namespace="/tickets")
+        def handle_ticket_connect():
+            """Handle client connection to tickets namespace."""
+            pass
+
+        @socketio.on("disconnect", namespace="/tickets")
+        def handle_ticket_disconnect():
+            """Handle client disconnection from tickets namespace."""
+            pass
+
+        @socketio.on("subscribe", namespace="/tickets")
+        def handle_subscribe(data):
+            """Handle subscription to specific ticket updates."""
+            pass
+
     # Store project root and API binding info in app config
     app.config['PROJECT_ROOT'] = root
     app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0  # Disable static file caching in development
@@ -779,6 +970,36 @@ def create_app(
             priority=TicketPriority.P2,
         )
 
+    _create_shootymcshoot_blueprint = None
+    _shootymcshoot_access_rule = MODULE_ACCESS_PUBLIC
+    try:
+        _, shootymcshoot_module, _ = module_registry.import_module("shootymcshoot")
+        _create_shootymcshoot_blueprint = getattr(shootymcshoot_module, "create_blueprint", None)
+        _shootymcshoot_access_rule = getattr(shootymcshoot_module, "ACCESS_RULE", MODULE_ACCESS_PUBLIC)
+    except ImportError:
+        pass
+    except Exception as exc:
+        record_error(
+            message=f"Failed to import shootymcshoot module: {exc}",
+            source="api.py:module_loader",
+            priority=TicketPriority.P2,
+        )
+
+    _create_hollogram_blueprint = None
+    _hollogram_access_rule = MODULE_ACCESS_LOCAL_ONLY
+    try:
+        _, hollogram_module, _ = module_registry.import_module("hollogram")
+        _create_hollogram_blueprint = getattr(hollogram_module, "create_blueprint", None)
+        _hollogram_access_rule = getattr(hollogram_module, "ACCESS_RULE", MODULE_ACCESS_LOCAL_ONLY)
+    except ImportError:
+        pass
+    except Exception as exc:
+        record_error(
+            message=f"Failed to import hollogram module: {exc}",
+            source="api.py:module_loader",
+            priority=TicketPriority.P2,
+        )
+
     if _create_yhatzee_blueprint:
         _register_module_blueprint(
             app,
@@ -811,6 +1032,38 @@ def create_app(
             registry=module_registry,
         )
 
+    if _create_shootymcshoot_blueprint:
+        _register_module_blueprint(
+            app,
+            "shootymcshoot",
+            _create_shootymcshoot_blueprint,
+            project_root=root,
+            host=host,
+            port=port,
+            status_file=status_file,
+            access_rule=_shootymcshoot_access_rule,
+            register_access=_register_module_access,
+            register_rate_limit=_register_module_rate_limit,
+            depgraph_edges=depgraph_edges,
+            registry=module_registry,
+        )
+
+    if _create_hollogram_blueprint:
+        _register_module_blueprint(
+            app,
+            "hollogram",
+            _create_hollogram_blueprint,
+            project_root=root,
+            host=host,
+            port=port,
+            status_file=status_file,
+            access_rule=_hollogram_access_rule,
+            register_access=_register_module_access,
+            register_rate_limit=_register_module_rate_limit,
+            depgraph_edges=depgraph_edges,
+            registry=module_registry,
+        )
+
     @app.before_request
     def _enforce_module_access():
         path = request.path or ""
@@ -828,11 +1081,8 @@ def create_app(
                 return None
             return jsonify({"error": "Module access restricted to local requests"}), 403
         if access_rule == MODULE_ACCESS_AUTH_REQUIRED:
-            token = _extract_bearer_token(request)
-            if not token:
+            if not _auth_credentials_valid(request, allow_local=False):
                 return jsonify({"error": "Authorization required"}), 401
-            if not _verify_auth_token(token):
-                return jsonify({"error": "Invalid token"}), 401
             return None
         return jsonify({"error": "Unsupported module access rule"}), 403
 
@@ -868,6 +1118,37 @@ def create_app(
             rate_limiter.record_call(provider, success=success, error=None if success else response.status)
         return response
 
+    @app.after_request
+    def _add_security_headers(response):
+        """Add security headers including Content Security Policy."""
+        # Content Security Policy - restricts sources for scripts, styles, etc.
+        # Allow self for API and frontend assets
+        csp = {
+            "default-src": "'self'",
+            "script-src": "'self' 'unsafe-inline'",  # Needed for inline scripts in frontend
+            "style-src": "'self' 'unsafe-inline'",   # Needed for inline styles in frontend
+            "img-src": "'self' data: https:",
+            "connect-src": "'self' ws: wss:",  # Allow WebSocket connections
+            "font-src": "'self'",
+            "object-src": "'none'",
+            "base-uri": "'self'",
+            "form-action": "'self'",
+        }
+        
+        # Convert CSP dict to header string
+        csp_header = "; ".join([f"{k} {v}" for k, v in csp.items()])
+        
+        response.headers["Content-Security-Policy"] = csp_header
+        
+        # Additional security headers
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
+        
+        return response
+
     @app.route('/', methods=['GET'])
     def serve_index():
         """Serve the dashboard frontend."""
@@ -881,6 +1162,10 @@ def create_app(
     @app.route('/api/health', methods=['GET'])
     def api_health():
         """Get comprehensive health check data."""
+        # Check authentication
+        if not _check_auth(request):
+            return jsonify({'error': 'Authorization required'}), 401
+        
         paths = get_actifix_paths(project_root=app.config['PROJECT_ROOT'])
         
         # Health summary
@@ -948,6 +1233,10 @@ def create_app(
     @app.route('/api/version', methods=['GET'])
     def api_version():
         """Return version metadata and git status for the dashboard."""
+        # Check authentication
+        if not _check_auth(request):
+            return jsonify({'error': 'Authorization required'}), 401
+        
         root = Path(app.config['PROJECT_ROOT'])
         info = _gather_version_info(root)
         return jsonify(info)
@@ -955,6 +1244,10 @@ def create_app(
     @app.route('/api/stats', methods=['GET'])
     def api_stats():
         """Get ticket statistics."""
+        # Check authentication
+        if not _check_auth(request):
+            return jsonify({'error': 'Authorization required'}), 401
+        
         paths = get_actifix_paths(project_root=app.config['PROJECT_ROOT'])
         stats = get_ticket_stats(paths)
         breaches = check_sla_breaches(paths)
@@ -970,6 +1263,10 @@ def create_app(
     @app.route('/api/tickets', methods=['GET'])
     def api_tickets():
         """Get recent tickets list."""
+        # Check authentication
+        if not _check_auth(request):
+            return jsonify({'error': 'Authorization required'}), 401
+        
         paths = get_actifix_paths(project_root=app.config['PROJECT_ROOT'])
         limit = request.args.get('limit', 20, type=int)
 
@@ -1009,6 +1306,10 @@ def create_app(
     @app.route('/api/ticket/<ticket_id>', methods=['GET'])
     def api_ticket(ticket_id):
         """Get full ticket details by ID."""
+        # Check authentication
+        if not _check_auth(request):
+            return jsonify({'error': 'Authorization required'}), 401
+        
         paths = get_actifix_paths(project_root=app.config['PROJECT_ROOT'])
         from .persistence.ticket_repo import get_ticket_repository
         repo = get_ticket_repository()
@@ -1020,6 +1321,10 @@ def create_app(
     @app.route('/api/fix-ticket', methods=['POST'])
     def api_fix_ticket():
         """Fix the highest priority open ticket with detailed logging."""
+        # Require authentication (no local bypass for mutations)
+        if not _require_auth(request):
+            return jsonify({'error': 'Authorization required (admin password)'}), 401
+        
         paths = get_actifix_paths(project_root=app.config['PROJECT_ROOT'])
 
         # Enforce Raise_AF-only policy before modifying tickets
@@ -1042,6 +1347,15 @@ def create_app(
             summary=summary,
             test_documentation_url=test_documentation_url
         )
+
+        # Emit WebSocket event for ticket completion
+        if result.get('processed') and result.get('ticket_id'):
+            emit_ticket_event('ticket_completed', {
+                'ticket_id': result.get('ticket_id'),
+                'priority': result.get('priority'),
+                'timestamp': datetime.now(timezone.utc).isoformat(),
+            })
+
         return jsonify({
             'processed': result.get('processed', False),
             'ticket_id': result.get('ticket_id'),
@@ -1237,12 +1551,20 @@ def create_app(
     @app.route('/api/modules', methods=['GET'])
     def api_modules():
         """List system/user modules from architecture catalog."""
+        # Check authentication
+        if not _check_auth(request):
+            return jsonify({'error': 'Authorization required'}), 401
+        
         modules = _load_modules(app.config['PROJECT_ROOT'])
         return jsonify(modules)
 
     @app.route('/api/modules/<module_id>/health', methods=['GET'])
     def api_module_health(module_id):
         """Aggregate module health and status."""
+        # Check authentication
+        if not _check_auth(request):
+            return jsonify({'error': 'Authorization required'}), 401
+        
         module_name = module_id.split(".", 1)[1] if module_id.startswith("modules.") else module_id
         paths = get_actifix_paths(project_root=app.config['PROJECT_ROOT'])
         status_payload = _read_module_status_payload(paths.state_dir / "module_statuses.json")
@@ -1262,6 +1584,10 @@ def create_app(
     @app.route('/api/modules/<module_id>', methods=['POST'])
     def api_toggle_module(module_id):
         """Toggle module status (enable/disable)."""
+        # Require authentication (no local bypass for mutations)
+        if not _require_auth(request):
+            return jsonify({'error': 'Authorization required (admin password)'}), 401
+        
         from actifix.state_paths import get_actifix_paths
 
         paths = get_actifix_paths(project_root=app.config['PROJECT_ROOT'])
@@ -1300,14 +1626,42 @@ def create_app(
     @app.route('/api/ping', methods=['GET'])
     def api_ping():
         """Simple ping endpoint for connectivity check."""
+        # Check authentication
+        if not _check_auth(request):
+            return jsonify({'error': 'Authorization required'}), 401
+
         return jsonify({
             'status': 'ok',
+            'timestamp': datetime.now(timezone.utc).isoformat(),
+        })
+
+    @app.route('/api/websocket/status', methods=['GET'])
+    def api_websocket_status():
+        """Return WebSocket availability and connection info."""
+        # Check authentication
+        if not _check_auth(request):
+            return jsonify({'error': 'Authorization required'}), 401
+
+        ws_available = socketio is not None
+        return jsonify({
+            'available': ws_available,
+            'namespace': '/tickets' if ws_available else None,
+            'events': {
+                'ticket_created': 'Emitted when a new ticket is created',
+                'ticket_updated': 'Emitted when a ticket is updated',
+                'ticket_completed': 'Emitted when a ticket is marked complete',
+                'ticket_deleted': 'Emitted when a ticket is deleted',
+            } if ws_available else {},
             'timestamp': datetime.now(timezone.utc).isoformat(),
         })
 
     @app.route('/api/ai-status', methods=['GET'])
     def api_ai_status():
         """Return AI provider status, defaults, and recent feedback."""
+        # Check authentication
+        if not _check_auth(request):
+            return jsonify({'error': 'Authorization required'}), 401
+        
         try:
             config = load_config(fail_fast=False)
             selection = resolve_provider_selection(config.ai_provider, config.ai_model)
@@ -1333,6 +1687,10 @@ def create_app(
     @app.route('/api/settings', methods=['GET'])
     def api_get_settings():
         """Get current AI settings (API key is masked for security)."""
+        # Check authentication
+        if not _check_auth(request):
+            return jsonify({'error': 'Authorization required'}), 401
+        
         config = load_config(fail_fast=False)
 
         api_key = config.ai_api_key
@@ -1353,6 +1711,10 @@ def create_app(
     @app.route('/api/settings', methods=['POST'])
     def api_update_settings():
         """Update AI settings."""
+        # Require authentication (no local bypass for mutations)
+        if not _require_auth(request):
+            return jsonify({'error': 'Authorization required (admin password)'}), 401
+        
         try:
             data = request.get_json()
 
@@ -1394,6 +1756,10 @@ def create_app(
     @app.route('/api/ideas', methods=['POST'])
     def api_ideas():
         """Process user idea into AI-enriched ticket."""
+        # Require authentication (no local bypass for mutations)
+        if not _require_auth(request):
+            return jsonify({'error': 'Authorization required (admin password)'}), 401
+        
         try:
             data = request.get_json()
             idea = data.get('idea', '').strip()
@@ -1443,6 +1809,14 @@ def create_app(
 
             preview = ai_notes[:150] + '...' if len(ai_notes) > 150 else ai_notes
 
+            # Emit WebSocket event for ticket creation
+            emit_ticket_event('ticket_created', {
+                'ticket_id': entry.entry_id,
+                'priority': entry.priority.value,
+                'message': idea[:100],
+                'timestamp': datetime.now(timezone.utc).isoformat(),
+            })
+
             return jsonify({
                 'success': True,
                 'ticket_id': entry.entry_id,
@@ -1461,6 +1835,10 @@ def create_app(
     @app.route('/api/cleanup', methods=['POST'])
     def api_cleanup():
         """Run ticket cleanup with retention policies."""
+        # Require authentication (no local bypass for mutations)
+        if not _require_auth(request):
+            return jsonify({'error': 'Authorization required (admin password)'}), 401
+        
         try:
             data = request.get_json() or {}
 
@@ -1494,6 +1872,10 @@ def create_app(
     @app.route('/api/cleanup/config', methods=['GET'])
     def api_cleanup_config():
         """Get cleanup configuration."""
+        # Check authentication
+        if not _check_auth(request):
+            return jsonify({'error': 'Authorization required'}), 401
+        
         try:
             config = get_cleanup_config()
             return jsonify({
@@ -1504,6 +1886,121 @@ def create_app(
             return jsonify({
                 'error': str(e)
             }), 500
+
+    @app.route('/api/auth/login', methods=['POST'])
+    def api_auth_login():
+        """Authenticate user and return token."""
+        try:
+            data = request.get_json()
+            if not data:
+                return jsonify({'error': 'No data provided'}), 400
+            
+            username = data.get('username', '').strip()
+            password = data.get('password', '')
+            
+            if not username or not password:
+                return jsonify({'error': 'Username and password required'}), 400
+            
+            from actifix.security.auth import get_user_manager
+            user_manager = get_user_manager()
+            
+            try:
+                user, token = user_manager.authenticate_user(username, password)
+                return jsonify({
+                    'success': True,
+                    'token': token,
+                    'user': {
+                        'user_id': user.user_id,
+                        'username': user.username,
+                        'roles': [r.value for r in user.roles],
+                        'is_active': user.is_active
+                    }
+                })
+            except Exception as auth_error:
+                return jsonify({'error': str(auth_error)}), 401
+        except Exception as e:
+            record_error(
+                message=f"Login failed: {e}",
+                source="api.py:api_auth_login",
+                priority=TicketPriority.P2,
+            )
+            return jsonify({'error': str(e)}), 500
+
+    @app.route('/api/auth/create-first-user', methods=['POST'])
+    def api_auth_create_first_user():
+        """Create first admin user if no users exist."""
+        try:
+            data = request.get_json()
+            if not data:
+                return jsonify({'error': 'No data provided'}), 400
+            
+            username = data.get('username', '').strip()
+            password = data.get('password', '')
+            
+            if not username or not password:
+                return jsonify({'error': 'Username and password required'}), 400
+            
+            from actifix.security.auth import get_user_manager, AuthRole
+            user_manager = get_user_manager()
+            
+            # Check if any users exist
+            try:
+                # Try to get any user to check if database exists
+                # This is a simplified check - in production you'd query the database
+                test_user = user_manager.get_user('admin')
+                if test_user:
+                    return jsonify({'error': 'Admin user already exists'}), 409
+            except:
+                pass  # No users exist yet
+            
+            # Create first admin user
+            try:
+                user = user_manager.create_user(
+                    user_id='admin',
+                    username=username,
+                    password=password,
+                    roles={AuthRole.ADMIN}
+                )
+                
+                # Generate token
+                from actifix.security.auth import get_token_manager
+                token_manager = get_token_manager()
+                _, token = token_manager.create_token(user.user_id)
+                
+                return jsonify({
+                    'success': True,
+                    'message': 'First admin user created successfully',
+                    'token': token,
+                    'user': {
+                        'user_id': user.user_id,
+                        'username': user.username,
+                        'roles': [r.value for r in user.roles],
+                        'is_active': user.is_active
+                    }
+                })
+            except Exception as create_error:
+                return jsonify({'error': f'Failed to create user: {create_error}'}), 500
+        except Exception as e:
+            record_error(
+                message=f"Create first user failed: {e}",
+                source="api.py:api_auth_create_first_user",
+                priority=TicketPriority.P2,
+            )
+            return jsonify({'error': str(e)}), 500
+
+
+    @app.route('/api/auth/verify-password', methods=['POST'])
+    def api_auth_verify_password():
+        """Test admin password validity."""
+        data = request.get_json() or {}
+        password = data.get('password', '')
+        if not password:
+            return jsonify({'valid': False, 'error': 'Password required'}), 400
+        
+        if _verify_admin_password(password):
+            return jsonify({'valid': True})
+        else:
+            return jsonify({'valid': False, 'error': 'Invalid password'}), 401
 
     return app
 
@@ -1516,7 +2013,7 @@ def run_api_server(
 ) -> None:
     """
     Run the API server.
-    
+
     Args:
         host: Host to bind to.
         port: Port to bind to.
@@ -1525,8 +2022,12 @@ def run_api_server(
     """
     app = create_app(project_root, host=host, port=port)
     registry = app.extensions.get("actifix_module_registry")
+    socketio = app.extensions.get("socketio")
     try:
-        app.run(host=host, port=port, debug=debug, threaded=True)
+        if socketio is not None:
+            socketio.run(app, host=host, port=port, debug=debug)
+        else:
+            app.run(host=host, port=port, debug=debug, threaded=True)
     finally:
         if isinstance(registry, ModuleRegistry):
             registry.shutdown()

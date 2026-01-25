@@ -1,6 +1,7 @@
 Metadata-Version: 2.4
 Name: actifix
-Version: 4.0.51
+Version: 5.0.64
+Requires-Dist: gitignore_parser>=0.1.3
 Provides-Extra: web
 Requires-Dist: flask; extra == "web"
 Requires-Dist: flask-cors; extra == "web"

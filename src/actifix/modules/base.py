@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import os
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -86,6 +87,8 @@ class ModuleBase:
 
     def health_response(self) -> dict[str, object]:
         """Default health route helper."""
+        if os.environ.get("ACTIFIX_MODULE_HEALTH_MINIMAL") == "1":
+            return {"status": "ok"}
         return {
             "status": "ok",
             "module": self.module_key,

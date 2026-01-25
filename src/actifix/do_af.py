@@ -450,6 +450,11 @@ def process_next_ticket(
         use_ai = False
     elif os.getenv("PYTEST_CURRENT_TEST") and os.getenv("ACTIFIX_ENABLE_AI_TESTS") != "1":
         use_ai = False
+    
+    # Check if AI is enabled in config
+    config = get_config()
+    if not config.ai_enabled:
+        use_ai = False
 
     locked = _select_and_lock_ticket(paths)
     if not locked:
@@ -470,6 +475,7 @@ def process_next_ticket(
         extra={"priority": ticket.priority}
     )
 
+    release_lock = True
     try:
         if use_ai and not ai_handler:
             try:
@@ -549,6 +555,7 @@ def process_next_ticket(
                         ticket_id=ticket.ticket_id,
                         extra={"error": ai_response.error}
                     )
+                    return None
 
             except Exception as e:
                 log_event(
@@ -557,6 +564,7 @@ def process_next_ticket(
                     ticket_id=ticket.ticket_id,
                     extra={"error": str(e)},
                 )
+                return None
         if ai_handler:
             try:
                 success = ai_handler(ticket)
@@ -584,8 +592,9 @@ def process_next_ticket(
                     ticket_id=ticket.ticket_id,
                     extra={"error": str(e)}
                 )
+                return None
 
-        return ticket
+        return None
     finally:
         if release_lock:
             repo.release_lock(ticket.ticket_id, lock_owner)

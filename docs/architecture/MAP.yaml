@@ -1,6 +1,6 @@
 schema_version: arch-map.v1
 meta:
-  generated_at: "2026-01-16T04:05:00.000000+00:00"
+  generated_at: "2026-01-20T18:08:36.934780+00:00"
   generator: update_architecture_docs.py
   generator_version: 2.0.0
   source_commit: current_development
@@ -10,6 +10,7 @@ meta:
   - Keep aligned with quality gates and architecture compliance
   - Auto-generated - includes persistence and testing subsystems
   - Run record-error simple ticket attack to generate 500 tickets
+  - Synced persistence/core/module entrypoints with current Python layout (base/config/dev_assistant/pokertool core/etc.)
 domains:
 - id: runtime
   summary: Bootstrap, configuration, state management, lifecycle
@@ -33,6 +34,7 @@ modules:
   entrypoints:
   - src/actifix/main.py
   - src/actifix/bootstrap.py
+  - src/actifix/thread_cleanup.py
   contracts:
   - ensures environment setup
   - launches core services in correct order
@@ -242,47 +244,20 @@ modules:
   owner: persistence
   summary: SQLite database backend with connection pooling and schema management
   entrypoints:
-  - src/actifix/persistence/database/__init__.py
+  - src/actifix/persistence/database.py
   contracts:
   - thread-safe connection pooling
   - automatic schema migrations
   - WAL mode for concurrency
   depends_on:
   - infra.logging
-  - infra.persistence.database.schema
-  - infra.persistence.database.pool
 
-- id: infra.persistence.database.schema
-  domain: infra
-  owner: persistence
-  summary: Database schema definitions, migrations, and table creation
-  entrypoints:
-  - src/actifix/persistence/database/schema.py
-  contracts:
-  - define database schema
-  - manage migrations
-  - create tables
-  depends_on:
-  - infra.logging
-
-- id: infra.persistence.database.pool
-  domain: infra
-  owner: persistence
-  summary: Connection pooling and thread-safe database access
-  entrypoints:
-  - src/actifix/persistence/database/pool.py
-  contracts:
-  - thread-safe connection pooling
-  - connection lifecycle management
-  - WAL mode configuration
-  depends_on:
-  - infra.logging
 - id: infra.persistence.ticket_repo
   domain: infra
   owner: persistence
   summary: Ticket repository with CRUD operations and locking
   entrypoints:
-  - src/actifix/persistence/ticket_repo/__init__.py
+  - src/actifix/persistence/ticket_repo.py
   contracts:
   - database CRUD for tickets
   - lease-based locking
@@ -290,41 +265,14 @@ modules:
   depends_on:
   - infra.logging
   - infra.persistence.database
-  - infra.persistence.ticket_repo.queries
-  - infra.persistence.ticket_repo.locking
   - core.raise_af
 
-- id: infra.persistence.ticket_repo.queries
-  domain: infra
-  owner: persistence
-  summary: SQL query builders and search operations for tickets
-  entrypoints:
-  - src/actifix/persistence/ticket_repo/queries.py
-  contracts:
-  - build SQL queries for ticket operations
-  - search tickets by criteria
-  - retrieve tickets by ID
-  depends_on:
-  - infra.logging
-
-- id: infra.persistence.ticket_repo.locking
-  domain: infra
-  owner: persistence
-  summary: Lease-based locking mechanism for concurrent ticket processing
-  entrypoints:
-  - src/actifix/persistence/ticket_repo/locking.py
-  contracts:
-  - claim tickets with lease
-  - release ticket locks
-  - extend lease duration
-  depends_on:
-  - infra.logging
 - id: core.raise_af
   domain: core
   owner: core
   summary: Error capture and ticket creation system (persists entries into the SQLite ticket repository)
   entrypoints:
-  - src/actifix/raise_af/__init__.py
+  - src/actifix/raise_af.py
   contracts:
   - capture all errors
   - create structured tickets persisted in `data/actifix.db`
@@ -334,67 +282,13 @@ modules:
   - core.quarantine
   - infra.persistence.ticket_repo
   - security.ticket_throttler
-  - core.raise_af.models
-  - core.raise_af.context
-  - core.raise_af.dedup
-  - core.raise_af.fallback
 
-- id: core.raise_af.models
-  domain: core
-  owner: core
-  summary: Data models for error capture (TicketPriority, ActifixEntry)
-  entrypoints:
-  - src/actifix/raise_af/models.py
-  contracts:
-  - define ticket priority levels
-  - define entry data structures
-  depends_on:
-  - infra.logging
-
-- id: core.raise_af.context
-  domain: core
-  owner: core
-  summary: Context capture utilities (stack trace, file context, system state)
-  entrypoints:
-  - src/actifix/raise_af/context.py
-  contracts:
-  - capture stack traces
-  - capture file context
-  - capture system state
-  depends_on:
-  - infra.logging
-
-- id: core.raise_af.dedup
-  domain: core
-  owner: core
-  summary: Duplicate detection and normalization utilities
-  entrypoints:
-  - src/actifix/raise_af/dedup.py
-  contracts:
-  - generate duplicate guards
-  - normalize text for comparison
-  - prevent duplicate tickets
-  depends_on:
-  - infra.logging
-
-- id: core.raise_af.fallback
-  domain: core
-  owner: core
-  summary: Fallback queue management for error persistence
-  entrypoints:
-  - src/actifix/raise_af/fallback.py
-  contracts:
-  - queue errors to fallback storage
-  - replay fallback queue on recovery
-  depends_on:
-  - infra.logging
-  - runtime.state
 - id: core.do_af
   domain: core
   owner: core
   summary: Ticket processing and automated remediation
   entrypoints:
-  - src/actifix/do_af/__init__.py
+  - src/actifix/do_af.py
   contracts:
   - process tickets systematically
   - integrate with AI systems
@@ -404,54 +298,7 @@ modules:
   - core.raise_af
   - core.ai_client
   - infra.persistence.ticket_repo
-  - core.do_af.manager
-  - core.do_af.processing
-  - core.do_af.cli
 
-- id: core.do_af.manager
-  domain: core
-  owner: core
-  summary: Stateful ticket manager with caching
-  entrypoints:
-  - src/actifix/do_af/manager.py
-  contracts:
-  - manage ticket cache state
-  - refresh ticket cache
-  - get open/completed tickets
-  depends_on:
-  - infra.logging
-  - infra.persistence.ticket_repo
-
-- id: core.do_af.processing
-  domain: core
-  owner: core
-  summary: Ticket processing and automated remediation logic
-  entrypoints:
-  - src/actifix/do_af/processing.py
-  contracts:
-  - process tickets systematically
-  - fix highest priority tickets
-  - validate fixes
-  depends_on:
-  - infra.logging
-  - core.raise_af
-  - core.ai_client
-  - infra.persistence.ticket_repo
-
-- id: core.do_af.cli
-  domain: core
-  owner: core
-  summary: CLI interface for ticket processing
-  entrypoints:
-  - src/actifix/do_af/cli.py
-  contracts:
-  - parse CLI arguments
-  - execute ticket processing commands
-  - display ticket information
-  depends_on:
-  - infra.logging
-  - core.do_af.manager
-  - core.do_af.processing
 - id: core.quarantine
   domain: core
   owner: core
@@ -537,7 +384,7 @@ modules:
   owner: core
   summary: Multi-provider AI integration with automatic fallback chain
   entrypoints:
-  - src/actifix/ai_client/__init__.py
+  - src/actifix/ai_client.py
   contracts:
   - Claude Code local auth detection
   - Claude API integration
@@ -550,51 +397,7 @@ modules:
   - runtime.config
   - infra.logging
   - runtime.state
-  - core.ai_client.models
-  - core.ai_client.providers
-  - core.ai_client.prompts
 
-- id: core.ai_client.models
-  domain: core
-  owner: core
-  summary: AI client data models (AIProvider, AIResponse, ProviderSelection)
-  entrypoints:
-  - src/actifix/ai_client/models.py
-  contracts:
-  - define AI provider enum
-  - define AI response structure
-  - define provider selection logic
-  depends_on:
-  - infra.logging
-
-- id: core.ai_client.providers
-  domain: core
-  owner: core
-  summary: Provider-specific AI integration implementations
-  entrypoints:
-  - src/actifix/ai_client/providers.py
-  contracts:
-  - Claude Code local integration
-  - Claude API integration
-  - OpenAI integration
-  - Ollama integration
-  - OpenRouter integration
-  - Free alternative integration
-  depends_on:
-  - infra.logging
-  - core.ai_client.models
-
-- id: core.ai_client.prompts
-  domain: core
-  owner: core
-  summary: AI prompt templates and construction
-  entrypoints:
-  - src/actifix/ai_client/prompts.py
-  contracts:
-  - build fix prompts
-  - manage prompt templates
-  depends_on:
-  - infra.logging
 - id: core.error_taxonomy
   domain: core
   owner: core
@@ -837,6 +640,32 @@ modules:
   depends_on:
   - infra.logging
   - core.raise_af
+- id: modules.base
+  domain: modules
+  owner: modules
+  summary: Shared module utilities for logging, config overrides, and error capture
+  entrypoints:
+  - src/actifix/modules/base.py
+  contracts:
+  - centralize ModuleBase helpers for logging, health, and error capture
+  - expose shared helpers for module config and state access
+  depends_on:
+  - modules.config
+  - infra.logging
+  - core.raise_af
+  - runtime.state
+- id: modules.config
+  domain: modules
+  owner: modules
+  summary: Module configuration helpers and override parsing
+  entrypoints:
+  - src/actifix/modules/config.py
+  contracts:
+  - parse ACTIFIX_MODULE_CONFIG_OVERRIDES payloads
+  - merge runtime config with module defaults and report parse errors
+  depends_on:
+  - runtime.config
+  - core.raise_af
 - id: modules.superquiz
   domain: modules
   owner: modules
@@ -847,40 +676,14 @@ modules:
   - expose the SuperQuiz GUI at /modules/superquiz on the runtime API server
   - support 1 to 6 players with category selection and random mode
   - use Actifix logging and error capture interfaces from the shared runtime
+  - ensure the launcher starts the module via scripts/start.py, including dependency checks and a /health probe on the configured host/port
   depends_on:
   - runtime.state
   - infra.logging
   - core.raise_af
   - runtime.api
-  - modules.superquiz.game
-  - modules.superquiz.routes
+  - modules.pokertool.core
 
-- id: modules.superquiz.game
-  domain: modules
-  owner: modules
-  summary: SuperQuiz game logic, scoring, and question handling
-  entrypoints:
-  - src/actifix/modules/superquiz/game.py
-  contracts:
-  - manage game state and logic
-  - handle scoring and questions
-  - support 1 to 6 players
-  depends_on:
-  - infra.logging
-
-- id: modules.superquiz.routes
-  domain: modules
-  owner: modules
-  summary: SuperQuiz Flask route handlers
-  entrypoints:
-  - src/actifix/modules/superquiz/routes.py
-  contracts:
-  - handle HTTP requests for SuperQuiz
-  - serve quiz interface
-  - manage player sessions
-  depends_on:
-  - infra.logging
-  - modules.superquiz.game
 
 - id: modules.yhatzee
   domain: modules
@@ -896,35 +699,146 @@ modules:
   - infra.logging
   - core.raise_af
   - runtime.api
-  - modules.yhatzee.game
-  - modules.yhatzee.routes
 
-- id: modules.yhatzee.game
+- id: modules.pokertool
   domain: modules
   owner: modules
-  summary: Yhatzee game logic, dice, and scoring
+  summary: Planned PokerTool integration exposing analysis, detection, and health endpoints
   entrypoints:
-  - src/actifix/modules/yhatzee/game.py
+  - src/actifix/modules/pokertool/__init__.py
   contracts:
-  - manage game state and logic
-  - handle dice rolls and scoring
-  - support two-player mode
+  - provide health and analysis stub endpoints under /modules/pokertool
+  - log module lifecycle events using centralized logging and RaiseAF helpers
+  - act as the future landing surface for PokerTool real-time analysis and detection systems
   depends_on:
+  - runtime.state
   - infra.logging
+  - core.raise_af
+  - runtime.api
 
-- id: modules.yhatzee.routes
+- id: modules.pokertool.core
   domain: modules
   owner: modules
-  summary: Yhatzee Flask route handlers
+  summary: PokerTool analysis heuristics used by the module GUI and HTTP handlers
   entrypoints:
-  - src/actifix/modules/yhatzee/routes.py
+  - src/actifix/modules/pokertool/core.py
   contracts:
-  - handle HTTP requests for Yhatzee
-  - serve game interface
-  - manage player sessions
+  - evaluate hands and boards for strength and provide structured metadata
+  - expose helper routines consumed by the PokerTool blueprint
+  depends_on: []
+
+- id: modules.pokertool.detector
+  domain: modules
+  owner: modules
+  summary: Mock detector service that streams table state updates via the Pokertool API
+  entrypoints:
+  - src/actifix/modules/pokertool/detector.py
+  contracts:
+  - emit sequential mock detection updates and confidence metadata
+  - expose start/stop controls and stream readiness for `/api/detect/stream`
   depends_on:
+  - runtime.state
   - infra.logging
-  - modules.yhatzee.game
+  - core.raise_af
+
+- id: modules.pokertool.solvers
+  domain: modules
+  owner: modules
+  summary: Solver heuristics for Nash/ICM guidance in the PokerTool port
+  entrypoints:
+  - src/actifix/modules/pokertool/solvers.py
+  contracts:
+  - provide Nash-equilibrium and ICM heuristics
+  - log solver failures through RaiseAF helpers
+  depends_on:
+  - runtime.state
+  - infra.logging
+  - core.raise_af
+
+- id: modules.pokertool.ml
+  domain: modules
+  owner: modules
+  summary: Machine-learning helpers for opponent profiling and active learning
+  entrypoints:
+  - src/actifix/modules/pokertool/ml.py
+  contracts:
+  - produce opponent profiles based on historical actions
+  - deliver active learning hints for model improvement
+  depends_on:
+  - runtime.state
+  - infra.logging
+  - core.raise_af
+
+
+- id: modules.dev_assistant
+  domain: modules
+  owner: modules
+  summary: Local Ollama-backed coding assistant exposed through /modules/dev-assistant
+  entrypoints:
+  - src/actifix/modules/dev_assistant/__init__.py
+  contracts:
+  - provide health and chat routes that proxy prompts to a local Ollama model
+  - log module errors through ModuleBase and RaiseAF helpers
+  depends_on:
+  - modules.base
+  - modules.config
+  - runtime.state
+  - infra.logging
+  - core.raise_af
+  - runtime.api
+
+
+- id: modules.artclass
+  domain: modules
+  owner: modules
+  summary: Art teaching module with interactive React-based GUI
+  entrypoints:
+  - src/actifix/modules/artclass/__init__.py
+  contracts:
+  - expose the ArtClass GUI at /modules/artclass on the runtime API server
+  - provide interactive art instruction interface
+  - use Actifix logging and error capture interfaces from the shared runtime
+  depends_on:
+  - runtime.state
+  - infra.logging
+  - core.raise_af
+  - runtime.api
+
+- id: modules.hollogram
+  domain: modules
+  owner: modules
+  summary: AI-powered medical research assistant with disclaimer, research, and history endpoints
+  entrypoints:
+  - src/actifix/modules/hollogram/__init__.py
+  contracts:
+  - expose /health, /disclaimer, /topics, /research, /history, and /history/<id> routes under /modules/hollogram
+  - log lifecycle metadata and errors through ModuleBase helpers and raise_af tickets
+  - keep research history in state-backed storage and enforce the local-only access rule
+  depends_on:
+  - runtime.state
+  - infra.logging
+  - core.raise_af
+  - runtime.api
+  - core.ai_client
+  - modules.base
+  - modules.config
+
+- id: modules.shootymcshoot
+  domain: modules
+  owner: modules
+  summary: ShootyMcShoot React hello world holding page on localhost:8040
+  entrypoints:
+    - src/actifix/modules/shootymcshoot/__init__.py
+  contracts:
+    - expose ShootyMcShoot GUI at /modules/shootymcshoot on the runtime API server
+    - React-powered holding page with health endpoint
+    - uses ModuleBase for logging/error capture
+  depends_on:
+    - runtime.state
+    - infra.logging
+    - core.raise_af
+    - runtime.api
+
 contracts:
 - id: contract.logging
   summary: All modules must log via centralized logging system with correlation IDs

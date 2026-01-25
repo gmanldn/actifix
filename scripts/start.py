@@ -29,6 +29,7 @@ import threading
 import time
 import webbrowser
 import signal
+import platform
 import atexit
 from pathlib import Path
 from typing import Optional
@@ -51,15 +52,23 @@ FRONTEND_DIR = ROOT / "actifix-frontend"
 DEFAULT_FRONTEND_PORT = 8080
 DEFAULT_API_PORT = 5001
 DEFAULT_YHATZEE_PORT = 8090
+DEFAULT_SUPERQUIZ_PORT = 8070
+DEFAULT_SHOOTY_PORT = 8040
+DEFAULT_POKERTOOL_PORT = 8060
 VERSION_LINE_RE = re.compile(r'^version\s*=\s*["\'](?P<version>[^"\']+)["\']', re.MULTILINE)
+
 
 # Global singleton instances - only one of each can exist
 _API_SERVER_INSTANCE: Optional[threading.Thread] = None
 _API_SERVER_LOCK = threading.Lock()
 _YHATZEE_SERVER_INSTANCE: Optional[threading.Thread] = None
 _YHATZEE_SERVER_LOCK = threading.Lock()
+_SUPERQUIZ_SERVER_INSTANCE: Optional[threading.Thread] = None
+_SUPERQUIZ_SERVER_LOCK = threading.Lock()
 _FRONTEND_MANAGER_INSTANCE: Optional['FrontendManager'] = None
 _FRONTEND_LOCK = threading.Lock()
+_POKERTOOL_THREAD: Optional[threading.Thread] = None
+_POKERTOOL_LOCK = threading.Lock()
 
 # ANSI Color codes for terminal output
 class Color:
@@ -205,22 +214,46 @@ def is_port_in_use(port: int) -> bool:
 def start_frontend(port: int) -> subprocess.Popen:
     """Launch the static frontend server."""
     cmd = [sys.executable, "-m", "http.server", str(port)]
-    return subprocess.Popen(cmd, cwd=FRONTEND_DIR, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    serve_dir = FRONTEND_DIR / "dist" if (FRONTEND_DIR / "dist").exists() else FRONTEND_DIR
+    return subprocess.Popen(cmd, cwd=serve_dir, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 def kill_processes_on_port(port: int) -> None:
     """Terminate any processes listening on the given TCP port."""
-    try:
-        result = subprocess.run(["lsof", "-ti", f"tcp:{port}"], capture_output=True, text=True)
-        pids = [pid for pid in result.stdout.splitlines() if pid.strip()]
-        if pids:
-            log_warning(f"Found {len(pids)} stale process(es) on port {port}")
-        for pid in pids:
-            if pid.isdigit():
-                log_info(f"Terminating process {pid}...")
-                os.kill(int(pid), signal.SIGTERM)
-                log_success(f"Terminated process {pid}")
-    except Exception as e:
-        log_error(f"Failed to kill processes on port {port}: {e}")
+    system = platform.system()
+    pids = []
+    if system == "Windows":
+        try:
+            ps_cmd = f'Get-NetTCPConnection -LocalPort {port} -State Listen | Select-Object -ExpandProperty OwningProcess'
+            output = subprocess.check_output(["powershell.exe", "-Command", ps_cmd], text=True, stderr=subprocess.STDOUT, timeout=10)
+            pids = [line.strip() for line in output.splitlines() if line.strip().isdigit()]
+        except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired) as e:
+            log_warning(f"Windows port query for port {port} failed: {e}")
+            return
+    else:
+        try:
+            result = subprocess.run(["lsof", "-tiTCP:{}".format(port)], capture_output=True, text=True, timeout=10)
+            pids = [pid.strip() for pid in result.stdout.splitlines() if pid.strip()]
+        except (FileNotFoundError, subprocess.TimeoutExpired, subprocess.CalledProcessError) as e:
+            log_warning(f"Unix port query for port {port} failed: {e}")
+            return
+    if not pids:
+        return
+    log_warning(f"Found {len(pids)} stale process(es) on port {port}")
+    killed = 0
+    for pid_str in pids:
+        try:
+            if system == "Windows":
+                subprocess.check_output(["taskkill", "/F", "/PID", pid_str], stderr=subprocess.STDOUT, timeout=10)
+                log_info(f"Terminated Windows PID {pid_str}")
+            else:
+                pid = int(pid_str)
+                os.kill(pid, signal.SIGTERM)
+                log_info(f"Signaled Unix PID {pid}")
+            killed += 1
+        except Exception as e:
+            log_warning(f"Failed to terminate PID {pid_str}: {e}")
+    if killed > 0:
+        log_success(f"Terminated {killed} process(es)")
 
 
 def cleanup_existing_instances() -> None:
@@ -277,7 +310,14 @@ def cleanup_existing_instances() -> None:
         pass
 
     # Kill any http.server processes on our ports
-    for port in [DEFAULT_FRONTEND_PORT, DEFAULT_API_PORT, DEFAULT_YHATZEE_PORT]:
+    for port in [
+        DEFAULT_FRONTEND_PORT,
+        DEFAULT_API_PORT,
+        DEFAULT_YHATZEE_PORT,
+        DEFAULT_SUPERQUIZ_PORT,
+        DEFAULT_SHOOTY_PORT,
+        DEFAULT_POKERTOOL_PORT,
+    ]:
         if is_port_in_use(port):
             log_warning(f"Port {port} is in use")
             kill_processes_on_port(port)
@@ -353,15 +393,132 @@ def start_yhatzee_server(port: int, project_root: Path, host: str = "127.0.0.1")
             except Exception as exc:
                 log_error(f"Yhatzee GUI server error: {exc}")
 
+    thread = threading.Thread(target=run_server, daemon=True)
+    thread.start()
+    _YHATZEE_SERVER_INSTANCE = thread
+    time.sleep(0.3)
+    log_success(f"Yhatzee GUI server running at http://{host}:{port}")
+    return thread
+
+
+def _wait_for_superquiz_health(host: str, port: int, timeout: float = 5.0) -> bool:
+    """Probe the SuperQuiz health endpoint to ensure the GUI started cleanly."""
+    from urllib.request import urlopen
+
+    url = f"http://{host}:{port}/health"
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        try:
+            with urlopen(url, timeout=1.0) as response:
+                if response.status == 200:
+                    return True
+        except Exception:
+            time.sleep(0.3)
+    return False
+
+
+def start_superquiz_server(port: int, project_root: Path, host: str = "127.0.0.1") -> threading.Thread:
+    """Launch the SuperQuiz GUI server and verify its dependencies."""
+    global _SUPERQUIZ_SERVER_INSTANCE
+
+    with _SUPERQUIZ_SERVER_LOCK:
+        if _SUPERQUIZ_SERVER_INSTANCE is not None and _SUPERQUIZ_SERVER_INSTANCE.is_alive():
+            log_warning("SuperQuiz server already running - refusing to start duplicate instance")
+            return _SUPERQUIZ_SERVER_INSTANCE
+
+        log_info(f"Starting SuperQuiz GUI server on {host}:{port}...")
+
+        try:
+            from actifix.modules.superquiz import run_gui
+        except ImportError as exc:
+            log_error("SuperQuiz module requires Flask (install via pip install -e '.[web]')")
+            raise exc
+
+        def run_server():
+            try:
+                run_gui(host=host, port=port, project_root=project_root, debug=False)
+            except Exception as exc:
+                log_error(f"SuperQuiz GUI server error: {exc}")
+
         thread = threading.Thread(target=run_server, daemon=True)
         thread.start()
-        _YHATZEE_SERVER_INSTANCE = thread
+        _SUPERQUIZ_SERVER_INSTANCE = thread
         time.sleep(0.3)
-        log_success(f"Yhatzee GUI server running at http://{host}:{port}")
+
+        if not _wait_for_superquiz_health(host, port):
+            message = "SuperQuiz GUI failed to respond on /health (check Flask/dependencies)"
+            log_error(message)
+            raise RuntimeError(message)
+
+        log_success(f"SuperQuiz GUI server running at http://{host}:{port}")
+        log_info("SuperQuiz health endpoint responded; dependencies validated")
+        return thread
+
+
+def start_shooty_server(port: int, project_root: Path, host: str = "127.0.0.1") -> threading.Thread:
+    """Launch the ShootyMcShoot GUI server in a background thread."""
+    global _SHOOTY_SERVER_INSTANCE
+
+    with _SHOOTY_SERVER_LOCK:
+        if _SHOOTY_SERVER_INSTANCE is not None and _SHOOTY_SERVER_INSTANCE.is_alive():
+            log_warning("ShootyMcShoot server already running - refusing to start duplicate instance")
+            return _SHOOTY_SERVER_INSTANCE
+
+        log_info(f"Starting ShootyMcShoot GUI server on {host}:{port}...")
+
+        try:
+            from actifix.modules.shootymcshoot import run_gui
+        except ImportError as exc:
+            log_error("ShootyMcShoot module requires Flask/Flask-CORS (install via pip install -e '.[web]')")
+            raise exc
+
+        def run_server():
+            try:
+                run_gui(host=host, port=port, project_root=project_root, debug=False)
+            except Exception as exc:
+                log_error(f"ShootyMcShoot GUI server error: {exc}")
+
+        thread = threading.Thread(target=run_server, daemon=True)
+        thread.start()
+        _SHOOTY_SERVER_INSTANCE = thread
+        time.sleep(0.3)
+        log_success(f"ShootyMcShoot GUI server running at http://{host}:{port}")
+        return thread
+
+
+def start_pokertool_service(port: int, project_root: Path, host: str = "127.0.0.1") -> threading.Thread:
+    """Launch the PokerTool service in a background thread."""
+    global _POKERTOOL_THREAD
+
+    with _POKERTOOL_LOCK:
+        if _POKERTOOL_THREAD is not None and _POKERTOOL_THREAD.is_alive():
+            log_warning("PokerTool service already running - refusing to start duplicate instance")
+            return _POKERTOOL_THREAD
+
+        log_info(f"Starting PokerTool service on {host}:{port}...")
+
+        try:
+            from actifix.modules.pokertool import run_service
+        except ImportError as exc:
+            log_error("PokerTool module requires Flask/Flask-CORS (install via pip install -e '.[web]')")
+            raise exc
+
+        def run_service_thread() -> None:
+            try:
+                run_service(host=host, port=port, project_root=project_root, debug=False)
+            except Exception as exc:
+                log_error(f"PokerTool service error: {exc}")
+
+        thread = threading.Thread(target=run_service_thread, daemon=True)
+        thread.start()
+        _POKERTOOL_THREAD = thread
+        time.sleep(0.3)
+        log_success(f"PokerTool service running at http://{host}:{port}")
         return thread
 
 
 def start_api_watchdog(api_port: int, project_root: Path, interval_seconds: float = 30.0, stop_event: Optional[threading.Event] = None) -> threading.Thread:
+
     """API watchdog: monitor port and auto-restart if down."""
     def watchdog_loop():
         while True:
@@ -472,20 +629,60 @@ def start_version_monitor(
     interval_seconds: float = 60.0,
     stop_event: Optional[threading.Event] = None,
 ) -> threading.Thread:
-    """Monitor pyproject version changes and bounce the frontend when needed."""
+    """Ensure the served frontend stays in sync with pyproject version."""
+
+    def _read_index_asset_version(frontend_dir: Path) -> Optional[str]:
+        index_path = frontend_dir / "index.html"
+        if not index_path.exists():
+            return None
+        try:
+            text = index_path.read_text(encoding="utf-8")
+        except OSError:
+            return None
+        match = re.search(r'window\\.ACTIFIX_ASSET_VERSION\\s*=\\s*["\\\']([^"\\\']+)["\\\']', text)
+        return match.group(1).strip() if match else None
+
+    def _read_app_ui_version(frontend_dir: Path) -> Optional[str]:
+        app_path = frontend_dir / "app.js"
+        if not app_path.exists():
+            return None
+        try:
+            text = app_path.read_text(encoding="utf-8")
+        except OSError:
+            return None
+        match = re.search(r"const\\s+UI_VERSION\\s*=\\s*['\\\"]([^'\\\"]+)['\\\"]", text)
+        return match.group(1).strip() if match else None
 
     def monitor_loop() -> None:
         last_version = read_project_version(project_root)
+        frontend_root = FRONTEND_DIR
+        served_frontend = frontend_root / "dist" if (frontend_root / "dist").exists() else frontend_root
         while True:
             if stop_event and stop_event.is_set():
                 break
             time.sleep(interval_seconds)
             current_version = read_project_version(project_root)
-            if current_version != last_version:
+            index_version = _read_index_asset_version(served_frontend)
+            ui_version = _read_app_ui_version(served_frontend)
+
+            mismatch = False
+            if current_version and index_version and current_version != index_version:
+                mismatch = True
+            if current_version and ui_version and current_version != ui_version:
+                mismatch = True
+
+            if current_version != last_version or mismatch:
                 log_info(
-                    f"Version change detected: "
-                    f"{last_version or 'unknown'} -> {current_version or 'unknown'}"
+                    "Frontend version sync triggered: "
+                    f"pyproject={current_version or 'unknown'} "
+                    f"index={index_version or 'unknown'} "
+                    f"ui={ui_version or 'unknown'}"
                 )
+                try:
+                    build_frontend(project_root)
+                except Exception as exc:
+                    log_warning(f"Frontend rebuild failed during sync monitor: {exc}")
+
                 try:
                     kill_processes_on_port(manager.port)
                 except Exception:
@@ -552,11 +749,45 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
         help="Do not start the standalone Yhatzee GUI",
     )
     parser.add_argument(
+        "--superquiz-port",
+        type=int,
+        default=DEFAULT_SUPERQUIZ_PORT,
+        help=f"Port for the standalone SuperQuiz GUI (default: {DEFAULT_SUPERQUIZ_PORT})",
+    )
+    parser.add_argument(
+        "--no-superquiz",
+        action="store_true",
+        help="Do not start the standalone SuperQuiz GUI",
+    )
+    parser.add_argument(
+        "--shooty-port",
+        type=int,
+        default=DEFAULT_SHOOTY_PORT,
+        help=f"Port for the standalone ShootyMcShoot GUI (default: {DEFAULT_SHOOTY_PORT})",
+    )
+    parser.add_argument(
+        "--no-shooty",
+        action="store_true",
+        help="Do not start the standalone ShootyMcShoot GUI",
+    )
+    parser.add_argument(
+        "--pokertool-port",
+        type=int,
+        default=DEFAULT_POKERTOOL_PORT,
+        help=f"Port for the standalone PokerTool service (default: {DEFAULT_POKERTOOL_PORT})",
+    )
+    parser.add_argument(
+        "--no-pokertool",
+        action="store_true",
+        help="Do not start the standalone PokerTool service",
+    )
+    parser.add_argument(
         "--browser",
         action="store_true",
         default=False,
         help="Open the browser automatically (disabled by default to prevent unwanted windows)",
     )
+
     parser.add_argument(
         "--no-api",
         action="store_true",
@@ -596,8 +827,17 @@ def main(argv: Optional[list[str]] = None) -> int:
         total_steps += 1
     if not args.no_yhatzee:
         total_steps += 1
+    if not args.no_superquiz:
+        total_steps += 1
+    if not args.no_shooty:
+        total_steps += 1
+    if not args.no_pokertool:
+        total_steps += 1
     total_steps += 1  # frontend step
+
     current_step = 0
+
+
 
     # Step 1: Clean cache
     current_step += 1
@@ -668,11 +908,33 @@ def main(argv: Optional[list[str]] = None) -> int:
             log_error("Try manually: pkill -f 'start.py' or use --yhatzee-port <PORT>")
             return 1
 
+    if not args.no_superquiz and is_port_in_use(args.superquiz_port):
+        log_warning(f"SuperQuiz port {args.superquiz_port} still in use, forcing cleanup")
+        kill_processes_on_port(args.superquiz_port)
+        time.sleep(0.5)
+
+        if is_port_in_use(args.superquiz_port):
+            log_error(f"Could not free SuperQuiz port {args.superquiz_port}")
+            log_error("Try manually: pkill -f 'start.py' or use --superquiz-port <PORT>")
+            return 1
+
+    if not args.no_pokertool and is_port_in_use(args.pokertool_port):
+        log_warning(f"PokerTool port {args.pokertool_port} still in use, forcing cleanup")
+        kill_processes_on_port(args.pokertool_port)
+        time.sleep(0.5)
+
+        if is_port_in_use(args.pokertool_port):
+            log_error(f"Could not free PokerTool port {args.pokertool_port}")
+            log_error("Try manually: pkill -f 'start.py' or use --pokertool-port <PORT>")
+            return 1
+
     # Step 4: Start API server (if enabled)
     api_thread = None
     api_watchdog_thread = None
     version_monitor_thread: Optional[threading.Thread] = None
     yhatzee_thread: Optional[threading.Thread] = None
+    superquiz_thread: Optional[threading.Thread] = None
+    pokertool_thread: Optional[threading.Thread] = None
     stop_event = threading.Event()
     if not args.no_api:
         current_step += 1
@@ -693,6 +955,24 @@ def main(argv: Optional[list[str]] = None) -> int:
             yhatzee_thread = start_yhatzee_server(args.yhatzee_port, ROOT)
         except Exception as e:
             log_error(f"Failed to start Yhatzee GUI: {e}")
+            return 1
+
+    if not args.no_superquiz:
+        current_step += 1
+        log_step(current_step, total_steps, "Starting SuperQuiz GUI")
+        try:
+            superquiz_thread = start_superquiz_server(args.superquiz_port, ROOT)
+        except Exception as e:
+            log_error(f"Failed to start SuperQuiz GUI: {e}")
+            return 1
+
+    if not args.no_pokertool:
+        current_step += 1
+        log_step(current_step, total_steps, "Starting PokerTool service")
+        try:
+            pokertool_thread = start_pokertool_service(args.pokertool_port, ROOT)
+        except Exception as e:
+            log_error(f"Failed to start PokerTool service: {e}")
             return 1
 
     # Start frontend server
@@ -718,8 +998,20 @@ def main(argv: Optional[list[str]] = None) -> int:
     if not args.no_yhatzee:
         yhatzee_url = f"http://localhost:{args.yhatzee_port}/"
         print(f"{Color.BOLD}{Color.GREEN}Yhatzee:{Color.RESET}   {Color.CYAN}{yhatzee_url}{Color.RESET}")
+    if not args.no_superquiz:
+        superquiz_url = f"http://localhost:{args.superquiz_port}/"
+        print(f"{Color.BOLD}{Color.GREEN}SuperQuiz:{Color.RESET} {Color.CYAN}{superquiz_url}{Color.RESET}")
+
+    if not args.no_shooty:
+        shooty_url = f"http://localhost:{args.shooty_port}/"
+        print(f"{Color.BOLD}{Color.GREEN}ShootyMcShoot:{Color.RESET} {Color.CYAN}{shooty_url}{Color.RESET}")
+
+    if not args.no_pokertool:
+        pokertool_url = f"http://localhost:{args.pokertool_port}/"
+        print(f"{Color.BOLD}{Color.GREEN}PokerTool:{Color.RESET} {Color.CYAN}{pokertool_url}{Color.RESET}")
 
     print()
+
 
     # Optional: Open browser
     if args.browser:

@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 50 actionable tasks implementation from documentation analysis
 - Comprehensive task list with priority distribution
 - Initial ticket creation via raise_af workflow
+- Launcher now starts the standalone PokerTool service by default (use `--pokertool-port` / `--no-pokertool`) and records a `POKERTOOL_SERVICE_START` event so the new module shows up with the other GUIs.
 
 ### Changed
 - Move the consolidated test runner into `test/test_runner.py` and align the docs/architecture references with the new path

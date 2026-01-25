@@ -36,6 +36,50 @@ from actifix.state_paths import (
 )
 from actifix.raise_af import record_error, TicketPriority
 
+QUICK_PYTEST_FILES = [
+    "test/test_actifix_basic.py",
+    "test/test_architecture_validation.py",
+    "test/test_config_extended.py",
+    "test/test_event_repo.py",
+    "test/test_module_base.py",
+    "test/test_module_dependency_validation.py",
+    "test/test_module_metadata.py",
+    "test/test_module_registry_status.py",
+    "test/test_public_api_contract.py",
+    "test/test_raise_af.py",
+    "test/test_raise_af_policy.py",
+    "test/test_ticket_repo.py",
+    "test/test_pokertool_core.py",
+    "test/test_pokertool_detector.py",
+    "test/test_pokertool_ml.py",
+    "test/test_pokertool_solvers.py",
+]
+
+# Coverage runs should stay representative enough to satisfy the global threshold,
+# but still avoid the heaviest suites unless the user explicitly requests --full.
+COVERAGE_PYTEST_FILES = QUICK_PYTEST_FILES + [
+    "test/test_coverage_boost.py",
+    "test/test_coverage_boost2.py",
+    "test/test_coverage_boost3.py",
+    "test/test_coverage_core.py",
+    "test/test_coverage_raise_doaf.py",
+    "test/test_extended_coverage.py",
+]
+
+
+def _resolve_pytest_targets(files: list[str]) -> list[str]:
+    """Return existing pytest targets as string paths relative to the repo root."""
+    targets: list[str] = []
+    seen = set()
+    for rel in files:
+        rel_path = str(rel)
+        if rel_path in seen:
+            continue
+        seen.add(rel_path)
+        if (ROOT / rel_path).exists():
+            targets.append(rel_path)
+    return targets
+
 
 def raise_tickets_for_system_failures(result, paths) -> int:
     """Raise tickets for system test failures and errors."""
@@ -291,6 +335,8 @@ def run_pytest(
     coverage: bool,
     quick: bool,
     pattern: Optional[str],
+    targets: Optional[list[str]] = None,
+    runslow: bool = False,
     fast_coverage: bool = False,
     run_id: Optional[str] = None,
     paths=None,
@@ -324,36 +370,46 @@ def run_pytest(
         except ImportError:
             print("pytest-cov plugin not found; skipping coverage reporting")
 
-        # Fast coverage mode: exclude slow tests and use parallel execution
+        # Fast coverage mode: exclude slow tests and use parallel execution.
+        # Keep integration tests because several "coverage boost" suites rely on them.
         if fast_coverage:
-            print("  → Fast coverage mode: excluding slow, heavy integration, and perf tests")
+            print("  → Fast mode: excluding slow/db/concurrent/perf tests (use --full for all)")
             cmd += [
                 "-m",
-                "not slow and not very_slow and not performance and not db and not integration and not concurrent",
+                "not slow and not very_slow and not performance and not db and not concurrent",
             ]
             cmd.extend(xdist_args)
         else:
             # Full coverage: run all tests, but still use parallel if available
+            print("  → Full mode: running all tests including slow/integration")
             cmd.extend(xdist_args)
     else:
         # Non-coverage runs can also use fast mode
         if fast_coverage:
+            print("  → Fast mode: excluding slow, heavy integration, and perf tests (use --full for all)")
             cmd += [
                 "-m",
                 "not slow and not very_slow and not performance and not db and not integration and not concurrent",
             ]
             cmd.extend(xdist_args)
         else:
+            print("  → Full mode: running all tests including slow/integration")
             cmd.extend(xdist_args)
 
+    if not targets:
+        targets = ["test"]
+
     if quick:
-        # Quick mode keeps the suite narrow and quiet
-        cmd += ["-q", "test"]
+        # Quick mode runs a curated, high-signal subset.
+        cmd += ["-q", *targets]
     else:
-        cmd.append("test")
+        cmd.extend(targets)
 
     if pattern:
         cmd += ["-k", pattern]
+
+    if runslow:
+        cmd.append("--runslow")
 
     env = os.environ.copy()
     env.setdefault("PYTHONPATH", str(ROOT / "src"))
@@ -406,14 +462,15 @@ def main(argv: Optional[list[str]] = None) -> int:
     parser = argparse.ArgumentParser(description="Actifix test runner")
     quick_group = parser.add_mutually_exclusive_group()
     quick_group.add_argument("--quick", action="store_true", help="Run the quick test subset (default)")
-    quick_group.add_argument("--full", action="store_true", help="Run the full pytest suite")
+    quick_group.add_argument("--full", action="store_true", help="Run the full pytest suite including slow tests")
+    quick_group.add_argument("--slow", action="store_true", help="Include slow/integration tests in the run")
     parser.add_argument("--coverage", action="store_true", help="Include coverage reporting")
     parser.add_argument("--fast-coverage", action="store_true", help="Fast coverage mode (exclude slow tests, use parallel execution)")
     parser.add_argument("--pattern", type=str, help="Pytest -k pattern")
     args = parser.parse_args(argv)
-    
+
     reset_actifix_paths()
-    
+
     reporter, runner, system_summary = run_system_suite()
     plan = system_summary["plan"]
     result = system_summary["result"]
@@ -430,19 +487,38 @@ def main(argv: Optional[list[str]] = None) -> int:
         print("  System test errors:")
         for name in result.error_tests:
             print(f"    - {name}")
-    
+
     quick = True
+    runslow = False
     if args.full:
         quick = False
+        runslow = True
+    elif args.slow:
+        quick = False
+        runslow = True
     elif args.quick:
         quick = True
 
-    # Use fast coverage mode if specified, otherwise use regular coverage
-    use_fast_coverage = args.fast_coverage or (args.coverage and os.getenv("ACTIFIX_FAST_COVERAGE"))
+    # Default: fast mode (exclude slow tests, use parallel)
+    # --full or --slow: include all tests
+    # --fast-coverage: explicit fast coverage mode
+    use_fast_mode = not (args.full or args.slow)
+    use_fast_coverage = args.fast_coverage or use_fast_mode or (args.coverage and os.getenv("ACTIFIX_FAST_COVERAGE"))
+
+    pytest_targets: list[str]
+    if args.full or args.slow:
+        pytest_targets = ["test"]
+    elif args.coverage:
+        pytest_targets = _resolve_pytest_targets(COVERAGE_PYTEST_FILES) or ["test"]
+    else:
+        pytest_targets = _resolve_pytest_targets(QUICK_PYTEST_FILES) or ["test"]
+
     pytest_stage = run_pytest(
         args.coverage,
         quick,
         args.pattern,
+        targets=pytest_targets,
+        runslow=runslow,
         fast_coverage=use_fast_coverage,
         run_id=reporter.run_id,
         paths=reporter.paths,

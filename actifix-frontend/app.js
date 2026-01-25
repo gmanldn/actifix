@@ -8,11 +8,32 @@ const { useState, useEffect, useRef, createElement: h } = React;
 
 // API Configuration
 const API_BASE = 'http://localhost:5001/api';
-const UI_VERSION = '5.0.0';
+const UI_VERSION = '6.0.3';
 const REFRESH_INTERVAL = 5000;
 const LOG_REFRESH_INTERVAL = 3000;
 const TICKET_REFRESH_INTERVAL = 4000;
 const TICKET_LIMIT = 250;
+
+const ADMIN_PASSWORD_KEY = 'actifix_admin_password';
+const getAdminPassword = () => localStorage.getItem(ADMIN_PASSWORD_KEY) || '';
+const setAdminPasswordInStorage = (value) => {
+  if (!value) {
+    localStorage.removeItem(ADMIN_PASSWORD_KEY);
+  } else {
+    localStorage.setItem(ADMIN_PASSWORD_KEY, value);
+  }
+};
+const clearAuthToken = () => setAdminPasswordInStorage('');
+const isAuthenticated = () => !!getAdminPassword();
+
+const buildAdminHeaders = (initial = {}) => {
+  const headers = { ...initial };
+  const adminPassword = getAdminPassword();
+  if (adminPassword) {
+    headers['X-Admin-Password'] = adminPassword;
+  }
+  return headers;
+};
 
 const applyAssetVersion = () => {
   const version = window.ACTIFIX_ASSET_VERSION || '4';
@@ -113,27 +134,150 @@ const useFetch = (endpoint, interval = REFRESH_INTERVAL) => {
   const [lastUpdated, setLastUpdated] = useState(null);
 
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchData = async (retryCount = 0, maxRetries = 3) => {
       try {
-        const response = await fetch(`${API_BASE}${endpoint}`, { cache: 'no-store' });
+        const headers = buildAdminHeaders();
+        const response = await fetch(`${API_BASE}${endpoint}`, { cache: 'no-store', headers });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const json = await response.json();
-        setData(json);
-        setError(null);
-        setLastUpdated(new Date());
+        const text = await response.text();
+        try {
+          const json = JSON.parse(text);
+          setData(json);
+          setError(null);
+          setLastUpdated(new Date());
+          return; // Success, no retry
+        } catch (parseErr) {
+          // Response is not JSON, likely an error page
+          throw new Error(`Invalid response from ${endpoint}: expected JSON`);
+        }
       } catch (err) {
-        setError(err.message);
+        // Detect network errors
+        let errorMsg = err.message;
+        if (err.name === 'TypeError' && (errorMsg.includes('fetch') || errorMsg.includes('Failed to fetch'))) {
+          errorMsg = 'Backend offline - API server not responding on port 5001. Run "python scripts/bounce.py" or "python scripts/start.py" to restart.';
+        } else if (retryCount < maxRetries) {
+          // Retry on network errors
+          const delay = Math.pow(2, retryCount) * 1000; // Exponential backoff
+          setTimeout(() => fetchData(retryCount + 1, maxRetries), delay);
+          return;
+        }
+        setError(errorMsg);
+        setData(null);
       } finally {
         setLoading(false);
       }
     };
 
     fetchData();
-    const timer = setInterval(fetchData, interval);
+    const timer = setInterval(() => fetchData(0), interval);
     return () => clearInterval(timer);
   }, [endpoint, interval]);
 
   return { data, loading, error, lastUpdated };
+};
+
+// Custom hook for authenticated POST requests
+const useAuthenticatedFetch = () => {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [result, setResult] = useState(null);
+
+  const execute = async (endpoint, options = {}) => {
+    setLoading(true);
+    setError(null);
+    setResult(null);
+
+    try {
+      const headers = buildAdminHeaders({
+        'Content-Type': 'application/json',
+        ...options.headers
+      });
+
+      const response = await fetch(`${API_BASE}${endpoint}`, {
+        method: options.method || 'POST',
+        headers,
+        body: options.body ? JSON.stringify(options.body) : undefined,
+        ...options
+      });
+
+      const text = await response.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        throw new Error(`Invalid response from ${endpoint}: expected JSON`);
+      }
+
+      if (!response.ok) {
+        throw new Error(data.error || `HTTP ${response.status}`);
+      }
+
+      setResult(data);
+      return data;
+    } catch (err) {
+      setError(err.message);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return { execute, loading, error, result };
+};
+
+const postJSON = async (endpoint, payload) => {
+  const headers = buildAdminHeaders({ 'Content-Type': 'application/json' });
+  const response = await fetch(`${API_BASE}${endpoint}`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(payload),
+  });
+  const text = await response.text();
+  let data;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    throw new Error(`Invalid response from ${endpoint}: expected JSON, got HTML or error page`);
+  }
+  if (!response.ok) {
+    throw new Error(data.message || data.error || `HTTP ${response.status}`);
+  }
+  return data;
+};
+
+const useEventStream = (endpoint) => {
+  const [updates, setUpdates] = useState([]);
+  const [latest, setLatest] = useState(null);
+  const [status, setStatus] = useState(null);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const source = new EventSource(`${API_BASE}${endpoint}`);
+    source.addEventListener('update', (event) => {
+      try {
+        const payload = JSON.parse(event.data);
+        setLatest(payload);
+        setUpdates((prev) => [...prev.slice(-5), payload]);
+      } catch (err) {
+        console.error('Invalid SSE payload', err);
+      }
+    });
+    source.addEventListener('status', (event) => {
+      try {
+        const payload = JSON.parse(event.data);
+        setStatus(payload);
+      } catch (err) {
+        console.error('Invalid SSE status', err);
+      }
+    });
+    source.onerror = () => {
+      setError('Detection stream disconnected.');
+      source.close();
+    };
+    return () => source.close();
+  }, [endpoint]);
+
+  return { updates, latest, status, error };
 };
 
 // ============================================================================
@@ -158,11 +302,12 @@ const NavigationRail = ({ activeView, onViewChange, logAlert }) => {
 const navItems = [
   { id: 'overview', icon: '📊', label: 'Overview' },
   { id: 'tickets', icon: '🎫', label: 'Tickets' },
+  { id: 'quiz', icon: '🎯', label: 'Quiz' },
   { id: 'logs', icon: '📜', label: 'Logs' },
-  { id: 'system', icon: '⚙️', label: 'System' },
+  { id: 'system', icon: 'S', label: 'System' },
   { id: 'modules', icon: '🧩', label: 'Modules' },
   { id: 'ideas', icon: '💡', label: 'Ideas' },
-  { id: 'settings', icon: '🔧', label: 'Settings' },
+  { id: 'settings', icon: '⚙️', label: 'Settings' },
 ];
 
   return h('nav', { className: 'nav-rail' },
@@ -175,6 +320,7 @@ const navItems = [
             'nav-rail-item',
             activeView === item.id ? 'active' : '',
             item.id === 'logs' && logAlert ? 'flash' : '',
+            item.id === 'system' ? 'system-item' : '',
           ].join(' ').trim(),
           onClick: () => onViewChange(item.id),
           title: item.label
@@ -248,7 +394,7 @@ const FixToolbar = ({ onFix, isFixing, status }) => {
 };
 
 // Header Component
-const Header = ({ onFix, isFixing, fixStatus, theme, onToggleTheme }) => {
+const Header = ({ onFix, isFixing, fixStatus, theme, onToggleTheme, onLogout }) => {
   const [connected, setConnected] = useState(false);
   const [time, setTime] = useState(new Date().toLocaleTimeString());
   const { data: health } = useFetch('/health', REFRESH_INTERVAL);
@@ -259,7 +405,9 @@ const Header = ({ onFix, isFixing, fixStatus, theme, onToggleTheme }) => {
   useEffect(() => {
     const checkConnection = async () => {
       try {
-        const response = await fetch(`${API_BASE}/ping`);
+        const headers = buildAdminHeaders();
+        
+        const response = await fetch(`${API_BASE}/ping`, { headers });
         setConnected(response.ok);
       } catch {
         setConnected(false);
@@ -306,7 +454,7 @@ const Header = ({ onFix, isFixing, fixStatus, theme, onToggleTheme }) => {
       h(VersionBadge),
       h('button', {
         onClick: onToggleTheme,
-        title: `Switch to ${theme === 'dark' ? 'Azure light' : 'Dark'} theme`,
+        title: `Switch to ${theme === 'dark' ? 'Portal light' : theme === 'portal' ? 'Azure light' : 'Dark'} theme`,
         className: 'theme-toggle-btn',
         style: {
           background: 'transparent',
@@ -318,6 +466,20 @@ const Header = ({ onFix, isFixing, fixStatus, theme, onToggleTheme }) => {
           color: 'var(--text-primary)'
         }
       }, theme === 'dark' ? '☀️' : '🌙'),
+      h('button', {
+        onClick: onLogout,
+        title: 'Logout',
+        className: 'theme-toggle-btn',
+        style: {
+          background: 'transparent',
+          border: '1px solid var(--border)',
+          borderRadius: '999px',
+          padding: '4px 8px',
+          fontSize: '16px',
+          cursor: 'pointer',
+          color: 'var(--text-primary)'
+        }
+      }, '🚪'),
       h('span', { className: 'header-time' }, time)
     )
   );
@@ -341,6 +503,183 @@ const MetricTile = ({ label, value, subvalue, icon, color, trend }) => {
     h('div', { className: 'metric-tile-value', style: color ? { color } : {} }, value),
     subvalue && h('div', { className: 'metric-tile-subvalue' }, subvalue),
     trend && h('div', { className: 'metric-tile-trend' }, trend)
+  );
+};
+
+const PokerToolPanel = () => {
+  const { data: detectStatus } = useFetch('/modules/pokertool/api/detect/status', 6000);
+  const { updates, latest, status: streamStatus, error: streamError } = useEventStream('/modules/pokertool/api/detect/stream');
+
+  const [nashPayload, setNashPayload] = useState({ hand: 'Ah,Kd', board: 'Qs, Jh, 10d' });
+  const [nashResult, setNashResult] = useState(null);
+  const [nashLoading, setNashLoading] = useState(false);
+  const [nashError, setNashError] = useState('');
+
+  const [icmPayload, setIcmPayload] = useState({ stacks: '100,50', payouts: '5,2.5' });
+  const [icmResult, setIcmResult] = useState(null);
+  const [icmError, setIcmError] = useState('');
+
+  const [mlPayload, setMlPayload] = useState({ history: '[{"action":"raise","aggression":0.9}]', scores: '0.3,0.65,0.82' });
+  const [mlResult, setMlResult] = useState(null);
+  const [mlError, setMlError] = useState('');
+
+  const callNash = async () => {
+    setNashError('');
+    setNashLoading(true);
+    try {
+      const hand = nashPayload.hand.split(',').map((h) => h.trim()).filter(Boolean);
+      const board = nashPayload.board.split(',').map((h) => h.trim()).filter(Boolean);
+      const data = await postJSON('/modules/pokertool/api/solvers/nash', { hand, board });
+      setNashResult(data);
+    } catch (err) {
+      setNashError(err.message);
+    } finally {
+      setNashLoading(false);
+    }
+  };
+
+  const callIcm = async () => {
+    setIcmError('');
+    try {
+      const stacks = icmPayload.stacks.split(',').map((value) => parseFloat(value.trim())).filter(Boolean);
+      const payouts = icmPayload.payouts.split(',').map((value) => parseFloat(value.trim())).filter(Boolean);
+      const data = await postJSON('/modules/pokertool/api/solvers/icm', { stacks, payouts });
+      setIcmResult(data);
+    } catch (err) {
+      setIcmError(err.message);
+    }
+  };
+
+  const callMl = async (type) => {
+    setMlError('');
+    try {
+      if (type === 'opponent') {
+        const history = JSON.parse(mlPayload.history);
+        const data = await postJSON('/modules/pokertool/api/ml/opponent', { history });
+        setMlResult(data);
+      } else {
+        const scores = mlPayload.scores.split(',').map((value) => parseFloat(value.trim())).filter((value) => !Number.isNaN(value));
+        const data = await postJSON('/modules/pokertool/api/ml/learn', { scores });
+        setMlResult(data);
+      }
+    } catch (err) {
+      setMlError(err.message);
+    }
+  };
+
+  const detectionSummary = detectStatus || {};
+  const latestEvent = latest || {};
+
+  return h('div', { className: 'panel pokertool-panel' },
+    h('div', { className: 'panel-header' },
+      h('div', { className: 'panel-title' },
+        h('span', { className: 'panel-title-icon' }, '🃏'),
+        'PokerTool Insights'
+      ),
+      h('div', { className: 'panel-actions' },
+        streamError && h('span', { className: 'text-dim' }, streamError),
+        streamStatus && h('span', { className: 'poker-tag' }, streamStatus.active ? 'Streaming' : 'Idle')
+      )
+    ),
+    h('div', { className: 'poker-section detection' },
+      h('div', { className: 'poker-subheader' }, 'Detection'),
+      h('div', { className: 'poker-detection-row' },
+        h('div', { className: 'poker-detection-card' },
+          h('strong', null, 'Host'),
+          h('span', null, detectionSummary.host || '—'),
+          h('small', null, 'Port: ', detectionSummary.port || '—')
+        ),
+        h('div', { className: 'poker-detection-card' },
+          h('strong', null, 'Latest Action'),
+          h('span', null, latestEvent.table_state?.action || 'N/A'),
+          h('small', null, 'Confidence:', latestEvent.confidence ?? '—')
+        ),
+        h('div', { className: 'poker-detection-card' },
+          h('strong', null, 'Board'),
+          h('span', null, (latestEvent.table_state?.board || []).join(', ') || '—'),
+          h('small', null, `${streamStatus?.history_count ?? 0} snapshots`)
+        )
+      ),
+      h('div', { className: 'poker-detection-stream' },
+        updates.map((event, idx) =>
+          h('div', { key: `det-${idx}`, className: 'poker-detection-item' },
+            h('div', { className: 'poker-detection-item-header' },
+              h('span', null, `#${event.sequence}`),
+              h('span', null, formatTime(new Date(event.timestamp).toISOString()))
+            ),
+            h('div', null, event.table_state?.action || 'update'),
+            h('small', null, `Confidence: ${event.confidence ?? 0}`)
+          )
+        )
+      )
+    ),
+    h('div', { className: 'poker-section solvers' },
+      h('div', { className: 'poker-subheader' }, 'Solvers'),
+      h('div', { className: 'poker-solver-grid' },
+        h('div', { className: 'poker-solver-card' },
+          h('label', null, 'Hand'),
+          h('input', {
+            className: 'poker-input',
+            value: nashPayload.hand,
+            onChange: (e) => setNashPayload({ ...nashPayload, hand: e.target.value }),
+          }),
+          h('label', null, 'Board'),
+          h('input', {
+            className: 'poker-input',
+            value: nashPayload.board,
+            onChange: (e) => setNashPayload({ ...nashPayload, board: e.target.value }),
+          }),
+          h('button', { className: 'btn btn-small', onClick: callNash, disabled: nashLoading },
+            nashLoading ? 'Computing…' : 'Run Nash'
+          ),
+          nashError && h('span', { className: 'poker-error' }, nashError),
+          nashResult && h('p', { className: 'poker-result' }, `Action: ${nashResult.recommendation?.action}`)
+        ),
+        h('div', { className: 'poker-solver-card' },
+          h('label', null, 'Stacks'),
+          h('input', {
+            className: 'poker-input',
+            value: icmPayload.stacks,
+            onChange: (e) => setIcmPayload({ ...icmPayload, stacks: e.target.value }),
+          }),
+          h('label', null, 'Payouts'),
+          h('input', {
+            className: 'poker-input',
+            value: icmPayload.payouts,
+            onChange: (e) => setIcmPayload({ ...icmPayload, payouts: e.target.value }),
+          }),
+          h('button', { className: 'btn btn-small', onClick: callIcm }, 'Run ICM'),
+          icmError && h('span', { className: 'poker-error' }, icmError),
+          icmResult && h('p', { className: 'poker-result' }, `Value: ${icmResult.icm_value}`)
+        )
+      )
+    ),
+    h('div', { className: 'poker-section ml' },
+      h('div', { className: 'poker-subheader' }, 'ML Insights'),
+      h('div', { className: 'poker-ml-grid' },
+        h('div', { className: 'poker-ml-card' },
+          h('label', null, 'History (JSON)'),
+          h('textarea', {
+            className: 'poker-input',
+            value: mlPayload.history,
+            onChange: (e) => setMlPayload({ ...mlPayload, history: e.target.value }),
+            rows: 3,
+          }),
+          h('button', { className: 'btn btn-small', onClick: () => callMl('opponent') }, 'Opponent Model')
+        ),
+        h('div', { className: 'poker-ml-card' },
+          h('label', null, 'Score Stream'),
+          h('input', {
+            className: 'poker-input',
+            value: mlPayload.scores,
+            onChange: (e) => setMlPayload({ ...mlPayload, scores: e.target.value }),
+          }),
+          h('button', { className: 'btn btn-small', onClick: () => callMl('learn') }, 'Active Learning')
+        )
+      ),
+      mlError && h('span', { className: 'poker-error' }, mlError),
+      mlResult && h('p', { className: 'poker-result' }, mlResult.message || 'ML response received')
+    )
   );
 };
 
@@ -406,6 +745,8 @@ const OverviewView = () => {
       })
     ),
 
+    h(PokerToolPanel),
+
     // Recent Tickets Panel
     h('div', { className: 'panel' },
       h('div', { className: 'panel-header' },
@@ -450,6 +791,7 @@ const OverviewView = () => {
 // Tickets View Component
 const TicketsView = () => {
   const { data, loading, error, lastUpdated } = useFetch(`/tickets?limit=${TICKET_LIMIT}`, TICKET_REFRESH_INTERVAL);
+  const { execute: authenticatedFetch, loading: authLoading, error: authError } = useAuthenticatedFetch();
 
   const [selectedTicket, setSelectedTicket] = useState(null);
   const [modalLoading, setModalLoading] = useState(false);
@@ -459,7 +801,8 @@ const TicketsView = () => {
     setModalLoading(true);
     setModalError('');
     try {
-      const response = await fetch(`${API_BASE}/ticket/${ticketId}`);
+      const headers = buildAdminHeaders();
+      const response = await fetch(`${API_BASE}/ticket/${ticketId}`, { headers });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const ticketData = await response.json();
       setSelectedTicket(ticketData);
@@ -481,12 +824,41 @@ const TicketsView = () => {
     ? lastUpdated.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
     : '—';
 
-  const renderTicketCard = (ticket, index) => {
+  const TicketCard = ({ ticket, index }) => {
     const priority = normalizePriority(ticket.priority);
+    const [isFixing, setIsFixing] = useState(false);
+    const [fixStatus, setFixStatus] = useState('');
+    
+    const handleFixTicket = async (e) => {
+      e.stopPropagation();
+      if (isFixing || ticket.status === 'completed') return;
+      
+      setIsFixing(true);
+      setFixStatus('Fixing...');
+      
+      try {
+        await authenticatedFetch('/fix-ticket', {
+          body: {
+            completion_notes: `Ticket ${ticket.ticket_id} fixed via dashboard fix button`,
+            test_steps: 'Manual fix via dashboard UI',
+            test_results: 'Fix applied successfully',
+            summary: `Resolved ${ticket.ticket_id} via dashboard fix`
+          }
+        });
+        
+        setFixStatus('✓ Fixed');
+        setTimeout(() => setFixStatus(''), 2000);
+      } catch (err) {
+        setFixStatus(`✗ ${err.message}`);
+        setTimeout(() => setFixStatus(''), 3000);
+      } finally {
+        setIsFixing(false);
+      }
+    };
+    
     return h('article', { 
       key: ticket.ticket_id || index, 
       className: `ticket-card ${ticket.status}`,
-      onClick: () => fetchTicket(ticket.ticket_id),
       style: { cursor: 'pointer' }
     },
       h('div', { className: 'ticket-card-header' },
@@ -499,63 +871,24 @@ const TicketsView = () => {
       h('div', { className: 'ticket-card-meta' },
         h('span', null, '📁 ', ticket.source || 'unknown'),
         h('span', null, '⏱ ', formatRelativeTime(ticket.created))
+      ),
+      ticket.status === 'open' && h('div', { className: 'ticket-card-actions' },
+        h('button', {
+          className: `btn-small fix-ticket-btn ${isFixing ? 'working' : ''}`,
+          onClick: handleFixTicket,
+          disabled: isFixing,
+          title: 'Fix this ticket'
+        }, isFixing ? 'Fixing...' : 'Fix'),
+        fixStatus && h('span', { className: 'fix-status-badge' }, fixStatus)
       )
     );
   };
 
-  return h('div', { className: 'panel tickets-board' },
-    h('div', { className: 'panel-header' },
-      h('div', { className: 'panel-title' },
-        h('span', { className: 'panel-title-icon' }, '🎫'),
-        'ALL TICKETS'
-      ),
-      h('div', { className: 'panel-actions' },
-        h('span', { className: 'tickets-live' },
-          h('span', { className: 'tickets-live-dot' }),
-          'Live',
-          h('span', { className: 'tickets-live-time' }, `Updated ${updatedLabel}`)
-        ),
-        h('span', { className: 'text-muted', style: { fontSize: '11px' } },
-          `${data?.total_open ?? 0} open • ${data?.total_completed ?? 0} completed`
-        )
-      )
-    ),
-    tickets.length > 0 ? h('div', { className: 'priority-lanes' },
-      PRIORITY_ORDER.map((priority) => {
-        const group = groupedTickets[priority];
-        const openTickets = group?.open || [];
-        const completedTickets = group?.completed || [];
-        const label = PRIORITY_LABELS[priority] || 'Priority';
+  const renderTicketCard = (ticket, index) => {
+    return h(TicketCard, { ticket, index });
+  };
 
-        return h('section', {
-          key: priority,
-          className: 'priority-lane',
-          'data-priority': priority,
-        },
-          h('div', { className: 'priority-lane-header' },
-            h('div', { className: 'priority-lane-title' },
-              h('span', { className: `priority-badge ${priority.toLowerCase()}` }, priority),
-              h('div', { className: 'priority-lane-label' }, label)
-            ),
-            h('div', { className: 'priority-lane-counts' },
-              h('span', { className: 'lane-count open' }, `${openTickets.length} open`),
-              h('span', { className: 'lane-count completed' }, `${completedTickets.length} done`)
-            )
-          ),
-          openTickets.length > 0
-            ? openTickets.map(renderTicketCard)
-            : h('div', { className: 'lane-empty' }, 'No open tickets'),
-          completedTickets.length > 0 && h('details', { className: 'lane-completed' },
-            h('summary', null, `Show ${completedTickets.length} completed`),
-            h('div', { className: 'lane-completed-list' },
-              completedTickets.map(renderTicketCard)
-            )
-          )
-        );
-      })
-    ) : h('div', { style: { padding: '24px', textAlign: 'center', color: 'var(--text-dim)' } }, 'No tickets found'),
-    renderModal()
-  );
+  const renderModal = () => {
     if (!selectedTicket && !modalLoading && !modalError) return null;
 
     const backdropStyle = {
@@ -564,7 +897,7 @@ const TicketsView = () => {
       left: 0,
       right: 0,
       bottom: 0,
-      background: 'rgba(0,0,0,0.8)',
+      background: 'transparent',
       zIndex: 9999,
       display: 'flex',
       alignItems: 'center',
@@ -709,6 +1042,58 @@ const TicketsView = () => {
   };
 
   return h('div', { className: 'panel tickets-board' },
+    h('div', { className: 'panel-header' },
+      h('div', { className: 'panel-title' },
+        h('span', { className: 'panel-title-icon' }, '🎫'),
+        'ALL TICKETS'
+      ),
+      h('div', { className: 'panel-actions' },
+        h('span', { className: 'tickets-live' },
+          h('span', { className: 'tickets-live-dot' }),
+          'Live',
+          h('span', { className: 'tickets-live-time' }, `Updated ${updatedLabel}`)
+        ),
+        h('span', { className: 'text-muted', style: { fontSize: '11px' } },
+          `${data?.total_open ?? 0} open • ${data?.total_completed ?? 0} completed`
+        )
+      )
+    ),
+    tickets.length > 0 ? h('div', { className: 'priority-lanes' },
+      PRIORITY_ORDER.map((priority) => {
+        const group = groupedTickets[priority];
+        const openTickets = group?.open || [];
+        const completedTickets = group?.completed || [];
+        const label = PRIORITY_LABELS[priority] || 'Priority';
+
+        return h('section', {
+          key: priority,
+          className: 'priority-lane',
+          'data-priority': priority,
+        },
+          h('div', { className: 'priority-lane-header' },
+            h('div', { className: 'priority-lane-title' },
+              h('span', { className: `priority-badge ${priority.toLowerCase()}` }, priority),
+              h('div', { className: 'priority-lane-label' }, label)
+            ),
+            h('div', { className: 'priority-lane-counts' },
+              h('span', { className: 'lane-count open' }, `${openTickets.length} open`),
+              h('span', { className: 'lane-count completed' }, `${completedTickets.length} done`)
+            )
+          ),
+          openTickets.length > 0
+            ? openTickets.map(renderTicketCard)
+            : h('div', { className: 'lane-empty' }, 'No open tickets'),
+          completedTickets.length > 0 && h('details', { className: 'lane-completed' },
+            h('summary', null, `Show ${completedTickets.length} completed`),
+            h('div', { className: 'lane-completed-list' },
+              completedTickets.map(renderTicketCard)
+            )
+          )
+        );
+      })
+    ) : h('div', { style: { padding: '24px', textAlign: 'center', color: 'var(--text-dim)' } }, 'No tickets found'),
+    renderModal()
+  );
 };
 
 // Logs View Component
@@ -960,8 +1345,8 @@ const SystemView = () => {
         )
       ),
       h('ul', { className: 'health-list' },
-        ...((health.warnings || []).map(w => h('li', { className: 'health-warning' }, w))),
-        ...((health.errors || []).map(e => h('li', { className: 'health-error' }, e)))
+        health.warnings > 0 && h('li', { className: 'health-warning' }, `${health.warnings} warning(s) detected`),
+        health.errors > 0 && h('li', { className: 'health-error' }, `${health.errors} error(s) detected`)
       )
     )
   );
@@ -973,16 +1358,25 @@ const SettingsView = () => {
   const [aiApiKey, setAiApiKey] = useState('');
   const [aiModel, setAiModel] = useState('');
   const [aiEnabled, setAiEnabled] = useState(false);
+  const [adminPassword, setAdminPassword] = useState('');
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
   const { data: aiStatus } = useFetch('/ai-status', 8000);
   const { data: systemInfo } = useFetch('/system', 10000);
+  const { execute: authenticatedFetch } = useAuthenticatedFetch();
 
   // Load current settings
   useEffect(() => {
+    // Load stored admin password from localStorage
+    const storedPassword = getAdminPassword();
+    if (storedPassword) {
+      setAdminPassword(storedPassword);
+    }
+
     const loadSettings = async () => {
       try {
-        const response = await fetch(`${API_BASE}/settings`);
+        const headers = buildAdminHeaders();
+        const response = await fetch(`${API_BASE}/settings`, { headers });
         if (response.ok) {
           const data = await response.json();
           setAiProvider(data.ai_provider || 'mimo-flash-v2-free');
@@ -1002,26 +1396,22 @@ const SettingsView = () => {
     setMessage('');
 
     try {
-      const response = await fetch(`${API_BASE}/settings`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+      // Store admin password in localStorage for subsequent requests
+      if (adminPassword) {
+        setAdminPasswordInStorage(adminPassword);
+      }
+
+      await authenticatedFetch('/settings', {
+        body: {
           ai_provider: aiProvider,
           ai_api_key: aiApiKey,
           ai_model: aiModel,
           ai_enabled: aiEnabled,
-        }),
+        }
       });
 
-      if (response.ok) {
-        setMessage('Settings saved successfully!');
-        setTimeout(() => setMessage(''), 3000);
-      } else {
-        const data = await response.json();
-        setMessage(`Error: ${data.error || 'Failed to save settings'}`);
-      }
+      setMessage('Settings saved successfully! Admin password stored for this session.');
+      setTimeout(() => setMessage(''), 3000);
     } catch (err) {
       setMessage(`Error: ${err.message}`);
     } finally {
@@ -1161,11 +1551,21 @@ const SettingsView = () => {
           }),
           h('label', { htmlFor: 'ai-enabled' }, 'Enable AI Integration')
         ),
+        h('div', { className: 'settings-field' },
+          h('label', { className: 'settings-label' }, 'Admin Password'),
+          h('input', {
+            type: 'password',
+            value: adminPassword,
+            onChange: (e) => setAdminPassword(e.target.value),
+            placeholder: 'Enter admin password to save settings',
+            className: 'settings-input',
+          })
+        ),
         h('div', { className: 'settings-actions' },
           h('button', {
             className: 'btn btn-primary',
             onClick: handleSave,
-            disabled: saving,
+            disabled: saving || !adminPassword,
           }, saving ? 'Saving...' : 'Save Settings'),
           message && h('span', {
             className: `settings-message ${message.includes('Error') ? 'error' : 'ok'}`,
@@ -1202,15 +1602,12 @@ const ModulesView = () => {
   const { data, loading, error } = useFetch(`/modules?key=${refreshKey}`, 15000);
   const [sortBy, setSortBy] = useState('name');
   const [sortDir, setSortDir] = useState('asc');
+  const { execute: authenticatedFetch } = useAuthenticatedFetch();
 
   const handleToggle = async (moduleId) => {
     try {
-      const response = await fetch(`${API_BASE}/modules/${moduleId}`, { method: 'POST' });
-      if (response.ok) {
-        setRefreshKey((rk) => rk + 1);
-      } else {
-        console.error('Toggle failed:', await response.text());
-      }
+      await authenticatedFetch(`/modules/${moduleId}`, { method: 'POST' });
+      setRefreshKey((rk) => rk + 1);
     } catch (e) {
       console.error('Toggle failed:', e);
     }
@@ -1296,34 +1693,479 @@ const ModulesView = () => {
   );
 };
 
+// Quiz View Component
+const QuizView = () => {
+  const [currentQuiz, setCurrentQuiz] = useState(null);
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [selectedAnswer, setSelectedAnswer] = useState(null);
+  const [showResult, setShowResult] = useState(false);
+  const [score, setScore] = useState(0);
+  const [answered, setAnswered] = useState(false);
+  const [category, setCategory] = useState('all');
+
+  const quizData = {
+    actifix: [
+      {
+        question: "What is the primary purpose of the Actifix system?",
+        options: [
+          "To manage poker games",
+          "To track and fix software errors automatically",
+          "To monitor network traffic",
+          "To manage user authentication"
+        ],
+        correct: 1,
+        explanation: "Actifix is an error intelligence system that automatically tracks, prioritizes, and fixes software errors."
+      },
+      {
+        question: "What does P0 priority indicate in Actifix?",
+        options: [
+          "Low priority issues",
+          "Medium priority issues",
+          "Critical issues requiring immediate attention",
+          "Deferred issues"
+        ],
+        correct: 2,
+        explanation: "P0 is the highest priority level, indicating critical issues like crashes, data loss, or security vulnerabilities that require immediate attention (1 hour SLA)."
+      },
+      {
+        question: "Where is the canonical ticket database stored?",
+        options: [
+          "In memory only",
+          "In .actifix/ directory",
+          "In data/actifix.db",
+          "In a remote cloud database"
+        ],
+        correct: 2,
+        explanation: "The SQLite database at data/actifix.db is the single source of truth for all ticket data."
+      },
+      {
+        question: "What is the Raise_AF gate requirement?",
+        options: [
+          "No environment variable required",
+          "ACTIFIX_CHANGE_ORIGIN=raise_af must be set",
+          "Only git commits need it",
+          "It's optional for testing"
+        ],
+        correct: 1,
+        explanation: "All changes must set ACTIFIX_CHANGE_ORIGIN=raise_af before running Actifix or making changes."
+      },
+      {
+        question: "What does the duplicate_guard field prevent?",
+        options: [
+          "Multiple users from editing",
+          "Duplicate tickets from being created",
+          "File corruption",
+          "Database locks"
+        ],
+        correct: 1,
+        explanation: "The duplicate_guard field ensures the same error isn't logged multiple times, preventing ticket spam."
+      }
+    ],
+    python: [
+      {
+        question: "What is the correct way to handle exceptions in Actifix?",
+        options: [
+          "Try-except with pass",
+          "record_error() then re-raise",
+          "Ignore the error",
+          "Print to console only"
+        ],
+        correct: 1,
+        explanation: "Always use record_error() to capture the error, then re-raise it. Never suppress errors."
+      },
+      {
+        question: "Which module should NOT import higher-level modules?",
+        options: [
+          "bootstrap.py",
+          "raise_af.py",
+          "do_af.py",
+          "main.py"
+        ],
+        correct: 0,
+        explanation: "Lower layers cannot import higher layers. bootstrap.py is at the bottom of the dependency chain."
+      },
+      {
+        question: "What is the correct import for recording errors?",
+        options: [
+          "from actifix import record_error",
+          "from actifix.raise_af import record_error, TicketPriority",
+          "import raise_af",
+          "from raise_af import record_error"
+        ],
+        correct: 1,
+        explanation: "Use: from actifix.raise_af import record_error, TicketPriority"
+      },
+      {
+        question: "What should you use for atomic file writes?",
+        options: [
+          "open().write()",
+          "atomic_write()",
+          "file.write()",
+          "print()"
+        ],
+        correct: 1,
+        explanation: "Always use atomic_write() from actifix.log_utils for atomic file operations."
+      },
+      {
+        question: "What is the correct way to get Actifix paths?",
+        options: [
+          "os.path.join()",
+          "get_actifix_paths()",
+          "manual path construction",
+          "Pathlib only"
+        ],
+        correct: 1,
+        explanation: "Use get_actifix_paths() from actifix.state_paths to get canonical paths."
+      }
+    ],
+    git: [
+      {
+        question: "What is the correct commit message format?",
+        options: [
+          "Fixed bug in raise_af",
+          "feat(raise_af): add error taxonomy",
+          "Changes made",
+          "Update"
+        ],
+        correct: 1,
+        explanation: "Use format: type(scope): description. Types: feat|fix|refactor|test|docs|chore|perf"
+      },
+      {
+        question: "Which branch should you work on?",
+        options: [
+          "feature branches",
+          "develop",
+          "main",
+          "master"
+        ],
+        correct: 1,
+        explanation: "Work directly on develop with regular pushes. No per-change branches required."
+      },
+      {
+        question: "When should you commit?",
+        options: [
+          "Only at the end of the day",
+          "After every ticket",
+          "Never",
+          "Only when tests pass"
+        ],
+        correct: 1,
+        explanation: "Always commit after every ticket and push. This is a mandatory rule."
+      },
+      {
+        question: "What command increments the version?",
+        options: [
+          "git commit",
+          "Manual edit of pyproject.toml",
+          "Automatic after commit",
+          "npm version"
+        ],
+        correct: 1,
+        explanation: "Increment version in pyproject.toml after every commit."
+      },
+      {
+        question: "What is the correct git push command?",
+        options: [
+          "git push origin develop",
+          "git push",
+          "git push --all",
+          "git push origin main"
+        ],
+        correct: 0,
+        explanation: "Push to develop branch: git push origin develop"
+      }
+    ],
+    architecture: [
+      {
+        question: "What is the architecture graph file?",
+        options: [
+          "docs/ARCHITECTURE.md",
+          "docs/architecture/MAP.yaml",
+          "architecture.json",
+          "MAP.md"
+        ],
+        correct: 1,
+        explanation: "Always open docs/architecture/MAP.yaml and docs/architecture/DEPGRAPH.json before starting work."
+      },
+      {
+        question: "What is the dependency rule for modules?",
+        options: [
+          "Higher layers can import lower layers",
+          "Lower layers cannot import higher layers",
+          "All modules can import each other",
+          "Only main.py can import others"
+        ],
+        correct: 1,
+        explanation: "Dependency rule: Lower layers cannot import higher layers. bootstrap → state_paths → config → log_utils → persistence → raise_af → do_af → api → main"
+      },
+      {
+        question: "Where is the ticket database located?",
+        options: [
+          "In memory",
+          "In .actifix/",
+          "In data/actifix.db",
+          "In a remote server"
+        ],
+        correct: 2,
+        explanation: "The database at data/actifix.db is the single source of truth for all ticket data."
+      },
+      {
+        question: "What is the fallback queue location?",
+        options: [
+          "data/actifix.db",
+          ".actifix/actifix_fallback_queue.json",
+          "logs/fallback.json",
+          "tmp/queue.json"
+        ],
+        correct: 1,
+        explanation: "If main storage fails, errors queue to .actifix/actifix_fallback_queue.json and replay on recovery."
+      },
+      {
+        question: "What is the correct API for processing tickets?",
+        options: [
+          "actifix.process_tickets()",
+          "actifix.do_af.get_open_tickets()",
+          "actifix.main.process()",
+          "actifix.api.get_tickets()"
+        ],
+        correct: 1,
+        explanation: "Use: from actifix.do_af import get_open_tickets, mark_ticket_complete, get_ticket_stats"
+      }
+    ]
+  };
+
+  const allQuestions = [
+    ...quizData.actifix,
+    ...quizData.python,
+    ...quizData.git,
+    ...quizData.architecture
+  ];
+
+  const filteredQuestions = category === 'all' ? allQuestions : quizData[category];
+
+  const startQuiz = (quizCategory) => {
+    setCategory(quizCategory);
+    setCurrentQuiz(quizCategory);
+    setCurrentQuestionIndex(0);
+    setSelectedAnswer(null);
+    setShowResult(false);
+    setScore(0);
+    setAnswered(false);
+  };
+
+  const restartQuiz = () => {
+    setCurrentQuiz(null);
+    setCurrentQuestionIndex(0);
+    setSelectedAnswer(null);
+    setShowResult(false);
+    setScore(0);
+    setAnswered(false);
+  };
+
+  const handleAnswerSelect = (index) => {
+    if (answered) return;
+    setSelectedAnswer(index);
+  };
+
+  const submitAnswer = () => {
+    if (selectedAnswer === null) return;
+    
+    const currentQuestion = filteredQuestions[currentQuestionIndex];
+    const isCorrect = selectedAnswer === currentQuestion.correct;
+    
+    if (isCorrect) {
+      setScore(score + 1);
+    }
+    
+    setAnswered(true);
+  };
+
+  const nextQuestion = () => {
+    if (currentQuestionIndex < filteredQuestions.length - 1) {
+      setCurrentQuestionIndex(currentQuestionIndex + 1);
+      setSelectedAnswer(null);
+      setAnswered(false);
+    } else {
+      setShowResult(true);
+    }
+  };
+
+  const getScorePercentage = () => {
+    return Math.round((score / filteredQuestions.length) * 100);
+  };
+
+  const getScoreMessage = () => {
+    const percentage = getScorePercentage();
+    if (percentage === 100) return "Perfect! You're an Actifix expert! 🎉";
+    if (percentage >= 80) return "Excellent! Great knowledge! 🌟";
+    if (percentage >= 60) return "Good job! Keep learning! 📚";
+    if (percentage >= 40) return "Not bad! Review the docs! 📖";
+    return "Keep studying! You'll get there! 💪";
+  };
+
+  const getScoreColor = () => {
+    const percentage = getScorePercentage();
+    if (percentage >= 80) return '#10b981';
+    if (percentage >= 60) return '#f59e0b';
+    return '#ef4444';
+  };
+
+  if (!currentQuiz) {
+    return h('div', { className: 'panel' },
+      h('div', { className: 'panel-header' },
+        h('div', { className: 'panel-title' },
+          h('span', { className: 'panel-title-icon' }, '🎯'),
+          'ACTIFIX QUIZ'
+        ),
+        h('div', { className: 'panel-actions' },
+          h('span', { className: 'text-muted', style: { fontSize: '11px' } },
+            'Test your knowledge of Actifix, Python, Git & Architecture'
+          )
+        )
+      ),
+      h('div', { className: 'quiz-categories' },
+        h('div', { className: 'quiz-category-card', onClick: () => startQuiz('actifix') },
+          h('div', { className: 'quiz-category-icon' }, '🎫'),
+          h('div', { className: 'quiz-category-title' }, 'Actifix'),
+          h('div', { className: 'quiz-category-desc' }, '5 questions about the system')
+        ),
+        h('div', { className: 'quiz-category-card', onClick: () => startQuiz('python') },
+          h('div', { className: 'quiz-category-icon' }, '🐍'),
+          h('div', { className: 'quiz-category-title' }, 'Python'),
+          h('div', { className: 'quiz-category-desc' }, '5 questions about Python best practices')
+        ),
+        h('div', { className: 'quiz-category-card', onClick: () => startQuiz('git') },
+          h('div', { className: 'quiz-category-icon' }, '🐙'),
+          h('div', { className: 'quiz-category-title' }, 'Git'),
+          h('div', { className: 'quiz-category-desc' }, '5 questions about Git workflow')
+        ),
+        h('div', { className: 'quiz-category-card', onClick: () => startQuiz('architecture') },
+          h('div', { className: 'quiz-category-icon' }, '🏗️'),
+          h('div', { className: 'quiz-category-title' }, 'Architecture'),
+          h('div', { className: 'quiz-category-desc' }, '5 questions about system architecture')
+        ),
+        h('div', { className: 'quiz-category-card', onClick: () => startQuiz('all') },
+          h('div', { className: 'quiz-category-icon' }, '🎯'),
+          h('div', { className: 'quiz-category-title' }, 'All Categories'),
+          h('div', { className: 'quiz-category-desc' }, '20 questions - Full assessment')
+        )
+      ),
+    );
+  }
+
+  if (showResult) {
+    const percentage = getScorePercentage();
+    const color = getScoreColor();
+    
+    return h('div', { className: 'panel' },
+      h('div', { className: 'panel-header' },
+        h('div', { className: 'panel-title' },
+          h('span', { className: 'panel-title-icon' }, '📊'),
+          'QUIZ RESULTS'
+        )
+      ),
+      h('div', { className: 'quiz-result' },
+        h('div', { className: 'quiz-result-score', style: { color } },
+          h('div', { className: 'quiz-result-percentage' }, `${percentage}%`),
+          h('div', { className: 'quiz-result-text' }, getScoreMessage())
+        ),
+        h('div', { className: 'quiz-result-details' },
+          h('div', { className: 'quiz-result-stat' },
+            h('span', { className: 'quiz-result-label' }, 'Correct:'),
+            h('span', { className: 'quiz-result-value' }, score)
+          ),
+          h('div', { className: 'quiz-result-stat' },
+            h('span', { className: 'quiz-result-label' }, 'Total:'),
+            h('span', { className: 'quiz-result-value' }, filteredQuestions.length)
+          ),
+          h('div', { className: 'quiz-result-stat' },
+            h('span', { className: 'quiz-result-label' }, 'Category:'),
+            h('span', { className: 'quiz-result-value' }, category === 'all' ? 'All Categories' : category.charAt(0).toUpperCase() + category.slice(1))
+          )
+        ),
+        h('div', { className: 'quiz-result-actions' },
+          h('button', { className: 'btn btn-primary', onClick: restartQuiz }, 'Take Another Quiz'),
+          h('button', { className: 'btn', onClick: () => startQuiz(category) }, 'Retry This Quiz')
+        )
+      )
+    );
+  }
+
+  const currentQuestion = filteredQuestions[currentQuestionIndex];
+  const progress = ((currentQuestionIndex + 1) / filteredQuestions.length) * 100;
+
+  return h('div', { className: 'panel' },
+    h('div', { className: 'panel-header' },
+      h('div', { className: 'panel-title' },
+        h('span', { className: 'panel-title-icon' }, '🎯'),
+        `${category === 'all' ? 'All Categories' : category.charAt(0).toUpperCase() + category.slice(1)} Quiz`
+      ),
+      h('div', { className: 'panel-actions' },
+        h('span', { className: 'text-muted', style: { fontSize: '11px' } },
+          `Question ${currentQuestionIndex + 1} of ${filteredQuestions.length}`
+        )
+      )
+    ),
+    h('div', { className: 'quiz-progress' },
+      h('div', { className: 'quiz-progress-bar', style: { width: `${progress}%` } })
+    ),
+    h('div', { className: 'quiz-question' },
+      h('div', { className: 'quiz-question-text' }, currentQuestion.question),
+      h('div', { className: 'quiz-options' },
+        currentQuestion.options.map((option, index) =>
+          h('div', {
+            key: index,
+            className: [
+              'quiz-option',
+              selectedAnswer === index ? 'selected' : '',
+              answered && index === currentQuestion.correct ? 'correct' : '',
+              answered && selectedAnswer === index && index !== currentQuestion.correct ? 'incorrect' : ''
+            ].join(' '),
+            onClick: () => handleAnswerSelect(index)
+          },
+            h('div', { className: 'quiz-option-letter' }, String.fromCharCode(65 + index)),
+            h('div', { className: 'quiz-option-text' }, option)
+          )
+        )
+      ),
+      answered && h('div', { className: 'quiz-explanation' },
+        h('div', { className: 'quiz-explanation-label' }, 'Explanation:'),
+        h('div', { className: 'quiz-explanation-text' }, currentQuestion.explanation)
+      ),
+      h('div', { className: 'quiz-actions' },
+        !answered && h('button', {
+          className: 'btn btn-primary',
+          onClick: submitAnswer,
+          disabled: selectedAnswer === null
+        }, 'Submit Answer'),
+        answered && h('button', {
+          className: 'btn btn-primary',
+          onClick: nextQuestion
+        }, currentQuestionIndex < filteredQuestions.length - 1 ? 'Next Question' : 'See Results')
+      )
+    )
+  );
+};
+
 // Ideas View Component
 const IdeasView = () => {
   const [idea, setIdea] = useState('');
-  const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [errorMsg, setErrorMsg] = useState('');
+  const { execute: authenticatedFetch, loading, error } = useAuthenticatedFetch();
 
   const submitIdea = async () => {
     if (!idea.trim()) return;
-    setLoading(true);
     setErrorMsg('');
     setResult(null);
+    
     try {
-      const response = await fetch(`${API_BASE}/ideas`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ idea: idea.trim() })
+      const data = await authenticatedFetch('/ideas', {
+        body: { idea: idea.trim() }
       });
-      const data = await response.json();
-      if (response.ok) {
-        setResult(data);
-      } else {
-        setErrorMsg(data.error || 'Failed to generate ticket');
-      }
+      setResult(data);
     } catch (err) {
       setErrorMsg(err.message);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -1388,6 +2230,148 @@ Examples:
   );
 };
 
+// Login Component
+const LoginView = ({ onLogin }) => {
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleLogin = async () => {
+    if (!password) {
+      setError('Please enter the admin password');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+
+    try {
+      // Test the password by making a simple API call
+      const response = await fetch(`${API_BASE}/health`, {
+        headers: { 'X-Admin-Password': password }
+      });
+
+      if (response.ok) {
+        // Password is correct, store it and log in
+        setAdminPasswordInStorage(password);
+        onLogin();
+      } else {
+        setError('Invalid admin password');
+      }
+    } catch (err) {
+      setError(`Connection error: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return h('div', { className: 'login-container' },
+    h('div', { className: 'login-card' },
+      h('div', { className: 'login-header' },
+        h('img', { src: './assets/pangolin.svg', alt: 'Actifix', className: 'login-logo' }),
+        h('h1', null, 'ACTIFIX'),
+        h('p', { className: 'login-subtitle' }, 'Secure Ticket Management System')
+      ),
+      
+      h('div', { className: 'login-form' },
+        h('div', { className: 'form-group' },
+          h('label', null, 'Admin Password'),
+          h('input', {
+            type: 'password',
+            value: password,
+            onChange: (e) => setPassword(e.target.value),
+            placeholder: 'Enter admin password',
+            className: 'login-input',
+            disabled: loading,
+            onKeyPress: (e) => e.key === 'Enter' && handleLogin()
+          })
+        ),
+
+        error && h('div', { className: 'login-error' }, error),
+
+        h('div', { className: 'login-actions' },
+          h('button', {
+            onClick: handleLogin,
+            disabled: loading || !password,
+            className: 'btn btn-primary'
+          }, loading ? 'Authenticating...' : 'Login'),
+          h('p', { className: 'login-help' }, 'Default password: admin123')
+        )
+      )
+    )
+  );
+};
+
+const LoginModal = ({ onClose, onSuccess }) => {
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleLogin = async () => {
+    if (!password) {
+      setError('Please enter the admin password');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+
+    try {
+      const response = await fetch(`${API_BASE}/api/auth/verify-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password })
+      });
+
+      const data = await response.json();
+
+      if (data.valid) {
+        setAdminPasswordInStorage(password);
+        onSuccess();
+        onClose();
+      } else {
+        setError(data.error || 'Invalid admin password');
+      }
+    } catch (err) {
+      setError(`Connection error: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return h('div', { className: 'login-modal-backdrop', onClick: onClose },
+    h('div', { className: 'login-modal', onClick: (e) => e.stopPropagation() },
+      h('div', { className: 'login-header' },
+        h('img', { src: './assets/pangolin.svg', alt: 'Actifix', className: 'login-logo-small' }),
+        h('h2', null, 'Admin Login')
+      ),
+      h('div', { className: 'login-form' },
+        h('input', {
+          type: 'password',
+          value: password,
+          onChange: (e) => setPassword(e.target.value),
+          placeholder: 'Enter admin password',
+          className: 'login-input',
+          disabled: loading,
+          onKeyPress: (e) => e.key === 'Enter' && handleLogin()
+        }),
+        error && h('div', { className: 'login-error' }, error),
+        h('div', { className: 'login-actions' },
+          h('button', {
+            onClick: handleLogin,
+            disabled: loading || !password,
+            className: 'btn btn-primary'
+          }, loading ? 'Authenticating...' : 'Login'),
+          h('button', {
+            onClick: onClose,
+            className: 'btn btn-secondary'
+          }, 'Cancel')
+        )
+      )
+    )
+  );
+};
+
 // Main App Component
 const App = () => {
   const [activeView, setActiveView] = useState('overview');
@@ -1395,7 +2379,21 @@ const App = () => {
   const [fixStatus, setFixStatus] = useState('Ready to fix the next ticket');
   const [logAlert, setLogAlert] = useState(false);
   const [theme, setTheme] = useState('dark');
+  const [hasPassword, setHasPassword] = useState(!!getAdminPassword());
+  const [showLoginModal, setShowLoginModal] = useState(false);
   const logFlashTimer = useRef(null);
+
+  const handleLogout = () => {
+    clearAuthToken();
+    setHasPassword(false);
+    setActiveView('overview');
+  };
+
+  const handleLoginSuccess = () => {
+    setHasPassword(true);
+  };
+
+  const openLoginModal = () => setShowLoginModal(true);
 
   useEffect(() => {
     const savedTheme = localStorage.getItem('actifix-theme') || 'dark';
@@ -1404,7 +2402,10 @@ const App = () => {
   }, []);
 
   const toggleTheme = () => {
-    const newTheme = theme === 'dark' ? 'azure' : 'dark';
+    const themeOrder = ['dark', 'portal', 'azure'];
+    const currentIndex = themeOrder.indexOf(theme);
+    const nextIndex = (currentIndex + 1) % themeOrder.length;
+    const newTheme = themeOrder[nextIndex];
     setTheme(newTheme);
     localStorage.setItem('actifix-theme', newTheme);
     document.documentElement.dataset.theme = newTheme;
@@ -1429,12 +2430,13 @@ const App = () => {
   };
 
   const handleFix = async () => {
-    if (isFixing) return;
+    if (isFixing || !hasPassword) return;
     setIsFixing(true);
     setFixStatus('Checking tickets…');
-    
+
     try {
-      const statsResp = await fetch(`${API_BASE}/tickets?limit=1`);
+      const headers = buildAdminHeaders();
+      const statsResp = await fetch(`${API_BASE}/tickets?limit=1`, { headers });
       const statsData = await statsResp.json();
       if (!statsResp.ok || !statsData || (statsData.total_open || 0) <= 0) {
         setFixStatus('No open tickets to fix');
@@ -1451,8 +2453,11 @@ const App = () => {
     triggerLogFlash();
 
     try {
+      const headers = buildAdminHeaders({ 'Content-Type': 'application/json' });
+      
       const response = await fetch(`${API_BASE}/fix-ticket`, {
         method: 'POST',
+        headers,
       });
       const data = await response.json();
       if (!response.ok) {
@@ -1478,23 +2483,25 @@ const App = () => {
 
   const renderView = () => {
     switch (activeView) {
-      case 'tickets': return h(TicketsView);
+      case 'tickets': return h(TicketsView, { hasPassword });
+      case 'quiz': return h(QuizView);
       case 'logs': return h(LogsView);
       case 'system': return h(SystemView);
-      case 'modules': return h(ModulesView);
-      case 'ideas': return h(IdeasView);
-      case 'settings': return h(SettingsView);
+      case 'modules': return h(ModulesView, { hasPassword });
+      case 'ideas': return h(IdeasView, { hasPassword });
+      case 'settings': return h(SettingsView, { hasPassword });
       default: return h(OverviewView);
     }
   };
 
   return h('div', { className: 'dashboard' },
     h(NavigationRail, { activeView, onViewChange: setActiveView, logAlert }),
-    h(Header, { onFix: handleFix, isFixing, fixStatus, theme, onToggleTheme: toggleTheme }),
+    h(Header, { onFix: handleFix, isFixing, fixStatus, theme, onToggleTheme: toggleTheme, onLogout: handleLogout, hasPassword, onLoginClick: openLoginModal }),
     h('main', { className: 'dashboard-content' },
       renderView()
     ),
-    h(Footer)
+    h(Footer),
+    showLoginModal && h(LoginModal, { onClose: () => setShowLoginModal(false), onSuccess: handleLoginSuccess })
   );
 };
 

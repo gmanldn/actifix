@@ -15,7 +15,7 @@ from actifix.config import load_config
 
 def test_config_defaults():
     config = load_config()
-    assert config.ai_provider.lower() == 'ollama', f"Expected ai_provider 'ollama', got {config.ai_provider}"
+    assert config.ai_provider == "", f"Expected ai_provider default to be empty, got {config.ai_provider}"
     assert config.ai_model == 'qwen2.5-coder:7b-instruct', f"Expected ai_model 'qwen2.5-coder:7b-instruct', got {config.ai_model}"
     assert config.ollama_model == 'qwen2.5-coder:7b-instruct', f"Expected ollama_model 'qwen2.5-coder:7b-instruct', got {config.ollama_model}"
 

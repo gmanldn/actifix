@@ -1,10 +1,13 @@
 {
   "schema_version": "arch-depgraph.v1",
   "meta": {
-    "generated_at": "2026-01-20T13:16:31Z",
-    "generator": "update_architecture_docs.py",
-    "generator_version": "2.0.0",
-    "source_commit": "current_development"
+    "generated_at": "2026-01-20T18:08:36.934780+00:00",
+    "generator": "codex-architecture-sync",
+    "generator_version": "1.0.0",
+    "source_commit": "current_development",
+    "notes": [
+      "Synced dependency graph with updated MAP.yaml modules and dependencies."
+    ]
   },
   "nodes": [
     {
@@ -154,7 +157,7 @@
     {
       "id": "tooling.testing",
       "domain": "tooling",
-      "owner": "testing",
+      "owner": "tooling",
       "label": "testing"
     },
     {
@@ -284,6 +287,24 @@
       "label": "core"
     },
     {
+      "id": "modules.registry",
+      "domain": "modules",
+      "owner": "modules",
+      "label": "registry"
+    },
+    {
+      "id": "modules.base",
+      "domain": "modules",
+      "owner": "modules",
+      "label": "base"
+    },
+    {
+      "id": "modules.config",
+      "domain": "modules",
+      "owner": "modules",
+      "label": "config"
+    },
+    {
       "id": "modules.superquiz",
       "domain": "modules",
       "owner": "modules",
@@ -296,16 +317,58 @@
       "label": "yhatzee"
     },
     {
-      "id": "modules.registry",
+      "id": "modules.pokertool",
       "domain": "modules",
       "owner": "modules",
-      "label": "registry"
+      "label": "pokertool"
+    },
+    {
+      "id": "modules.pokertool.core",
+      "domain": "modules",
+      "owner": "modules",
+      "label": "core"
+    },
+    {
+      "id": "modules.pokertool.detector",
+      "domain": "modules",
+      "owner": "modules",
+      "label": "detector"
+    },
+    {
+      "id": "modules.pokertool.solvers",
+      "domain": "modules",
+      "owner": "modules",
+      "label": "solvers"
+    },
+    {
+      "id": "modules.pokertool.ml",
+      "domain": "modules",
+      "owner": "modules",
+      "label": "ml"
     },
     {
       "id": "modules.dev_assistant",
       "domain": "modules",
       "owner": "modules",
       "label": "dev_assistant"
+    },
+    {
+      "id": "modules.artclass",
+      "domain": "modules",
+      "owner": "modules",
+      "label": "artclass"
+    },
+    {
+      "id": "modules.shootymcshoot",
+      "domain": "modules",
+      "owner": "modules",
+      "label": "shootymcshoot"
+    },
+    {
+      "id": "modules.hollogram",
+      "domain": "modules",
+      "owner": "modules",
+      "label": "hollogram"
     }
   ],
   "edges": [
@@ -327,7 +390,7 @@
     {
       "from": "bootstrap.main",
       "to": "infra.persistence.database",
-      "reason": "bootstrap.main ensures the ticket database is initialized"
+      "reason": "bootstrap.main depends on infra.persistence.database"
     },
     {
       "from": "runtime.api",
@@ -358,26 +421,6 @@
       "from": "runtime.api",
       "to": "modules.registry",
       "reason": "runtime.api depends on modules.registry"
-    },
-    {
-      "from": "modules.core",
-      "to": "runtime.config",
-      "reason": "modules.core depends on runtime.config"
-    },
-    {
-      "from": "modules.core",
-      "to": "core.raise_af",
-      "reason": "modules.core depends on core.raise_af"
-    },
-    {
-      "from": "modules.registry",
-      "to": "infra.logging",
-      "reason": "modules.registry depends on infra.logging"
-    },
-    {
-      "from": "modules.registry",
-      "to": "core.raise_af",
-      "reason": "modules.registry depends on core.raise_af"
     },
     {
       "from": "runtime.config",
@@ -517,27 +560,12 @@
     {
       "from": "core.raise_af",
       "to": "infra.persistence.ticket_repo",
-      "reason": "core.raise_af persists tickets through the repository"
+      "reason": "core.raise_af depends on infra.persistence.ticket_repo"
     },
     {
-      "from": "core.ai_client",
-      "to": "runtime.config",
-      "reason": "core.ai_client depends on runtime.config"
-    },
-    {
-      "from": "core.ai_client",
-      "to": "runtime.state",
-      "reason": "core.ai_client depends on runtime.state"
-    },
-    {
-      "from": "core.ai_client",
-      "to": "infra.logging",
-      "reason": "core.ai_client depends on infra.logging"
-    },
-    {
-      "from": "core.error_taxonomy",
-      "to": "core.raise_af",
-      "reason": "core.error_taxonomy depends on core.raise_af"
+      "from": "core.raise_af",
+      "to": "security.ticket_throttler",
+      "reason": "core.raise_af depends on security.ticket_throttler"
     },
     {
       "from": "core.do_af",
@@ -557,7 +585,7 @@
     {
       "from": "core.do_af",
       "to": "infra.persistence.ticket_repo",
-      "reason": "core.do_af claims work from the ticket repository"
+      "reason": "core.do_af depends on infra.persistence.ticket_repo"
     },
     {
       "from": "core.quarantine",
@@ -568,21 +596,6 @@
       "from": "core.quarantine",
       "to": "runtime.state",
       "reason": "core.quarantine depends on runtime.state"
-    },
-    {
-      "from": "tooling.simple_ticket_attack",
-      "to": "runtime.state",
-      "reason": "tooling.simple_ticket_attack depends on runtime.state"
-    },
-    {
-      "from": "tooling.simple_ticket_attack",
-      "to": "core.raise_af",
-      "reason": "tooling.simple_ticket_attack depends on core.raise_af"
-    },
-    {
-      "from": "tooling.bounce",
-      "to": "bootstrap.main",
-      "reason": "tooling.bounce depends on bootstrap.main"
     },
     {
       "from": "tooling.testing.system",
@@ -617,7 +630,7 @@
     {
       "from": "tooling.testing",
       "to": "core.raise_af",
-      "reason": "tooling.testing uses raise_af to record hang tickets"
+      "reason": "tooling.testing depends on core.raise_af"
     },
     {
       "from": "tooling.testing",
@@ -630,89 +643,39 @@
       "reason": "tooling.testing depends on tooling.testing.reporting"
     },
     {
-      "from": "plugins.registry",
-      "to": "infra.logging",
-      "reason": "plugins.registry depends on infra.logging"
-    },
-    {
-      "from": "plugins.registry",
-      "to": "plugins.protocol",
-      "reason": "plugins.registry depends on plugins.protocol"
-    },
-    {
-      "from": "plugins.validation",
-      "to": "infra.logging",
-      "reason": "plugins.validation depends on infra.logging"
-    },
-    {
-      "from": "plugins.validation",
-      "to": "plugins.protocol",
-      "reason": "plugins.validation depends on plugins.protocol"
-    },
-    {
-      "from": "plugins.sandbox",
-      "to": "infra.logging",
-      "reason": "plugins.sandbox depends on infra.logging"
-    },
-    {
-      "from": "plugins.sandbox",
+      "from": "tooling.simple_ticket_attack",
       "to": "core.raise_af",
-      "reason": "plugins.sandbox depends on core.raise_af"
+      "reason": "tooling.simple_ticket_attack depends on core.raise_af"
     },
     {
-      "from": "plugins.sandbox",
-      "to": "plugins.registry",
-      "reason": "plugins.sandbox depends on plugins.registry"
+      "from": "tooling.simple_ticket_attack",
+      "to": "runtime.state",
+      "reason": "tooling.simple_ticket_attack depends on runtime.state"
     },
     {
-      "from": "plugins.sandbox",
-      "to": "plugins.validation",
-      "reason": "plugins.sandbox depends on plugins.validation"
+      "from": "tooling.bounce",
+      "to": "bootstrap.main",
+      "reason": "tooling.bounce depends on bootstrap.main"
     },
     {
-      "from": "plugins.loader",
+      "from": "core.ai_client",
+      "to": "runtime.config",
+      "reason": "core.ai_client depends on runtime.config"
+    },
+    {
+      "from": "core.ai_client",
       "to": "infra.logging",
-      "reason": "plugins.loader depends on infra.logging"
+      "reason": "core.ai_client depends on infra.logging"
     },
     {
-      "from": "plugins.loader",
+      "from": "core.ai_client",
+      "to": "runtime.state",
+      "reason": "core.ai_client depends on runtime.state"
+    },
+    {
+      "from": "core.error_taxonomy",
       "to": "core.raise_af",
-      "reason": "plugins.loader depends on core.raise_af"
-    },
-    {
-      "from": "plugins.loader",
-      "to": "plugins.registry",
-      "reason": "plugins.loader depends on plugins.registry"
-    },
-    {
-      "from": "plugins.loader",
-      "to": "plugins.validation",
-      "reason": "plugins.loader depends on plugins.validation"
-    },
-    {
-      "from": "plugins.loader",
-      "to": "plugins.sandbox",
-      "reason": "plugins.loader depends on plugins.sandbox"
-    },
-    {
-      "from": "plugins.api",
-      "to": "plugins.protocol",
-      "reason": "plugins.api depends on plugins.protocol"
-    },
-    {
-      "from": "plugins.api",
-      "to": "plugins.registry",
-      "reason": "plugins.api depends on plugins.registry"
-    },
-    {
-      "from": "plugins.builtin",
-      "to": "plugins.protocol",
-      "reason": "plugins.builtin depends on plugins.protocol"
-    },
-    {
-      "from": "plugins.builtin",
-      "to": "plugins.registry",
-      "reason": "plugins.builtin depends on plugins.registry"
+      "reason": "core.error_taxonomy depends on core.raise_af"
     },
     {
       "from": "core.recovery",
@@ -727,7 +690,7 @@
     {
       "from": "core.self_repair",
       "to": "infra.logging",
-      "reason": "core.self_repair logs blueprints via infra.logging"
+      "reason": "core.self_repair depends on infra.logging"
     },
     {
       "from": "security.api",
@@ -780,19 +743,14 @@
       "reason": "security.secrets_scanner depends on infra.logging"
     },
     {
-      "from": "core.raise_af",
-      "to": "security.ticket_throttler",
-      "reason": "core.raise_af depends on security.ticket_throttler"
+      "from": "security.ticket_throttler",
+      "to": "runtime.state",
+      "reason": "security.ticket_throttler depends on runtime.state"
     },
     {
       "from": "security.ticket_throttler",
       "to": "core.raise_af",
-      "reason": "security.ticket_throttler imports TicketPriority from core.raise_af"
-    },
-    {
-      "from": "security.ticket_throttler",
-      "to": "runtime.state",
-      "reason": "security.ticket_throttler uses Actifix paths for throttle storage"
+      "reason": "security.ticket_throttler depends on core.raise_af"
     },
     {
       "from": "plugins.permissions",
@@ -805,64 +763,354 @@
       "reason": "plugins.permissions depends on security.auth"
     },
     {
+      "from": "plugins.registry",
+      "to": "infra.logging",
+      "reason": "plugins.registry depends on infra.logging"
+    },
+    {
+      "from": "plugins.registry",
+      "to": "plugins.protocol",
+      "reason": "plugins.registry depends on plugins.protocol"
+    },
+    {
+      "from": "plugins.validation",
+      "to": "infra.logging",
+      "reason": "plugins.validation depends on infra.logging"
+    },
+    {
+      "from": "plugins.validation",
+      "to": "plugins.protocol",
+      "reason": "plugins.validation depends on plugins.protocol"
+    },
+    {
+      "from": "plugins.sandbox",
+      "to": "core.raise_af",
+      "reason": "plugins.sandbox depends on core.raise_af"
+    },
+    {
+      "from": "plugins.sandbox",
+      "to": "infra.logging",
+      "reason": "plugins.sandbox depends on infra.logging"
+    },
+    {
+      "from": "plugins.sandbox",
+      "to": "plugins.registry",
+      "reason": "plugins.sandbox depends on plugins.registry"
+    },
+    {
+      "from": "plugins.sandbox",
+      "to": "plugins.validation",
+      "reason": "plugins.sandbox depends on plugins.validation"
+    },
+    {
+      "from": "plugins.loader",
+      "to": "core.raise_af",
+      "reason": "plugins.loader depends on core.raise_af"
+    },
+    {
+      "from": "plugins.loader",
+      "to": "infra.logging",
+      "reason": "plugins.loader depends on infra.logging"
+    },
+    {
+      "from": "plugins.loader",
+      "to": "plugins.registry",
+      "reason": "plugins.loader depends on plugins.registry"
+    },
+    {
+      "from": "plugins.loader",
+      "to": "plugins.validation",
+      "reason": "plugins.loader depends on plugins.validation"
+    },
+    {
+      "from": "plugins.loader",
+      "to": "plugins.sandbox",
+      "reason": "plugins.loader depends on plugins.sandbox"
+    },
+    {
+      "from": "plugins.api",
+      "to": "plugins.protocol",
+      "reason": "plugins.api depends on plugins.protocol"
+    },
+    {
+      "from": "plugins.api",
+      "to": "plugins.registry",
+      "reason": "plugins.api depends on plugins.registry"
+    },
+    {
+      "from": "plugins.builtin",
+      "to": "plugins.registry",
+      "reason": "plugins.builtin depends on plugins.registry"
+    },
+    {
+      "from": "plugins.builtin",
+      "to": "plugins.protocol",
+      "reason": "plugins.builtin depends on plugins.protocol"
+    },
+    {
+      "from": "modules.core",
+      "to": "runtime.config",
+      "reason": "modules.core depends on runtime.config"
+    },
+    {
+      "from": "modules.core",
+      "to": "core.raise_af",
+      "reason": "modules.core depends on core.raise_af"
+    },
+    {
+      "from": "modules.registry",
+      "to": "infra.logging",
+      "reason": "modules.registry depends on infra.logging"
+    },
+    {
+      "from": "modules.registry",
+      "to": "core.raise_af",
+      "reason": "modules.registry depends on core.raise_af"
+    },
+    {
+      "from": "modules.base",
+      "to": "modules.config",
+      "reason": "modules.base depends on modules.config"
+    },
+    {
+      "from": "modules.base",
+      "to": "infra.logging",
+      "reason": "modules.base depends on infra.logging"
+    },
+    {
+      "from": "modules.base",
+      "to": "core.raise_af",
+      "reason": "modules.base depends on core.raise_af"
+    },
+    {
+      "from": "modules.base",
+      "to": "runtime.state",
+      "reason": "modules.base depends on runtime.state"
+    },
+    {
+      "from": "modules.config",
+      "to": "runtime.config",
+      "reason": "modules.config depends on runtime.config"
+    },
+    {
+      "from": "modules.config",
+      "to": "core.raise_af",
+      "reason": "modules.config depends on core.raise_af"
+    },
+    {
       "from": "modules.superquiz",
       "to": "runtime.state",
-      "reason": "modules.superquiz uses Actifix state paths"
+      "reason": "modules.superquiz depends on runtime.state"
     },
     {
       "from": "modules.superquiz",
       "to": "infra.logging",
-      "reason": "modules.superquiz logs events via infra.logging"
+      "reason": "modules.superquiz depends on infra.logging"
     },
     {
       "from": "modules.superquiz",
       "to": "core.raise_af",
-      "reason": "modules.superquiz records errors via core.raise_af"
+      "reason": "modules.superquiz depends on core.raise_af"
     },
     {
       "from": "modules.superquiz",
       "to": "runtime.api",
-      "reason": "modules.superquiz registers a blueprint on the runtime API server"
+      "reason": "modules.superquiz depends on runtime.api"
+    },
+    {
+      "from": "modules.superquiz",
+      "to": "modules.pokertool.core",
+      "reason": "modules.superquiz depends on modules.pokertool.core"
     },
     {
       "from": "modules.yhatzee",
       "to": "runtime.state",
-      "reason": "modules.yhatzee uses Actifix state paths"
+      "reason": "modules.yhatzee depends on runtime.state"
     },
     {
       "from": "modules.yhatzee",
       "to": "infra.logging",
-      "reason": "modules.yhatzee logs events via infra.logging"
+      "reason": "modules.yhatzee depends on infra.logging"
     },
     {
       "from": "modules.yhatzee",
       "to": "core.raise_af",
-      "reason": "modules.yhatzee records errors via core.raise_af"
+      "reason": "modules.yhatzee depends on core.raise_af"
     },
     {
       "from": "modules.yhatzee",
       "to": "runtime.api",
-      "reason": "modules.yhatzee registers a blueprint on the runtime API server"
+      "reason": "modules.yhatzee depends on runtime.api"
+    },
+    {
+      "from": "modules.pokertool",
+      "to": "runtime.state",
+      "reason": "modules.pokertool depends on runtime.state"
+    },
+    {
+      "from": "modules.pokertool",
+      "to": "infra.logging",
+      "reason": "modules.pokertool depends on infra.logging"
+    },
+    {
+      "from": "modules.pokertool",
+      "to": "core.raise_af",
+      "reason": "modules.pokertool depends on core.raise_af"
+    },
+    {
+      "from": "modules.pokertool",
+      "to": "runtime.api",
+      "reason": "modules.pokertool depends on runtime.api"
+    },
+    {
+      "from": "modules.pokertool.detector",
+      "to": "runtime.state",
+      "reason": "modules.pokertool.detector depends on runtime.state"
+    },
+    {
+      "from": "modules.pokertool.detector",
+      "to": "infra.logging",
+      "reason": "modules.pokertool.detector depends on infra.logging"
+    },
+    {
+      "from": "modules.pokertool.detector",
+      "to": "core.raise_af",
+      "reason": "modules.pokertool.detector depends on core.raise_af"
+    },
+    {
+      "from": "modules.pokertool.solvers",
+      "to": "runtime.state",
+      "reason": "modules.pokertool.solvers depends on runtime.state"
+    },
+    {
+      "from": "modules.pokertool.solvers",
+      "to": "infra.logging",
+      "reason": "modules.pokertool.solvers depends on infra.logging"
+    },
+    {
+      "from": "modules.pokertool.solvers",
+      "to": "core.raise_af",
+      "reason": "modules.pokertool.solvers depends on core.raise_af"
+    },
+    {
+      "from": "modules.pokertool.ml",
+      "to": "runtime.state",
+      "reason": "modules.pokertool.ml depends on runtime.state"
+    },
+    {
+      "from": "modules.pokertool.ml",
+      "to": "infra.logging",
+      "reason": "modules.pokertool.ml depends on infra.logging"
+    },
+    {
+      "from": "modules.pokertool.ml",
+      "to": "core.raise_af",
+      "reason": "modules.pokertool.ml depends on core.raise_af"
+    },
+    {
+      "from": "modules.dev_assistant",
+      "to": "modules.base",
+      "reason": "modules.dev_assistant depends on modules.base"
+    },
+    {
+      "from": "modules.dev_assistant",
+      "to": "modules.config",
+      "reason": "modules.dev_assistant depends on modules.config"
     },
     {
       "from": "modules.dev_assistant",
       "to": "runtime.state",
-      "reason": "modules.dev_assistant uses Actifix state paths"
+      "reason": "modules.dev_assistant depends on runtime.state"
     },
     {
       "from": "modules.dev_assistant",
       "to": "infra.logging",
-      "reason": "modules.dev_assistant logs events via infra.logging"
+      "reason": "modules.dev_assistant depends on infra.logging"
     },
     {
       "from": "modules.dev_assistant",
       "to": "core.raise_af",
-      "reason": "modules.dev_assistant records errors via core.raise_af"
+      "reason": "modules.dev_assistant depends on core.raise_af"
     },
     {
       "from": "modules.dev_assistant",
       "to": "runtime.api",
-      "reason": "modules.dev_assistant registers a blueprint on the runtime API server"
+      "reason": "modules.dev_assistant depends on runtime.api"
+    },
+    {
+      "from": "modules.artclass",
+      "to": "runtime.state",
+      "reason": "modules.artclass depends on runtime.state"
+    },
+    {
+      "from": "modules.artclass",
+      "to": "infra.logging",
+      "reason": "modules.artclass depends on infra.logging"
+    },
+    {
+      "from": "modules.artclass",
+      "to": "core.raise_af",
+      "reason": "modules.artclass depends on core.raise_af"
+    },
+    {
+      "from": "modules.artclass",
+      "to": "runtime.api",
+      "reason": "modules.artclass depends on runtime.api"
+    },
+    {
+      "from": "modules.shootymcshoot",
+      "to": "runtime.state",
+      "reason": "modules.shootymcshoot depends on runtime.state"
+    },
+    {
+      "from": "modules.shootymcshoot",
+      "to": "infra.logging",
+      "reason": "modules.shootymcshoot depends on infra.logging"
+    },
+    {
+      "from": "modules.shootymcshoot",
+      "to": "core.raise_af",
+      "reason": "modules.shootymcshoot depends on core.raise_af"
+    },
+    {
+      "from": "modules.shootymcshoot",
+      "to": "runtime.api",
+      "reason": "modules.shootymcshoot depends on runtime.api"
+    },
+    {
+      "from": "modules.hollogram",
+      "to": "modules.base",
+      "reason": "modules.hollogram depends on modules.base"
+    },
+    {
+      "from": "modules.hollogram",
+      "to": "modules.config",
+      "reason": "modules.hollogram depends on modules.config"
+    },
+    {
+      "from": "modules.hollogram",
+      "to": "runtime.state",
+      "reason": "modules.hollogram depends on runtime.state"
+    },
+    {
+      "from": "modules.hollogram",
+      "to": "infra.logging",
+      "reason": "modules.hollogram depends on infra.logging"
+    },
+    {
+      "from": "modules.hollogram",
+      "to": "core.raise_af",
+      "reason": "modules.hollogram depends on core.raise_af"
+    },
+    {
+      "from": "modules.hollogram",
+      "to": "runtime.api",
+      "reason": "modules.hollogram depends on runtime.api"
+    },
+    {
+      "from": "modules.hollogram",
+      "to": "core.ai_client",
+      "reason": "modules.hollogram depends on core.ai_client"
     }
   ]
 }

@@ -18,6 +18,7 @@ from typing import Optional, Callable, Tuple, Any
 
 from .raise_af import record_error, ACTIFIX_CAPTURE_ENV_VAR, enforce_raise_af_only
 from .state_paths import get_actifix_paths, init_actifix_files, ActifixPaths
+from .thread_cleanup import cleanup_orphan_threads, log_thread_state
 
 
 def enable_actifix_capture() -> None:
@@ -152,10 +153,17 @@ def bootstrap(project_root: Optional[Path] = None) -> ActifixPaths:
     Returns:
         Initialized ActifixPaths.
     """
+    # Clean up orphan threads from previous runs
+    cleanup_orphan_threads(timeout=2.0)
+    
     enforce_raise_af_only(get_actifix_paths(project_root=project_root))
     paths = get_actifix_paths(project_root=project_root)
     init_actifix_files(paths)
     ensure_ticket_database(paths)
+    
+    # Log final thread state after initialization
+    log_thread_state()
+    
     return paths
 
 
