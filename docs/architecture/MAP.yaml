@@ -336,6 +336,23 @@ modules:
   - infra.logging
   - runtime.config
 
+- id: core.diagnostics
+  domain: core
+  owner: core
+  summary: Diagnostics bundle export for support and troubleshooting
+  entrypoints:
+  - src/actifix/diagnostics.py
+  contracts:
+  - collect system state, tickets, logs, and configuration
+  - sanitize sensitive data before export
+  - export as compressed ZIP bundle
+  depends_on:
+  - infra.logging
+  - runtime.config
+  - runtime.state
+  - core.do_af
+  - infra.health
+
 - id: core.do_af
   domain: core
   owner: core

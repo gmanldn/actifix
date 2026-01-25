@@ -155,6 +155,12 @@
       "label": "completion_hooks"
     },
     {
+      "id": "core.diagnostics",
+      "domain": "core",
+      "owner": "core",
+      "label": "diagnostics"
+    },
+    {
       "id": "core.do_af",
       "domain": "core",
       "owner": "core",
@@ -615,6 +621,31 @@
       "from": "core.completion_hooks",
       "to": "runtime.config",
       "reason": "core.completion_hooks depends on runtime.config"
+    },
+    {
+      "from": "core.diagnostics",
+      "to": "infra.logging",
+      "reason": "core.diagnostics depends on infra.logging"
+    },
+    {
+      "from": "core.diagnostics",
+      "to": "runtime.config",
+      "reason": "core.diagnostics depends on runtime.config"
+    },
+    {
+      "from": "core.diagnostics",
+      "to": "runtime.state",
+      "reason": "core.diagnostics depends on runtime.state"
+    },
+    {
+      "from": "core.diagnostics",
+      "to": "core.do_af",
+      "reason": "core.diagnostics depends on core.do_af"
+    },
+    {
+      "from": "core.diagnostics",
+      "to": "infra.health",
+      "reason": "core.diagnostics depends on infra.health"
     },
     {
       "from": "core.do_af",

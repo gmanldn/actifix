@@ -111,6 +111,33 @@ def cmd_quarantine(args: argparse.Namespace) -> int:
         return 0
 
 
+def cmd_diagnostics(args: argparse.Namespace) -> int:
+    """Export diagnostics bundle for support."""
+    with ActifixContext(project_root=Path(args.project_root or Path.cwd())):
+        from .diagnostics import export_diagnostics_bundle, print_diagnostics_summary
+
+        if args.diagnostics_action == "summary":
+            print_diagnostics_summary()
+            return 0
+
+        elif args.diagnostics_action == "export":
+            output_path = None
+            if args.output:
+                output_path = Path(args.output)
+
+            bundle_path = export_diagnostics_bundle(
+                output_path=output_path,
+                include_logs=not args.no_logs,
+                include_tickets=not args.no_tickets,
+            )
+
+            print(f"✓ Diagnostics bundle exported to: {bundle_path}")
+            print(f"  Size: {bundle_path.stat().st_size} bytes")
+            return 0
+
+        return 1
+
+
 def cmd_test(args: argparse.Namespace) -> int:
     """Run Actifix self-tests."""
     with ActifixContext(project_root=Path(args.project_root or Path.cwd())):
@@ -119,7 +146,7 @@ def cmd_test(args: argparse.Namespace) -> int:
         from .state_paths import get_actifix_paths
         from .log_utils import atomic_write
         import tempfile
-        
+
         def test_basic() -> None:
             paths = get_actifix_paths()
             assert paths.base_dir.exists()
@@ -127,7 +154,7 @@ def cmd_test(args: argparse.Namespace) -> int:
         def test_record() -> None:
             entry = record_error("TestError", "test", "test/test_runner.py:1", "P3")
             assert entry is not None
-        
+
         result = run_tests(
             "actifix-self-test",
             [
@@ -135,7 +162,7 @@ def cmd_test(args: argparse.Namespace) -> int:
                 ("test_record", test_record),
             ]
         )
-        
+
         return 0 if result.success else 1
 
 
@@ -264,6 +291,30 @@ def main(argv: Optional[list[str]] = None) -> int:
         help="Quarantine action",
     )
     
+    # Diagnostics command
+    diagnostics_parser = subparsers.add_parser("diagnostics", help="Export diagnostics bundle")
+    diagnostics_parser.add_argument(
+        "diagnostics_action",
+        choices=["summary", "export"],
+        help="Diagnostics action (summary or export)",
+    )
+    diagnostics_parser.add_argument(
+        "--output",
+        "-o",
+        type=str,
+        help="Output path for diagnostics bundle (export only)",
+    )
+    diagnostics_parser.add_argument(
+        "--no-logs",
+        action="store_true",
+        help="Exclude logs from bundle",
+    )
+    diagnostics_parser.add_argument(
+        "--no-tickets",
+        action="store_true",
+        help="Exclude tickets from bundle",
+    )
+
     # Test command
     test_parser = subparsers.add_parser("test", help="Run self-tests")
 
@@ -294,6 +345,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         "process": cmd_process,
         "stats": cmd_stats,
         "quarantine": cmd_quarantine,
+        "diagnostics": cmd_diagnostics,
         "test": cmd_test,
         "modules": cmd_modules,
     }
