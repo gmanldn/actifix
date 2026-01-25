@@ -404,7 +404,7 @@ def start_api_server(port: int, project_root: Path, host: str = "127.0.0.1") -> 
         return thread
 
 
-def _probe_http_status(url: str, timeout: float = 1.5) -> tuple[bool, int, str]:
+def _probe_http_status(url: str, timeout: float = 0.75) -> tuple[bool, int, str]:
     """Return (ok, status_code, error_text) for a URL."""
     try:
         from urllib.request import urlopen
@@ -441,9 +441,13 @@ def announce_api_modules(host: str, port: int) -> None:
         url = f"{base}{path}"
         # Retry briefly: API thread may have started but not yet accepted connections.
         ok, status, err = False, 0, ""
-        for _ in range(10):
+        for _ in range(5):
             ok, status, err = _probe_http_status(url)
             if ok:
+                break
+            # Retry only when the TCP connection is refused; timeouts typically mean
+            # the handler is present but slow (don't stall startup output).
+            if "Connection refused" not in err and "Errno 61" not in err:
                 break
             time.sleep(0.2)
         if ok and status == 200:
