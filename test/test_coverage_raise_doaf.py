@@ -24,6 +24,12 @@ from actifix.raise_af import ActifixEntry, TicketPriority
 from actifix.state_paths import get_actifix_paths, init_actifix_files
 
 
+def _completion_notes(paths, detail: str) -> str:
+    readme = Path(paths.project_root) / "README.md"
+    readme.write_text("test repo", encoding="utf-8")
+    return f"Implementation: {detail}\nFiles:\n- README.md"
+
+
 def _seed_ticket(
     ticket_id: str,
     priority: TicketPriority = TicketPriority.P2,
@@ -46,7 +52,11 @@ def _seed_ticket(
     if completed:
         repo.mark_complete(
             ticket_id,
-            completion_notes="Test ticket completed in seed helper function",
+            completion_notes=(
+                "Implementation: Test ticket completed in seed helper function.\n"
+                "Files:\n"
+                "- src/actifix/do_af.py"
+            ),
             test_steps="Seeded with test harness",
             test_results="All test seeds passed successfully",
             summary=summary
@@ -97,7 +107,7 @@ def test_mark_ticket_complete_and_idempotent(tmp_path):
     # Try to complete already-completed ticket (should return False)
     assert do_af.mark_ticket_complete(
         ticket_id,
-        completion_notes="Dummy notes for idempotency test",
+        completion_notes=_completion_notes(paths, "Dummy notes for idempotency test"),
         test_steps="Dummy test steps",
         test_results="Dummy test results",
         paths=paths
@@ -111,7 +121,7 @@ def test_mark_ticket_complete_and_idempotent(tmp_path):
 
     assert do_af.mark_ticket_complete(
         ticket_id,
-        completion_notes="Fixed critical bug in ticket completion workflow",
+        completion_notes=_completion_notes(paths, "Fixed critical bug in ticket completion workflow"),
         test_steps="Ran full test suite for ticket completion",
         test_results="All 450+ tests passed with 95% coverage",
         summary="New summary",
@@ -125,6 +135,7 @@ def test_process_next_ticket_handlers(tmp_path):
     paths = get_actifix_paths(project_root=tmp_path)
     init_actifix_files(paths)
     do_af._global_manager = None
+    (Path(paths.project_root) / "README.md").write_text("test repo", encoding="utf-8")
 
     ticket_id = "ACT-20250103-AAAAA"
     _seed_ticket(ticket_id, TicketPriority.P0)

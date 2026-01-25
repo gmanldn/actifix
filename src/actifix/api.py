@@ -1485,13 +1485,19 @@ def create_app(
         # (Defense in depth - also enforced in fix_highest_priority_ticket)
         enforce_raise_af_only(paths)
 
-        # Get completion fields from request body or use defaults
+        # Require explicit completion evidence from request body
         data = request.get_json() if request.is_json else {}
-        completion_notes = data.get('completion_notes', 'Ticket resolved via API endpoint. Issue addressed and verified.')
-        test_steps = data.get('test_steps', 'Automated testing performed via API.')
-        test_results = data.get('test_results', 'All validation checks passed successfully.')
+        completion_notes = data.get('completion_notes')
+        test_steps = data.get('test_steps')
+        test_results = data.get('test_results')
         summary = data.get('summary', 'Resolved via dashboard fix')
         test_documentation_url = data.get('test_documentation_url')
+
+        if not completion_notes or not test_steps or not test_results:
+            return jsonify({
+                'error': 'completion_notes, test_steps, and test_results are required',
+                'hint': 'Include Implementation and Files sections in completion_notes.'
+            }), 400
 
         result = fix_highest_priority_ticket(
             paths,

@@ -74,7 +74,11 @@ def _seed_ticket(
     if completed:
         repo.mark_complete(
             ticket_id,
-            completion_notes="Coverage boost 2 test ticket completed via seed",
+            completion_notes=(
+                "Implementation: Coverage boost 2 test ticket completed via seed.\n"
+                "Files:\n"
+                "- src/actifix/do_af.py"
+            ),
             test_steps="Ran coverage boost 2 test suite",
             test_results="All coverage boost 2 tests passed"
         )
@@ -117,6 +121,7 @@ def test_api_endpoints_fix_ticket_and_logs(tmp_path, monkeypatch):
     monkeypatch.setenv("ACTIFIX_CHANGE_ORIGIN", "raise_af")
     paths = get_actifix_paths(project_root=tmp_path)
     init_actifix_files(paths)
+    (tmp_path / "README.md").write_text("test repo", encoding="utf-8")
 
     repo = get_ticket_repository()
     entry = ActifixEntry(
@@ -135,7 +140,19 @@ def test_api_endpoints_fix_ticket_and_logs(tmp_path, monkeypatch):
     app = api.create_app(tmp_path)
     client = app.test_client()
 
-    response = client.post("/api/fix-ticket")
+    response = client.post(
+        "/api/fix-ticket",
+        json={
+            "completion_notes": (
+                "Implementation: Resolved API log fix with verified changes.\n"
+                "Files:\n"
+                "- README.md"
+            ),
+            "test_steps": "Ran API endpoint tests via Flask client.",
+            "test_results": "Fix ticket endpoint completed successfully.",
+            "summary": "Resolved via dashboard fix",
+        },
+    )
     data = response.get_json()
     assert data["processed"] is True
 

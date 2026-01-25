@@ -46,6 +46,12 @@ from actifix.raise_af import ActifixEntry, TicketPriority
 pytestmark = [pytest.mark.integration]
 
 
+def _completion_notes(paths, detail: str) -> str:
+    readme = Path(paths.project_root) / "README.md"
+    readme.write_text("test repo", encoding="utf-8")
+    return f"Implementation: {detail}\nFiles:\n- README.md"
+
+
 def _create_ticket(ticket_id: str, priority: TicketPriority, message: str = "Test issue") -> ActifixEntry:
     repo = get_ticket_repository()
     entry = ActifixEntry(
@@ -93,7 +99,14 @@ def test_stateful_ticket_manager_refreshes_and_replaces_completed(tmp_path):
 
     ticket_id = "ACT-20260111-BBBBB"
     _create_ticket(ticket_id, TicketPriority.P2)
-    assert mark_ticket_complete(ticket_id, completion_notes="Fixed critical test ticket successfully validated", test_steps="Test validation", test_results="Test passed", summary="Closed", paths=paths)
+    assert mark_ticket_complete(
+        ticket_id,
+        completion_notes=_completion_notes(paths, "Fixed critical test ticket successfully validated"),
+        test_steps="Test validation",
+        test_results="Test passed",
+        summary="Closed",
+        paths=paths,
+    )
 
     manager = StatefulTicketManager(paths=paths, cache_ttl=0)
     stats = manager.get_stats()
@@ -121,7 +134,14 @@ def test_mark_ticket_complete_records_summary(tmp_path):
     ticket_id = "ACT-20260111-DDDD1"
     created_entry = _create_ticket(ticket_id, TicketPriority.P2)
 
-    assert mark_ticket_complete(ticket_id, completion_notes="Fixed critical test ticket successfully validated", test_steps="Test validation", test_results="Test passed", summary="Closed", paths=paths)
+    assert mark_ticket_complete(
+        ticket_id,
+        completion_notes=_completion_notes(paths, "Fixed critical test ticket successfully validated"),
+        test_steps="Test validation",
+        test_results="Test passed",
+        summary="Closed",
+        paths=paths,
+    )
     stored = get_ticket_repository().get_ticket(ticket_id)
     assert stored["status"] == "Completed"
     assert stored["completion_summary"] == "Closed"
@@ -134,11 +154,25 @@ def test_mark_ticket_complete_can_reapply_summary_after_reopen(tmp_path):
     ticket_id = "ACT-20260111-EEEE1"
     _create_ticket(ticket_id, TicketPriority.P3)
 
-    assert mark_ticket_complete(ticket_id, completion_notes="Fixed critical test ticket successfully validated", test_steps="Test validation", test_results="Test passed", summary="First summary", paths=paths)
+    assert mark_ticket_complete(
+        ticket_id,
+        completion_notes=_completion_notes(paths, "Fixed critical test ticket successfully validated"),
+        test_steps="Test validation",
+        test_results="Test passed",
+        summary="First summary",
+        paths=paths,
+    )
     repo = get_ticket_repository()
     repo.update_ticket(ticket_id, {"status": "Open", "completed": 0})
 
-    assert mark_ticket_complete(ticket_id, completion_notes="Fixed critical test ticket successfully validated", test_steps="Test validation", test_results="Test passed", summary="Second summary", paths=paths)
+    assert mark_ticket_complete(
+        ticket_id,
+        completion_notes=_completion_notes(paths, "Fixed critical test ticket successfully validated"),
+        test_steps="Test validation",
+        test_results="Test passed",
+        summary="Second summary",
+        paths=paths,
+    )
     stored = repo.get_ticket(ticket_id)
     assert stored["completion_summary"] == "Second summary"
 
@@ -149,9 +183,23 @@ def test_mark_ticket_complete_idempotent_guard(tmp_path):
 
     ticket_id = "ACT-20260111-FFFF1"
     _create_ticket(ticket_id, TicketPriority.P2)
-    assert mark_ticket_complete(ticket_id, completion_notes="Fixed critical test ticket successfully validated", test_steps="Test validation", test_results="Test passed", summary="First pass", paths=paths)
+    assert mark_ticket_complete(
+        ticket_id,
+        completion_notes=_completion_notes(paths, "Fixed critical test ticket successfully validated"),
+        test_steps="Test validation",
+        test_results="Test passed",
+        summary="First pass",
+        paths=paths,
+    )
 
-    assert mark_ticket_complete(ticket_id, completion_notes="Fixed critical test ticket successfully validated", test_steps="Test validation", test_results="Test passed", summary="Ignored", paths=paths) is False
+    assert mark_ticket_complete(
+        ticket_id,
+        completion_notes=_completion_notes(paths, "Fixed critical test ticket successfully validated"),
+        test_steps="Test validation",
+        test_results="Test passed",
+        summary="Ignored",
+        paths=paths,
+    ) is False
     repo = get_event_repository()
     events = repo.get_events(EventFilter(event_type="TICKET_ALREADY_COMPLETED", limit=10))
     assert any(event.get("event_type") == "TICKET_ALREADY_COMPLETED" for event in events)
@@ -169,7 +217,7 @@ def test_fix_highest_priority_ticket_paths(tmp_path):
     high_ticket = _create_ticket("ACT-20260111-ABCD2", TicketPriority.P0)
     result = fix_highest_priority_ticket(
         paths=paths,
-        completion_notes="Fixed highest priority ticket with validated changes",
+        completion_notes=_completion_notes(paths, "Fixed highest priority ticket with validated changes"),
         test_steps="Ran ticket completion path validation",
         test_results="Completion flow passed",
         summary="Handled",

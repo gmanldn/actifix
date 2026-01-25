@@ -85,7 +85,11 @@ def test_ticket_repository_locking_and_completion(ticket_repo_env):
     # Mark complete twice to ensure status remains completed
     assert repo.mark_complete(
         entry.entry_id,
-        completion_notes="Fixed the locking issue in the repository layer",
+        completion_notes=(
+            "Implementation: Fixed the locking issue in the repository layer.\n"
+            "Files:\n"
+            "- src/actifix/persistence/ticket_repo.py"
+        ),
         test_steps="Ran pytest test_ticket_repo.py with concurrent tests",
         test_results="All 12 concurrent locking tests passed",
         summary="Done"
@@ -93,7 +97,11 @@ def test_ticket_repository_locking_and_completion(ticket_repo_env):
     # Second call to mark_complete should return False (idempotency check)
     assert repo.mark_complete(
         entry.entry_id,
-        completion_notes="Fixed the locking issue in the repository layer",
+        completion_notes=(
+            "Implementation: Fixed the locking issue in the repository layer.\n"
+            "Files:\n"
+            "- src/actifix/persistence/ticket_repo.py"
+        ),
         test_steps="Ran pytest test_ticket_repo.py with concurrent tests",
         test_results="All 12 concurrent locking tests passed",
         summary="Already done"
@@ -338,7 +346,11 @@ class TestConcurrentLocking:
             repo.acquire_lock(ticket_id, locked_by="completer", lease_duration=timedelta(seconds=10))
             repo.mark_complete(
                 ticket_id,
-                completion_notes=f"Successfully completed ticket {ticket_id} in concurrent test",
+                completion_notes=(
+                    f"Implementation: Successfully completed ticket {ticket_id} in concurrent test.\n"
+                    "Files:\n"
+                    "- src/actifix/persistence/ticket_repo.py"
+                ),
                 test_steps="Ran concurrent completion test with 5 tickets",
                 test_results="All 5 tickets completed successfully without race conditions",
                 summary=f"Completed {ticket_id}"

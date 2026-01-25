@@ -9,6 +9,9 @@ All Changes Must Start via Raise_AF
 1.2 **Docs first** Always read `AGENTS.md`, `README.md`, and `docs/INDEX.md` (and any referenced docs) before starting work so every change respects the Actifix rules and architecture.
 1.3 **Actifix rules** Insist on following the Actifix workflow/QA rules for every task—no exceptions.
 1.4 **Last-minute sync** Immediately before committing or bumping the version (including `pyproject.toml`), fetch the current `develop`, confirm the remote `pyproject.toml` (and frontend asset version constants) still match what you plan to bump, and resolve or merge any incoming changes before you increment or push to avoid colliding with other agents. After the sync, always rerun `scripts/build_frontend.py` and stage the frontend artifacts so the asset constants match the canonical version on every commit.
+2. **Completion evidence is mandatory** Tickets must never be marked complete without real implementation work in the codebase. If no implementation exists, create it first, then test it, then complete the ticket.
+2.1 **Implementation proof** `completion_notes` must include `Implementation:` and `Files:` sections. The `Files:` list must reference real paths that exist in the repo (no placeholders).
+2.2 **No sign-off only** Completing tickets with documentation-only or intent-only notes is prohibited unless the docs themselves were updated and listed in `Files:`.
 3. **Version bump**: Increment version in `pyproject.toml` after every commit
 4. **No plan docs**: Never create `*_PLAN.md`, `ROADMAP.md`, `DESIGN.md` files
 5. **No new documentation files**: Do not create new documentation files (e.g., feature-specific `.md` files). Instead, blend content into existing docs:

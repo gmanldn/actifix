@@ -32,7 +32,11 @@ def comprehensive_tickets():
         if i <= 90:
             repo.mark_complete(
                 ticket_id,
-                completion_notes=f"Comprehensive test {i:03d} completed successfully with full validation",
+                completion_notes=(
+                    f"Implementation: Comprehensive test {i:03d} completed successfully with full validation.\n"
+                    "Files:\n"
+                    "- src/actifix/do_af.py"
+                ),
                 test_steps="Ran comprehensive test suite with 100 tickets",
                 test_results="90 tickets validated and marked complete with quality documentation",
                 summary="Processed comprehensive test ticket"

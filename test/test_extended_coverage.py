@@ -54,6 +54,12 @@ from actifix.raise_af import ActifixEntry, TicketPriority
 pytestmark = [pytest.mark.integration, pytest.mark.slow]
 
 
+def _completion_notes(paths, detail: str) -> str:
+    readme = Path(paths.project_root) / "README.md"
+    readme.write_text("test repo", encoding="utf-8")
+    return f"Implementation: {detail}\nFiles:\n- README.md"
+
+
 def _seed_ticket(
     ticket_id: str,
     priority: TicketPriority = TicketPriority.P2,
@@ -76,7 +82,11 @@ def _seed_ticket(
     if completed:
         repo.mark_complete(
             ticket_id,
-            completion_notes="Extended coverage test ticket completed in seed",
+            completion_notes=(
+                "Implementation: Extended coverage test ticket completed in seed.\n"
+                "Files:\n"
+                "- src/actifix/do_af.py"
+            ),
             test_steps="Seeded with extended coverage test harness",
             test_results="All extended coverage tests passed",
             summary=summary
@@ -484,7 +494,14 @@ class TestDoAFProcessing:
         init_actifix_files(paths)
 
         entry = _seed_ticket("ACT-20260101-AAA118", TicketPriority.P2)
-        assert mark_ticket_complete(entry.ticket_id, completion_notes="Fixed critical test ticket successfully validated", test_steps="Test validation", test_results="Test passed", summary="Done", paths=paths)
+        assert mark_ticket_complete(
+            entry.ticket_id,
+            completion_notes=_completion_notes(paths, "Fixed critical test ticket successfully validated"),
+            test_steps="Test validation",
+            test_results="Test passed",
+            summary="Done",
+            paths=paths,
+        )
 
         stored = get_ticket_repository().get_ticket(entry.ticket_id)
         assert stored["completion_summary"] == "Done"

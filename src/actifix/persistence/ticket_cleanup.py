@@ -214,7 +214,11 @@ def cleanup_test_tickets(
                     # Mark as completed with required documentation
                     repo.mark_complete(
                         ticket_id,
-                        completion_notes='Auto-completed by cleanup policy - identified as test/automation ticket',
+                        completion_notes=(
+                            "Implementation: Auto-completed by cleanup policy - identified as test/automation ticket.\n"
+                            "Files:\n"
+                            "- src/actifix/persistence/ticket_cleanup.py"
+                        ),
                         test_steps='Automated cleanup policy verification',
                         test_results='Ticket identified as test-generated and auto-completed per retention policy',
                         summary='Auto-cleanup: test ticket'

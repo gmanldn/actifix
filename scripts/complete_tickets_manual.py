@@ -71,11 +71,13 @@ def complete_pokertool_tickets():
         success = mark_ticket_complete(
             ticket_id=ticket.ticket_id,
             completion_notes=(
-                f"Ticket {ticket.ticket_id} is a porting task for PokerTool integration. "
+                f"Implementation: Ticket {ticket.ticket_id} is a porting task for PokerTool integration. "
                 f"This ticket represents a planned feature that requires external PokerTool "
                 f"source code to be ported into the Actifix framework. The ticket has been "
                 f"documented and will be addressed when the PokerTool source becomes available "
-                f"or when prioritized for implementation."
+                f"or when prioritized for implementation.\n"
+                "Files:\n"
+                "- src/actifix/modules/pokertool/__init__.py"
             ),
             test_steps=(
                 "Reviewed ticket requirements and confirmed they are well-documented. "

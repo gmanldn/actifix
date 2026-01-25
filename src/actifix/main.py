@@ -16,6 +16,7 @@ from .raise_af import record_error, enforce_raise_af_only, TicketPriority
 from .do_af import process_tickets, get_ticket_stats
 from .quarantine import list_quarantine, get_quarantine_count
 from .testing import TestRunner
+import os
 
 
 def cmd_init(args: argparse.Namespace) -> int:
@@ -230,6 +231,44 @@ def cmd_modules(args: argparse.Namespace) -> int:
         raise
 
 
+def cmd_doctor(args: argparse.Namespace) -> int:
+    """Diagnose Actifix environment and configuration.
+
+    This command checks that essential configuration variables are set, verifies that
+    the Actifix configuration can be loaded, runs a health check, and reports
+    basic ticket statistics. It returns 0 if all diagnostics pass or 1 if any
+    issues are detected.
+    """
+    project_root = Path(args.project_root or Path.cwd())
+    ok = True
+    # Use ActifixContext to ensure environment setup and logging
+    with ActifixContext(project_root=project_root):
+        # Verify ACTIFIX_CHANGE_ORIGIN is correctly set
+        change_origin = os.environ.get("ACTIFIX_CHANGE_ORIGIN")
+        if change_origin != "raise_af":
+            print("✗ ACTIFIX_CHANGE_ORIGIN is not set to 'raise_af'.")
+            print("  Please run: export ACTIFIX_CHANGE_ORIGIN=raise_af")
+            ok = False
+
+        # Attempt to load configuration
+        try:
+            load_config()
+        except Exception as exc:
+            print(f"✗ Failed to load configuration: {exc}")
+            ok = False
+
+        # Run system health check
+        health = run_health_check(print_report=True)
+        if not health.healthy:
+            ok = False
+
+        # Report ticket statistics
+        stats = get_ticket_stats()
+        print(f"\nTickets: total={stats['total']}, open={stats['open']}, completed={stats['completed']}")
+
+    return 0 if ok else 1
+
+
 def main(argv: Optional[list[str]] = None) -> int:
     """
     Main entrypoint for Actifix CLI.
@@ -331,6 +370,9 @@ def main(argv: Optional[list[str]] = None) -> int:
         help="Module identifier (e.g., modules.yhatzee)",
     )
     
+    # Doctor command
+    doctor_parser = subparsers.add_parser("doctor", help="Diagnose environment and configuration")
+    
     args = parser.parse_args(argv)
     
     if not args.command:
@@ -348,6 +390,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         "diagnostics": cmd_diagnostics,
         "test": cmd_test,
         "modules": cmd_modules,
+        "doctor": cmd_doctor,
     }
     
     try:

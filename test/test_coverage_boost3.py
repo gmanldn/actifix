@@ -67,7 +67,11 @@ def _seed_ticket(
     if completed:
         repo.mark_complete(
             ticket_id,
-            completion_notes="Coverage boost test ticket completed via seed",
+            completion_notes=(
+                "Implementation: Coverage boost test ticket completed via seed.\n"
+                "Files:\n"
+                "- src/actifix/do_af.py"
+            ),
             test_steps="Ran coverage boost test suite",
             test_results="All coverage boost tests passed successfully"
         )

@@ -17,6 +17,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 from actifix.do_af import (
     BackgroundAgentConfig,
     fix_highest_priority_ticket,
+    mark_ticket_complete,
     process_next_ticket,
     process_tickets,
     run_background_agent,
@@ -58,6 +59,7 @@ def doaf_paths(tmp_path, monkeypatch):
 
     paths = get_actifix_paths(project_root=base)
     init_actifix_files(paths)
+    (base / "README.md").write_text("test repo", encoding="utf-8")
     yield paths
 
     reset_database_pool()
@@ -71,7 +73,7 @@ def test_fix_highest_priority_ticket_triggers_logging(doaf_paths):
 
     result = fix_highest_priority_ticket(
         paths=doaf_paths,
-        completion_notes="Fixed critical issue in dashboard workflow",
+        completion_notes="Implementation: Fixed critical issue in dashboard workflow.\nFiles:\n- README.md",
         test_steps="Ran automated dashboard tests",
         test_results="All dashboard tests passed",
         summary="Automated dashboard fix"
@@ -171,3 +173,18 @@ def test_background_agent_records_agent_voice(doaf_paths, monkeypatch):
     processed = run_background_agent(config, paths=doaf_paths)
     assert processed == 1
     assert calls
+
+
+def test_mark_ticket_complete_requires_existing_files(doaf_paths):
+    repo = get_ticket_repository()
+    entry = _build_entry("ACT-20260115-MISSING", TicketPriority.P2)
+    repo.create_ticket(entry)
+
+    result = mark_ticket_complete(
+        entry.entry_id,
+        completion_notes="Implementation: Added guard for completion evidence.\nFiles:\n- missing.txt",
+        test_steps="Ran unit tests.",
+        test_results="Unit tests passed.",
+        paths=doaf_paths,
+    )
+    assert result is False

@@ -40,6 +40,7 @@ def temp_actifix_paths(monkeypatch):
         # Create directories
         paths.base_dir.mkdir(parents=True, exist_ok=True)
         paths.logs_dir.mkdir(parents=True, exist_ok=True)
+        (base / "README.md").write_text("test repo", encoding="utf-8")
 
         yield paths
 
@@ -71,12 +72,24 @@ def test_idempotency_guard_prevents_double_completion(temp_actifix_paths):
     _create_ticket(ticket_id, TicketPriority.P3, "Idempotency test")
 
     # First call: mark as complete (should succeed)
-    result1 = mark_ticket_complete(ticket_id, completion_notes="Fixed critical test ticket successfully validated", test_steps="Test validation", test_results="Test passed", summary="Fixed successfully", paths=paths
+    result1 = mark_ticket_complete(
+        ticket_id,
+        completion_notes="Implementation: Fixed critical test ticket successfully validated.\nFiles:\n- README.md",
+        test_steps="Test validation",
+        test_results="Test passed",
+        summary="Fixed successfully",
+        paths=paths,
     )
     assert result1 is True
 
     # Second call: should be skipped
-    result2 = mark_ticket_complete(ticket_id, completion_notes="Fixed critical test ticket successfully validated", test_steps="Test validation", test_results="Test passed", summary="Already fixed", paths=paths
+    result2 = mark_ticket_complete(
+        ticket_id,
+        completion_notes="Implementation: Fixed critical test ticket successfully validated.\nFiles:\n- README.md",
+        test_steps="Test validation",
+        test_results="Test passed",
+        summary="Already fixed",
+        paths=paths,
     )
     assert result2 is False
 
@@ -93,7 +106,14 @@ def test_ticket_queries_use_database(temp_actifix_paths):
 
     _create_ticket("ACT-20260101-OPEN1", TicketPriority.P1, "Open ticket 1")
     _create_ticket("ACT-20260101-OPEN2", TicketPriority.P2, "Open ticket 2")
-    mark_ticket_complete("ACT-20260101-OPEN2", completion_notes="Fixed critical test ticket successfully validated", test_steps="Test validation", test_results="Test passed", summary="done", paths=paths)
+    mark_ticket_complete(
+        "ACT-20260101-OPEN2",
+        completion_notes="Implementation: Fixed critical test ticket successfully validated.\nFiles:\n- README.md",
+        test_steps="Test validation",
+        test_results="Test passed",
+        summary="done",
+        paths=paths,
+    )
 
     open_tickets = get_open_tickets(paths)
     assert any(ticket.ticket_id == "ACT-20260101-OPEN1" for ticket in open_tickets)

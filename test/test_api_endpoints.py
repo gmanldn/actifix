@@ -133,7 +133,11 @@ def test_api_logs_stats_and_tickets(api_workspace, monkeypatch):
     repo.create_ticket(completed_entry)
     repo.mark_complete(
         completed_entry.entry_id,
-        completion_notes="API endpoint test ticket completed successfully",
+        completion_notes=(
+            "Implementation: API endpoint test ticket completed successfully.\n"
+            "Files:\n"
+            "- src/actifix/api.py"
+        ),
         test_steps="Tested API endpoints with client",
         test_results="API stats and tickets endpoints working correctly",
         summary="completed"

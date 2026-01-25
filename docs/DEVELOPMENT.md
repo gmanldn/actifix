@@ -46,6 +46,9 @@ Tickets cannot be marked complete without evidence. Required fields:
 - `completion_notes`: min 20 characters (what was done)
 - `test_steps`: min 10 characters (how it was tested)
 - `test_results`: min 10 characters (test evidence)
+- `completion_notes` must include `Implementation:` and `Files:` sections
+  - `Implementation:` describes the concrete code changes
+  - `Files:` lists the modified file paths (must exist in repo)
 
 Recommended workflow:
 ```bash
@@ -58,7 +61,11 @@ from actifix.do_af import mark_ticket_complete
 
 mark_ticket_complete(
     ticket_id="ACT-20260118-XXXXX",
-    completion_notes="Added guard in raise_af to clamp payload size.",
+    completion_notes=(
+        "Implementation: Added guard in raise_af to clamp payload size.\n"
+        "Files:\n"
+        "- src/actifix/raise_af.py"
+    ),
     test_steps="Ran python3 test.py --coverage and manual CLI smoke test.",
     test_results="All tests passed; CLI record/health commands succeed.",
 )

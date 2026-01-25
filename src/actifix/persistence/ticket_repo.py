@@ -98,6 +98,7 @@ Version: 1.0.0
 """
 
 import os
+import re
 import sqlite3
 from dataclasses import dataclass, field
 from datetime import datetime, timezone, timedelta
@@ -116,6 +117,86 @@ from .database import (
     deserialize_timestamp,
     log_database_audit,
 )
+
+
+_SECTION_HEADER_PATTERN = re.compile(r"^[A-Za-z0-9 _/.-]{2,60}:\s*$")
+
+
+def _extract_completion_section(completion_notes: str, header: str) -> str:
+    header_pattern = re.compile(rf"^{re.escape(header)}\s*:\s*(.*)$", re.IGNORECASE)
+    lines = completion_notes.splitlines()
+    collecting = False
+    collected: list[str] = []
+
+    for line in lines:
+        stripped = line.strip()
+        if not stripped:
+            if collecting:
+                break
+            continue
+        match = header_pattern.match(stripped)
+        if match:
+            collecting = True
+            remainder = match.group(1).strip()
+            if remainder:
+                collected.append(remainder)
+            continue
+        if collecting:
+            if _SECTION_HEADER_PATTERN.match(stripped):
+                break
+            item = stripped.lstrip("-*").strip()
+            if item:
+                collected.append(item)
+
+    return " ".join(collected).strip()
+
+
+def _extract_completion_files(completion_notes: str) -> list[str]:
+    header_pattern = re.compile(
+        r"^(files?(?:\s+changed|\s+touched|\s+modified|\s+updated)?|paths?)\s*:\s*(.*)$",
+        re.IGNORECASE,
+    )
+    lines = completion_notes.splitlines()
+    collecting = False
+    files: list[str] = []
+
+    for line in lines:
+        stripped = line.strip()
+        if not stripped:
+            if collecting:
+                break
+            continue
+        match = header_pattern.match(stripped)
+        if match:
+            collecting = True
+            remainder = match.group(2).strip()
+            if remainder:
+                files.extend([part.strip() for part in remainder.split(",") if part.strip()])
+            continue
+        if collecting:
+            if _SECTION_HEADER_PATTERN.match(stripped):
+                break
+            item = stripped.lstrip("-*").strip()
+            if item:
+                files.append(item)
+
+    return files
+
+
+def _normalize_completion_file_entry(entry: str) -> str:
+    lowered = entry.lower()
+    for prefix in ("deleted:", "removed:", "renamed:", "moved:", "added:", "updated:"):
+        if lowered.startswith(prefix):
+            return entry[len(prefix):].strip()
+    return entry.strip()
+
+
+def _looks_like_path(value: str) -> bool:
+    if not value:
+        return False
+    if value in {"Makefile", "Dockerfile"}:
+        return True
+    return "/" in value or "." in Path(value).name
 
 
 # DoS Prevention: Length limits for ticket fields
@@ -613,6 +694,30 @@ class TicketRepository:
             raise ValueError(
                 "test_results required: must provide test outcomes/evidence (min 10 chars)"
             )
+
+        implementation_details = _extract_completion_section(completion_notes, "Implementation")
+        if not implementation_details:
+            raise ValueError(
+                "completion_notes required: include Implementation section describing code changes"
+            )
+
+        completion_files = _extract_completion_files(completion_notes)
+        if not completion_files:
+            raise ValueError(
+                "completion_notes required: include Files section with modified paths"
+            )
+
+        for entry in completion_files:
+            normalized = _normalize_completion_file_entry(entry)
+            lowered = normalized.lower()
+            if lowered in {"tbd", "todo", "n/a", "na", "none"}:
+                raise ValueError(
+                    "completion_notes required: Files section must list real paths"
+                )
+            if not _looks_like_path(normalized):
+                raise ValueError(
+                    "completion_notes required: Files section must list valid file paths"
+                )
 
         # Build updates with validated fields
         updates = {

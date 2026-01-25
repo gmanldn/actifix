@@ -27,13 +27,15 @@ def main():
             "ticket_id": "ACT-20260125-45D88",
             "summary": "Implemented webhook integration (v7.0.3)",
             "completion_notes": (
-                "Implemented webhook integration in v7.0.3. Created src/actifix/webhooks.py "
+                "Implementation: Implemented webhook integration in v7.0.3. Created src/actifix/webhooks.py "
                 "with send_webhook_notification() function that sends HTTP POST notifications "
                 "for ticket creation/completion events. Added config options (webhook_urls, "
                 "webhook_enabled), integrated into raise_af.py and do_af.py. Includes "
                 "comprehensive tests in test/test_webhooks.py (8 tests), architecture docs "
                 "updated (MAP.yaml, DEPGRAPH.json). Webhook failures are best-effort and "
-                "don't block ticket operations. Escalated to P3 tickets in v7.0.8."
+                "don't block ticket operations. Escalated to P3 tickets in v7.0.8.\n"
+                "Files:\n"
+                "- src/actifix/webhooks.py"
             ),
             "test_steps": (
                 "1. Created comprehensive test suite (test_webhooks.py)\n"
@@ -54,14 +56,16 @@ def main():
             "ticket_id": "ACT-20260125-0CF34",
             "summary": "Implemented completion hooks (v7.0.4)",
             "completion_notes": (
-                "Implemented completion hooks in v7.0.4. Created src/actifix/completion_hooks.py "
+                "Implementation: Implemented completion hooks in v7.0.4. Created src/actifix/completion_hooks.py "
                 "for running custom scripts after ticket completion in safe mode. Added "
                 "execute_completion_hooks() with 30s timeout, passes ticket data via environment "
                 "variables (ACTIFIX_TICKET_ID, ACTIFIX_TICKET_PRIORITY, etc.). Added config "
                 "options (completion_hook_scripts, completion_hooks_enabled), integrated into "
                 "do_af.py. Includes comprehensive tests in test/test_completion_hooks.py (9 tests), "
                 "architecture docs updated. Hook failures are best-effort and escalated to P3 "
-                "tickets in v7.0.8."
+                "tickets in v7.0.8.\n"
+                "Files:\n"
+                "- src/actifix/completion_hooks.py"
             ),
             "test_steps": (
                 "1. Created comprehensive test suite (test_completion_hooks.py)\n"
@@ -83,14 +87,16 @@ def main():
             "ticket_id": "ACT-20260125-D3796",
             "summary": "Implemented diagnostics export (v7.0.5)",
             "completion_notes": (
-                "Implemented diagnostics export in v7.0.5. Created src/actifix/diagnostics.py "
+                "Implementation: Implemented diagnostics export in v7.0.5. Created src/actifix/diagnostics.py "
                 "with export_diagnostics_bundle() function that creates a ZIP bundle containing "
                 "system info, sanitized config, ticket stats, health data, and logs. Added CLI "
                 "commands 'actifix diagnostics export' and 'actifix diagnostics summary' in "
                 "main.py. Sensitive data properly sanitized (API keys removed, messages "
                 "truncated, stack traces excluded). Includes comprehensive tests in "
                 "test/test_diagnostics.py (11 tests), architecture docs updated (MAP.yaml, "
-                "DEPGRAPH.json)."
+                "DEPGRAPH.json).\n"
+                "Files:\n"
+                "- src/actifix/diagnostics.py"
             ),
             "test_steps": (
                 "1. Created comprehensive test suite (test_diagnostics.py)\n"
@@ -111,14 +117,16 @@ def main():
             "ticket_id": "ACT-20260125-08A19",
             "summary": "Implemented Sentry ingestion (v7.0.6)",
             "completion_notes": (
-                "Implemented Sentry ingestion in v7.0.6. Created src/actifix/ingestion.py with "
+                "Implementation: Implemented Sentry ingestion in v7.0.6. Created src/actifix/ingestion.py with "
                 "ingest_sentry_event() function that parses Sentry-style error events and maps "
                 "them to Actifix tickets. Added POST /api/ingest/sentry endpoint in api.py. "
                 "Maps Sentry levels to Actifix priorities (fatal→P0, error→P1, warning→P2, "
                 "info→P3, debug→P4). Handles message, exception.value, and logentry formats "
                 "with fallback chains. Includes tests in test/test_ingestion.py (13 tests "
                 "focusing on parsing functions), architecture docs updated (MAP.yaml, "
-                "DEPGRAPH.json)."
+                "DEPGRAPH.json).\n"
+                "Files:\n"
+                "- src/actifix/ingestion.py"
             ),
             "test_steps": (
                 "1. Created test suite (test_ingestion.py) focusing on parsing\n"

@@ -181,7 +181,11 @@ class TestIntegration:
             # Mark complete
             success = mark_ticket_complete(
                 entry.ticket_id,
-                completion_notes="Fixed critical issue in integration test workflow",
+                completion_notes=(
+                    "Implementation: Fixed critical issue in integration test workflow.\n"
+                    "Files:\n"
+                    "- src/actifix/do_af.py"
+                ),
                 test_steps="Ran full integration test suite",
                 test_results="All integration tests passed successfully",
                 summary="Fixed in integration test",

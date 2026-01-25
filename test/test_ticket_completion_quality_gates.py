@@ -53,6 +53,14 @@ def create_test_ticket(repo, ticket_id=None) -> str:
     return entry.entry_id
 
 
+def completion_notes_with_files(detail: str = "Applied fix with validated workflow changes.") -> str:
+    return (
+        f"Implementation: {detail}\n"
+        "Files:\n"
+        "- src/actifix/do_af.py"
+    )
+
+
 class TestCompletionNotesValidation:
     """Test completion_notes field validation."""
 
@@ -107,13 +115,45 @@ class TestCompletionNotesValidation:
         ticket = repo.get_ticket(ticket_id)
         assert ticket['status'] == 'Open'
 
-    def test_completion_notes_minimum_length_accepted(self, clean_db):
-        """Verify exactly 20 chars in completion_notes is accepted."""
+    def test_missing_implementation_section_rejected(self, clean_db):
+        """Verify completion_notes without Implementation section are rejected."""
         repo = get_ticket_repository()
         ticket_id = create_test_ticket(repo)
 
-        # Exactly 20 chars
-        notes = "x" * 20
+        with pytest.raises(ValueError, match="completion_notes required"):
+            repo.mark_complete(
+                ticket_id,
+                completion_notes="Files:\n- src/actifix/do_af.py",
+                test_steps="Ran pytest tests successfully",
+                test_results="All 10 tests passed",
+            )
+
+        ticket = repo.get_ticket(ticket_id)
+        assert ticket['status'] == 'Open'
+
+    def test_missing_files_section_rejected(self, clean_db):
+        """Verify completion_notes without Files section are rejected."""
+        repo = get_ticket_repository()
+        ticket_id = create_test_ticket(repo)
+
+        with pytest.raises(ValueError, match="completion_notes required"):
+            repo.mark_complete(
+                ticket_id,
+                completion_notes="Implementation: Added guards to ticket completion.",
+                test_steps="Ran pytest tests successfully",
+                test_results="All 10 tests passed",
+            )
+
+        ticket = repo.get_ticket(ticket_id)
+        assert ticket['status'] == 'Open'
+
+    def test_completion_notes_minimum_length_accepted(self, clean_db):
+        """Verify minimum-length completion_notes with evidence is accepted."""
+        repo = get_ticket_repository()
+        ticket_id = create_test_ticket(repo)
+
+        detail = "x" * 20
+        notes = completion_notes_with_files(detail)
 
         success = repo.mark_complete(
             ticket_id,
@@ -139,7 +179,9 @@ class TestTestStepsValidation:
         with pytest.raises(ValueError, match="test_steps required"):
             repo.mark_complete(
                 ticket_id,
-                completion_notes="Fixed null pointer by adding validation at lines 42-48",
+                completion_notes=completion_notes_with_files(
+                    "Fixed null pointer by adding validation at lines 42-48"
+                ),
                 test_steps="",  # ❌ EMPTY
                 test_results="All 10 tests passed"
             )
@@ -155,7 +197,9 @@ class TestTestStepsValidation:
         with pytest.raises(ValueError, match="test_steps required"):
             repo.mark_complete(
                 ticket_id,
-                completion_notes="Fixed null pointer by adding validation at lines 42-48",
+                completion_notes=completion_notes_with_files(
+                    "Fixed null pointer by adding validation at lines 42-48"
+                ),
                 test_steps="Tested",  # ❌ 6 chars, need 10
                 test_results="All 10 tests passed"
             )
@@ -173,7 +217,9 @@ class TestTestStepsValidation:
 
         success = repo.mark_complete(
             ticket_id,
-            completion_notes="Fixed null pointer by adding validation at lines 42-48",
+            completion_notes=completion_notes_with_files(
+                "Fixed null pointer by adding validation at lines 42-48"
+            ),
             test_steps=steps,
             test_results="All 10 tests passed"
         )
@@ -195,7 +241,9 @@ class TestTestResultsValidation:
         with pytest.raises(ValueError, match="test_results required"):
             repo.mark_complete(
                 ticket_id,
-                completion_notes="Fixed null pointer by adding validation at lines 42-48",
+                completion_notes=completion_notes_with_files(
+                    "Fixed null pointer by adding validation at lines 42-48"
+                ),
                 test_steps="Ran pytest test_validation.py with -v flag",
                 test_results=""  # ❌ EMPTY
             )
@@ -211,7 +259,9 @@ class TestTestResultsValidation:
         with pytest.raises(ValueError, match="test_results required"):
             repo.mark_complete(
                 ticket_id,
-                completion_notes="Fixed null pointer by adding validation at lines 42-48",
+                completion_notes=completion_notes_with_files(
+                    "Fixed null pointer by adding validation at lines 42-48"
+                ),
                 test_steps="Ran pytest test_validation.py with -v flag",
                 test_results="All pass"  # ❌ 8 chars, need 10
             )
@@ -229,7 +279,9 @@ class TestTestResultsValidation:
 
         success = repo.mark_complete(
             ticket_id,
-            completion_notes="Fixed null pointer by adding validation at lines 42-48",
+            completion_notes=completion_notes_with_files(
+                "Fixed null pointer by adding validation at lines 42-48"
+            ),
             test_steps="Ran pytest test_validation.py with -v flag",
             test_results=results
         )
@@ -250,7 +302,9 @@ class TestSuccessfulCompletion:
 
         success = repo.mark_complete(
             ticket_id,
-            completion_notes="Fixed null pointer exception by adding validation at lines 42-48 in database.py. Defensive checks prevent NullPointerException.",
+            completion_notes=completion_notes_with_files(
+                "Fixed null pointer exception by adding validation at lines 42-48 in database.py. Defensive checks prevent NullPointerException."
+            ),
             test_steps="Ran pytest test_database.py with -v. Added 15 new unit tests. Manual regression testing on 5 scenarios. Verified with gdb debugger.",
             test_results="All 47 tests passing. 99% code coverage. Zero memory leaks detected. Graceful error handling verified. Performance improved 35%."
         )
@@ -277,7 +331,9 @@ class TestSuccessfulCompletion:
 
         success = repo.mark_complete(
             ticket_id,
-            completion_notes="Fixed null pointer exception by adding validation at lines 42-48",
+            completion_notes=completion_notes_with_files(
+                "Fixed null pointer exception by adding validation at lines 42-48"
+            ),
             test_steps="Ran pytest test_database.py with full coverage",
             test_results="All 47 tests passing with 99% code coverage",
             summary="Database validation hardening",
@@ -298,7 +354,9 @@ class TestSuccessfulCompletion:
         # First completion succeeds
         success1 = repo.mark_complete(
             ticket_id,
-            completion_notes="Fixed the issue by adding proper validation checks",
+            completion_notes=completion_notes_with_files(
+                "Fixed the issue by adding proper validation checks"
+            ),
             test_steps="Ran pytest test suite completely",
             test_results="All tests passing with excellent coverage"
         )
@@ -307,7 +365,9 @@ class TestSuccessfulCompletion:
         # Second completion fails (ticket already completed)
         success2 = repo.mark_complete(
             ticket_id,
-            completion_notes="Different notes for second completion attempt",
+            completion_notes=completion_notes_with_files(
+                "Different notes for second completion attempt"
+            ),
             test_steps="Different test steps",
             test_results="Different test results"
         )
@@ -348,7 +408,9 @@ class TestValidationErrorHandling:
 
         success = mark_ticket_complete(
             ticket_id,
-            completion_notes="Fixed null pointer by adding proper validation checks throughout database module",
+            completion_notes=completion_notes_with_files(
+                "Fixed null pointer by adding proper validation checks throughout database module"
+            ),
             test_steps="Ran pytest test_database.py with full coverage and manual testing",
             test_results="All 47 tests passing with 99% code coverage and zero memory leaks"
         )

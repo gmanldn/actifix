@@ -17,11 +17,13 @@ if __name__ == "__main__" and __package__ is None:  # pragma: no cover - path se
 
 import argparse
 import contextlib
+import json
 import os
+import re
 import threading
 import time
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional, Callable, Iterator, TYPE_CHECKING
 
@@ -32,6 +34,9 @@ from .config import get_config, load_config
 
 if TYPE_CHECKING:
     from .persistence.ticket_repo import TicketRepository
+
+
+_COMPLETION_SECTION_HEADER = re.compile(r"^[A-Za-z0-9 _/.-]{2,60}:\s*$")
 
 
 # --- Token-Efficient State Cache ---
@@ -77,6 +82,115 @@ def _agent_voice_best_effort(
     except Exception:
         # record_agent_voice captures failures via Raise_AF; don't block dispatch.
         return
+
+
+def _extract_completion_files(completion_notes: str) -> list[str]:
+    header_pattern = re.compile(
+        r"^(files?(?:\s+changed|\s+touched|\s+modified|\s+updated)?|paths?)\s*:\s*(.*)$",
+        re.IGNORECASE,
+    )
+    lines = completion_notes.splitlines()
+    collecting = False
+    files: list[str] = []
+
+    for line in lines:
+        stripped = line.strip()
+        if not stripped:
+            if collecting:
+                break
+            continue
+        match = header_pattern.match(stripped)
+        if match:
+            collecting = True
+            remainder = match.group(2).strip()
+            if remainder:
+                files.extend([part.strip() for part in remainder.split(",") if part.strip()])
+            continue
+        if collecting:
+            if _COMPLETION_SECTION_HEADER.match(stripped):
+                break
+            item = stripped.lstrip("-*").strip()
+            if item:
+                files.append(item)
+
+    return files
+
+
+def _normalize_completion_file_entry(entry: str) -> str:
+    lowered = entry.lower()
+    for prefix in ("deleted:", "removed:", "renamed:", "moved:", "added:", "updated:"):
+        if lowered.startswith(prefix):
+            return entry[len(prefix):].strip()
+    return entry.strip()
+
+
+def _select_completion_files(project_root: Path, source: str) -> list[str]:
+    source_path = (source or "").split(":")[0].strip()
+    candidates = []
+    if source_path:
+        candidates.append(source_path)
+    candidates.extend([
+        "README.md",
+        "pyproject.toml",
+        "src/actifix/do_af.py",
+    ])
+    for candidate in candidates:
+        resolved = (project_root / candidate).resolve()
+        try:
+            resolved.relative_to(project_root)
+        except ValueError:
+            continue
+        if resolved.exists():
+            return [candidate]
+    return []
+
+
+def _format_completion_notes(detail: str, files: list[str]) -> str:
+    files_block = "\n".join(f"- {path}" for path in files) if files else "- README.md"
+    return f"Implementation: {detail}\nFiles:\n{files_block}"
+
+
+def _validate_completion_files_exist(
+    completion_notes: str,
+    project_root: Path,
+    ticket_id: str,
+) -> None:
+    completion_files = _extract_completion_files(completion_notes)
+    if not completion_files:
+        raise ValueError(
+            "completion_notes required: include Files section with modified paths"
+        )
+
+    missing: list[str] = []
+    invalid: list[str] = []
+    for entry in completion_files:
+        normalized = _normalize_completion_file_entry(entry)
+        if not normalized:
+            invalid.append(entry)
+            continue
+        candidate = Path(normalized)
+        if candidate.is_absolute():
+            invalid.append(entry)
+            continue
+        resolved = (project_root / candidate).resolve()
+        try:
+            resolved.relative_to(project_root)
+        except ValueError:
+            invalid.append(entry)
+            continue
+        if not resolved.exists() or not resolved.is_file():
+            missing.append(normalized)
+
+    if invalid or missing:
+        details = []
+        if invalid:
+            details.append(f"invalid paths: {', '.join(invalid[:5])}")
+        if missing:
+            details.append(f"missing files: {', '.join(missing[:5])}")
+        detail_text = "; ".join(details)
+        raise ValueError(
+            f"completion_notes required: Files must exist in repo for {ticket_id} ({detail_text})"
+        )
 
 
 @dataclass
@@ -384,9 +498,12 @@ def _process_locked_ticket(
 
                     if mark_ticket_complete(
                         ticket.ticket_id,
-                        completion_notes=(
-                            f"Fixed by {ai_response.provider.value} using {ai_response.model}: "
-                            f"{ai_response.content[:200]}"
+                        completion_notes=_format_completion_notes(
+                            (
+                                f"Fixed by {ai_response.provider.value} using {ai_response.model}: "
+                                f"{ai_response.content[:200]}"
+                            ),
+                            _select_completion_files(paths.project_root, ticket.source),
                         ),
                         test_steps=(
                             f"Validated AI remediation output from {ai_response.provider.value}."
@@ -468,7 +585,10 @@ def _process_locked_ticket(
                 if success:
                     if mark_ticket_complete(
                         ticket.ticket_id,
-                        completion_notes=f"Fixed via custom handler for {ticket.ticket_id}.",
+                        completion_notes=_format_completion_notes(
+                            f"Fixed via custom handler for {ticket.ticket_id}.",
+                            _select_completion_files(paths.project_root, ticket.source),
+                        ),
                         test_steps="Validated handler output and completion state.",
                         test_results="Custom handler completed successfully.",
                         summary="Fixed via custom handler",
@@ -518,7 +638,7 @@ def _process_locked_ticket(
 
 def _fallback_complete_ticket(ticket: TicketInfo, paths: ActifixPaths) -> Optional[TicketInfo]:
     """Deterministic fallback completion for non-interactive processing."""
-    completion_notes = _fallback_completion_notes(ticket)
+    completion_notes = _fallback_completion_notes(ticket, paths.project_root)
     test_steps = _fallback_test_steps(ticket)
     test_results = _fallback_test_results(ticket)
     summary = f"Fallback completion for {ticket.error_type} ticket."
@@ -559,7 +679,7 @@ def _fallback_complete_ticket(ticket: TicketInfo, paths: ActifixPaths) -> Option
     return None
 
 
-def _fallback_completion_notes(ticket: TicketInfo) -> str:
+def _fallback_completion_notes(ticket: TicketInfo, project_root: Path) -> str:
     base_notes = {
         "Robustness": (
             "Applied defensive handling, retry logic, and graceful degradation "
@@ -586,10 +706,12 @@ def _fallback_completion_notes(ticket: TicketInfo) -> str:
             "observability for the affected flow."
         ),
     }
-    return base_notes.get(
+    implementation = base_notes.get(
         ticket.error_type,
         "Completed the requested change with appropriate validation and integration checks.",
     )
+    files = _select_completion_files(project_root, ticket.source)
+    return _format_completion_notes(implementation, files)
 
 
 def _fallback_test_steps(ticket: TicketInfo) -> str:
@@ -703,6 +825,12 @@ def mark_ticket_complete(
         return False
 
     try:
+        _validate_completion_files_exist(
+            completion_notes=completion_notes,
+            project_root=paths.project_root,
+            ticket_id=ticket_id,
+        )
+
         success = repo.mark_complete(
             ticket_id,
             completion_notes=completion_notes,
@@ -782,6 +910,12 @@ def mark_ticket_complete(
             f"Failed to complete ticket {ticket_id}: {e}",
             ticket_id=ticket_id,
             extra={"error": str(e)},
+        )
+        _agent_voice_best_effort(
+            f"Completion validation failed for {ticket_id}: {e}",
+            level="ERROR",
+            run_label="do-af-completion",
+            extra={"ticket_id": ticket_id},
         )
         return False
 
@@ -1547,7 +1681,7 @@ def _write_agent_status(
     payload["timestamp"] = datetime.now(timezone.utc).isoformat()
     status_path = paths.state_dir / _AGENT_STATUS_FILENAME
     try:
-        atomic_write(status_path, payload)
+        atomic_write(status_path, json.dumps(payload, indent=2, sort_keys=True))
     except Exception as exc:
         record_error(
             message=f"Failed to write DoAF agent status: {exc}",
