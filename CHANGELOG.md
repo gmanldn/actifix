@@ -13,6 +13,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [6.0.22] - 2026-01-25
+
+### Added
+- Non-interactive fallback completion for background DoAF processing via `--fallback-complete`
+
+### Changed
+- Background DoAF agent CLI now exposes explicit fallback behavior controls
+
 ## [6.0.21] - 2026-01-25
 
 ### Added

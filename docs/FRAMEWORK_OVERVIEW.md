@@ -122,7 +122,8 @@ export ACTIFIX_CHANGE_ORIGIN=raise_af
 python3 -m actifix.do_af agent --idle-sleep 5 --idle-backoff-max 60 --renew-interval 300
 ```
 
-Use `--no-ai` for non-interactive environments and `--priority P0 --priority P1`
+Use `--no-ai` for non-interactive environments. To deterministically complete
+tickets without AI, add `--fallback-complete`. Use `--priority P0 --priority P1`
 to scope what the agent will pick up. The agent emits AgentVoice entries for
 ticket acquisition, dispatch, success, and failure.
 
@@ -131,9 +132,9 @@ Actifix is ready for manual/CLI processing today, but background ticket agents n
 The following tickets track the gap closures in detail:
 
 - `ACT-20260125-FD74D` - Background ticket agent loop with lease renewals, idle backoff, and clean shutdown. (completed)
-- `ACT-20260125-FF6CC` - Non-interactive processing policy with deterministic fallback when AI is unavailable.
+- `ACT-20260125-FF6CC` - Non-interactive processing policy with deterministic fallback when AI is unavailable. (completed)
 - `ACT-20260125-35DCB` - AgentVoice instrumentation for DoAF acquisition, dispatch, completion, and failures. (completed)
-- `ACT-20260125-B760C` - Health/monitoring for agent liveness, last-run time, and backlog lag.
+- `ACT-20260125-B760C` - Health/monitoring for agent liveness, last-run time, and backlog lag. (completed)
 - `ACT-20260125-2FC6E` - Managed daemon/launcher support for the ticket agent with logs and restart policy.
 - `ACT-20260125-71BDF` - Tests covering background processing, lease renewal, fallback, and AgentVoice logging.
 
