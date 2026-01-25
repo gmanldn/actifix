@@ -221,6 +221,15 @@ class ModuleRegistry:
                 for module_id, (_, context) in self._registered.items()
             }
 
+    def registered_metadata(self) -> dict[str, dict[str, Any]]:
+        with self._lock:
+            metadata_map: dict[str, dict[str, Any]] = {}
+            for module_id, (module, _) in self._registered.items():
+                metadata = getattr(module, "MODULE_METADATA", None)
+                if isinstance(metadata, dict):
+                    metadata_map[module_id] = metadata
+            return metadata_map
+
     def import_module(self, module_label: str) -> tuple[str, object, Optional[dict[str, Any]]]:
         return _lazy_import_module(module_label)
 

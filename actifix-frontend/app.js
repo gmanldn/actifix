@@ -8,7 +8,7 @@ const { useState, useEffect, useRef, createElement: h } = React;
 
 // API Configuration
 const API_BASE = 'http://localhost:5001/api';
-const UI_VERSION = '7.0.14';
+const UI_VERSION = '7.0.15';
 const REFRESH_INTERVAL = 5000;
 const LOG_REFRESH_INTERVAL = 3000;
 const TICKET_REFRESH_INTERVAL = 4000;
@@ -2414,17 +2414,19 @@ const LoginView = ({ onLogin }) => {
     setError('');
 
     try {
-      // Test the password by making a simple API call
-      const response = await fetch(`${API_BASE}/health`, {
-        headers: { 'X-Admin-Password': password }
+      const response = await fetch(`${API_BASE}/auth/verify-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password })
       });
 
-      if (response.ok) {
-        // Password is correct, store it and log in
+      const data = await response.json();
+
+      if (data.valid) {
         setAdminPasswordInStorage(password);
         onLogin();
       } else {
-        setError('Invalid admin password');
+        setError(data.error || 'Invalid admin password');
       }
     } catch (err) {
       setError(`Connection error: ${err.message}`);
@@ -2485,7 +2487,7 @@ const LoginModal = ({ onClose, onSuccess }) => {
     setError('');
 
     try {
-      const response = await fetch(`${API_BASE}/api/auth/verify-password`, {
+      const response = await fetch(`${API_BASE}/auth/verify-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password })

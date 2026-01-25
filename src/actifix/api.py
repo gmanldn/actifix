@@ -82,11 +82,20 @@ from .do_af import (
     get_completed_tickets,
     fix_highest_priority_ticket,
 )
-from .raise_af import enforce_raise_af_only, record_error, TicketPriority
+from .raise_af import (
+    STRUCTURED_MESSAGE_ENFORCED,
+    _ensure_structured_message,
+    capture_stack_trace,
+    enforce_raise_af_only,
+    generate_duplicate_guard,
+    record_error,
+    TicketPriority,
+)
 from .state_paths import get_actifix_paths
 from .persistence.event_repo import get_event_repository, EventFilter
 from .persistence.ticket_cleanup import run_automatic_cleanup
 from .persistence.cleanup_config import get_cleanup_config
+from .metrics import export_prometheus_metrics
 from .config import get_config, set_config, load_config
 from .security.rate_limiter import RateLimitConfig, RateLimitError, get_rate_limiter
 from .log_utils import log_event
@@ -712,7 +721,8 @@ def _load_modules(project_root: Path) -> Dict[str, List[Dict[str, str]]]:
                     "domain": node.get("domain", ""),
                     "owner": node.get("owner", ""),
                     "summary": node.get("label", node["id"]),
-                    "status": get_status(module_id)
+                    "status": get_status(module_id),
+                    "version": "unknown",
                 })
         except Exception:
             modules_data = []
@@ -727,6 +737,7 @@ def _load_modules(project_root: Path) -> Dict[str, List[Dict[str, str]]]:
                 "owner": module.get("owner", ""),
                 "summary": module.get("summary", module_id),
                 "status": get_status(module_id),
+                "version": "unknown",
             })
 
     system_domains = {"runtime", "infra", "core", "tooling", "security", "plugins", "persistence"}
@@ -743,6 +754,7 @@ def _annotate_modules_with_runtime_contexts(
     if not registry or not modules_payload:
         return
     contexts = registry.registered_contexts()
+    metadata_map = registry.registered_metadata()
     if not contexts:
         return
     for bucket in modules_payload.values():
@@ -754,6 +766,11 @@ def _annotate_modules_with_runtime_contexts(
             if context:
                 module["host"] = context.host
                 module["port"] = context.port
+            metadata = metadata_map.get(module_id)
+            if metadata:
+                version = metadata.get("version")
+                if version:
+                    module["version"] = str(version)
 
 
 def _collect_ai_feedback(limit: int = 40) -> List[str]:
@@ -1330,6 +1347,72 @@ def create_app(
             'by_priority': stats.get('by_priority', {}),
             'sla_breaches': breaches,
         })
+
+    @app.route('/api/metrics', methods=['GET'])
+    def api_metrics():
+        """Export Prometheus-compatible metrics."""
+        # Check authentication
+        if not _check_auth(request):
+            return jsonify({'error': 'Authorization required'}), 401
+
+        paths = get_actifix_paths(project_root=app.config['PROJECT_ROOT'])
+        try:
+            payload = export_prometheus_metrics(paths)
+        except Exception as exc:
+            record_error(
+                message=f"Metrics export failed: {exc}",
+                source="api.py:api_metrics",
+                error_type=type(exc).__name__,
+                priority=TicketPriority.P2,
+            )
+            return jsonify({'error': 'Failed to export metrics'}), 500
+
+        response = app.response_class(payload, mimetype="text/plain")
+        response.headers["Content-Type"] = "text/plain; version=0.0.4"
+        return response
+
+    @app.route('/api/status/export', methods=['GET'])
+    def api_status_export():
+        """Export a status snapshot for sharing."""
+        # Check authentication
+        if not _check_auth(request):
+            return jsonify({'error': 'Authorization required'}), 401
+
+        root = Path(app.config['PROJECT_ROOT'])
+        paths = get_actifix_paths(project_root=root)
+        try:
+            health = get_health(paths)
+            stats = get_ticket_stats(paths)
+            modules = _load_modules(root)
+            registry = app.extensions.get("actifix_module_registry")
+            _annotate_modules_with_runtime_contexts(modules, registry)
+            version_info = _gather_version_info(root)
+        except Exception as exc:
+            record_error(
+                message=f"Status export failed: {exc}",
+                source="api.py:api_status_export",
+                error_type=type(exc).__name__,
+                priority=TicketPriority.P2,
+            )
+            return jsonify({'error': 'Failed to export status'}), 500
+
+        return jsonify({
+            'timestamp': datetime.now(timezone.utc).isoformat(),
+            'health': {
+                'healthy': health.healthy,
+                'status': health.status,
+                'warnings': health.warnings,
+                'errors': health.errors,
+            },
+            'tickets': {
+                'total': stats.get('total', 0),
+                'open': stats.get('open', 0),
+                'completed': stats.get('completed', 0),
+                'by_priority': stats.get('by_priority', {}),
+            },
+            'modules': modules,
+            'version': version_info,
+        })
     
     @app.route('/api/tickets', methods=['GET'])
     def api_tickets():
@@ -1859,22 +1942,46 @@ def create_app(
 
             # Create enriched ticket
             from .raise_af import record_error, TicketPriority
+            stack_trace = capture_stack_trace()
+            base_message = f"User Feature Request: {idea}"
+            clean_message = _ensure_structured_message(base_message) if STRUCTURED_MESSAGE_ENFORCED else base_message
+            duplicate_guard = generate_duplicate_guard(
+                "gui_ideas",
+                clean_message,
+                "feature_request",
+                stack_trace,
+            )
+
+            from .persistence.ticket_repo import get_ticket_repository
+            repo = get_ticket_repository()
+            existing = repo.check_duplicate_guard(duplicate_guard)
+            if existing:
+                preview = ai_notes[:150] + '...' if len(ai_notes) > 150 else ai_notes
+                return jsonify({
+                    'success': True,
+                    'ticket_id': existing.get('id'),
+                    'priority': existing.get('priority', 'P3'),
+                    'preview': preview,
+                    'duplicate': True,
+                    'ai_provider': ai_response.provider.value if ai_response.provider else 'none',
+                })
+
             entry = record_error(
-                message=f"User Feature Request: {idea}",
+                message=clean_message,
                 source="gui_ideas",
                 run_label="dashboard",
                 error_type="feature_request",
                 priority=TicketPriority.P3,
                 paths=paths,
-                skip_ai_notes=True  # Use our custom notes
+                skip_ai_notes=True,  # Use our custom notes
+                skip_duplicate_check=True,
+                stack_trace=stack_trace,
             )
 
             if not entry:
                 return jsonify({'error': 'Failed to create ticket (possible duplicate)'}), 500
 
             # Update with AI notes
-            from .persistence.ticket_repo import get_ticket_repository
-            repo = get_ticket_repository()
             repo.update_ticket(entry.entry_id, {
                 'ai_remediation_notes': ai_notes[:4000],  # Truncate if needed
                 'message': f"User Idea → AI Expanded\n\nOriginal: {idea}\n\nAI Analysis:\n{ai_notes[:500]}...",

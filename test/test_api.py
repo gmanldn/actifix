@@ -5,8 +5,10 @@ Tests API endpoints for health, stats, tickets, logs, and system information.
 """
 
 import json
+import os
 import pytest
 import tempfile
+import uuid
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 from datetime import datetime, timezone
@@ -25,6 +27,27 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 from actifix.persistence.ticket_repo import get_ticket_repository
 from actifix.raise_af import ActifixEntry, TicketPriority
 from actifix.state_paths import get_actifix_paths, init_actifix_files
+from actifix.ai_client import AIResponse, AIProvider
+from actifix.config import reset_config
+from actifix.persistence.database import reset_database_pool, get_database_pool
+from actifix.persistence.ticket_repo import reset_ticket_repository
+from actifix.security.ticket_throttler import reset_ticket_throttler
+
+
+def _ensure_admin_user(password: str = "admin123") -> str:
+    from actifix.security.auth import get_user_manager, AuthRole
+
+    user_manager = get_user_manager()
+    try:
+        user_manager.create_user(
+            user_id="admin",
+            username="admin",
+            password=password,
+            roles={AuthRole.ADMIN},
+        )
+    except Exception:
+        pass
+    return password
 
 
 @pytest.fixture
@@ -99,6 +122,90 @@ class TestAPIEndpoints:
         assert 'open' in data
         assert 'completed' in data
         assert 'by_priority' in data
+
+    def test_metrics_endpoint(self, test_client):
+        """Test /api/metrics returns Prometheus text payload."""
+        response = test_client.get('/api/metrics')
+        assert response.status_code == 200
+        assert response.mimetype == 'text/plain'
+        assert b"actifix_info" in response.data
+
+    def test_status_export_endpoint(self, test_client):
+        """Test /api/status/export returns a status snapshot."""
+        response = test_client.get('/api/status/export')
+        assert response.status_code == 200
+        data = json.loads(response.data)
+        assert 'timestamp' in data
+        assert 'health' in data
+        assert 'tickets' in data
+        assert 'modules' in data
+        assert 'version' in data
+
+    def test_modules_endpoint_includes_version(self, test_client):
+        """Test /api/modules includes a version field on module entries."""
+        response = test_client.get('/api/modules')
+        assert response.status_code == 200
+        data = json.loads(response.data)
+        for bucket in ('system', 'user'):
+            for module in data.get(bucket, []):
+                assert 'version' in module
+
+    def test_verify_password_endpoint(self, test_client):
+        """Verify admin password validation endpoint."""
+        password = _ensure_admin_user()
+        response = test_client.post('/api/auth/verify-password', json={'password': password})
+        assert response.status_code == 200
+        assert response.get_json() == {'valid': True}
+
+        response = test_client.post('/api/auth/verify-password', json={'password': 'bad-pass'})
+        assert response.status_code == 401
+        assert response.get_json().get('valid') is False
+
+    def test_ideas_endpoint_requires_auth(self, test_client):
+        """Ideas endpoint should reject missing admin auth."""
+        response = test_client.post('/api/ideas', json={'idea': 'Add export'})
+        assert response.status_code == 401
+
+    def test_ideas_endpoint_creates_ticket(self, test_client):
+        """Ideas endpoint should create ticket with valid auth."""
+        password = _ensure_admin_user()
+        paths = get_actifix_paths(project_root=test_client.application.config.get('PROJECT_ROOT'))
+        db_path = os.environ.get("ACTIFIX_DB_PATH") or str(paths.project_root / "data" / "actifix.db")
+        os.environ["ACTIFIX_DB_PATH"] = db_path
+        os.environ["ACTIFIX_TICKET_THROTTLING_ENABLED"] = "0"
+        reset_database_pool()
+        reset_ticket_repository()
+        reset_ticket_throttler()
+        reset_config()
+        assert str(get_database_pool().config.db_path) == db_path
+        ai_response = AIResponse(
+            content="Test analysis",
+            provider=AIProvider.FREE_ALTERNATIVE,
+            model="test-model",
+            success=True,
+        )
+        idea_text = f"Add export {uuid.uuid4().hex}"
+        entry = ActifixEntry(
+            message=f"User Feature Request: {idea_text}",
+            source="gui_ideas",
+            run_label="dashboard",
+            entry_id="ACT-TEST-IDEA",
+            created_at=datetime.now(timezone.utc),
+            priority=TicketPriority.P3,
+            error_type="feature_request",
+        )
+        with patch('actifix.api.get_ai_client') as mock_client, patch('actifix.raise_af.record_error') as mock_record:
+            mock_client.return_value.generate_fix.return_value = ai_response
+            mock_record.return_value = entry
+            response = test_client.post(
+                '/api/ideas',
+                json={'idea': idea_text},
+                headers={'X-Admin-Password': password},
+            )
+        assert response.status_code == 200, response.get_data(as_text=True)
+        data = response.get_json()
+        assert data.get('success') is True
+        assert data.get('ticket_id')
     
     def test_tickets_endpoint(self, test_client):
         """Test /api/tickets returns ticket list."""

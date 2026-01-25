@@ -18,7 +18,7 @@ import time
 from pathlib import Path
 from typing import Dict, Any, Optional
 from .state_paths import get_actifix_paths, ActifixPaths
-from .persistence.ticket_repo import TicketRepository
+from .do_af import get_ticket_stats
 from .health import get_health
 from .log_utils import log_event
 
@@ -49,10 +49,8 @@ def export_prometheus_metrics(paths: Optional[ActifixPaths] = None) -> str:
         lines.append("")
 
         # Ticket metrics
-        repo = TicketRepository(paths.database_path)
-
         # Get ticket counts by status
-        ticket_stats = repo.get_ticket_stats()
+        ticket_stats = get_ticket_stats(paths)
 
         lines.append("# HELP actifix_tickets_total Total number of tickets")
         lines.append("# TYPE actifix_tickets_total counter")
@@ -82,21 +80,21 @@ def export_prometheus_metrics(paths: Optional[ActifixPaths] = None) -> str:
 
         lines.append("# HELP actifix_health_status System health status (1=healthy, 0=unhealthy)")
         lines.append("# TYPE actifix_health_status gauge")
-        health_status = 1 if health_data.get("overall_status") == "healthy" else 0
+        health_status = 1 if health_data.healthy else 0
         lines.append(f"actifix_health_status {health_status}")
         lines.append("")
 
         # Database health
         lines.append("# HELP actifix_database_healthy Database health status (1=healthy, 0=unhealthy)")
         lines.append("# TYPE actifix_database_healthy gauge")
-        db_healthy = 1 if health_data.get("checks", {}).get("database") == "healthy" else 0
+        db_healthy = 1 if health_data.files_exist else 0
         lines.append(f"actifix_database_healthy {db_healthy}")
         lines.append("")
 
         # Storage health
         lines.append("# HELP actifix_storage_healthy Storage health status (1=healthy, 0=unhealthy)")
         lines.append("# TYPE actifix_storage_healthy gauge")
-        storage_healthy = 1 if health_data.get("checks", {}).get("storage") == "healthy" else 0
+        storage_healthy = 1 if health_data.files_writable else 0
         lines.append(f"actifix_storage_healthy {storage_healthy}")
         lines.append("")
 
@@ -133,8 +131,7 @@ def get_metrics_summary(paths: Optional[ActifixPaths] = None) -> Dict[str, Any]:
         paths = get_actifix_paths()
 
     try:
-        repo = TicketRepository(paths.database_path)
-        ticket_stats = repo.get_ticket_stats()
+        ticket_stats = get_ticket_stats(paths)
         health_data = get_health(paths)
 
         return {
@@ -146,9 +143,9 @@ def get_metrics_summary(paths: Optional[ActifixPaths] = None) -> Dict[str, Any]:
                 "by_priority": ticket_stats.get('by_priority', {}),
             },
             "health": {
-                "overall_status": health_data.get("overall_status"),
-                "database": health_data.get("checks", {}).get("database"),
-                "storage": health_data.get("checks", {}).get("storage"),
+            "overall_status": health_data.status,
+            "database": "healthy" if health_data.files_exist else "unhealthy",
+            "storage": "healthy" if health_data.files_writable else "unhealthy",
             },
             "timestamp": int(time.time()),
         }
