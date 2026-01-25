@@ -129,8 +129,14 @@ def emit_ticket_event(event_type: str, ticket_data: dict) -> None:
         return
     try:
         socketio.emit(event_type, ticket_data, namespace="/tickets")
-    except Exception:
-        pass  # Silently ignore WebSocket errors
+    except Exception as e:
+        # WebSocket failures should be recorded but not block operations
+        record_error(
+            message=f"WebSocket emission failed: {e}",
+            source="api.py:emit_ticket_event",
+            error_type=type(e).__name__,
+            priority=TicketPriority.P3,
+        )
 MODULE_STATUS_SCHEMA_VERSION = "module-statuses.v1"
 MODULE_ACCESS_PUBLIC = "public"
 MODULE_ACCESS_LOCAL_ONLY = "local-only"
@@ -2059,7 +2065,7 @@ def create_app(
                 test_user = user_manager.get_user('admin')
                 if test_user:
                     return jsonify({'error': 'Admin user already exists'}), 409
-            except:
+            except Exception:
                 pass  # No users exist yet
             
             # Create first admin user

@@ -887,8 +887,18 @@ def record_error(
             # This prevents the same issue from creating new tickets after being fixed
             if existing:
                 return None
-        except Exception:
-            pass
+        except Exception as e:
+            # Duplicate check failed - log but proceed with ticket creation
+            # to avoid losing error reports
+            log_event(
+                "DUPLICATE_CHECK_FAILED",
+                f"Failed to check duplicate guard: {e}",
+                extra={
+                    "error": str(e),
+                    "duplicate_guard": duplicate_guard[:50],
+                    "source": clean_source,
+                },
+            )
 
     # Auto-classify priority if not provided
     if isinstance(priority, str):

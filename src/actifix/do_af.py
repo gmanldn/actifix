@@ -734,9 +734,14 @@ def mark_ticket_complete(
                     updated_ticket = repo.get_ticket(ticket_id)
                     if updated_ticket:
                         send_ticket_completed_webhook(updated_ticket)
-            except Exception:
+            except Exception as e:
                 # Webhook failures should not block ticket completion
-                pass
+                record_error(
+                    message=f"Webhook notification failed for ticket {ticket_id}: {e}",
+                    source="do_af.py:mark_ticket_complete",
+                    error_type=type(e).__name__,
+                    priority=TicketPriority.P3,
+                )
 
             # Execute completion hooks if enabled
             try:
@@ -761,6 +766,12 @@ def mark_ticket_complete(
                     f"Error executing completion hooks: {e}",
                     ticket_id=ticket_id,
                     extra={"error": str(e)},
+                )
+                record_error(
+                    message=f"Completion hooks failed for ticket {ticket_id}: {e}",
+                    source="do_af.py:mark_ticket_complete",
+                    error_type=type(e).__name__,
+                    priority=TicketPriority.P3,
                 )
 
         return success
