@@ -64,13 +64,13 @@ def run_tests(modules=None):
     if modules:
         print(f"🧪 Running tests for changed modules: {', '.join(sorted(modules))}")
         # Run tests for specific modules
-        cmd = ["python", "-m", "pytest", "test/", "-v", "--tb=short", "-x"]
+        cmd = [sys.executable, "-m", "pytest", "test/", "-v", "--tb=short", "-x"]
         # Build pattern matching for module tests
         patterns = " or ".join([f"test_{m}" for m in modules])
         cmd.extend(["-k", patterns])
     else:
         print("📋 Critical files changed - running full test suite")
-        cmd = ["python", "test/test_runner.py"]
+        cmd = [sys.executable, "test/test_runner.py"]
 
     result = subprocess.run(cmd, env=env)
     return result.returncode

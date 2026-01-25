@@ -113,6 +113,12 @@
       "label": "event_repo"
     },
     {
+      "id": "infra.persistence.agent_voice_repo",
+      "domain": "infra",
+      "owner": "persistence",
+      "label": "agent_voice_repo"
+    },
+    {
       "id": "infra.persistence.database",
       "domain": "infra",
       "owner": "persistence",
@@ -129,6 +135,12 @@
       "domain": "core",
       "owner": "core",
       "label": "raise_af"
+    },
+    {
+      "id": "core.agent_voice",
+      "domain": "core",
+      "owner": "core",
+      "label": "agent_voice"
     },
     {
       "id": "core.do_af",
@@ -1111,6 +1123,21 @@
       "from": "modules.hollogram",
       "to": "core.ai_client",
       "reason": "modules.hollogram depends on core.ai_client"
+    },
+    {
+      "from": "infra.persistence.agent_voice_repo",
+      "to": "infra.persistence.database",
+      "reason": "infra.persistence.agent_voice_repo depends on infra.persistence.database"
+    },
+    {
+      "from": "core.agent_voice",
+      "to": "core.raise_af",
+      "reason": "core.agent_voice depends on core.raise_af"
+    },
+    {
+      "from": "core.agent_voice",
+      "to": "infra.persistence.agent_voice_repo",
+      "reason": "core.agent_voice depends on infra.persistence.agent_voice_repo"
     }
   ]
 }

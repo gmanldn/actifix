@@ -100,6 +100,14 @@ from .event_repo import (
     reset_event_repository,
 )
 
+from .agent_voice_repo import (
+    AgentVoiceEntry,
+    AgentVoiceRepository,
+    DEFAULT_MAX_AGENT_VOICE_ROWS,
+    get_agent_voice_repository,
+    reset_agent_voice_repository,
+)
+
 __version__ = "1.0.0"
 
 __all__ = [
@@ -158,4 +166,11 @@ __all__ = [
     "EventFilter",
     "get_event_repository",
     "reset_event_repository",
+
+    # AgentVoice Repository
+    "AgentVoiceEntry",
+    "AgentVoiceRepository",
+    "DEFAULT_MAX_AGENT_VOICE_ROWS",
+    "get_agent_voice_repository",
+    "reset_agent_voice_repository",
 ]

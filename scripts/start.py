@@ -188,6 +188,14 @@ def ensure_scaffold() -> None:
         log_info(f"Project root: {paths.project_root}")
         log_info(f"State directory: {paths.state_dir}")
         log_info(f"Database: {db_path}")
+        # Lazy import: src/ isn't on sys.path until we've resolved and injected it.
+        from actifix.agent_voice import record_agent_voice
+        record_agent_voice(
+            "Scaffold initialized",
+            agent_id="scripts/start.py",
+            run_label="start",
+            extra={"project_root": str(paths.project_root), "db_path": str(db_path)},
+        )
         _ensure_frontend_build(paths.project_root)
     except Exception as e:
         log_error(f"Failed to initialize Actifix: {e}")
@@ -200,6 +208,12 @@ def _ensure_frontend_build(project_root: Path) -> None:
     try:
         build_frontend(project_root)
         log_success("Frontend assets ready")
+        from actifix.agent_voice import record_agent_voice
+        record_agent_voice(
+            "Frontend assets built",
+            agent_id="scripts/start.py",
+            run_label="start",
+        )
     except FileNotFoundError as exc:
         log_warning(f"Frontend bundle skipped: {exc}")
 
@@ -340,6 +354,13 @@ def start_api_server(port: int, project_root: Path, host: str = "127.0.0.1") -> 
             return _API_SERVER_INSTANCE
 
         log_info(f"Starting API server on {host}:{port}...")
+        from actifix.agent_voice import record_agent_voice
+        record_agent_voice(
+            "Starting API server",
+            agent_id="scripts/start.py",
+            run_label="start",
+            extra={"host": host, "port": port},
+        )
 
         def run_server():
             try:
@@ -367,6 +388,12 @@ def start_api_server(port: int, project_root: Path, host: str = "127.0.0.1") -> 
         _API_SERVER_INSTANCE = thread
         # Give the server a moment to start
         time.sleep(0.5)
+        record_agent_voice(
+            "API server thread started",
+            agent_id="scripts/start.py",
+            run_label="start",
+            extra={"host": host, "port": port},
+        )
         return thread
 
 

@@ -22,7 +22,7 @@ from pathlib import Path
 from typing import Optional, List, Dict, Any, Iterator
 
 # Schema version for migrations
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 6
 
 
 class DatabaseSecurityError(Exception):
@@ -296,6 +296,25 @@ CREATE INDEX IF NOT EXISTS idx_audit_log_operation ON database_audit_log(operati
 CREATE INDEX IF NOT EXISTS idx_audit_log_record_id ON database_audit_log(record_id);
 CREATE INDEX IF NOT EXISTS idx_audit_log_user ON database_audit_log(user_context);
 CREATE INDEX IF NOT EXISTS idx_audit_log_table_record ON database_audit_log(table_name, record_id);
+
+-- Agent voice table (for review/audit of agent activity)
+CREATE TABLE IF NOT EXISTS agent_voice (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    agent_id TEXT NOT NULL,
+    run_label TEXT,
+    level TEXT DEFAULT 'INFO',
+    thought TEXT NOT NULL,
+    extra_json TEXT,
+    correlation_id TEXT,
+
+    CHECK (level IN ('DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_agent_voice_created ON agent_voice(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_agent_voice_agent ON agent_voice(agent_id);
+CREATE INDEX IF NOT EXISTS idx_agent_voice_run_label ON agent_voice(run_label);
+CREATE INDEX IF NOT EXISTS idx_agent_voice_level ON agent_voice(level);
 """
 
 
@@ -523,6 +542,11 @@ class DatabasePool:
                     conn.rollback()
                 except Exception:
                     pass
+
+        # Migration from v5 to v6: Add agent_voice table
+        if from_version <= 5 and to_version >= 6:
+            # Execute the full schema (CREATE IF NOT EXISTS protects existing tables)
+            conn.executescript(SCHEMA_SQL)
 
         # Migration from v4 to v5: Add database audit log table
         if from_version <= 4 and to_version >= 5:

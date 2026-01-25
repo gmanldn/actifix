@@ -56,6 +56,7 @@ QUICK_PYTEST_FILES = [
     "test/test_pokertool_ml.py",
     "test/test_pokertool_solvers.py",
     "test/test_yhatzee_session_sync.py",
+    "test/test_agent_voice_repo.py",
 ]
 
 # Coverage runs should stay representative enough to satisfy the global threshold,

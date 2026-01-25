@@ -239,6 +239,17 @@ modules:
   - store simple events for instrumentation
   - provide resettable hooks for tests
   depends_on: []
+- id: infra.persistence.agent_voice_repo
+  domain: infra
+  owner: persistence
+  summary: AgentVoice persistence (append-only rows with pruning for review)
+  entrypoints:
+  - src/actifix/persistence/agent_voice_repo.py
+  contracts:
+  - record agent activity rows
+  - enforce max row retention (prune oldest)
+  depends_on:
+  - infra.persistence.database
 - id: infra.persistence.database
   domain: infra
   owner: persistence
@@ -282,6 +293,19 @@ modules:
   - core.quarantine
   - infra.persistence.ticket_repo
   - security.ticket_throttler
+
+- id: core.agent_voice
+  domain: core
+  owner: core
+  summary: Agent voice logging wrapper (records reviewable agent activity rows into SQLite)
+  entrypoints:
+  - src/actifix/agent_voice.py
+  contracts:
+  - capture agent activity rows during runs
+  - record failures via raise_af
+  depends_on:
+  - core.raise_af
+  - infra.persistence.agent_voice_repo
 
 - id: core.do_af
   domain: core
