@@ -57,12 +57,56 @@ DEFAULT_SHOOTY_PORT = 8040
 DEFAULT_POKERTOOL_PORT = 8060
 VERSION_LINE_RE = re.compile(r'^version\s*=\s*["\'](?P<version>[^"\']+)["\']', re.MULTILINE)
 
+# Environment keys for the running instance ports (used by the version monitor).
+ENV_FRONTEND_PORT = "ACTIFIX_FRONTEND_PORT"
+ENV_API_PORT = "ACTIFIX_API_PORT"
+ENV_YHATZEE_PORT = "ACTIFIX_YHATZEE_PORT"
+ENV_SUPERQUIZ_PORT = "ACTIFIX_SUPERQUIZ_PORT"
+ENV_SHOOTY_PORT = "ACTIFIX_SHOOTY_PORT"
+ENV_POKERTOOL_PORT = "ACTIFIX_POKERTOOL_PORT"
+
 # Optional API modules we want to surface in startup output.
 API_MODULE_HEALTH_PATHS = {
     "Hollogram": "/modules/hollogram/health",
     # Note: url_prefix for this module uses a hyphen.
     "Dev_Assistant": "/modules/dev-assistant/health",
 }
+
+
+def _get_runtime_ports_from_env() -> list[int]:
+    """Return the ports this start.py instance is responsible for."""
+    ports: list[int] = []
+    for key, default in [
+        (ENV_FRONTEND_PORT, DEFAULT_FRONTEND_PORT),
+        (ENV_API_PORT, DEFAULT_API_PORT),
+        (ENV_YHATZEE_PORT, DEFAULT_YHATZEE_PORT),
+        (ENV_SUPERQUIZ_PORT, DEFAULT_SUPERQUIZ_PORT),
+        (ENV_SHOOTY_PORT, DEFAULT_SHOOTY_PORT),
+        (ENV_POKERTOOL_PORT, DEFAULT_POKERTOOL_PORT),
+    ]:
+        raw = os.environ.get(key)
+        try:
+            ports.append(int(raw) if raw else int(default))
+        except Exception:
+            ports.append(int(default))
+    return ports
+
+
+def restart_process_for_new_version(project_root: Path, reason: str, ports: Optional[list[int]] = None) -> None:
+    """Hard restart this launcher to ensure all modules reload code and UI."""
+    log_warning(f"{reason} - restarting all services from scratch")
+    try:
+        build_frontend(project_root)
+    except Exception as exc:
+        log_warning(f"Frontend rebuild failed during restart: {exc}")
+
+    for port in (ports or _get_runtime_ports_from_env()):
+        try:
+            kill_processes_on_port(int(port))
+        except Exception:
+            pass
+
+    os.execv(sys.executable, [sys.executable, str(Path(__file__).resolve())] + sys.argv[1:])
 
 
 # Global singleton instances - only one of each can exist
@@ -476,6 +520,31 @@ def announce_api_modules(host: str, port: int) -> None:
         )
 
 
+def report_runtime_status(args: argparse.Namespace, host: str = "127.0.0.1") -> None:
+    """Print a consistent status line for every managed service/module."""
+    log_info("Runtime status:")
+    services = []
+    services.append(("Frontend", args.frontend_port, f"http://localhost:{args.frontend_port}"))
+    if not args.no_api:
+        services.append(("API", args.api_port, f"http://localhost:{args.api_port}/api/"))
+    if not args.no_yhatzee:
+        services.append(("Yhatzee", args.yhatzee_port, f"http://localhost:{args.yhatzee_port}/"))
+    if not args.no_superquiz:
+        services.append(("SuperQuiz", args.superquiz_port, f"http://localhost:{args.superquiz_port}/"))
+    if not args.no_shooty:
+        services.append(("ShootyMcShoot", args.shooty_port, f"http://localhost:{args.shooty_port}/"))
+    if not args.no_pokertool:
+        services.append(("PokerTool", args.pokertool_port, f"http://localhost:{args.pokertool_port}/"))
+
+    for name, port, url in services:
+        running = is_port_in_use(int(port))
+        marker = "RUNNING" if running else "DOWN"
+        (log_success if running else log_warning)(f"{name}: {marker} ({url})")
+
+    if not args.no_api:
+        announce_api_modules(host, args.api_port)
+
+
 def start_yhatzee_server(port: int, project_root: Path, host: str = "127.0.0.1") -> threading.Thread:
     """Launch the Yhatzee GUI server in a background thread."""
     global _YHATZEE_SERVER_INSTANCE
@@ -777,7 +846,14 @@ def start_version_monitor(
             if current_version and ui_version and current_version != ui_version:
                 mismatch = True
 
-            if current_version != last_version or mismatch:
+            if current_version != last_version:
+                restart_process_for_new_version(
+                    project_root,
+                    reason=f"Version changed to {current_version or 'unknown'}",
+                    ports=[manager.port] + _get_runtime_ports_from_env(),
+                )
+
+            if mismatch:
                 log_info(
                     "Frontend version sync triggered: "
                     f"pyproject={current_version or 'unknown'} "
@@ -928,6 +1004,14 @@ def main(argv: Optional[list[str]] = None) -> int:
     # Step 0: Cleanup existing instances first
     cleanup_existing_instances()
 
+    # Persist the configured ports for other threads (e.g., version monitor).
+    os.environ[ENV_FRONTEND_PORT] = str(args.frontend_port)
+    os.environ[ENV_API_PORT] = str(args.api_port)
+    os.environ[ENV_YHATZEE_PORT] = str(args.yhatzee_port)
+    os.environ[ENV_SUPERQUIZ_PORT] = str(args.superquiz_port)
+    os.environ[ENV_SHOOTY_PORT] = str(args.shooty_port)
+    os.environ[ENV_POKERTOOL_PORT] = str(args.pokertool_port)
+
     total_steps = 3
     if not args.no_api:
         total_steps += 1
@@ -1024,6 +1108,16 @@ def main(argv: Optional[list[str]] = None) -> int:
             log_error("Try manually: pkill -f 'start.py' or use --superquiz-port <PORT>")
             return 1
 
+    if not args.no_shooty and is_port_in_use(args.shooty_port):
+        log_warning(f"ShootyMcShoot port {args.shooty_port} still in use, forcing cleanup")
+        kill_processes_on_port(args.shooty_port)
+        time.sleep(0.5)
+
+        if is_port_in_use(args.shooty_port):
+            log_error(f"Could not free ShootyMcShoot port {args.shooty_port}")
+            log_error("Try manually: pkill -f 'start.py' or use --shooty-port <PORT>")
+            return 1
+
     if not args.no_pokertool and is_port_in_use(args.pokertool_port):
         log_warning(f"PokerTool port {args.pokertool_port} still in use, forcing cleanup")
         kill_processes_on_port(args.pokertool_port)
@@ -1040,6 +1134,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     version_monitor_thread: Optional[threading.Thread] = None
     yhatzee_thread: Optional[threading.Thread] = None
     superquiz_thread: Optional[threading.Thread] = None
+    shooty_thread: Optional[threading.Thread] = None
     pokertool_thread: Optional[threading.Thread] = None
     stop_event = threading.Event()
     if not args.no_api:
@@ -1074,6 +1169,15 @@ def main(argv: Optional[list[str]] = None) -> int:
             log_error(f"Failed to start SuperQuiz GUI: {e}")
             return 1
 
+    if not args.no_shooty:
+        current_step += 1
+        log_step(current_step, total_steps, "Starting ShootyMcShoot GUI")
+        try:
+            shooty_thread = start_shooty_server(args.shooty_port, ROOT)
+        except Exception as e:
+            log_error(f"Failed to start ShootyMcShoot GUI: {e}")
+            return 1
+
     if not args.no_pokertool:
         current_step += 1
         log_step(current_step, total_steps, "Starting PokerTool service")
@@ -1097,7 +1201,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     # Success banner
     print_banner("ACTIFIX IS READY!")
 
-    # Display access information
+    # Display access information (stable, concise) and a status snapshot for review.
     url = f"http://localhost:{args.frontend_port}"
     print(f"{Color.BOLD}{Color.GREEN}Frontend:{Color.RESET}  {Color.CYAN}{url}{Color.RESET}")
     if not args.no_api:
@@ -1118,6 +1222,8 @@ def main(argv: Optional[list[str]] = None) -> int:
         pokertool_url = f"http://localhost:{args.pokertool_port}/"
         print(f"{Color.BOLD}{Color.GREEN}PokerTool:{Color.RESET} {Color.CYAN}{pokertool_url}{Color.RESET}")
 
+    print()
+    report_runtime_status(args)
     print()
 
 
