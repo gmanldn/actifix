@@ -13,6 +13,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [7.0.0] - 2026-01-26
+
+### Added
+- Release documentation now calls out the 7.0.0 big-point release so the timeline and highlights stay discoverable in `docs/FRAMEWORK_OVERVIEW`.
+
+### Changed
+- Bumped the canonical version to 7.0.0 and synchronized the frontend asset, version badge, and API surfaces with the new number.
+- Updated the version synchronization guidance and `docs/INDEX` pointers so the release flow clarifies the single source of truth.
+
+### Fixed
+- Removed stale 5.x version references from production docs so the version audit tests run cleanly against the latest release.
+
 ## [6.0.31] - 2026-01-25
 
 ### Added

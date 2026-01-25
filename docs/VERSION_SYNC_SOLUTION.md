@@ -1,73 +1,49 @@
 # Version Synchronization Solution
 
 ## Problem
-The UI version didn't match the API version. They should always be the same - a single project version at any time.
+The UI version must always match the API version so the dashboard can detect mismatches, prompt a reload, and keep users confident that the backend and frontend are bundled from the same release. When the number drifted, the warning badge appeared and the tests flagged the discrepancy.
 
 ## Root Cause
-The versions were defined in three separate files and were not synchronized:
+Historically the version lived in several files:
 
-1. **Backend** (`src/actifix/__init__.py`): `__version__ = "5.0.0"` (outdated)
-2. **Frontend** (`actifix-frontend/app.js`): `UI_VERSION = '5.0.50'`
-3. **pyproject.toml**: `version = "5.0.50"` (canonical source)
+1. `pyproject.toml` (the canonical source of truth)
+2. `src/actifix/__init__.py` (a hardcoded `__version__`)
+3. `actifix-frontend/app.js` (the `UI_VERSION` constant)
+
+Releasing a new version meant updating each location manually, and it was easy to forget the frontend or docs.
 
 ## Solution
 
-### 1. Updated Backend Version
-Changed `src/actifix/__init__.py` to use the canonical version from `pyproject.toml`:
-```python
-__version__ = "5.0.50"  # Now matches pyproject.toml
-```
+1. **Backend version resolution**  
+   `src/actifix/__init__.py` now calls `_resolve_version()` to read the version straight from `pyproject.toml`. That means the API always exposes the canonical version, we do not hardcode `__version__`, and the `/api/version` endpoint is kept in sync automatically.
 
-### 2. Enhanced Build Script
-Updated `scripts/build_frontend.py` to automatically sync the frontend version from `pyproject.toml` during the build process:
+2. **Frontend synchronization**  
+   `scripts/build_frontend.py` reads `pyproject.toml` via `get_version_from_pyproject()` and rewrites the `UI_VERSION` constant in `actifix-frontend/app.js`. The same version is also embedded in `actifix-frontend/index.html` via `ACTIFIX_ASSET_VERSION` so the served assets advertise the release number.
 
-- Added `_get_version_from_pyproject()` function to extract version from `pyproject.toml`
-- Added `_update_frontend_version()` function to update `UI_VERSION` in `app.js`
-- The build script now:
-  1. Reads the version from `pyproject.toml` (single source of truth)
-  2. Updates the frontend `UI_VERSION` to match
-  3. Copies files to the dist directory
-
-### 3. Version Flow
-```
-pyproject.toml (source of truth)
-       ↓
-   build_frontend.py
-       ↓
-   actifix-frontend/app.js (UI_VERSION synced)
-       ↓
-   src/actifix/__init__.py (__version__ matches)
-       ↓
-   API /version endpoint returns correct version
-```
+3. **Release flow**  
+   During a release, update `pyproject.toml` to the new number (e.g., `7.0.0`), run `python3 scripts/build_frontend.py`, and rebuild the `actifix-frontend` assets. The launcher (`scripts/start.py`) and tests (`test/test_version_synchronization.py`) then confirm all surfaces show the new version and highlight any mismatch.
 
 ## Usage
 
-### Building the Frontend
+### Building the frontend
+
 ```bash
 python3 scripts/build_frontend.py
 ```
 
-This will:
-- Extract version from `pyproject.toml`
-- Update `actifix-frontend/app.js` with the correct `UI_VERSION`
-- Copy files to `actifix-frontend/dist/`
+This script:
 
-### Version Display
-The frontend displays the version in the header via the `VersionBadge` component, which:
-1. Fetches version from `/api/version` endpoint
-2. Compares it with the hardcoded `UI_VERSION`
-3. Shows a warning if they don't match
-4. Auto-reloads the page if a version change is detected
+- Extracts the version from `pyproject.toml`.
+- Updates `actifix-frontend/app.js` (`UI_VERSION`) and `index.html` (`ACTIFIX_ASSET_VERSION`/query strings).
+- Copies the updated files into `actifix-frontend/dist/`.
 
-## Benefits
-- **Single source of truth**: Version is only defined in `pyproject.toml`
-- **Automatic synchronization**: Build script ensures frontend version matches
-- **No manual updates needed**: Version updates automatically when `pyproject.toml` changes
-- **Consistent versioning**: UI and API always show the same version
+### Version display
+
+The React UI compares the API `/api/version` payload with the hardcoded `UI_VERSION`. When they match (as they should after the build script runs) the version badge shows `v7.0.0`; if not, the UI prompts a reload and records a warning to help catch release drift.
 
 ## Testing
-All three versions are now synchronized at `5.0.53`:
-- Frontend `UI_VERSION`: 5.0.53
-- Backend `__version__`: 5.0.53
-- `pyproject.toml`: 5.0.53
+
+- `python3 -m pytest test/test_version_synchronization.py` validates that `pyproject.toml`, the backend `__version__`, the API `/api/version`, and the frontend `UI_VERSION` all agree on the release string (currently `7.0.0`).
+- The `@pytest.mark.slow` check in the same file ensures no legacy `5.x` numbers remain in the production files so future builds start clean.
+
+Keeping this doc up to date with every release ensures the release gate stays green and the frontend never drifts from the backend version.
