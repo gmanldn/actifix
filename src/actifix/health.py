@@ -4,6 +4,7 @@ Actifix Health Check - System health and SLA monitoring.
 Provides health checks, SLA tracking, and system diagnostics.
 """
 
+import json
 import os
 import re
 from dataclasses import dataclass, field
@@ -13,6 +14,10 @@ from typing import Optional
 
 from .state_paths import get_actifix_paths, ActifixPaths
 from .do_af import get_open_tickets, get_ticket_stats
+from .raise_af import record_error, TicketPriority
+
+_AGENT_STATUS_FILENAME = "doaf_agent_status.json"
+_AGENT_STALE_MINUTES = 10
 
 
 # SLA thresholds (hours)
@@ -81,6 +86,35 @@ def _get_sla_threshold(priority: str) -> int:
         "P3": SLA_P3,
     }
     return thresholds.get(priority, SLA_P2)
+
+
+def _read_agent_status(paths: ActifixPaths) -> Optional[dict]:
+    status_path = paths.state_dir / _AGENT_STATUS_FILENAME
+    if not status_path.exists():
+        return None
+    try:
+        payload = status_path.read_text()
+        return json.loads(payload)
+    except Exception as exc:
+        record_error(
+            message=f"Failed to read DoAF agent status: {exc}",
+            source="actifix/health.py:_read_agent_status",
+            error_type=type(exc).__name__,
+            priority=TicketPriority.P3,
+        )
+        return None
+
+
+def _agent_status_stale(agent_status: dict, now: datetime) -> bool:
+    timestamp = agent_status.get("timestamp")
+    if not timestamp:
+        return True
+    parsed = _parse_iso_datetime(timestamp)
+    if not parsed:
+        return True
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return now - parsed > timedelta(minutes=_AGENT_STALE_MINUTES)
 
 
 def check_sla_breaches(paths: Optional[ActifixPaths] = None) -> list[dict]:
@@ -190,6 +224,23 @@ def get_health(paths: Optional[ActifixPaths] = None) -> ActifixHealthCheck:
     # High ticket count warning
     if open_tickets > 20:
         warnings.append(f"High open ticket count: {open_tickets}")
+
+    agent_status = _read_agent_status(paths)
+    if agent_status:
+        if _agent_status_stale(agent_status, now):
+            warnings.append("DoAF agent heartbeat is stale")
+        details_agent = {
+            "state": agent_status.get("state"),
+            "agent_id": agent_status.get("agent_id"),
+            "run_label": agent_status.get("run_label"),
+            "processed": agent_status.get("processed"),
+            "ticket_id": agent_status.get("ticket_id"),
+            "use_ai": agent_status.get("use_ai"),
+            "fallback_complete": agent_status.get("fallback_complete"),
+            "timestamp": agent_status.get("timestamp"),
+        }
+    else:
+        details_agent = {}
     
     return ActifixHealthCheck(
         healthy=healthy,
@@ -206,7 +257,8 @@ def get_health(paths: Optional[ActifixPaths] = None) -> ActifixHealthCheck:
             "breaches": breaches,
             "paths": {
                 "base_dir": str(paths.base_dir),
-            }
+            },
+            "doaf_agent": details_agent,
         },
         warnings=warnings,
         errors=errors,
@@ -237,6 +289,10 @@ def format_health_report(health: ActifixHealthCheck) -> str:
         f"Completed Tickets: {health.completed_tickets}",
         f"SLA Breaches: {health.sla_breaches}",
         f"Oldest Ticket Age: {health.oldest_ticket_age_hours}h",
+        "",
+        "--- DoAF Agent ---",
+        f"Agent State: {health.details.get('doaf_agent', {}).get('state', 'unknown')}",
+        f"Agent Last Seen: {health.details.get('doaf_agent', {}).get('timestamp', 'n/a')}",
         "",
         "--- System Checks ---",
         f"Files Exist: {'Yes' if health.files_exist else 'No'}",

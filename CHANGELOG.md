@@ -13,6 +13,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [6.0.23] - 2026-01-25
+
+### Added
+- DoAF agent heartbeat tracking written to state and surfaced in health reports
+
+### Changed
+- Health report includes DoAF agent liveness details and warns on stale heartbeats
+
 ## [6.0.22] - 2026-01-25
 
 ### Added

@@ -12,6 +12,7 @@ Health checks summarize:
 - SLA breaches
 - Storage state and quarantine
 - Recent errors in the event log
+- DoAF agent heartbeat (last updated timestamp)
 
 ## Key metrics to monitor
 - Startup time (target: < 5s)

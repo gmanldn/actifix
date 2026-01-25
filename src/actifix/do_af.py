@@ -25,7 +25,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional, Callable, Iterator, TYPE_CHECKING
 
-from .log_utils import log_event
+from .log_utils import atomic_write, log_event
 from .raise_af import enforce_raise_af_only, record_error, TicketPriority
 from .state_paths import ActifixPaths, get_actifix_paths, init_actifix_files
 from .config import get_config, load_config
@@ -971,6 +971,18 @@ def run_background_agent(
         run_label=config.run_label,
         extra={"agent_id": config.agent_id},
     )
+    _write_agent_status(
+        paths,
+        {
+            "agent_id": config.agent_id,
+            "run_label": config.run_label,
+            "state": "starting",
+            "processed": processed,
+            "use_ai": use_ai,
+            "fallback_complete": config.fallback_complete,
+        },
+        run_label=config.run_label,
+    )
 
     while not stop_event.is_set():
         repo = _get_ticket_repository(paths)
@@ -987,6 +999,18 @@ def run_background_agent(
                 "Background agent idle - no open tickets",
                 run_label=config.run_label,
             )
+            _write_agent_status(
+                paths,
+                {
+                    "agent_id": config.agent_id,
+                    "run_label": config.run_label,
+                    "state": "idle",
+                    "processed": processed,
+                    "use_ai": use_ai,
+                    "fallback_complete": config.fallback_complete,
+                },
+                run_label=config.run_label,
+            )
             stop_event.wait(backoff)
             backoff = min(backoff * 2, max(config.idle_backoff_max_seconds, idle_sleep))
             continue
@@ -997,6 +1021,19 @@ def run_background_agent(
             f"Background agent acquired {ticket_id}",
             run_label=config.run_label,
             extra={"ticket_id": ticket_id},
+        )
+        _write_agent_status(
+            paths,
+            {
+                "agent_id": config.agent_id,
+                "run_label": config.run_label,
+                "state": "processing",
+                "processed": processed,
+                "ticket_id": ticket_id,
+                "use_ai": use_ai,
+                "fallback_complete": config.fallback_complete,
+            },
+            run_label=config.run_label,
         )
 
         renew_stop = threading.Event()
@@ -1023,6 +1060,19 @@ def run_background_agent(
             )
             if ticket:
                 processed += 1
+                _write_agent_status(
+                    paths,
+                    {
+                        "agent_id": config.agent_id,
+                        "run_label": config.run_label,
+                        "state": "processed",
+                        "processed": processed,
+                        "ticket_id": ticket.ticket_id,
+                        "use_ai": use_ai,
+                        "fallback_complete": config.fallback_complete,
+                    },
+                    run_label=config.run_label,
+                )
         finally:
             renew_stop.set()
             renewer.join(timeout=5)
@@ -1049,6 +1099,18 @@ def run_background_agent(
         f"Background ticket agent stopped after {processed} tickets",
         run_label=config.run_label,
         extra={"processed": processed},
+    )
+    _write_agent_status(
+        paths,
+        {
+            "agent_id": config.agent_id,
+            "run_label": config.run_label,
+            "state": "stopped",
+            "processed": processed,
+            "use_ai": use_ai,
+            "fallback_complete": config.fallback_complete,
+        },
+        run_label=config.run_label,
     )
     return processed
 
@@ -1336,6 +1398,7 @@ def main(argv: Optional[list[str]] = None) -> int:
 
 _THREAD_LOCK = threading.Lock()
 _LOCK_FILENAME = "doaf.lock"
+_AGENT_STATUS_FILENAME = "doaf_agent_status.json"
 
 
 @contextlib.contextmanager
@@ -1422,6 +1485,29 @@ def _has_msvcrt() -> bool:
         return True
     except Exception:
         return False
+
+
+def _write_agent_status(
+    paths: ActifixPaths,
+    status: dict,
+    *,
+    run_label: str,
+) -> None:
+    payload = dict(status)
+    payload["timestamp"] = datetime.now(timezone.utc).isoformat()
+    status_path = paths.state_dir / _AGENT_STATUS_FILENAME
+    try:
+        atomic_write(status_path, payload)
+    except Exception as exc:
+        record_error(
+            message=f"Failed to write DoAF agent status: {exc}",
+            source="actifix/do_af.py:_write_agent_status",
+            error_type=type(exc).__name__,
+            priority=TicketPriority.P2,
+            run_label=run_label,
+            capture_context=True,
+        )
+        raise
 
 
 
