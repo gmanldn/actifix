@@ -69,8 +69,13 @@ def test_frontend_version_display_logic(tmp_path):
         api_version = api_data["version"]
         
         # This simulates what the frontend does:
-        # It has UI_VERSION hardcoded and compares it with API version
-        UI_VERSION = actifix.__version__  # This is what's in app.js
+        # It has UI_VERSION hardcoded in the JS bundle and compares it with API version.
+        project_root = Path(__file__).parent.parent
+        app_js = project_root / "actifix-frontend" / "app.js"
+        content = app_js.read_text(encoding="utf-8")
+        match = re.search(r"\bconst\s+UI_VERSION\s*=\s*['\"]([^'\"]+)['\"]\s*;", content)
+        assert match, "Frontend UI_VERSION constant not found in actifix-frontend/app.js"
+        UI_VERSION = match.group(1)
         
         # Version mismatch detection (what frontend does)
         version_mismatch = api_version != UI_VERSION
@@ -130,8 +135,13 @@ def test_version_endpoint_matches_frontend_ui_version(tmp_path):
         api_data = response.get_json()
         api_version = api_data["version"]
         
-        # This is what the frontend has hardcoded
-        frontend_ui_version = actifix.__version__
+        # This is what the frontend has hardcoded.
+        project_root = Path(__file__).parent.parent
+        app_js = project_root / "actifix-frontend" / "app.js"
+        content = app_js.read_text(encoding="utf-8")
+        match = re.search(r"\bconst\s+UI_VERSION\s*=\s*['\"]([^'\"]+)['\"]\s*;", content)
+        assert match, "Frontend UI_VERSION constant not found in actifix-frontend/app.js"
+        frontend_ui_version = match.group(1)
         
         # They should match (this is what ensures sync)
         assert api_version == frontend_ui_version, \
@@ -213,26 +223,28 @@ def test_actual_production_files_have_correct_version():
     finally:
         os.chdir(original_cwd)
     
-    # Check src/actifix/__init__.py
-    init_py = project_root / "src" / "actifix" / "init__.py"
-    if init_py.exists():
-        content = init_py.read_text(encoding="utf-8")
-        assert f'__version__ = "{expected_version}"' in content, \
-            f"Backend __version__ doesn't match expected version {expected_version}"
-    
     # Check actifix-frontend/app.js (uses single quotes for UI_VERSION)
     app_js = project_root / "actifix-frontend" / "app.js"
     if app_js.exists():
         content = app_js.read_text(encoding="utf-8")
-        assert f"const UI_VERSION = '{expected_version}'" in content, \
-            f"Frontend UI_VERSION doesn't match expected version {expected_version}"
+        assert re.search(
+            rf"\bconst\s+UI_VERSION\s*=\s*['\"]{re.escape(expected_version)}['\"]\s*;",
+            content,
+        ), f"Frontend UI_VERSION doesn't match expected version {expected_version}"
+
+        # The top-right version badge must render the UI build version.
+        assert "className: 'version-indicator'" in content
+        assert "className: 'version-label'" in content
+        assert "`v${UI_VERSION}`" in content
     
     # Check actifix-frontend/dist/app.js (uses single quotes for UI_VERSION)
     dist_app_js = project_root / "actifix-frontend" / "dist" / "app.js"
     if dist_app_js.exists():
         content = dist_app_js.read_text(encoding="utf-8")
-        assert f"const UI_VERSION = '{expected_version}'" in content, \
-            f"Frontend dist UI_VERSION doesn't match expected version {expected_version}"
+        assert re.search(
+            rf"\bconst\s+UI_VERSION\s*=\s*['\"]{re.escape(expected_version)}['\"]\s*;",
+            content,
+        ), f"Frontend dist UI_VERSION doesn't match expected version {expected_version}"
     
     # Check actifix-frontend/dist/index.html (uses double quotes for ACTIFIX_ASSET_VERSION)
     dist_index = project_root / "actifix-frontend" / "dist" / "index.html"
