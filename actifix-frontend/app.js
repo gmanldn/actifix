@@ -8,7 +8,7 @@ const { useState, useEffect, useRef, createElement: h } = React;
 
 // API Configuration
 const API_BASE = 'http://localhost:5001/api';
-const UI_VERSION = '6.0.20';
+const UI_VERSION = '6.0.21';
 const REFRESH_INTERVAL = 5000;
 const LOG_REFRESH_INTERVAL = 3000;
 const TICKET_REFRESH_INTERVAL = 4000;
@@ -1604,6 +1604,7 @@ const ModulesView = () => {
   const [sortBy, setSortBy] = useState('name');
   const [sortDir, setSortDir] = useState('asc');
   const { execute: authenticatedFetch } = useAuthenticatedFetch();
+  const refreshModules = () => setRefreshKey((rk) => rk + 1);
 
   const handleToggle = async (moduleId) => {
     try {
@@ -1646,14 +1647,21 @@ const ModulesView = () => {
 
   const renderModuleTable = (title, modules, icon) => {
     const sortedModules = sortModules(modules);
-    return h('div', { className: 'panel' },
-      h('div', { className: 'panel-header' },
+    return h('div', { className: 'panel modules-panel' },
+      h('div', { className: 'panel-header modules-header' },
         h('div', { className: 'panel-title' },
           h('span', { className: 'panel-title-icon' }, icon),
           title
         ),
-        h('span', { className: 'text-muted', style: { fontSize: '10px' } }, `${sortedModules.length} modules`),
-        h('span', { className: 'text-dim', style: { fontSize: '9px' } }, `Sorted: ${sortBy} ${sortDir.toUpperCase()}`)
+        h('div', { className: 'panel-actions panel-actions--modules' },
+          h('span', { className: 'text-muted modules-count' }, `${sortedModules.length} modules`),
+          h('span', { className: 'text-dim modules-count-info' }, `Sorted: ${sortBy} ${sortDir.toUpperCase()}`),
+          h('button', {
+            type: 'button',
+            className: 'btn modules-refresh',
+            onClick: refreshModules,
+          }, 'Refresh')
+        )
       ),
       modules.length === 0 ?
         h('div', { className: 'module-empty' }, 'No modules') :
@@ -1662,6 +1670,7 @@ const ModulesView = () => {
             h('div', { className: 'table-cell name', onClick: () => handleSort('name'), title: 'Click to sort' }, 'Name', sortIndicator('name')),
             h('div', { className: 'table-cell domain', onClick: () => handleSort('domain'), title: 'Click to sort' }, 'Domain', sortIndicator('domain')),
             h('div', { className: 'table-cell owner', onClick: () => handleSort('owner'), title: 'Click to sort' }, 'Owner', sortIndicator('owner')),
+            h('div', { className: 'table-cell port', onClick: () => handleSort('port'), title: 'Click to sort' }, 'Port', sortIndicator('port')),
             h('div', { className: 'table-cell status', onClick: () => handleSort('status'), title: 'Click to sort' }, 'Status', sortIndicator('status')),
             h('div', { className: 'table-cell actions' }, 'Actions'),
             h('div', { className: 'table-cell summary', onClick: () => handleSort('summary'), title: 'Click to sort' }, 'Summary', sortIndicator('summary'))
@@ -1671,6 +1680,7 @@ const ModulesView = () => {
               h('div', { className: 'table-cell name truncate' }, m.name || '—'),
               h('div', { className: 'table-cell domain truncate' }, m.domain || '—'),
               h('div', { className: 'table-cell owner truncate' }, m.owner || '—'),
+              h('div', { className: 'table-cell port' }, m.port ? `${m.port}` : '—'),
               h('div', { className: 'table-cell status' },
                 h('span', { className: `status-badge ${m.status || 'active'}` }, m.status || 'active')
               ),

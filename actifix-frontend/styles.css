@@ -633,30 +633,62 @@ body {
 }
 
 /* MODULES COMPACT SORTABLE TABLES */
+.modules-panel {
+  padding: calc(var(--spacing-md) - 2px);
+  margin-bottom: var(--spacing-md);
+  border-color: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.01);
+  box-shadow: 0 6px 18px rgba(3, 3, 3, 0.16);
+}
+
+.modules-header {
+  gap: var(--spacing-xs);
+}
+
+.panel-actions--modules {
+  gap: var(--spacing-xs);
+  align-items: center;
+}
+
+.modules-count {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.modules-count-info {
+  font-size: 9px;
+  color: var(--text-dim);
+}
+
+.modules-refresh {
+  font-size: 10px;
+  padding: 4px 10px;
+}
+
 .modules-table {
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   overflow: hidden;
   font-family: 'IBM Plex Mono', monospace;
-  font-size: 11px;
+  font-size: 10px;
+  line-height: 1.3;
 }
 
 .table-header {
   display: grid;
-  grid-template-columns: 2fr 1fr 1fr 3fr;
-  gap: 12px;
+  grid-template-columns: 2.4fr 1fr 1fr 0.6fr 0.9fr 0.9fr 2fr;
+  gap: 8px;
   align-items: center;
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.05);
   border-bottom: 1px solid var(--border);
   font-weight: 600;
-  font-size: 11px;
   color: var(--text-primary);
-  letter-spacing: 0.02em;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
 }
 
 .table-header > div {
-  padding: 8px 10px;
+  padding: 6px 8px;
   cursor: pointer;
   transition: var(--transition);
   position: relative;
@@ -669,8 +701,8 @@ body {
 
 .table-row {
   display: grid;
-  grid-template-columns: 2fr 1fr 1fr 3fr;
-  gap: 12px;
+  grid-template-columns: 2.4fr 1fr 1fr 0.6fr 0.9fr 0.9fr 2fr;
+  gap: 8px;
   align-items: center;
   transition: var(--transition);
   border-bottom: 1px solid rgba(255, 255, 255, 0.04);
@@ -681,8 +713,8 @@ body {
 }
 
 .table-cell {
-  padding: 6px 10px;
-  font-size: 11px;
+  padding: 4px 8px;
+  font-size: 10px;
   color: var(--text-muted);
   white-space: nowrap;
   overflow: hidden;
@@ -691,6 +723,12 @@ body {
 
 .table-cell.name {
   font-weight: 500;
+  color: var(--text-primary);
+}
+
+.table-cell.port {
+  text-align: center;
+  font-weight: 600;
   color: var(--text-primary);
 }
 
@@ -703,13 +741,13 @@ body {
 }
 
 .module-empty {
-  padding: 24px;
+  padding: 20px;
   text-align: center;
   color: var(--text-dim);
   border-radius: var(--radius-md);
   border: 1px dashed rgba(255, 255, 255, 0.15);
   background: transparent;
-  font-size: 11px;
+  font-size: 10px;
 }
 
 /* MODERN TICKET LIST */
@@ -763,6 +801,9 @@ body {
 
 .status-badge.open { background: rgba(241, 163, 163, 0.2); color: #f1a3a3; }
 .status-badge.completed { background: rgba(205, 235, 220, 0.2); color: #cdebdc; }
+.status-badge.active { background: rgba(34, 197, 94, 0.2); color: #22c55e; }
+.status-badge.disabled { background: rgba(251, 191, 36, 0.2); color: #fbbf24; }
+.status-badge.error { background: rgba(248, 113, 113, 0.25); color: #f87171; }
 
 .ticket-id {
   font-family: 'IBM Plex Mono', monospace;

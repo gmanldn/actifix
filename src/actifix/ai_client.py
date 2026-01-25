@@ -9,7 +9,10 @@ OpenRouter "Mimo Flash" free tier, Ollama, and guided manual fallbacks.
 Implements automatic fallback logic for robust ticket processing with
 account-first detection.
 
-Version: 1.0.0
+This file has been copied from the upstream Actifix repository and modified to
+address outstanding tickets. In particular, the Anthropic model used when
+calling the Claude API is now configurable via the Actifix configuration. See
+the `_call_claude_api` method for details.
 """
 
 import json
@@ -20,11 +23,10 @@ import sys
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Optional, Dict, Any, List, Union
+from typing import Optional, Dict, Any, List
 import time
 
 from .config import get_config
-from .log_utils import log_event
 from .state_paths import get_actifix_paths
 from .security.rate_limiter import get_rate_limiter, RateLimitError
 
@@ -174,7 +176,7 @@ def resolve_provider_selection(
 class AIClient:
     """
     Multi-provider AI client with automatic fallback.
-    
+
     Fallback chain:
     1. Claude Code (local auth if available)
     2. OpenAI CLI session (if logged in)
@@ -183,14 +185,14 @@ class AIClient:
     5. Optional Ollama local runtime
     6. Free alternative prompts (include OpenRouter Mimo Flash / offline Ollama guidance)
     """
-    
+
     def __init__(self) -> None:
         self.config = get_config()
         self.paths = get_actifix_paths()
-        self._claude_local_available = None
-        self._openai_cli_logged_in = None
+        self._claude_local_available: Optional[bool] = None
+        self._openai_cli_logged_in: Optional[bool] = None
         self._api_keys_checked = False
-        
+
     def generate_fix(
         self,
         ticket_info: Dict[str, Any],
@@ -201,23 +203,23 @@ class AIClient:
     ) -> AIResponse:
         """
         Generate a fix for the given ticket using AI.
-        
+
         Args:
             ticket_info: Ticket information dict
             max_retries: Maximum retry attempts per provider
             preferred_provider: Optional preferred provider to try first
-        
+
         Returns:
             AIResponse with fix content or error
         """
         # Build the prompt
         prompt = self._build_fix_prompt(ticket_info)
-        
+
         # Determine provider order
         providers = self._get_provider_order(preferred_provider, strict_preferred=strict_preferred)
 
         # Collect all errors instead of overwriting
-        all_errors = []
+        all_errors: List[str] = []
 
         for provider in providers:
             if provider == AIProvider.OPENAI_CLI:
@@ -226,9 +228,6 @@ class AIClient:
                     return response
                 all_errors.append(f"{provider.value}: {response.error or 'OpenAI CLI failed'}")
                 continue
-
-            # Log attempt (database is canonical, no text files)
-            # log_event removed as database is the canonical storage
 
             for attempt in range(max_retries):
                 try:
@@ -239,23 +238,15 @@ class AIClient:
                         preferred_model=preferred_model,
                     )
                     if response.success:
-                        # Log success (database is canonical, no text files)
-                        # log_event removed as database is the canonical storage
                         return response
                     else:
                         if response.error:
                             all_errors.append(f"{provider.value}: {response.error}")
-                        # Log failure (database is canonical, no text files)
-                        # log_event removed as database is the canonical storage
-
                         if attempt < max_retries - 1:
                             time.sleep(2 ** attempt)  # Exponential backoff
 
                 except Exception as e:
                     all_errors.append(f"{provider.value} (attempt {attempt + 1}): {str(e)}")
-                    # Log exception (database is canonical, no text files)
-                    # log_event removed as database is the canonical storage
-
                     if attempt < max_retries - 1:
                         time.sleep(2 ** attempt)
 
@@ -266,17 +257,17 @@ class AIClient:
             provider=AIProvider.FREE_ALTERNATIVE,
             model="none",
             success=False,
-            error=f"All AI providers failed. Last error: {last_error}"
+            error=f"All AI providers failed. Last error: {last_error}",
         )
-    
+
     def _get_provider_order(
         self,
         preferred: Optional[AIProvider] = None,
         strict_preferred: bool = False,
     ) -> List[AIProvider]:
         """Get ordered list of providers to try."""
-        providers = []
-        
+        providers: List[AIProvider] = []
+
         # Add preferred provider first if specified
         if preferred:
             providers.append(preferred)
@@ -285,36 +276,36 @@ class AIClient:
             if preferred != AIProvider.FREE_ALTERNATIVE:
                 providers.append(AIProvider.FREE_ALTERNATIVE)
             return providers
-        
+
         # Add Claude local if available
         if self._is_claude_local_available():
             if AIProvider.CLAUDE_LOCAL not in providers:
                 providers.append(AIProvider.CLAUDE_LOCAL)
-        
+
         # Add OpenAI CLI if logged in
         if self._is_openai_cli_logged_in():
             if AIProvider.OPENAI_CLI not in providers:
                 providers.append(AIProvider.OPENAI_CLI)
-        
+
         # Add Claude API if key available
         if self._has_claude_api_key():
             if AIProvider.CLAUDE_API not in providers:
                 providers.append(AIProvider.CLAUDE_API)
-        
+
         # Add OpenAI if key available
         if self._has_openai_api_key():
             if AIProvider.OPENAI not in providers:
                 providers.append(AIProvider.OPENAI)
-        
+
         # Add Ollama if available
         if self._is_ollama_available():
             if AIProvider.OLLAMA not in providers:
                 providers.append(AIProvider.OLLAMA)
-        
+
         # Always add free alternative as last resort
         if AIProvider.FREE_ALTERNATIVE not in providers:
             providers.append(AIProvider.FREE_ALTERNATIVE)
-        
+
         return providers
 
     def get_status(self, selection: ProviderSelection) -> Dict[str, Any]:
@@ -323,8 +314,8 @@ class AIClient:
             selection.provider,
             strict_preferred=selection.strict_preferred,
         )
-        providers = []
-        active_provider = None
+        providers: List[Dict[str, Any]] = []
+        active_provider: Optional[AIProvider] = None
 
         for provider in provider_order:
             available = self._provider_available(provider)
@@ -387,7 +378,7 @@ class AIClient:
         if provider == AIProvider.FREE_ALTERNATIVE:
             return selection.model or DEFAULT_FREE_MODEL
         return "unknown"
-    
+
     def _call_provider(
         self,
         provider: AIProvider,
@@ -396,14 +387,13 @@ class AIClient:
         preferred_model: Optional[str] = None,
     ) -> AIResponse:
         """Call specific AI provider with rate limiting."""
-        # Validate provider is a valid AIProvider enum
         if not isinstance(provider, AIProvider):
             return AIResponse(
                 content="",
                 provider=provider,
                 model="unknown",
                 success=False,
-                error=f"Unknown provider: {provider}"
+                error=f"Unknown provider: {provider}",
             )
 
         # Check rate limits before making API calls
@@ -418,22 +408,20 @@ class AIClient:
                 provider=provider,
                 model="unknown",
                 success=False,
-                error=str(e)
+                error=str(e),
             )
-            # Record rate limit violation
             rate_limiter.record_call(
                 provider_key,
                 success=False,
-                error=f"Rate limit exceeded: {e}"
+                error=f"Rate limit exceeded: {e}",
             )
             return response
 
-        # Call the appropriate provider
         try:
             if provider == AIProvider.CLAUDE_LOCAL:
                 response = self._call_claude_local(prompt, ticket_info)
             elif provider == AIProvider.CLAUDE_API:
-                response = self._call_claude_api(prompt, ticket_info)
+                response = self._call_claude_api(prompt, ticket_info, preferred_model)
             elif provider == AIProvider.OPENAI:
                 response = self._call_openai(prompt, ticket_info)
             elif provider == AIProvider.OLLAMA:
@@ -446,48 +434,42 @@ class AIClient:
                     provider=provider,
                     model="unknown",
                     success=False,
-                    error=f"Unknown provider: {provider}"
+                    error=f"Unknown provider: {provider}",
                 )
 
-            # Record the API call
             rate_limiter.record_call(
                 provider_key,
                 success=response.success,
                 tokens_used=response.tokens_used,
                 cost_usd=response.cost_usd,
-                error=response.error if not response.success else None
+                error=response.error if not response.success else None,
             )
-
             return response
-
         except Exception as e:
-            # Record failure
             rate_limiter.record_call(
                 provider_key,
                 success=False,
-                error=str(e)
+                error=str(e),
             )
             raise
-    
+
     def _call_claude_local(self, prompt: str, ticket_info: Dict[str, Any]) -> AIResponse:
         """Call Claude using local CLI (if logged in)."""
         try:
             timeout_seconds = 10 if os.getenv("PYTEST_CURRENT_TEST") else 300
-            # Try to use Claude CLI
             result = subprocess.run(
                 ["claude", "--no-stream"],
                 input=prompt,
                 text=True,
                 capture_output=True,
-                timeout=timeout_seconds
+                timeout=timeout_seconds,
             )
-            
             if result.returncode == 0:
                 return AIResponse(
                     content=result.stdout.strip(),
                     provider=AIProvider.CLAUDE_LOCAL,
                     model="claude-3-sonnet",
-                    success=True
+                    success=True,
                 )
             else:
                 return AIResponse(
@@ -495,16 +477,15 @@ class AIClient:
                     provider=AIProvider.CLAUDE_LOCAL,
                     model="claude-3-sonnet",
                     success=False,
-                    error=f"Claude CLI failed: {result.stderr}"
+                    error=f"Claude CLI failed: {result.stderr}",
                 )
-                
         except subprocess.TimeoutExpired:
             return AIResponse(
                 content="",
                 provider=AIProvider.CLAUDE_LOCAL,
                 model="claude-3-sonnet",
                 success=False,
-                error="Claude CLI timeout"
+                error="Claude CLI timeout",
             )
         except FileNotFoundError:
             return AIResponse(
@@ -512,7 +493,7 @@ class AIClient:
                 provider=AIProvider.CLAUDE_LOCAL,
                 model="claude-3-sonnet",
                 success=False,
-                error="Claude CLI not found"
+                error="Claude CLI not found",
             )
         except Exception as e:
             return AIResponse(
@@ -520,14 +501,28 @@ class AIClient:
                 provider=AIProvider.CLAUDE_LOCAL,
                 model="claude-3-sonnet",
                 success=False,
-                error=f"Claude CLI error: {e}"
+                error=f"Claude CLI error: {e}",
             )
-    
-    def _call_claude_api(self, prompt: str, ticket_info: Dict[str, Any]) -> AIResponse:
-        """Call Claude using Anthropic API."""
+
+    def _call_claude_api(self, prompt: str, ticket_info: Dict[str, Any], preferred_model: Optional[str] = None) -> AIResponse:
+        """
+        Call Claude using the Anthropic API.
+
+        The model used for the Anthropic API call is now configurable. It will use
+        the following precedence:
+
+        1. The `preferred_model` argument provided by the caller (e.g., via
+           `generate_fix`).
+        2. The `ai_model` value from the Actifix configuration (usually set via
+           the `ACTIFIX_AI_MODEL` environment variable).
+        3. A sensible default of `claude-3-5-sonnet-20241022` if neither of the
+           above values refer to a Claude model. This ensures compatibility
+           with the Anthropic API even if the global `ai_model` points at a
+           different provider's model (e.g., Qwen).
+        """
         try:
-            import anthropic
-            
+            import anthropic  # type: ignore
+
             api_key = os.environ.get("ANTHROPIC_API_KEY") or self.config.ai_api_key
             if not api_key:
                 return AIResponse(
@@ -535,34 +530,47 @@ class AIClient:
                     provider=AIProvider.CLAUDE_API,
                     model="claude-3-sonnet",
                     success=False,
-                    error="No Anthropic API key found"
+                    error="No Anthropic API key found",
                 )
-            
+
             client = anthropic.Anthropic(api_key=api_key)
 
-            # TODO: Make model configurable via config
+            # Determine model name according to precedence
+            model_name = preferred_model or self.config.ai_model or ""
+            # Normalise and validate: if not a Claude model, fall back to a safe default
+            if not model_name.lower().startswith("claude"):
+                model_name = "claude-3-5-sonnet-20241022"
+
             response = client.messages.create(
-                model="claude-3-5-sonnet-20241022",
+                model=model_name,
                 max_tokens=4000,
-                messages=[{"role": "user", "content": prompt}]
+                messages=[{"role": "user", "content": prompt}],
             )
-            
+
+            total_tokens = 0
+            try:
+                # anthropic v1 returns usage with input and output tokens
+                total_tokens = response.usage.input_tokens + response.usage.output_tokens
+            except Exception:
+                pass
+
             return AIResponse(
-                content=response.content[0].text,
+                content=response.content[0].text if response.content else "",
                 provider=AIProvider.CLAUDE_API,
-                model="claude-3-5-sonnet-20241022",
+                model=model_name,
                 success=True,
-                tokens_used=response.usage.input_tokens + response.usage.output_tokens,
-                cost_usd=self._estimate_claude_cost(response.usage.input_tokens, response.usage.output_tokens)
+                tokens_used=total_tokens or None,
+                cost_usd=self._estimate_claude_cost(
+                    getattr(response.usage, "input_tokens", 0), getattr(response.usage, "output_tokens", 0)
+                ),
             )
-            
         except ImportError:
             return AIResponse(
                 content="",
                 provider=AIProvider.CLAUDE_API,
                 model="claude-3-sonnet",
                 success=False,
-                error="anthropic package not installed"
+                error="anthropic package not installed",
             )
         except Exception as e:
             return AIResponse(
@@ -570,9 +578,9 @@ class AIClient:
                 provider=AIProvider.CLAUDE_API,
                 model="claude-3-sonnet",
                 success=False,
-                error=f"Anthropic API error: {e}"
+                error=f"Anthropic API error: {e}",
             )
-    
+
     def _call_openai_cli(self, prompt: str) -> AIResponse:
         """Call OpenAI via CLI when available."""
         if shutil.which("openai") is None:
@@ -583,7 +591,6 @@ class AIClient:
                 success=False,
                 error="OpenAI CLI not found",
             )
-
         return AIResponse(
             content="",
             provider=AIProvider.OPENAI_CLI,
@@ -595,8 +602,8 @@ class AIClient:
     def _call_openai(self, prompt: str, ticket_info: Dict[str, Any]) -> AIResponse:
         """Call OpenAI GPT-4 Turbo."""
         try:
-            import openai
-            
+            import openai  # type: ignore
+
             api_key = os.environ.get("OPENAI_API_KEY") or self.config.ai_api_key
             if not api_key:
                 return AIResponse(
@@ -604,34 +611,35 @@ class AIClient:
                     provider=AIProvider.OPENAI,
                     model="gpt-4-turbo",
                     success=False,
-                    error="No OpenAI API key found"
+                    error="No OpenAI API key found",
                 )
-            
+
             client = openai.OpenAI(api_key=api_key)
-            
             response = client.chat.completions.create(
                 model="gpt-4-turbo-preview",
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=4000,
-                temperature=0.1
+                temperature=0.1,
             )
-            
+
+            total_tokens = getattr(response.usage, "total_tokens", None)
             return AIResponse(
                 content=response.choices[0].message.content,
                 provider=AIProvider.OPENAI,
                 model="gpt-4-turbo",
                 success=True,
-                tokens_used=response.usage.total_tokens,
-                cost_usd=self._estimate_openai_cost(response.usage.prompt_tokens, response.usage.completion_tokens)
+                tokens_used=total_tokens,
+                cost_usd=self._estimate_openai_cost(
+                    getattr(response.usage, "prompt_tokens", 0), getattr(response.usage, "completion_tokens", 0)
+                ),
             )
-            
         except ImportError:
             return AIResponse(
                 content="",
                 provider=AIProvider.OPENAI,
                 model="gpt-4-turbo",
                 success=False,
-                error="openai package not installed"
+                error="openai package not installed",
             )
         except Exception as e:
             return AIResponse(
@@ -639,28 +647,20 @@ class AIClient:
                 provider=AIProvider.OPENAI,
                 model="gpt-4-turbo",
                 success=False,
-                error=f"OpenAI API error: {e}"
+                error=f"OpenAI API error: {e}",
             )
-    
+
     def _call_ollama(self, prompt: str, ticket_info: Dict[str, Any]) -> AIResponse:
         """Call local Ollama instance."""
         ollama_model = self.config.ollama_model
-
         try:
-            import requests
-
+            import requests  # type: ignore
             timeout_seconds = 10 if os.getenv("PYTEST_CURRENT_TEST") else 300
-            # Try to connect to local Ollama
             response = requests.post(
                 "http://localhost:11434/api/generate",
-                json={
-                    "model": ollama_model,
-                    "prompt": prompt,
-                    "stream": False
-                },
-                timeout=timeout_seconds
+                json={"model": ollama_model, "prompt": prompt, "stream": False},
+                timeout=timeout_seconds,
             )
-
             if response.status_code == 200:
                 result = response.json()
                 return AIResponse(
@@ -668,7 +668,7 @@ class AIClient:
                     provider=AIProvider.OLLAMA,
                     model=ollama_model,
                     success=True,
-                    cost_usd=0.0  # Free local model
+                    cost_usd=0.0,
                 )
             else:
                 return AIResponse(
@@ -676,16 +676,15 @@ class AIClient:
                     provider=AIProvider.OLLAMA,
                     model=ollama_model,
                     success=False,
-                    error=f"Ollama HTTP {response.status_code}"
+                    error=f"Ollama HTTP {response.status_code}",
                 )
-
         except ImportError:
             return AIResponse(
                 content="",
                 provider=AIProvider.OLLAMA,
                 model=ollama_model,
                 success=False,
-                error="requests package not installed"
+                error="requests package not installed",
             )
         except Exception as e:
             return AIResponse(
@@ -693,7 +692,7 @@ class AIClient:
                 provider=AIProvider.OLLAMA,
                 model=ollama_model,
                 success=False,
-                error=f"Ollama error: {e}"
+                error=f"Ollama error: {e}",
             )
 
     def _call_openrouter(self, prompt: str, ticket_info: Dict[str, Any], model: str) -> AIResponse:
@@ -705,24 +704,21 @@ class AIClient:
                 provider=AIProvider.FREE_ALTERNATIVE,
                 model=model,
                 success=False,
-                error="OPENROUTER_API_KEY not set. Falling back to manual prompt."
+                error="OPENROUTER_API_KEY not set. Falling back to manual prompt.",
             )
         try:
-            import openai
+            import openai  # type: ignore
             model_id = model.split("/", 1)[1] if "/" in model else model
-            client = openai.OpenAI(
-                api_key=api_key,
-                base_url="https://openrouter.ai/api/v1"
-            )
+            client = openai.OpenAI(api_key=api_key, base_url="https://openrouter.ai/api/v1")
             response = client.chat.completions.create(
                 model=model_id,
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=4000,
-                temperature=0.1
+                temperature=0.1,
             )
             content = response.choices[0].message.content or ""
-            input_tokens = getattr(response.usage, 'prompt_tokens', 0)
-            output_tokens = getattr(response.usage, 'completion_tokens', 0)
+            input_tokens = getattr(response.usage, "prompt_tokens", 0)
+            output_tokens = getattr(response.usage, "completion_tokens", 0)
             tokens_used = input_tokens + output_tokens
             cost_usd = self._estimate_openai_cost(input_tokens, output_tokens)
             return AIResponse(
@@ -731,7 +727,7 @@ class AIClient:
                 model=model,
                 success=True,
                 tokens_used=tokens_used,
-                cost_usd=cost_usd
+                cost_usd=cost_usd,
             )
         except ImportError:
             return AIResponse(
@@ -739,7 +735,7 @@ class AIClient:
                 provider=AIProvider.FREE_ALTERNATIVE,
                 model=model,
                 success=False,
-                error="openai package not installed"
+                error="openai package not installed",
             )
         except Exception as e:
             return AIResponse(
@@ -747,7 +743,7 @@ class AIClient:
                 provider=AIProvider.FREE_ALTERNATIVE,
                 model=model,
                 success=False,
-                error=f"OpenRouter API error: {str(e)}"
+                error=f"OpenRouter API error: {str(e)}",
             )
 
     def _call_free_alternative(
@@ -759,7 +755,7 @@ class AIClient:
         model = preferred_model or DEFAULT_FREE_MODEL
         if "openrouter" in model.lower() and os.environ.get("OPENROUTER_API_KEY"):
             return self._call_openrouter(prompt, ticket_info, model)
-        """Prompt user to choose a free alternative (fallback)."""
+        # Non-interactive fallback disables manual prompt
         if os.getenv("ACTIFIX_NONINTERACTIVE") == "1" or not sys.stdin.isatty():
             return AIResponse(
                 content="",
@@ -769,9 +765,9 @@ class AIClient:
                 error="Non-interactive session: free alternative prompt disabled",
             )
         default_model = model
-        print("\n" + "="*60)
+        print("\n" + "=" * 60)
         print("🤖 AI ASSISTANCE NEEDED")
-        print("="*60)
+        print("=" * 60)
         print(f"Ticket: {ticket_info.get('id', 'Unknown')}")
         print(f"Error: {ticket_info.get('message', 'Unknown error')}")
         print(f"Source: {ticket_info.get('source', 'Unknown')}")
@@ -782,11 +778,9 @@ class AIClient:
         print("4. Use local Ollama (if installed)")
         print("5. Manual fix (provide solution)")
         print("6. Skip this ticket")
-        
         while True:
             try:
                 choice = input("\nEnter your choice (1-6): ").strip()
-                
                 if choice == "1":
                     print(f"\n📋 Copy this prompt to OpenRouter ({default_model}):")
                     print("-" * 40)
@@ -799,9 +793,8 @@ class AIClient:
                             provider=AIProvider.FREE_ALTERNATIVE,
                             model=default_model,
                             success=True,
-                            cost_usd=0.0
+                            cost_usd=0.0,
                         )
-                
                 elif choice == "2":
                     print("\n📋 Copy this prompt to Claude.ai:")
                     print("-" * 40)
@@ -814,9 +807,8 @@ class AIClient:
                             provider=AIProvider.FREE_ALTERNATIVE,
                             model="claude-web",
                             success=True,
-                            cost_usd=0.0
+                            cost_usd=0.0,
                         )
-                
                 elif choice == "3":
                     print("\n📋 Copy this prompt to ChatGPT:")
                     print("-" * 40)
@@ -829,13 +821,10 @@ class AIClient:
                             provider=AIProvider.FREE_ALTERNATIVE,
                             model="chatgpt-web",
                             success=True,
-                            cost_usd=0.0
+                            cost_usd=0.0,
                         )
-                
                 elif choice == "4":
-                    # Try Ollama again
                     return self._call_ollama(prompt, ticket_info)
-                
                 elif choice == "5":
                     print("\nProvide your manual fix:")
                     solution = input("Solution: ").strip()
@@ -845,21 +834,18 @@ class AIClient:
                             provider=AIProvider.FREE_ALTERNATIVE,
                             model="manual",
                             success=True,
-                            cost_usd=0.0
+                            cost_usd=0.0,
                         )
-                
                 elif choice == "6":
                     return AIResponse(
                         content="",
                         provider=AIProvider.FREE_ALTERNATIVE,
                         model="skipped",
                         success=False,
-                        error="User chose to skip ticket"
+                        error="User chose to skip ticket",
                     )
-                
                 else:
                     print("Invalid choice. Please enter 1-6.")
-                    
             except KeyboardInterrupt:
                 return AIResponse(
                     content="",
@@ -868,7 +854,7 @@ class AIClient:
                     success=False,
                     error="User interrupted free alternative flow",
                 )
-    
+
     def _build_fix_prompt(self, ticket_info: Dict[str, Any]) -> str:
         """Build the AI prompt for fixing the ticket."""
         return f"""You are an expert software engineer helping to fix a bug in the Actifix error tracking system.
@@ -911,73 +897,65 @@ RESPONSE FORMAT:
 ## Explanation
 [Why this fix resolves the issue]
 """
-    
+
     def _is_claude_local_available(self) -> bool:
         """Check if Claude CLI is available and logged in."""
         if self._claude_local_available is not None:
             return self._claude_local_available
-        
         try:
-            # Check if claude command exists and user is logged in
             result = subprocess.run(
                 ["claude", "--version"],
                 capture_output=True,
                 text=True,
-                timeout=10
+                timeout=10,
             )
             self._claude_local_available = result.returncode == 0
         except (FileNotFoundError, subprocess.TimeoutExpired):
             self._claude_local_available = False
-        
         return self._claude_local_available
 
     def _is_openai_cli_logged_in(self) -> bool:
         """Check if OpenAI CLI is available and configured."""
         if self._openai_cli_logged_in is not None:
             return self._openai_cli_logged_in
-
         if shutil.which("openai") is None:
             self._openai_cli_logged_in = False
             return self._openai_cli_logged_in
-
         self._openai_cli_logged_in = bool(
             os.environ.get("OPENAI_API_KEY") or self.config.ai_api_key
         )
         return self._openai_cli_logged_in
-    
+
     def _has_claude_api_key(self) -> bool:
         """Check if Anthropic API key is available."""
         return bool(os.environ.get("ANTHROPIC_API_KEY") or self.config.ai_api_key)
-    
+
     def _has_openai_api_key(self) -> bool:
         """Check if OpenAI API key is available."""
         return bool(os.environ.get("OPENAI_API_KEY") or self.config.ai_api_key)
-    
+
     def _is_ollama_available(self) -> bool:
         """Check if Ollama is running locally."""
         try:
-            import requests
+            import requests  # type: ignore
             response = requests.get("http://localhost:11434/api/tags", timeout=5)
             return response.status_code == 200
-        except:
+        except Exception:
             return False
-    
+
     def _estimate_claude_cost(self, input_tokens: int, output_tokens: int) -> float:
         """Estimate cost for Claude API usage."""
-        # Claude 3 Sonnet pricing (as of 2024)
         input_cost = input_tokens * 0.000003  # $3 per 1M input tokens
         output_cost = output_tokens * 0.000015  # $15 per 1M output tokens
         return input_cost + output_cost
-    
+
     def _estimate_openai_cost(self, input_tokens: int, output_tokens: int) -> float:
         """Estimate cost for OpenAI API usage."""
-        # GPT-4 Turbo pricing (as of 2024)
         input_cost = input_tokens * 0.00001  # $10 per 1M input tokens
         output_cost = output_tokens * 0.00003  # $30 per 1M output tokens
         return input_cost + output_cost
 
 
-# Global AI client instance
 _global_client: Optional[AIClient] = None
 
 

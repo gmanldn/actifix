@@ -26,7 +26,7 @@ from pathlib import Path
 from typing import Optional, Callable, Iterator, TYPE_CHECKING
 
 from .log_utils import atomic_write, log_event
-from .raise_af import enforce_raise_af_only
+from .raise_af import enforce_raise_af_only, record_error, TicketPriority
 from .state_paths import ActifixPaths, get_actifix_paths, init_actifix_files
 from .config import get_config, load_config
 
@@ -54,6 +54,88 @@ class TicketCacheState:
         """Force cache invalidation."""
         self.cached_at = 0.0
 
+
+def _agent_voice_best_effort(
+    thought: str,
+    *,
+    level: str = "INFO",
+    run_label: Optional[str] = None,
+    extra: Optional[dict] = None,
+    correlation_id: Optional[str] = None,
+) -> None:
+    try:
+        from .agent_voice import record_agent_voice
+
+        record_agent_voice(
+            thought,
+            agent_id="do_af",
+            run_label=run_label,
+            level=level,
+            extra=extra,
+            correlation_id=correlation_id,
+        )
+    except Exception:
+        # record_agent_voice captures failures via Raise_AF; don't block dispatch.
+        return
+
+
+@dataclass
+class BackgroundAgentConfig:
+    agent_id: str = "do-af-agent"
+    run_label: str = "do-af-background"
+    lease_duration: timedelta = timedelta(hours=1)
+    renew_interval_seconds: int = 300
+    idle_sleep_seconds: float = 5.0
+    idle_backoff_max_seconds: float = 60.0
+    max_tickets: Optional[int] = None
+    use_ai: bool = True
+    priority_filter: Optional[list[str]] = None
+
+
+class _LeaseRenewer(threading.Thread):
+    def __init__(
+        self,
+        *,
+        repo: "TicketRepository",
+        ticket_id: str,
+        lock_owner: str,
+        lease_duration: timedelta,
+        interval_seconds: int,
+        stop_event: threading.Event,
+        run_label: str,
+    ) -> None:
+        super().__init__(daemon=True)
+        self._repo = repo
+        self._ticket_id = ticket_id
+        self._lock_owner = lock_owner
+        self._lease_duration = lease_duration
+        self._interval_seconds = max(interval_seconds, 1)
+        self._stop_event = stop_event
+        self._run_label = run_label
+        self.error: Optional[Exception] = None
+
+    def run(self) -> None:
+        while not self._stop_event.wait(self._interval_seconds):
+            try:
+                renewed = self._repo.renew_lock(
+                    self._ticket_id,
+                    self._lock_owner,
+                    lease_duration=self._lease_duration,
+                )
+                if renewed is None:
+                    raise RuntimeError(
+                        f"Lease renewal failed for {self._ticket_id} ({self._lock_owner})"
+                    )
+            except Exception as exc:
+                self.error = exc
+                _agent_voice_best_effort(
+                    f"Lease renewal failed for {self._ticket_id}: {exc}",
+                    level="ERROR",
+                    run_label=self._run_label,
+                    extra={"ticket_id": self._ticket_id, "lock_owner": self._lock_owner},
+                )
+                self._stop_event.set()
+                break
 
 class StatefulTicketManager:
     """
@@ -195,6 +277,239 @@ def _select_and_lock_ticket(paths: ActifixPaths) -> Optional[tuple[dict, str]]:
         if repo.acquire_lock(ticket["id"], lock_owner):
             return ticket, lock_owner
     return None
+
+
+def _process_locked_ticket(
+    ticket_record: dict,
+    lock_owner: str,
+    repo: "TicketRepository",
+    paths: ActifixPaths,
+    ai_handler: Optional[Callable[[TicketInfo], bool]],
+    use_ai: bool,
+) -> Optional[TicketInfo]:
+    ticket = _ticket_info_from_record(ticket_record)
+
+    log_event(
+        "DISPATCH_STARTED",
+        f"Processing ticket: {ticket.ticket_id}",
+        ticket_id=ticket.ticket_id,
+        extra={"priority": ticket.priority},
+    )
+    _agent_voice_best_effort(
+        f"Dispatch started for {ticket.ticket_id}",
+        run_label="do-af-dispatch",
+        extra={"ticket_id": ticket.ticket_id, "priority": ticket.priority},
+    )
+
+    release_lock = True
+    try:
+        if not use_ai and not ai_handler:
+            log_event(
+                "DISPATCH_SKIPPED",
+                "AI disabled and no custom handler configured",
+                ticket_id=ticket.ticket_id,
+            )
+            _agent_voice_best_effort(
+                f"Dispatch skipped for {ticket.ticket_id}: AI disabled",
+                level="ERROR",
+                run_label="do-af-dispatch",
+                extra={"ticket_id": ticket.ticket_id},
+            )
+            return None
+
+        if use_ai and not ai_handler:
+            try:
+                from .ai_client import get_ai_client, resolve_provider_selection
+
+                ai_client = get_ai_client()
+                config = get_config()
+                selection = resolve_provider_selection(config.ai_provider, config.ai_model)
+
+                log_event(
+                    "AI_PROVIDER_SELECTED",
+                    f"AI preference: {selection.label}",
+                    ticket_id=ticket.ticket_id,
+                    extra={
+                        "preferred_provider": selection.label,
+                        "preferred_model": selection.model,
+                        "strict_preferred": selection.strict_preferred,
+                    },
+                )
+                _agent_voice_best_effort(
+                    f"AI provider selected: {selection.label}",
+                    run_label="do-af-dispatch",
+                    extra={
+                        "ticket_id": ticket.ticket_id,
+                        "provider": selection.label,
+                        "model": selection.model,
+                    },
+                )
+
+                ticket_dict = {
+                    "id": ticket.ticket_id,
+                    "priority": ticket.priority,
+                    "error_type": ticket.error_type,
+                    "message": ticket.message,
+                    "source": ticket.source,
+                    "stack_trace": getattr(ticket, "stack_trace", ""),
+                    "created": ticket.created,
+                }
+
+                log_event(
+                    "AI_PROCESSING",
+                    f"Requesting AI fix for ticket: {ticket.ticket_id}",
+                    ticket_id=ticket.ticket_id,
+                )
+                _agent_voice_best_effort(
+                    f"AI processing started for {ticket.ticket_id}",
+                    run_label="do-af-dispatch",
+                    extra={"ticket_id": ticket.ticket_id},
+                )
+
+                ai_response = ai_client.generate_fix(
+                    ticket_dict,
+                    preferred_provider=selection.provider,
+                    preferred_model=selection.model,
+                    strict_preferred=selection.strict_preferred,
+                )
+
+                if ai_response.success:
+                    summary = f"Fixed via {ai_response.provider.value} ({ai_response.model})"
+                    if ai_response.cost_usd:
+                        summary += f" - Cost: ${ai_response.cost_usd:.4f}"
+
+                    if mark_ticket_complete(
+                        ticket.ticket_id,
+                        completion_notes=(
+                            f"Fixed by {ai_response.provider.value} using {ai_response.model}: "
+                            f"{ai_response.content[:200]}"
+                        ),
+                        test_steps=(
+                            f"Validated AI remediation output from {ai_response.provider.value}."
+                        ),
+                        test_results=(
+                            f"AI response successful with {ai_response.tokens_used} tokens used."
+                        ),
+                        summary=summary,
+                        paths=paths,
+                        use_lock=False,
+                    ):
+                        release_lock = False
+
+                    log_event(
+                        "AI_DISPATCH_SUCCESS",
+                        f"AI successfully fixed ticket: {ticket.ticket_id}",
+                        ticket_id=ticket.ticket_id,
+                        extra={
+                            "provider": ai_response.provider.value,
+                            "model": ai_response.model,
+                            "tokens": ai_response.tokens_used,
+                            "cost": ai_response.cost_usd,
+                            "fix_preview": ai_response.content[:100] + "..."
+                            if len(ai_response.content) > 100
+                            else ai_response.content,
+                        },
+                    )
+                    _agent_voice_best_effort(
+                        f"AI dispatch success for {ticket.ticket_id}",
+                        run_label="do-af-dispatch",
+                        extra={
+                            "ticket_id": ticket.ticket_id,
+                            "provider": ai_response.provider.value,
+                            "model": ai_response.model,
+                        },
+                    )
+                    return ticket
+
+                log_event(
+                    "AI_DISPATCH_FAILED",
+                    f"AI failed to fix ticket: {ai_response.error}",
+                    ticket_id=ticket.ticket_id,
+                    extra={"error": ai_response.error},
+                )
+                _agent_voice_best_effort(
+                    f"AI dispatch failed for {ticket.ticket_id}: {ai_response.error}",
+                    level="ERROR",
+                    run_label="do-af-dispatch",
+                    extra={"ticket_id": ticket.ticket_id},
+                )
+                return None
+
+            except Exception as exc:
+                log_event(
+                    "AI_DISPATCH_EXCEPTION",
+                    f"AI processing exception: {exc}",
+                    ticket_id=ticket.ticket_id,
+                    extra={"error": str(exc)},
+                )
+                _agent_voice_best_effort(
+                    f"AI dispatch exception for {ticket.ticket_id}: {exc}",
+                    level="ERROR",
+                    run_label="do-af-dispatch",
+                    extra={"ticket_id": ticket.ticket_id},
+                )
+                record_error(
+                    message=f"AI dispatch failed for {ticket.ticket_id}: {exc}",
+                    source="actifix/do_af.py:_process_locked_ticket",
+                    error_type=type(exc).__name__,
+                    priority=TicketPriority.P2,
+                    run_label="do-af-dispatch",
+                    capture_context=True,
+                )
+                raise
+
+        if ai_handler:
+            try:
+                success = ai_handler(ticket)
+                if success:
+                    if mark_ticket_complete(
+                        ticket.ticket_id,
+                        completion_notes=f"Fixed via custom handler for {ticket.ticket_id}.",
+                        test_steps="Validated handler output and completion state.",
+                        test_results="Custom handler completed successfully.",
+                        summary="Fixed via custom handler",
+                        paths=paths,
+                        use_lock=False,
+                    ):
+                        release_lock = False
+                    log_event(
+                        "CUSTOM_DISPATCH_SUCCESS",
+                        f"Custom handler completed: {ticket.ticket_id}",
+                        ticket_id=ticket.ticket_id,
+                    )
+                    _agent_voice_best_effort(
+                        f"Custom handler success for {ticket.ticket_id}",
+                        run_label="do-af-dispatch",
+                        extra={"ticket_id": ticket.ticket_id},
+                    )
+                    return ticket
+            except Exception as exc:
+                log_event(
+                    "CUSTOM_DISPATCH_FAILED",
+                    f"Custom handler failed: {exc}",
+                    ticket_id=ticket.ticket_id,
+                    extra={"error": str(exc)},
+                )
+                _agent_voice_best_effort(
+                    f"Custom handler exception for {ticket.ticket_id}: {exc}",
+                    level="ERROR",
+                    run_label="do-af-dispatch",
+                    extra={"ticket_id": ticket.ticket_id},
+                )
+                record_error(
+                    message=f"Custom handler failed for {ticket.ticket_id}: {exc}",
+                    source="actifix/do_af.py:_process_locked_ticket",
+                    error_type=type(exc).__name__,
+                    priority=TicketPriority.P2,
+                    run_label="do-af-dispatch",
+                    capture_context=True,
+                )
+                raise
+
+        return None
+    finally:
+        if release_lock:
+            repo.release_lock(ticket.ticket_id, lock_owner)
 
 
 
@@ -462,142 +777,22 @@ def process_next_ticket(
             "NO_TICKETS",
             "No open tickets to process"
         )
+        _agent_voice_best_effort(
+            "No open tickets to process",
+            run_label="do-af-dispatch",
+        )
         return None
 
     ticket_record, lock_owner = locked
-    ticket = _ticket_info_from_record(ticket_record)
     repo = _get_ticket_repository(paths)
-
-    log_event(
-        "DISPATCH_STARTED",
-        f"Processing ticket: {ticket.ticket_id}",
-        ticket_id=ticket.ticket_id,
-        extra={"priority": ticket.priority}
+    return _process_locked_ticket(
+        ticket_record,
+        lock_owner,
+        repo,
+        paths,
+        ai_handler,
+        use_ai,
     )
-
-    release_lock = True
-    try:
-        if use_ai and not ai_handler:
-            try:
-                from .ai_client import get_ai_client, resolve_provider_selection
-
-                ai_client = get_ai_client()
-                config = get_config()
-                selection = resolve_provider_selection(config.ai_provider, config.ai_model)
-
-                log_event(
-                    "AI_PROVIDER_SELECTED",
-                    f"AI preference: {selection.label}",
-                    ticket_id=ticket.ticket_id,
-                    extra={
-                        "preferred_provider": selection.label,
-                        "preferred_model": selection.model,
-                        "strict_preferred": selection.strict_preferred,
-                    },
-                )
-
-                ticket_dict = {
-                    'id': ticket.ticket_id,
-                    'priority': ticket.priority,
-                    'error_type': ticket.error_type,
-                    'message': ticket.message,
-                    'source': ticket.source,
-                    'stack_trace': getattr(ticket, 'stack_trace', ''),
-                    'created': ticket.created,
-                }
-
-                log_event(
-                    "AI_PROCESSING",
-                    f"Requesting AI fix for ticket: {ticket.ticket_id}",
-                    ticket_id=ticket.ticket_id
-                )
-
-                ai_response = ai_client.generate_fix(
-                    ticket_dict,
-                    preferred_provider=selection.provider,
-                    preferred_model=selection.model,
-                    strict_preferred=selection.strict_preferred,
-                )
-
-                if ai_response.success:
-                    summary = f"Fixed via {ai_response.provider.value} ({ai_response.model})"
-                    if ai_response.cost_usd:
-                        summary += f" - Cost: ${ai_response.cost_usd:.4f}"
-
-                    if mark_ticket_complete(
-                        ticket.ticket_id,
-                        completion_notes=f"Fixed by {ai_response.provider.value} using {ai_response.model}: {ai_response.content[:200]}",
-                        test_steps=f"AI validation performed by {ai_response.provider.value}",
-                        test_results=f"AI response successful with {ai_response.tokens_used} tokens used",
-                        summary=summary,
-                        paths=paths,
-                        use_lock=False,
-                    ):
-                        release_lock = False
-
-                    log_event(
-                        "AI_DISPATCH_SUCCESS",
-                        f"AI successfully fixed ticket: {ticket.ticket_id}",
-                        ticket_id=ticket.ticket_id,
-                        extra={
-                            "provider": ai_response.provider.value,
-                            "model": ai_response.model,
-                            "tokens": ai_response.tokens_used,
-                            "cost": ai_response.cost_usd,
-                            "fix_preview": ai_response.content[:100] + "..." if len(ai_response.content) > 100 else ai_response.content
-                        }
-                    )
-                    return ticket
-                else:
-                    log_event(
-                        "AI_DISPATCH_FAILED",
-                        f"AI failed to fix ticket: {ai_response.error}",
-                        ticket_id=ticket.ticket_id,
-                        extra={"error": ai_response.error}
-                    )
-                    return None
-
-            except Exception as e:
-                log_event(
-                    "AI_DISPATCH_EXCEPTION",
-                    f"AI processing exception: {e}",
-                    ticket_id=ticket.ticket_id,
-                    extra={"error": str(e)},
-                )
-                return None
-        if ai_handler:
-            try:
-                success = ai_handler(ticket)
-                if success:
-                    if mark_ticket_complete(
-                        ticket.ticket_id,
-                        completion_notes=f"Fixed via custom AI handler for {ticket.ticket_id}",
-                        test_steps="Custom AI handler validation performed",
-                        test_results="Custom handler returned success status",
-                        summary="Fixed via custom AI handler",
-                        paths=paths,
-                        use_lock=False,
-                    ):
-                        release_lock = False
-                    log_event(
-                        "CUSTOM_DISPATCH_SUCCESS",
-                        f"Custom AI handler completed: {ticket.ticket_id}",
-                        ticket_id=ticket.ticket_id
-                    )
-                    return ticket
-            except Exception as e:
-                log_event(
-                    "CUSTOM_DISPATCH_FAILED",
-                    f"Custom AI handler failed: {e}",
-                    ticket_id=ticket.ticket_id,
-                    extra={"error": str(e)}
-                )
-                return None
-
-        return None
-    finally:
-        if release_lock:
-            repo.release_lock(ticket.ticket_id, lock_owner)
 
 
 def process_tickets(
@@ -628,6 +823,121 @@ def process_tickets(
         else:
             break
     
+    return processed
+
+
+def run_background_agent(
+    config: BackgroundAgentConfig,
+    *,
+    paths: Optional[ActifixPaths] = None,
+    stop_event: Optional[threading.Event] = None,
+) -> int:
+    """
+    Run a background ticket processing loop with lease renewal and backoff.
+    """
+    if paths is None:
+        paths = get_actifix_paths()
+
+    enforce_raise_af_only(paths)
+
+    stop_event = stop_event or threading.Event()
+    processed = 0
+    idle_sleep = max(config.idle_sleep_seconds, 0.5)
+    backoff = idle_sleep
+    use_ai = config.use_ai
+
+    if os.getenv("ACTIFIX_NONINTERACTIVE") == "1":
+        use_ai = False
+    elif os.getenv("PYTEST_CURRENT_TEST") and os.getenv("ACTIFIX_ENABLE_AI_TESTS") != "1":
+        use_ai = False
+
+    ai_config = get_config()
+    if not ai_config.ai_enabled:
+        use_ai = False
+
+    _agent_voice_best_effort(
+        "Background ticket agent starting",
+        run_label=config.run_label,
+        extra={"agent_id": config.agent_id},
+    )
+
+    while not stop_event.is_set():
+        repo = _get_ticket_repository(paths)
+        lock_owner = f"{config.agent_id}:{os.getpid()}"
+        ticket_record = repo.get_and_lock_next_ticket(
+            lock_owner,
+            lease_duration=config.lease_duration,
+            priority_filter=config.priority_filter,
+        )
+
+        if ticket_record is None:
+            log_event("NO_TICKETS", "Background agent idle - no open tickets")
+            _agent_voice_best_effort(
+                "Background agent idle - no open tickets",
+                run_label=config.run_label,
+            )
+            stop_event.wait(backoff)
+            backoff = min(backoff * 2, max(config.idle_backoff_max_seconds, idle_sleep))
+            continue
+
+        backoff = idle_sleep
+        ticket_id = ticket_record.get("id", "unknown")
+        _agent_voice_best_effort(
+            f"Background agent acquired {ticket_id}",
+            run_label=config.run_label,
+            extra={"ticket_id": ticket_id},
+        )
+
+        renew_stop = threading.Event()
+        renewer = _LeaseRenewer(
+            repo=repo,
+            ticket_id=ticket_id,
+            lock_owner=lock_owner,
+            lease_duration=config.lease_duration,
+            interval_seconds=config.renew_interval_seconds,
+            stop_event=renew_stop,
+            run_label=config.run_label,
+        )
+        renewer.start()
+
+        try:
+            ticket = _process_locked_ticket(
+                ticket_record,
+                lock_owner,
+                repo,
+                paths,
+                None,
+                use_ai,
+            )
+            if ticket:
+                processed += 1
+        finally:
+            renew_stop.set()
+            renewer.join(timeout=5)
+            if renewer.error:
+                record_error(
+                    message=f"Background agent lease renewal error: {renewer.error}",
+                    source="actifix/do_af.py:run_background_agent",
+                    error_type=type(renewer.error).__name__,
+                    priority=TicketPriority.P2,
+                    run_label=config.run_label,
+                    capture_context=True,
+                )
+                raise RuntimeError(str(renewer.error)) from renewer.error
+
+        if config.max_tickets is not None and processed >= config.max_tickets:
+            _agent_voice_best_effort(
+                f"Background agent reached max tickets ({processed})",
+                run_label=config.run_label,
+                extra={"processed": processed},
+            )
+            break
+
+    _agent_voice_best_effort(
+        f"Background ticket agent stopped after {processed} tickets",
+        run_label=config.run_label,
+        extra={"processed": processed},
+    )
     return processed
 
 
@@ -748,6 +1058,60 @@ def _build_cli_parser() -> argparse.ArgumentParser:
         help="Maximum number of tickets to dispatch (default: 5)",
     )
 
+    agent_parser = subparsers.add_parser("agent", help="Run background ticket agent")
+    agent_parser.add_argument(
+        "--max-tickets",
+        type=int,
+        default=0,
+        help="Maximum number of tickets to process before stopping (default: 0 = unlimited)",
+    )
+    agent_parser.add_argument(
+        "--idle-sleep",
+        type=float,
+        default=5.0,
+        help="Idle sleep seconds before backoff (default: 5)",
+    )
+    agent_parser.add_argument(
+        "--idle-backoff-max",
+        type=float,
+        default=60.0,
+        help="Maximum idle backoff seconds (default: 60)",
+    )
+    agent_parser.add_argument(
+        "--lease-minutes",
+        type=int,
+        default=60,
+        help="Ticket lease duration in minutes (default: 60)",
+    )
+    agent_parser.add_argument(
+        "--renew-interval",
+        type=int,
+        default=300,
+        help="Lease renewal interval in seconds (default: 300)",
+    )
+    agent_parser.add_argument(
+        "--agent-id",
+        type=str,
+        default="do-af-agent",
+        help="Agent identifier used for locks (default: do-af-agent)",
+    )
+    agent_parser.add_argument(
+        "--run-label",
+        type=str,
+        default="do-af-background",
+        help="Run label for logs/AgentVoice (default: do-af-background)",
+    )
+    agent_parser.add_argument(
+        "--priority",
+        action="append",
+        help="Limit processing to a priority (repeatable, e.g. --priority P0 --priority P1)",
+    )
+    agent_parser.add_argument(
+        "--no-ai",
+        action="store_true",
+        help="Disable AI dispatch and only use non-AI handlers",
+    )
+
     return parser
 
 
@@ -765,17 +1129,20 @@ def main(argv: Optional[list[str]] = None) -> int:
     - stats: show ticket statistics
     - list: list open tickets
     - process: dispatch open tickets (AI handler optional)
+    - agent: run background ticket agent loop
     """
     parser = _build_cli_parser()
     args = parser.parse_args(argv)
 
-    if getattr(args, "max_tickets", 1) < 1:
+    if args.command == "process" and args.max_tickets < 1:
         parser.error("--max-tickets must be at least 1")
+    if args.command == "agent" and args.max_tickets < 0:
+        parser.error("--max-tickets must be >= 0")
 
     paths = _resolve_paths_from_args(args)
     
     # Enforce Raise_AF-only policy for any command that might modify state
-    if args.command == "process":
+    if args.command in {"process", "agent"}:
         enforce_raise_af_only(paths)
 
     if args.command == "stats":
@@ -815,6 +1182,34 @@ def main(argv: Optional[list[str]] = None) -> int:
         for ticket in tickets:
             _print_ticket(ticket)
         return 0
+
+    if args.command == "agent":
+        max_tickets = None if args.max_tickets == 0 else args.max_tickets
+        config = BackgroundAgentConfig(
+            agent_id=args.agent_id,
+            run_label=args.run_label,
+            lease_duration=timedelta(minutes=args.lease_minutes),
+            renew_interval_seconds=args.renew_interval,
+            idle_sleep_seconds=args.idle_sleep,
+            idle_backoff_max_seconds=args.idle_backoff_max,
+            max_tickets=max_tickets,
+            use_ai=not args.no_ai,
+            priority_filter=args.priority,
+        )
+        try:
+            processed = run_background_agent(config, paths=paths)
+            print(f"Background agent processed {processed} ticket(s).")
+            return 0
+        except Exception as exc:
+            record_error(
+                message=f"Background agent failed: {exc}",
+                source="actifix/do_af.py:main",
+                error_type=type(exc).__name__,
+                priority=TicketPriority.P2,
+                run_label=config.run_label,
+                capture_context=True,
+            )
+            raise
 
     return 1
 

@@ -114,6 +114,29 @@ The launcher now starts the standalone SuperQuiz GUI on its configured host/port
 3. Ticket stored in `data/actifix.db`.
 4. DoAF or CLI processes tickets, records completion evidence, and updates status.
 
+## Background ticket agent
+Actifix can run a long-lived ticket agent loop with lease renewal and idle backoff:
+
+```bash
+export ACTIFIX_CHANGE_ORIGIN=raise_af
+python3 -m actifix.do_af agent --idle-sleep 5 --idle-backoff-max 60 --renew-interval 300
+```
+
+Use `--no-ai` for non-interactive environments and `--priority P0 --priority P1`
+to scope what the agent will pick up. The agent emits AgentVoice entries for
+ticket acquisition, dispatch, success, and failure.
+
+## Background ticket agent roadmap
+Actifix is ready for manual/CLI processing today, but background ticket agents need dedicated work.
+The following tickets track the gap closures in detail:
+
+- `ACT-20260125-FD74D` - Background ticket agent loop with lease renewals, idle backoff, and clean shutdown. (completed)
+- `ACT-20260125-FF6CC` - Non-interactive processing policy with deterministic fallback when AI is unavailable.
+- `ACT-20260125-35DCB` - AgentVoice instrumentation for DoAF acquisition, dispatch, completion, and failures. (completed)
+- `ACT-20260125-B760C` - Health/monitoring for agent liveness, last-run time, and backlog lag.
+- `ACT-20260125-2FC6E` - Managed daemon/launcher support for the ticket agent with logs and restart policy.
+- `ACT-20260125-71BDF` - Tests covering background processing, lease renewal, fallback, and AgentVoice logging.
+
 ## Module health aggregation
 `GET /api/modules/<module_id>/health` returns the aggregated health response:
 ```json

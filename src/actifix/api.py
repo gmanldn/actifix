@@ -729,6 +729,27 @@ def _load_modules(project_root: Path) -> Dict[str, List[Dict[str, str]]]:
     return {"system": system_modules, "user": user_modules}
 
 
+def _annotate_modules_with_runtime_contexts(
+    modules_payload: Dict[str, List[Dict[str, str]]],
+    registry: Optional[ModuleRegistry],
+) -> None:
+    """Enrich module metadata with runtime context such as host/port."""
+    if not registry or not modules_payload:
+        return
+    contexts = registry.registered_contexts()
+    if not contexts:
+        return
+    for bucket in modules_payload.values():
+        for module in bucket:
+            module_id = module.get("name")
+            if not module_id:
+                continue
+            context = contexts.get(module_id)
+            if context:
+                module["host"] = context.host
+                module["port"] = context.port
+
+
 def _collect_ai_feedback(limit: int = 40) -> List[str]:
     """Collect recent AI-related feedback for the settings panel."""
     try:
@@ -1600,6 +1621,8 @@ def create_app(
             return jsonify({'error': 'Authorization required'}), 401
         
         modules = _load_modules(app.config['PROJECT_ROOT'])
+        registry = app.extensions.get("actifix_module_registry")
+        _annotate_modules_with_runtime_contexts(modules, registry)
         return jsonify(modules)
 
     @app.route('/api/modules/<module_id>/health', methods=['GET'])

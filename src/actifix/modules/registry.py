@@ -214,6 +214,13 @@ class ModuleRegistry:
     def discover_modules(self) -> list[dict[str, Any]]:
         return _discover_module_nodes(self._project_root)
 
+    def registered_contexts(self) -> dict[str, "ModuleRuntimeContext"]:
+        with self._lock:
+            return {
+                module_id: context
+                for module_id, (_, context) in self._registered.items()
+            }
+
     def import_module(self, module_label: str) -> tuple[str, object, Optional[dict[str, Any]]]:
         return _lazy_import_module(module_label)
 

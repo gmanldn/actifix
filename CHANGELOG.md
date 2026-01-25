@@ -8,10 +8,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+
+### Changed
+
+### Fixed
+
+## [6.0.21] - 2026-01-25
+
+### Added
 - 50 actionable tasks implementation from documentation analysis
 - Comprehensive task list with priority distribution
 - Initial ticket creation via raise_af workflow
 - Launcher now starts the standalone PokerTool service by default (use `--pokertool-port` / `--no-pokertool`) and records a `POKERTOOL_SERVICE_START` event so the new module shows up with the other GUIs.
+- Background DoAF agent loop with lease renewal, idle backoff, and a dedicated CLI command
+- AgentVoice logging for DoAF dispatch lifecycle events
 
 ### Changed
 - Move the consolidated test runner into `test/test_runner.py` and align the docs/architecture references with the new path
@@ -19,6 +29,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Stop tracking local `data/actifix.db` artifacts in git and ignore the runtime SQLite WAL files
 - Ensure bootstrap initializes the ticket database and add root symlink guards for start/test helpers
 - Consolidate and refresh documentation across quickstart, installation, development, and testing guides
+- AI client now honors the configured Claude API model for Anthropic calls
+- Modules API now includes runtime host/port metadata, and the UI exposes a refresh control with port display
 
 ### Fixed
 - Automatically tighten `data/actifix.db` permissions to `chmod 600` before validation so the world-readable guard rails only flag intentionally insecure paths.
