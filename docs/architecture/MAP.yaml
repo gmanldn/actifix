@@ -875,7 +875,7 @@ modules:
 - id: modules.dev_assistant
   domain: modules
   owner: modules
-  summary: Local Ollama-backed coding assistant exposed through /modules/dev-assistant
+  summary: Local Ollama-backed coding assistant exposed through /modules/dev_assistant
   entrypoints:
   - src/actifix/modules/dev_assistant/__init__.py
   contracts:

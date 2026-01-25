@@ -39,10 +39,12 @@ MODULE_METADATA = {
     "capabilities": {"ai": True, "health": True, "research": True},
     "data_access": {"state_dir": True},
     "network": {"external_requests": True},
-    "permissions": ["logging"],
+    "permissions": ["logging", "network_http"],
 }
 
 MODULE_DEPENDENCIES = [
+    "modules.base",
+    "modules.config",
     "runtime.state",
     "infra.logging",
     "core.raise_af",

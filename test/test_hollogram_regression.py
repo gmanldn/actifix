@@ -203,19 +203,19 @@ class TestHollogramModuleIntegration:
 
         from actifix.api import create_app
 
-        with tempfile.TemporaryDirectory() as tmpdir:
-            app = create_app(project_root=Path(tmpdir))
+        repo_root = Path(__file__).resolve().parents[1]
+        app = create_app(project_root=repo_root)
 
-            # Check that hollogram routes are registered
-            rules = [rule.rule for rule in app.url_map.iter_rules()]
-            hollogram_rules = [r for r in rules if "/modules/hollogram" in r]
+        # Check that hollogram routes are registered
+        rules = [rule.rule for rule in app.url_map.iter_rules()]
+        hollogram_rules = [r for r in rules if "/modules/hollogram" in r]
 
-            assert len(hollogram_rules) > 0, "Hollogram routes not registered"
-            assert "/modules/hollogram/health" in rules
-            assert "/modules/hollogram/disclaimer" in rules
-            assert "/modules/hollogram/topics" in rules
-            assert "/modules/hollogram/research" in rules
-            assert "/modules/hollogram/history" in rules
+        assert len(hollogram_rules) > 0, "Hollogram routes not registered"
+        assert "/modules/hollogram/health" in rules
+        assert "/modules/hollogram/disclaimer" in rules
+        assert "/modules/hollogram/topics" in rules
+        assert "/modules/hollogram/research" in rules
+        assert "/modules/hollogram/history" in rules
 
     def test_module_appears_in_depgraph(self):
         """Ensure module is in DEPGRAPH.json."""

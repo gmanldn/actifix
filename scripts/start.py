@@ -72,7 +72,7 @@ ENV_POKERTOOL_PORT = "ACTIFIX_POKERTOOL_PORT"
 API_MODULE_HEALTH_PATHS = {
     "Hollogram": "/modules/hollogram/health",
     # Note: url_prefix for this module uses a hyphen.
-    "Dev_Assistant": "/modules/dev-assistant/health",
+    "Dev_Assistant": "/modules/dev_assistant/health",
 }
 
 

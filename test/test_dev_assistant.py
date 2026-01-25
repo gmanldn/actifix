@@ -1,14 +1,13 @@
 # -*- coding: utf-8 -*-
 
 import importlib
-import json
+import shutil
 import subprocess
-import sys
+import urllib.error
+import urllib.request
+from pathlib import Path
 
 import pytest
-import requests
-
-import shutil
 
 from actifix.config import load_config
 
@@ -33,11 +32,26 @@ def test_module_import_and_blueprint():
     app.register_blueprint(blueprint)
     with app.test_client() as client:
         # Health should return 200
-        resp = client.get('/modules/dev-assistant/health')
+        resp = client.get('/modules/dev_assistant/health')
         assert resp.status_code == 200, f"Health returned {resp.status_code}"
         # Missing prompt should return 400
-        resp = client.post('/modules/dev-assistant/chat', json={})
+        resp = client.post('/modules/dev_assistant/chat', json={})
         assert resp.status_code == 400, f"Empty prompt should return 400, got {resp.status_code}"
+
+
+def test_module_registered_in_api():
+    try:
+        from flask import Flask  # noqa: F401
+    except ImportError:
+        pytest.skip('Flask not installed; skipping API registration test')
+
+    from actifix.api import create_app
+
+    repo_root = Path(__file__).resolve().parents[1]
+    app = create_app(project_root=repo_root)
+    rules = [rule.rule for rule in app.url_map.iter_rules()]
+    assert "/modules/dev_assistant/health" in rules
+    assert "/modules/dev_assistant/chat" in rules
 
 
 def test_ollama_installation_and_model():
@@ -55,8 +69,12 @@ def test_ollama_installation_and_model():
 
 def test_ollama_server_running():
     try:
-        resp = requests.get('http://localhost:11434', timeout=5)
+        try:
+            with urllib.request.urlopen('http://localhost:11434', timeout=5) as resp:
+                status = resp.getcode()
+        except urllib.error.HTTPError as exc:
+            status = exc.code
         # It may return 404 if root path is not handled; any response means server is up
-        assert resp.status_code in (200, 404), f"Unexpected status code: {resp.status_code}"
-    except requests.RequestException as exc:
+        assert status in (200, 404), f"Unexpected status code: {status}"
+    except urllib.error.URLError as exc:
         pytest.fail(f"Failed to connect to Ollama server: {exc}")

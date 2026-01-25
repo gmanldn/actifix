@@ -44,12 +44,13 @@ import re
 import subprocess
 import sys
 import time
+import urllib.error
+import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional, Union
 
 import shutil
-import requests
 
 # Bump this constant to change the Actifix version.  It should follow
 # semantic versioning.  The UI version will mirror this version.
@@ -192,7 +193,7 @@ Ollama server is running at http://localhost:11434 and that the model
 specified in MODULE_DEFAULTS['model'] is pulled locally (e.g.
 `ollama pull {DEFAULT_MODEL}`).
 
-The blueprint registers two routes under the prefix ``/modules/dev-assistant``:
+The blueprint registers two routes under the prefix ``/modules/dev_assistant``:
   • ``/health`` returns the module health status via ModuleBase.  It
     uses the standard ModuleBase health implementation.
   • ``/chat`` accepts a JSON payload with a ``prompt`` field and
@@ -202,9 +203,10 @@ The blueprint registers two routes under the prefix ``/modules/dev-assistant``:
 
 from __future__ import annotations
 
-import requests
-from typing import Optional, Union
+import json
+import urllib.request
 from pathlib import Path
+from typing import Optional, Union
 
 from actifix.modules.base import ModuleBase
 from actifix.modules.config import get_module_config
@@ -222,10 +224,12 @@ MODULE_METADATA = {{
     "capabilities": {{"ai": True}},
     "data_access": {{"state_dir": False}},
     "network": {{"external_requests": False}},
-    "permissions": ["logging"],
+    "permissions": ["logging", "network_http"],
 }}
 
 MODULE_DEPENDENCIES = [
+    "modules.base",
+    "modules.config",
     "runtime.state",
     "infra.logging",
     "core.raise_af",
@@ -257,10 +261,27 @@ def _resolve_model(
     module_config = get_module_config(helper.module_key, helper.module_defaults, project_root=project_root)
     return str(module_config.get("model") or MODULE_DEFAULTS["model"])
 
+def _post_ollama_chat(payload: dict[str, object], timeout: float = 60.0) -> dict[str, object]:
+    """Send a chat payload to the local Ollama API using stdlib HTTP."""
+    data = json.dumps(payload).encode("utf-8")
+    request = urllib.request.Request(
+        "http://localhost:11434/api/chat",
+        data=data,
+        headers={{"Content-Type": "application/json"}},
+        method="POST",
+    )
+    with urllib.request.urlopen(request, timeout=timeout) as response:
+        body = response.read()
+        if not body:
+            return {{}}
+        return json.loads(body.decode("utf-8"))
+
 def create_blueprint(
     project_root: Optional[Union[str, Path]] = None,
+    host: Optional[str] = None,
+    port: Optional[int] = None,
     model: Optional[str] = None,
-    url_prefix: Optional[str] = "/modules/dev-assistant",
+    url_prefix: Optional[str] = "/modules/dev_assistant",
 ) -> "Blueprint":
     """Create and return the Flask blueprint for the DevAssistant module.
 
@@ -268,9 +289,11 @@ def create_blueprint(
 
     Args:
         project_root: Optional override for the project root.
+        host: Optional override for the host (unused).
+        port: Optional override for the port (unused).
         model: Optional override for the Ollama model name.
         url_prefix: URL prefix for the blueprint.  Defaults to
-            ``/modules/dev-assistant``.
+            ``/modules/dev_assistant``.
 
     Returns:
         flask.Blueprint: The configured blueprint.
@@ -301,13 +324,7 @@ def create_blueprint(
                         {{"role": "user", "content": prompt.strip()}},
                     ],
                 }}
-                response = requests.post(
-                    "http://localhost:11434/api/chat",
-                    json=payload,
-                    timeout=60,
-                )
-                response.raise_for_status()
-                result = response.json()
+                result = _post_ollama_chat(payload, timeout=60.0)
                 # Ollama returns either {{"message": {{"content": ...}}}} or {{"response": ...}}
                 answer = (
                     (result.get("message") or {{}}).get("content")
@@ -350,9 +367,13 @@ def is_ollama_running() -> bool:
         bool: True if a connection succeeds, False otherwise.
     """
     try:
+        try:
+            with urllib.request.urlopen("http://localhost:11434", timeout=3) as resp:
+                status = resp.getcode()
+        except urllib.error.HTTPError as exc:
+            status = exc.code
         # We don't care about the return value, just whether we can connect.
-        requests.get("http://localhost:11434", timeout=3)
-        return True
+        return status in (200, 404)
     except Exception:
         return False
 
@@ -478,21 +499,20 @@ def write_dev_assistant_tests(root: Path) -> None:
     test_content = f"""# -*- coding: utf-8 -*-
 
 import importlib
-import json
+import shutil
 import subprocess
-import sys
+import urllib.error
+import urllib.request
+from pathlib import Path
 
 import pytest
-import requests
-
-import shutil
 
 from actifix.config import load_config
 
 
 def test_config_defaults():
     config = load_config()
-    assert config.ai_provider.lower() == 'ollama', f"Expected ai_provider 'ollama', got {{config.ai_provider}}"
+    assert config.ai_provider == "", f"Expected ai_provider default to be empty, got {{config.ai_provider}}"
     assert config.ai_model == '{DEFAULT_MODEL}', f"Expected ai_model '{DEFAULT_MODEL}', got {{config.ai_model}}"
     assert config.ollama_model == '{DEFAULT_MODEL}', f"Expected ollama_model '{DEFAULT_MODEL}', got {{config.ollama_model}}"
 
@@ -510,11 +530,26 @@ def test_module_import_and_blueprint():
     app.register_blueprint(blueprint)
     with app.test_client() as client:
         # Health should return 200
-        resp = client.get('/modules/dev-assistant/health')
+        resp = client.get('/modules/dev_assistant/health')
         assert resp.status_code == 200, f"Health returned {{resp.status_code}}"
         # Missing prompt should return 400
-        resp = client.post('/modules/dev-assistant/chat', json={{}})
+        resp = client.post('/modules/dev_assistant/chat', json={{}})
         assert resp.status_code == 400, f"Empty prompt should return 400, got {{resp.status_code}}"
+
+
+def test_module_registered_in_api():
+    try:
+        from flask import Flask  # noqa: F401
+    except ImportError:
+        pytest.skip('Flask not installed; skipping API registration test')
+
+    from actifix.api import create_app
+
+    repo_root = Path(__file__).resolve().parents[1]
+    app = create_app(project_root=repo_root)
+    rules = [rule.rule for rule in app.url_map.iter_rules()]
+    assert "/modules/dev_assistant/health" in rules
+    assert "/modules/dev_assistant/chat" in rules
 
 
 def test_ollama_installation_and_model():
@@ -532,10 +567,14 @@ def test_ollama_installation_and_model():
 
 def test_ollama_server_running():
     try:
-        resp = requests.get('http://localhost:11434', timeout=5)
+        try:
+            with urllib.request.urlopen('http://localhost:11434', timeout=5) as resp:
+                status = resp.getcode()
+        except urllib.error.HTTPError as exc:
+            status = exc.code
         # It may return 404 if root path is not handled; any response means server is up
-        assert resp.status_code in (200, 404), f"Unexpected status code: {{resp.status_code}}"
-    except requests.RequestException as exc:
+        assert status in (200, 404), f"Unexpected status code: {{status}}"
+    except urllib.error.URLError as exc:
         pytest.fail(f"Failed to connect to Ollama server: {{exc}}")
 """
     test_file.write_text(test_content, encoding="utf-8")

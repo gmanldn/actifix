@@ -1113,6 +1113,21 @@ def create_app(
             priority=TicketPriority.P2,
         )
 
+    _create_dev_assistant_blueprint = None
+    _dev_assistant_access_rule = MODULE_ACCESS_PUBLIC
+    try:
+        _, dev_assistant_module, _ = module_registry.import_module("dev_assistant")
+        _create_dev_assistant_blueprint = getattr(dev_assistant_module, "create_blueprint", None)
+        _dev_assistant_access_rule = getattr(dev_assistant_module, "ACCESS_RULE", MODULE_ACCESS_PUBLIC)
+    except ImportError:
+        pass
+    except Exception as exc:
+        record_error(
+            message=f"Failed to import dev_assistant module: {exc}",
+            source="api.py:module_loader",
+            priority=TicketPriority.P2,
+        )
+
     _create_hollogram_blueprint = None
     _hollogram_access_rule = MODULE_ACCESS_LOCAL_ONLY
     try:
@@ -1170,6 +1185,22 @@ def create_app(
             port=port,
             status_file=status_file,
             access_rule=_shootymcshoot_access_rule,
+            register_access=_register_module_access,
+            register_rate_limit=_register_module_rate_limit,
+            depgraph_edges=depgraph_edges,
+            registry=module_registry,
+        )
+
+    if _create_dev_assistant_blueprint:
+        _register_module_blueprint(
+            app,
+            "dev_assistant",
+            _create_dev_assistant_blueprint,
+            project_root=root,
+            host=host,
+            port=port,
+            status_file=status_file,
+            access_rule=_dev_assistant_access_rule,
             register_access=_register_module_access,
             register_rate_limit=_register_module_rate_limit,
             depgraph_edges=depgraph_edges,

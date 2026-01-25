@@ -52,14 +52,14 @@ def test_dev_assistant_module():
                 app.register_blueprint(blueprint)
                 with app.test_client() as client:
                     # Test health endpoint
-                    resp = client.get('/modules/dev-assistant/health')
+                    resp = client.get('/modules/dev_assistant/health')
                     if resp.status_code == 200:
                         print(f"  ✓ /health endpoint: {resp.status_code}")
                     else:
                         print(f"  ⚠ /health endpoint: {resp.status_code}")
                     
                     # Test chat endpoint (expect 400 for empty request)
-                    resp = client.post('/modules/dev-assistant/chat', json={})
+                    resp = client.post('/modules/dev_assistant/chat', json={})
                     if resp.status_code == 400:
                         print(f"  ✓ /chat endpoint: {resp.status_code} (expected for empty request)")
                     else:
@@ -211,8 +211,8 @@ def main():
         print("\nYou can now use these modules by:")
         print("  1. Starting the Actifix server")
         print("  2. Accessing the API endpoints:")
-        print("     - /modules/dev-assistant/health")
-        print("     - /modules/dev-assistant/chat")
+        print("     - /modules/dev_assistant/health")
+        print("     - /modules/dev_assistant/chat")
         print("     - /modules/hollogram/health")
         print("     - /modules/hollogram/research")
         print("     - /modules/hollogram/topics")

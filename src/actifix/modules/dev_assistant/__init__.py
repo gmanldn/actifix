@@ -10,7 +10,7 @@ Ollama server is running at http://localhost:11434 and that the model
 specified in MODULE_DEFAULTS['model'] is pulled locally (e.g.
 `ollama pull qwen2.5-coder:7b-instruct`).
 
-The blueprint registers two routes under the prefix ``/modules/dev-assistant``:
+The blueprint registers two routes under the prefix ``/modules/dev_assistant``:
   • ``/health`` returns the module health status via ModuleBase.  It
     uses the standard ModuleBase health implementation.
   • ``/chat`` accepts a JSON payload with a ``prompt`` field and
@@ -20,9 +20,10 @@ The blueprint registers two routes under the prefix ``/modules/dev-assistant``:
 
 from __future__ import annotations
 
-import requests
-from typing import Optional, Union
+import json
+import urllib.request
 from pathlib import Path
+from typing import Optional, Union
 
 from actifix.modules.base import ModuleBase
 from actifix.modules.config import get_module_config
@@ -40,10 +41,12 @@ MODULE_METADATA = {
     "capabilities": {"ai": True},
     "data_access": {"state_dir": False},
     "network": {"external_requests": False},
-    "permissions": ["logging"],
+    "permissions": ["logging", "network_http"],
 }
 
 MODULE_DEPENDENCIES = [
+    "modules.base",
+    "modules.config",
     "runtime.state",
     "infra.logging",
     "core.raise_af",
@@ -75,10 +78,29 @@ def _resolve_model(
     module_config = get_module_config(helper.module_key, helper.module_defaults, project_root=project_root)
     return str(module_config.get("model") or MODULE_DEFAULTS["model"])
 
+
+def _post_ollama_chat(payload: dict[str, object], timeout: float = 60.0) -> dict[str, object]:
+    """Send a chat payload to the local Ollama API using stdlib HTTP."""
+    data = json.dumps(payload).encode("utf-8")
+    request = urllib.request.Request(
+        "http://localhost:11434/api/chat",
+        data=data,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    with urllib.request.urlopen(request, timeout=timeout) as response:
+        body = response.read()
+        if not body:
+            return {}
+        return json.loads(body.decode("utf-8"))
+
+
 def create_blueprint(
     project_root: Optional[Union[str, Path]] = None,
+    host: Optional[str] = None,
+    port: Optional[int] = None,
     model: Optional[str] = None,
-    url_prefix: Optional[str] = "/modules/dev-assistant",
+    url_prefix: Optional[str] = "/modules/dev_assistant",
 ) -> "Blueprint":
     """Create and return the Flask blueprint for the DevAssistant module.
 
@@ -86,9 +108,11 @@ def create_blueprint(
 
     Args:
         project_root: Optional override for the project root.
+        host: Optional override for the host (unused).
+        port: Optional override for the port (unused).
         model: Optional override for the Ollama model name.
         url_prefix: URL prefix for the blueprint.  Defaults to
-            ``/modules/dev-assistant``.
+            ``/modules/dev_assistant``.
 
     Returns:
         flask.Blueprint: The configured blueprint.
@@ -119,13 +143,7 @@ def create_blueprint(
                         {"role": "user", "content": prompt.strip()},
                     ],
                 }
-                response = requests.post(
-                    "http://localhost:11434/api/chat",
-                    json=payload,
-                    timeout=60,
-                )
-                response.raise_for_status()
-                result = response.json()
+                result = _post_ollama_chat(payload, timeout=60.0)
                 # Ollama returns either {"message": {"content": ...}} or {"response": ...}
                 answer = (
                     (result.get("message") or {}).get("content")
