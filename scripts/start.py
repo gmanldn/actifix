@@ -418,7 +418,8 @@ def _probe_http_status(url: str, timeout: float = 1.5) -> tuple[bool, int, str]:
 def _wait_for_api_ready(host: str, port: int, timeout: float = 5.0) -> bool:
     """Wait until the API responds to a lightweight request."""
     deadline = time.monotonic() + timeout
-    url = f"http://{host}:{port}/api/health"
+    # Use the lightest endpoint available; /api/health can perform heavier checks.
+    url = f"http://{host}:{port}/api/version"
     while time.monotonic() < deadline:
         ok, status, _ = _probe_http_status(url, timeout=1.0)
         if ok and status == 200:
