@@ -30,7 +30,7 @@ MODULE_METADATA = {
         "state_dir": True,
     },
     "network": {
-        "external_requests": False,
+        "external_requests": True,
     },
     "permissions": ["logging", "fs_read"],
 }
@@ -304,6 +304,10 @@ _HTML_PAGE = """<!doctype html>
       background: linear-gradient(160deg, #e7f6f4, #cfe8e5);
       transform: translateY(-4px) rotate(-1deg);
     }
+    .die.rolling {
+      animation: roll-jitter 0.5s ease-in-out;
+      box-shadow: 0 12px 18px rgba(196, 79, 44, 0.35);
+    }
     .die span {
       position: absolute;
       bottom: 6px;
@@ -311,6 +315,26 @@ _HTML_PAGE = """<!doctype html>
       text-transform: uppercase;
       letter-spacing: 1px;
       color: var(--muted);
+    }
+    @keyframes roll-jitter {
+      0% {
+        transform: translateY(0) rotate(0deg);
+      }
+      20% {
+        transform: translateY(-6px) rotate(-6deg);
+      }
+      40% {
+        transform: translateY(2px) rotate(5deg);
+      }
+      60% {
+        transform: translateY(-4px) rotate(-4deg);
+      }
+      80% {
+        transform: translateY(1px) rotate(3deg);
+      }
+      100% {
+        transform: translateY(0) rotate(0deg);
+      }
     }
     table {
       width: 100%;
@@ -364,6 +388,27 @@ _HTML_PAGE = """<!doctype html>
       color: var(--muted);
       font-size: 13px;
       margin-top: 8px;
+    }
+    .session-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 12px;
+    }
+    .session-status {
+      margin-top: 10px;
+      font-size: 13px;
+      color: var(--accent-2);
+      font-weight: 600;
+    }
+    .session-status.error {
+      color: #b23b2f;
+    }
+    .session-share {
+      margin-top: 6px;
+      font-size: 12px;
+      color: var(--ink);
+      word-break: break-all;
     }
 
     /* Enhanced scorecard styles */
@@ -433,6 +478,20 @@ _HTML_PAGE = """<!doctype html>
           <button id="rollBtn" class="button">Roll Dice</button>
         </div>
       </section>
+
+      <section class="card">
+        <h2>Session Sync</h2>
+        <label>Session code
+          <input id="sessionCode" type="text" placeholder="e.g. yhatzee-8k2l1p or paste.rs/yhatzee-8k2l1p">
+        </label>
+        <div class="session-actions">
+          <button id="createSessionBtn" class="button secondary">Create Session</button>
+          <button id="joinSessionBtn" class="button">Join Session</button>
+        </div>
+        <div class="session-status" id="sessionStatus">Not connected</div>
+        <div class="session-share" id="sessionShare"></div>
+        <div class="note">Uses free paste.rs sessions. Share the session code with your partner.</div>
+      </section>
     </div>
 
     <section class="card" style="margin-top: 18px;">
@@ -487,7 +546,21 @@ _HTML_PAGE = """<!doctype html>
         Object.fromEntries(categories.map(cat => [cat.id, null])),
         Object.fromEntries(categories.map(cat => [cat.id, null]))
       ],
-      started: false
+      started: false,
+      updatedAt: Date.now(),
+      rollingIndices: [],
+      rollAnimationId: 0
+    };
+
+    const sync = {
+      baseUrl: "https://paste.rs",
+      sessionId: "",
+      enabled: false,
+      isHost: false,
+      suppressPush: false,
+      pushTimer: null,
+      pollTimer: null,
+      pollingMs: 3000
     };
 
     const diceRow = document.getElementById("diceRow");
@@ -504,6 +577,11 @@ _HTML_PAGE = """<!doctype html>
     const scoreTableBody = document.querySelector("#scoreTable tbody");
     const totalOne = document.getElementById("totalOne");
     const totalTwo = document.getElementById("totalTwo");
+    const sessionCodeInput = document.getElementById("sessionCode");
+    const createSessionBtn = document.getElementById("createSessionBtn");
+    const joinSessionBtn = document.getElementById("joinSessionBtn");
+    const sessionStatus = document.getElementById("sessionStatus");
+    const sessionShare = document.getElementById("sessionShare");
 
     function sum(dice) {
       return dice.reduce((acc, value) => acc + value, 0);
@@ -562,13 +640,194 @@ _HTML_PAGE = """<!doctype html>
       return getUpperSum(playerIndex) + getBonus(playerIndex) + getLowerSum(playerIndex);
     }
 
+    function setSessionStatus(message, isError = false) {
+      sessionStatus.textContent = message;
+      sessionStatus.className = "session-status" + (isError ? " error" : "");
+    }
+
+    function setSessionShare(message) {
+      sessionShare.textContent = message;
+    }
+
+    function normalizeSessionCode(rawValue) {
+      const trimmed = rawValue.trim();
+      if (!trimmed) {
+        return "";
+      }
+      const withoutProtocol = trimmed.replace(/^https?:\\/\\//, "");
+      if (withoutProtocol.includes("/")) {
+        const parts = withoutProtocol.split("/").filter(Boolean);
+        return parts[parts.length - 1];
+      }
+      return withoutProtocol;
+    }
+
+    function sessionUrl() {
+      return `${sync.baseUrl}/${sync.sessionId}`;
+    }
+
+    function exportState() {
+      return {
+        players: state.players.slice(),
+        currentPlayer: state.currentPlayer,
+        rollsLeft: state.rollsLeft,
+        turn: state.turn,
+        dice: state.dice.slice(),
+        held: state.held.slice(),
+        scores: state.scores.map(score => ({ ...score })),
+        started: state.started
+      };
+    }
+
+    function applyRemoteState(payload) {
+      if (!payload || !payload.state) {
+        return;
+      }
+      const remote = payload.state;
+      sync.suppressPush = true;
+      if (Array.isArray(remote.players)) {
+        state.players = remote.players.slice(0, 2);
+      }
+      if (typeof remote.currentPlayer === "number") {
+        state.currentPlayer = remote.currentPlayer;
+      }
+      if (typeof remote.rollsLeft === "number") {
+        state.rollsLeft = remote.rollsLeft;
+      }
+      if (typeof remote.turn === "number") {
+        state.turn = remote.turn;
+      }
+      if (Array.isArray(remote.dice)) {
+        state.dice = remote.dice.slice(0, 5);
+      }
+      if (Array.isArray(remote.held)) {
+        state.held = remote.held.slice(0, 5);
+      }
+      if (Array.isArray(remote.scores) && remote.scores.length === 2) {
+        state.scores = remote.scores.map(score => ({ ...score }));
+      }
+      state.started = Boolean(remote.started);
+      state.updatedAt = payload.updatedAt || Date.now();
+      sync.suppressPush = false;
+      render();
+    }
+
+    function markStateUpdated() {
+      state.updatedAt = Date.now();
+      if (sync.enabled && !sync.suppressPush) {
+        queuePush();
+      }
+    }
+
+    function queuePush() {
+      if (sync.pushTimer) {
+        clearTimeout(sync.pushTimer);
+      }
+      sync.pushTimer = setTimeout(pushState, 300);
+    }
+
+    async function pushState() {
+      if (!sync.enabled || !sync.sessionId || sync.suppressPush) {
+        return;
+      }
+      try {
+        const response = await fetch(sessionUrl(), {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ updatedAt: state.updatedAt, state: exportState() })
+        });
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        setSessionStatus(sync.isHost ? "Hosting session" : "Session synced");
+        setSessionShare(`Session URL: ${sessionUrl()}`);
+      } catch (error) {
+        setSessionStatus(`Sync failed: ${error.message}`, true);
+      }
+    }
+
+    async function pollRemote() {
+      if (!sync.enabled || !sync.sessionId) {
+        return;
+      }
+      try {
+        const response = await fetch(sessionUrl(), { method: "GET", cache: "no-store" });
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        const text = await response.text();
+        if (!text) {
+          return;
+        }
+        const payload = JSON.parse(text);
+        if (payload.updatedAt && payload.updatedAt > state.updatedAt) {
+          applyRemoteState(payload);
+          setSessionStatus("Session updated");
+        } else {
+          setSessionStatus(sync.isHost ? "Hosting session" : "Session synced");
+        }
+        setSessionShare(`Session URL: ${sessionUrl()}`);
+      } catch (error) {
+        setSessionStatus(`Sync failed: ${error.message}`, true);
+      }
+    }
+
+    function startPolling() {
+      if (sync.pollTimer) {
+        clearInterval(sync.pollTimer);
+      }
+      sync.pollTimer = setInterval(pollRemote, sync.pollingMs);
+    }
+
+    function createSession() {
+      const generated = `yhatzee-${Math.random().toString(36).slice(2, 8)}`;
+      const input = normalizeSessionCode(sessionCodeInput.value) || generated;
+      sync.sessionId = input;
+      sync.enabled = true;
+      sync.isHost = true;
+      sessionCodeInput.value = input;
+      setSessionStatus("Creating session...");
+      setSessionShare(`Session URL: ${sessionUrl()}`);
+      startPolling();
+      markStateUpdated();
+      pushState();
+    }
+
+    function joinSession() {
+      const input = normalizeSessionCode(sessionCodeInput.value);
+      if (!input) {
+        setSessionStatus("Enter a session code to join.", true);
+        return;
+      }
+      sync.sessionId = input;
+      sync.enabled = true;
+      sync.isHost = false;
+      setSessionStatus("Joining session...");
+      setSessionShare(`Session URL: ${sessionUrl()}`);
+      startPolling();
+      pollRemote();
+    }
+
     function rollDice() {
       if (!state.started || state.rollsLeft <= 0) {
         return;
       }
+      const rollingIndices = state.held
+        .map((held, index) => (held ? null : index))
+        .filter(value => value !== null);
       state.dice = state.dice.map((value, index) => state.held[index] ? value : randomDie());
       state.rollsLeft -= 1;
+      state.rollingIndices = rollingIndices;
+      state.rollAnimationId += 1;
+      const animationId = state.rollAnimationId;
       render();
+      markStateUpdated();
+      setTimeout(() => {
+        if (state.rollAnimationId === animationId) {
+          state.rollingIndices = [];
+          renderDice();
+        }
+      }, 520);
     }
 
     function randomDie() {
@@ -581,6 +840,7 @@ _HTML_PAGE = """<!doctype html>
       }
       state.held[index] = !state.held[index];
       renderDice();
+      markStateUpdated();
     }
 
     function scoreCategory(categoryId) {
@@ -606,6 +866,7 @@ _HTML_PAGE = """<!doctype html>
       state.held = [false, false, false, false, false];
       state.dice = [1, 1, 1, 1, 1];
       render();
+      markStateUpdated();
     }
 
     function resetGame() {
@@ -623,6 +884,7 @@ _HTML_PAGE = """<!doctype html>
       playerOneInput.value = "Player 1";
       playerTwoInput.value = "Player 2";
       render();
+      markStateUpdated();
     }
 
     function startGame() {
@@ -637,13 +899,22 @@ _HTML_PAGE = """<!doctype html>
       state.held = [false, false, false, false, false];
       state.dice = [1, 1, 1, 1, 1];
       render();
+      markStateUpdated();
     }
 
     function renderDice() {
       diceRow.innerHTML = "";
+      const rolling = new Set(state.rollingIndices);
       state.dice.forEach((value, index) => {
         const die = document.createElement("button");
-        die.className = "die" + (state.held[index] ? " held" : "");
+        const classes = ["die"];
+        if (state.held[index]) {
+          classes.push("held");
+        }
+        if (rolling.has(index)) {
+          classes.push("rolling");
+        }
+        die.className = classes.join(" ");
         die.type = "button";
         die.textContent = value;
         const label = document.createElement("span");
@@ -808,6 +1079,8 @@ _HTML_PAGE = """<!doctype html>
     rollBtn.addEventListener("click", rollDice);
     startBtn.addEventListener("click", startGame);
     resetBtn.addEventListener("click", resetGame);
+    createSessionBtn.addEventListener("click", createSession);
+    joinSessionBtn.addEventListener("click", joinSession);
 
     render();
   </script>
