@@ -26,6 +26,21 @@ def get_staged_files():
     )
     return result.stdout.strip().split("\n") if result.stdout.strip() else []
 
+
+def _record_hook_error(message: str, source: str) -> None:
+    try:
+        sys.path.insert(0, str(SRC_ROOT))
+        from actifix.raise_af import record_error, TicketPriority
+
+        record_error(
+            message=message,
+            source=source,
+            error_type="VersionGuardError",
+            priority=TicketPriority.P2,
+        )
+    except Exception:
+        return
+
 def get_changed_modules(files):
     """Extract module names from changed files."""
     modules = set()
@@ -133,12 +148,22 @@ def _sync_remote_version_guard(pyproject_path: Path) -> bool:
     local_version = _read_version_from_pyproject(pyproject_path)
     remote_version = _read_remote_version()
     if not local_version or not remote_version:
-        return True
+        print("✗ Unable to verify remote version; aborting commit.")
+        _record_hook_error(
+            "Unable to verify remote version during pre-commit guard.",
+            "scripts/pre-commit-hook.py:_sync_remote_version_guard",
+        )
+        return False
 
     local_tuple = _parse_version_tuple(local_version)
     remote_tuple = _parse_version_tuple(remote_version)
     if not local_tuple or not remote_tuple:
-        return True
+        print("✗ Version parsing failed; aborting commit.")
+        _record_hook_error(
+            "Version parsing failed during pre-commit guard.",
+            "scripts/pre-commit-hook.py:_sync_remote_version_guard",
+        )
+        return False
 
     if local_tuple >= remote_tuple:
         return True

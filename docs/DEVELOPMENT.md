@@ -94,6 +94,24 @@ python3 -m actifix.main health
 python3 test.py --pattern architecture_validation
 ```
 
+## Doctor command
+
+Actifix includes a `doctor` command to diagnose common environment and configuration issues.
+Running this command will:
+
+- Verify that the `ACTIFIX_CHANGE_ORIGIN` environment variable is set to `raise_af`.
+- Attempt to load the current Actifix configuration and report any errors.
+- Run the builtin health check and print its report.
+- Summarise open and completed ticket counts.
+
+Usage:
+
+```bash
+python3 -m actifix.main doctor
+```
+
+The command exits with code 0 if all checks pass, or 1 if any issues are detected. Use it as a first step when troubleshooting your development environment.
+
 ## Module CLI
 Use the CLI to list and toggle modules:
 ```bash
@@ -217,3 +235,6 @@ Commit format:
 git commit -m "docs(workflow): refresh development and testing guides"
 ```
 Always push after each ticket is complete.
+Version guard: pre-commit and Do_AF enforce that `pyproject.toml` cannot be below `origin/develop`.
+If the remote version is higher, the guard rewrites `pyproject.toml` to the remote version,
+bumps the patch, and re-syncs frontend assets before allowing commit/push.
