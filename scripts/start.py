@@ -225,6 +225,7 @@ def clean_bytecode_cache() -> None:
 def sync_frontend_assets(project_root: Path) -> None:
     """Rebuild the frontend assets to match the current version."""
     log_info("Synchronizing frontend assets via build_frontend.py")
+    log_info(f"Building frontend assets from {project_root}")
     try:
         build_frontend(project_root)
         log_success("Frontend assets synchronized")
