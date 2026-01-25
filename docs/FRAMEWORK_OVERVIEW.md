@@ -161,6 +161,7 @@ See `CHANGELOG.md` for full history. Recent highlights:
 
 | Version | Highlights |
 |---------|------------|
+| **7.0.1** (2026-01-27) | Patch release that keeps the version-sync story aligned (docs, assets, UI/API) while capturing the latest release workflow content before the next milestone. |
 | **7.0.0** (2026-01-26) | Big-point release aligning API and UI versions with refreshed release notes, synchronizing the version sync guidance, and keeping the screenscan/status story front-and-center before unlocking the next milestone. |
 | **6.0.19** (2026-01-25) | **AgentVoice (AgentThoughts)** enforced for modules (info+error stream in `agent_voice` table, capped at 1,000,000 rows). **Start launcher** reports full runtime status and hard-restarts services on version change. |
 | **4.0.49** (2026-01-21) | **ShootyMcShoot module**: React hello world holding page at `/modules/shootymcshoot` (127.0.0.1:8040). Follows ModuleBase pattern with metadata, health endpoint, local-only access. |

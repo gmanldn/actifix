@@ -13,6 +13,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [7.0.1] - 2026-01-27
+
+### Added
+- Minor release notes that capture the patched synchronization flow and release guidance so the timeline reflects the 7.0.y cadence.
+
+### Changed
+- Canonical version metadata, frontend assets, and documentation pointers now show 7.0.1 so release tooling stays in sync across both branches.
+
+### Fixed
+- Cleared stale release references and ensured the version sync documentation mentions the latest patch release number, keeping the audit-heavy tests green.
+
 ## [7.0.0] - 2026-01-26
 
 ### Added
