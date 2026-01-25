@@ -13,6 +13,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [6.0.24] - 2026-01-25
+
+### Added
+- Launcher support for running the DoAF background ticket agent alongside services
+
+### Changed
+- Daemon documentation now covers running the ticket agent via launchctl
+
 ## [6.0.23] - 2026-01-25
 
 ### Added

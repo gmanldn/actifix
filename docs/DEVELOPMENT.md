@@ -175,6 +175,11 @@ To run Actifix persistently as a user daemon (auto-start on login, auto-restart 
 - Uses project venv PATH.
 - `KeepAlive: true` ensures restart on crash/exit.
 
+### Ticket agent daemon
+To run the background ticket agent under launchctl, include `--ticket-agent`
+in the launcher arguments (and optionally `--ticket-agent-no-ai` or
+`--ticket-agent-fallback-complete`).
+
 ## Background ticket agent status
 Background ticket processing is available via the DoAF agent loop, but it is not enabled by default:
 
@@ -196,7 +201,7 @@ The remaining readiness work is tracked in:
 - `ACT-20260125-FF6CC` - Non-interactive processing policy with deterministic fallback when AI is unavailable. (completed)
 - `ACT-20260125-35DCB` - AgentVoice instrumentation for DoAF acquisition, dispatch, completion, and failures. (completed)
 - `ACT-20260125-B760C` - Health/monitoring for agent liveness, last-run time, and backlog lag. (completed)
-- `ACT-20260125-2FC6E` - Managed daemon/launcher support for the ticket agent with logs and restart policy.
+- `ACT-20260125-2FC6E` - Managed daemon/launcher support for the ticket agent with logs and restart policy. (completed)
 - `ACT-20260125-71BDF` - Tests covering background processing, lease renewal, fallback, and AgentVoice logging.
 
 ## Commit and push

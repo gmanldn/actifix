@@ -15,6 +15,7 @@ Usage:
     python scripts/start.py --health-only       # health check and exit
     python scripts/start.py --frontend-port 8081
     python scripts/start.py --api-port 5002
+    python scripts/start.py --ticket-agent      # run background ticket agent alongside services
 """
 
 from __future__ import annotations
@@ -33,6 +34,7 @@ import platform
 import atexit
 from pathlib import Path
 from typing import Optional
+from datetime import timedelta
 
 # Detect the repository root (pyproject marker) so we can import sibling packages reliably.
 _SCRIPT_DIR = Path(__file__).resolve().parent
@@ -122,6 +124,8 @@ _FRONTEND_MANAGER_INSTANCE: Optional['FrontendManager'] = None
 _FRONTEND_LOCK = threading.Lock()
 _POKERTOOL_THREAD: Optional[threading.Thread] = None
 _POKERTOOL_LOCK = threading.Lock()
+_TICKET_AGENT_THREAD: Optional[threading.Thread] = None
+_TICKET_AGENT_LOCK = threading.Lock()
 
 # ANSI Color codes for terminal output
 class Color:
@@ -694,6 +698,61 @@ def start_pokertool_service(port: int, project_root: Path, host: str = "127.0.0.
         return thread
 
 
+def start_ticket_agent(
+    project_root: Path,
+    stop_event: threading.Event,
+    *,
+    agent_id: str,
+    run_label: str,
+    lease_minutes: int,
+    renew_interval: int,
+    max_tickets: Optional[int],
+    no_ai: bool,
+    fallback_complete: bool,
+    priorities: Optional[list[str]],
+) -> threading.Thread:
+    """Launch the DoAF background ticket agent in a daemon thread."""
+    with _TICKET_AGENT_LOCK:
+        global _TICKET_AGENT_THREAD
+        if _TICKET_AGENT_THREAD is not None and _TICKET_AGENT_THREAD.is_alive():
+            log_warning("Ticket agent already running - refusing to start duplicate instance")
+            return _TICKET_AGENT_THREAD
+
+        def run_agent() -> None:
+            if str(project_root / "src") not in sys.path:
+                sys.path.insert(0, str(project_root / "src"))
+            try:
+                from actifix.do_af import run_background_agent, BackgroundAgentConfig
+                from actifix.raise_af import record_error, TicketPriority
+
+                config = BackgroundAgentConfig(
+                    agent_id=agent_id,
+                    run_label=run_label,
+                    lease_duration=timedelta(minutes=lease_minutes),
+                    renew_interval_seconds=renew_interval,
+                    max_tickets=max_tickets,
+                    use_ai=not no_ai,
+                    priority_filter=priorities,
+                    fallback_complete=fallback_complete,
+                )
+                run_background_agent(config, stop_event=stop_event)
+            except Exception as exc:
+                log_error(f"Ticket agent crashed: {exc}")
+                record_error(
+                    message=f"Ticket agent crashed: {exc}",
+                    source="scripts/start.py:start_ticket_agent",
+                    error_type=type(exc).__name__,
+                    priority=TicketPriority.P2,
+                )
+                raise
+
+        thread = threading.Thread(target=run_agent, daemon=True)
+        thread.start()
+        _TICKET_AGENT_THREAD = thread
+        log_success("Ticket agent thread started")
+        return thread
+
+
 def start_api_watchdog(api_port: int, project_root: Path, interval_seconds: float = 30.0, stop_event: Optional[threading.Event] = None) -> threading.Thread:
 
     """API watchdog: monitor port and auto-restart if down."""
@@ -978,6 +1037,56 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
         help="Do not start the API server",
     )
     parser.add_argument(
+        "--ticket-agent",
+        action="store_true",
+        help="Run background DoAF ticket agent alongside services",
+    )
+    parser.add_argument(
+        "--ticket-agent-id",
+        type=str,
+        default="launcher-agent",
+        help="Agent ID for the ticket agent (default: launcher-agent)",
+    )
+    parser.add_argument(
+        "--ticket-agent-run-label",
+        type=str,
+        default="launcher-ticket-agent",
+        help="Run label for ticket agent logs (default: launcher-ticket-agent)",
+    )
+    parser.add_argument(
+        "--ticket-agent-lease-minutes",
+        type=int,
+        default=60,
+        help="Ticket agent lease duration in minutes (default: 60)",
+    )
+    parser.add_argument(
+        "--ticket-agent-renew-interval",
+        type=int,
+        default=300,
+        help="Ticket agent lease renewal interval in seconds (default: 300)",
+    )
+    parser.add_argument(
+        "--ticket-agent-max-tickets",
+        type=int,
+        default=0,
+        help="Max tickets to process before stopping (default: 0 = unlimited)",
+    )
+    parser.add_argument(
+        "--ticket-agent-no-ai",
+        action="store_true",
+        help="Disable AI for the ticket agent",
+    )
+    parser.add_argument(
+        "--ticket-agent-fallback-complete",
+        action="store_true",
+        help="Enable deterministic fallback completion for ticket agent",
+    )
+    parser.add_argument(
+        "--ticket-agent-priority",
+        action="append",
+        help="Limit agent to a priority (repeatable, e.g. --ticket-agent-priority P0)",
+    )
+    parser.add_argument(
         "--run-duration",
         type=float,
         metavar="SECONDS",
@@ -1024,6 +1133,8 @@ def main(argv: Optional[list[str]] = None) -> int:
     if not args.no_shooty:
         total_steps += 1
     if not args.no_pokertool:
+        total_steps += 1
+    if args.ticket_agent:
         total_steps += 1
     total_steps += 1  # frontend step
 
@@ -1138,6 +1249,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     superquiz_thread: Optional[threading.Thread] = None
     shooty_thread: Optional[threading.Thread] = None
     pokertool_thread: Optional[threading.Thread] = None
+    ticket_agent_thread: Optional[threading.Thread] = None
     stop_event = threading.Event()
     if not args.no_api:
         current_step += 1
@@ -1150,6 +1262,27 @@ def main(argv: Optional[list[str]] = None) -> int:
             announce_api_modules("127.0.0.1", args.api_port)
         except Exception as e:
             log_error(f"Failed to start API server: {e}")
+            return 1
+
+    if args.ticket_agent:
+        current_step += 1
+        log_step(current_step, total_steps, "Starting ticket agent")
+        try:
+            max_tickets = args.ticket_agent_max_tickets or None
+            ticket_agent_thread = start_ticket_agent(
+                ROOT,
+                stop_event,
+                agent_id=args.ticket_agent_id,
+                run_label=args.ticket_agent_run_label,
+                lease_minutes=args.ticket_agent_lease_minutes,
+                renew_interval=args.ticket_agent_renew_interval,
+                max_tickets=max_tickets,
+                no_ai=args.ticket_agent_no_ai,
+                fallback_complete=args.ticket_agent_fallback_complete,
+                priorities=args.ticket_agent_priority,
+            )
+        except Exception as e:
+            log_error(f"Failed to start ticket agent: {e}")
             return 1
 
     # Step 5: Start Yhatzee GUI
@@ -1286,6 +1419,8 @@ def main(argv: Optional[list[str]] = None) -> int:
             api_watchdog_thread.join(timeout=1)
         if version_monitor_thread:
             version_monitor_thread.join(timeout=1)
+        if ticket_agent_thread:
+            ticket_agent_thread.join(timeout=1)
         log_success("All servers stopped")
         log_success("Goodbye!")
 
