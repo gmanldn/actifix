@@ -39,7 +39,7 @@ Enforcement:
    ```bash
    python3 scripts/start.py
    ```
-   The launcher now cleans up previous Actifix processes and removes stale bytecode before spinning services up, ensuring each run starts from a clean slate.
+   The launcher now cleans up previous Actifix processes, removes stale bytecode, and rebuilds the frontend via `scripts/build_frontend.py` before spinning services up, ensuring each run starts from a clean slate with the latest GUI.
 4. Run a health check:
    ```bash
    python3 -m actifix.main health

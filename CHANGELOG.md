@@ -13,6 +13,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [7.0.6] - 2026-01-29
+
+### Added
+- `scripts/start.py` now runs `scripts/build_frontend.py` to rebuild the GUI before every launch so the dashboard version always matches the backend before services start.
+
+### Changed
+- Introduced the `sync_frontend_assets()` helper and a regression test (`test/test_start_frontend_sync.py`) to prove the frontend build step is executed during startup.
+
+### Fixed
+- None (automation enhancement).
+
 ## [7.0.4] - 2026-01-29
 
 ### Added

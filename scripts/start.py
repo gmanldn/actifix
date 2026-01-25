@@ -222,6 +222,16 @@ def clean_bytecode_cache() -> None:
         log_success(f"Removed {cleaned_dirs} stale __pycache__ directories")
 
 
+def sync_frontend_assets(project_root: Path) -> None:
+    """Rebuild the frontend assets to match the current version."""
+    log_info("Synchronizing frontend assets via build_frontend.py")
+    try:
+        build_frontend(project_root)
+        log_success("Frontend assets synchronized")
+    except Exception as exc:
+        log_error(f"Frontend build failed: {exc}")
+        raise
+
 def ensure_scaffold() -> None:
     """Create Actifix directories and files if missing."""
     log_info("Initializing Actifix environment...")
@@ -1230,6 +1240,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     if args.ticket_agent:
         total_steps += 1
     total_steps += 1  # frontend step
+    total_steps += 1  # frontend sync step
 
     current_step = 0
 
@@ -1276,6 +1287,15 @@ def main(argv: Optional[list[str]] = None) -> int:
         log_error(f"Frontend directory missing: {FRONTEND_DIR}")
         return 1
     log_success(f"Frontend directory found: {FRONTEND_DIR}")
+
+    # Step 4: Synchronize frontend assets
+    current_step += 1
+    log_step(current_step, total_steps, "Synchronizing frontend assets")
+    try:
+        sync_frontend_assets(ROOT)
+    except Exception as exc:
+        log_error(f"Frontend synchronization failed: {exc}")
+        return 1
 
     # Final port check (should be clean after cleanup_existing_instances)
     if is_port_in_use(args.frontend_port):

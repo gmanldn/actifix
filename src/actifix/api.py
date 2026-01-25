@@ -1899,6 +1899,48 @@ def create_app(
             )
             return jsonify({'error': str(e)}), 500
 
+    @app.route('/api/ingest/sentry', methods=['POST'])
+    def api_ingest_sentry():
+        """
+        Sentry-style error ingestion endpoint.
+
+        Accepts Sentry event format and creates Actifix tickets.
+        Compatible with Sentry SDK error reporting.
+        """
+        try:
+            # Parse Sentry event from request
+            event = request.get_json()
+
+            if not event:
+                return jsonify({'error': 'No event data provided'}), 400
+
+            # Ingest event and create ticket
+            from .ingestion import ingest_sentry_event
+
+            ticket_id = ingest_sentry_event(event)
+
+            if ticket_id:
+                return jsonify({
+                    'success': True,
+                    'ticket_id': ticket_id,
+                    'event_id': event.get('event_id', 'unknown'),
+                }), 201
+            else:
+                # Duplicate or ingestion failed
+                return jsonify({
+                    'success': False,
+                    'reason': 'duplicate_or_failed',
+                    'event_id': event.get('event_id', 'unknown'),
+                }), 200
+
+        except Exception as e:
+            record_error(
+                message=f"Sentry ingestion endpoint failed: {e}",
+                source="api.py:api_ingest_sentry",
+                priority=TicketPriority.P2,
+            )
+            return jsonify({'error': str(e)}), 500
+
     @app.route('/api/cleanup', methods=['POST'])
     def api_cleanup():
         """Run ticket cleanup with retention policies."""

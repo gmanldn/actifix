@@ -353,6 +353,20 @@ modules:
   - core.do_af
   - infra.health
 
+- id: core.ingestion
+  domain: core
+  owner: core
+  summary: Sentry-style error ingestion endpoint for external error reporting
+  entrypoints:
+  - src/actifix/ingestion.py
+  contracts:
+  - accept Sentry event format via HTTP POST
+  - parse and map to Actifix tickets
+  - maintain compatibility with Sentry SDK
+  depends_on:
+  - core.raise_af
+  - infra.logging
+
 - id: core.do_af
   domain: core
   owner: core

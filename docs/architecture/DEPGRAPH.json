@@ -161,6 +161,12 @@
       "label": "diagnostics"
     },
     {
+      "id": "core.ingestion",
+      "domain": "core",
+      "owner": "core",
+      "label": "ingestion"
+    },
+    {
       "id": "core.do_af",
       "domain": "core",
       "owner": "core",
@@ -646,6 +652,16 @@
       "from": "core.diagnostics",
       "to": "infra.health",
       "reason": "core.diagnostics depends on infra.health"
+    },
+    {
+      "from": "core.ingestion",
+      "to": "core.raise_af",
+      "reason": "core.ingestion depends on core.raise_af"
+    },
+    {
+      "from": "core.ingestion",
+      "to": "infra.logging",
+      "reason": "core.ingestion depends on infra.logging"
     },
     {
       "from": "core.do_af",
