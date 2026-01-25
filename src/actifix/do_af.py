@@ -724,6 +724,20 @@ def mark_ticket_complete(
                     "test_results_len": len(test_results),
                 },
             )
+
+            # Send webhook notification if enabled
+            try:
+                from .config import get_config
+                config = get_config()
+                if config.webhook_enabled:
+                    from .webhooks import send_ticket_completed_webhook
+                    updated_ticket = repo.get_ticket(ticket_id)
+                    if updated_ticket:
+                        send_ticket_completed_webhook(updated_ticket)
+            except Exception:
+                # Webhook failures should not block ticket completion
+                pass
+
         return success
 
     except ValueError as e:

@@ -143,6 +143,12 @@
       "label": "agent_voice"
     },
     {
+      "id": "core.webhooks",
+      "domain": "core",
+      "owner": "core",
+      "label": "webhooks"
+    },
+    {
       "id": "core.do_af",
       "domain": "core",
       "owner": "core",
@@ -580,6 +586,21 @@
       "reason": "core.raise_af depends on security.ticket_throttler"
     },
     {
+      "from": "core.raise_af",
+      "to": "core.webhooks",
+      "reason": "core.raise_af depends on core.webhooks"
+    },
+    {
+      "from": "core.webhooks",
+      "to": "infra.logging",
+      "reason": "core.webhooks depends on infra.logging"
+    },
+    {
+      "from": "core.webhooks",
+      "to": "runtime.config",
+      "reason": "core.webhooks depends on runtime.config"
+    },
+    {
       "from": "core.do_af",
       "to": "infra.logging",
       "reason": "core.do_af depends on infra.logging"
@@ -598,6 +619,11 @@
       "from": "core.do_af",
       "to": "infra.persistence.ticket_repo",
       "reason": "core.do_af depends on infra.persistence.ticket_repo"
+    },
+    {
+      "from": "core.do_af",
+      "to": "core.webhooks",
+      "reason": "core.do_af depends on core.webhooks"
     },
     {
       "from": "core.quarantine",

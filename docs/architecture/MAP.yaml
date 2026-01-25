@@ -293,6 +293,7 @@ modules:
   - core.quarantine
   - infra.persistence.ticket_repo
   - security.ticket_throttler
+  - core.webhooks
 
 - id: core.agent_voice
   domain: core
@@ -306,6 +307,20 @@ modules:
   depends_on:
   - core.raise_af
   - infra.persistence.agent_voice_repo
+
+- id: core.webhooks
+  domain: core
+  owner: core
+  summary: Webhook integration for ticket creation and completion events
+  entrypoints:
+  - src/actifix/webhooks.py
+  contracts:
+  - send HTTP POST notifications for ticket events
+  - support multiple webhook URLs with retry logic
+  - sanitize ticket data for external transmission
+  depends_on:
+  - infra.logging
+  - runtime.config
 
 - id: core.do_af
   domain: core
@@ -322,6 +337,7 @@ modules:
   - core.raise_af
   - core.ai_client
   - infra.persistence.ticket_repo
+  - core.webhooks
 
 - id: core.quarantine
   domain: core

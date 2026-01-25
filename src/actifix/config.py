@@ -140,6 +140,10 @@ class ActifixConfig:
     ollama_model: str = "qwen2.5-coder:7b-instruct"  # Default Ollama model
     ai_enabled: bool = True  # AI dispatch enabled by default
 
+    # Webhook Integration
+    webhook_urls: str = ""  # Comma-separated URLs for ticket event notifications
+    webhook_enabled: bool = True  # Webhook dispatch enabled by default
+
 
 def _parse_bool(value: str) -> bool:
     """Parse boolean from string."""
@@ -306,6 +310,9 @@ def load_config(
         ai_model=_get_env_sanitized("ACTIFIX_AI_MODEL", "qwen2.5-coder:7b-instruct", value_type="string"),
         ollama_model=_get_env_sanitized("ACTIFIX_OLLAMA_MODEL", "qwen2.5-coder:7b-instruct", value_type="string"),
         ai_enabled=_parse_bool(_get_env_sanitized("ACTIFIX_AI_ENABLED", "1", value_type="boolean")),
+
+        webhook_urls=_get_env_sanitized("ACTIFIX_WEBHOOK_URLS", "", value_type="string"),
+        webhook_enabled=_parse_bool(_get_env_sanitized("ACTIFIX_WEBHOOK_ENABLED", "1", value_type="boolean")),
     )
     
     # Validate configuration
