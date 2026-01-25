@@ -326,7 +326,7 @@ def run_pytest(
 
         # Fast coverage mode: exclude slow tests and use parallel execution
         if fast_coverage:
-            print("  → Fast coverage mode: excluding slow, heavy integration, and perf tests")
+            print("  → Fast mode: excluding slow, heavy integration, and perf tests (use --full for all)")
             cmd += [
                 "-m",
                 "not slow and not very_slow and not performance and not db and not integration and not concurrent",
@@ -334,16 +334,19 @@ def run_pytest(
             cmd.extend(xdist_args)
         else:
             # Full coverage: run all tests, but still use parallel if available
+            print("  → Full mode: running all tests including slow/integration")
             cmd.extend(xdist_args)
     else:
         # Non-coverage runs can also use fast mode
         if fast_coverage:
+            print("  → Fast mode: excluding slow, heavy integration, and perf tests (use --full for all)")
             cmd += [
                 "-m",
                 "not slow and not very_slow and not performance and not db and not integration and not concurrent",
             ]
             cmd.extend(xdist_args)
         else:
+            print("  → Full mode: running all tests including slow/integration")
             cmd.extend(xdist_args)
 
     if quick:
@@ -406,14 +409,15 @@ def main(argv: Optional[list[str]] = None) -> int:
     parser = argparse.ArgumentParser(description="Actifix test runner")
     quick_group = parser.add_mutually_exclusive_group()
     quick_group.add_argument("--quick", action="store_true", help="Run the quick test subset (default)")
-    quick_group.add_argument("--full", action="store_true", help="Run the full pytest suite")
+    quick_group.add_argument("--full", action="store_true", help="Run the full pytest suite including slow tests")
+    quick_group.add_argument("--slow", action="store_true", help="Include slow/integration tests in the run")
     parser.add_argument("--coverage", action="store_true", help="Include coverage reporting")
     parser.add_argument("--fast-coverage", action="store_true", help="Fast coverage mode (exclude slow tests, use parallel execution)")
     parser.add_argument("--pattern", type=str, help="Pytest -k pattern")
     args = parser.parse_args(argv)
-    
+
     reset_actifix_paths()
-    
+
     reporter, runner, system_summary = run_system_suite()
     plan = system_summary["plan"]
     result = system_summary["result"]
@@ -430,15 +434,18 @@ def main(argv: Optional[list[str]] = None) -> int:
         print("  System test errors:")
         for name in result.error_tests:
             print(f"    - {name}")
-    
+
     quick = True
-    if args.full:
+    if args.full or args.slow:
         quick = False
     elif args.quick:
         quick = True
 
-    # Use fast coverage mode if specified, otherwise use regular coverage
-    use_fast_coverage = args.fast_coverage or (args.coverage and os.getenv("ACTIFIX_FAST_COVERAGE"))
+    # Default: fast mode (exclude slow tests, use parallel)
+    # --full or --slow: include all tests
+    # --fast-coverage: explicit fast coverage mode
+    use_fast_mode = not (args.full or args.slow)
+    use_fast_coverage = args.fast_coverage or use_fast_mode or (args.coverage and os.getenv("ACTIFIX_FAST_COVERAGE"))
     pytest_stage = run_pytest(
         args.coverage,
         quick,
