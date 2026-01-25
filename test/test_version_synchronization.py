@@ -149,6 +149,7 @@ def test_version_endpoint_matches_frontend_ui_version(tmp_path):
             os.chdir(original_cwd)
 
 
+@pytest.mark.slow
 def test_no_hardcoded_old_versions_in_production_files():
     """Test that no old version numbers (5.0.50, 5.0.51, 5.0.52) remain in production files."""
     project_root = Path(__file__).parent.parent

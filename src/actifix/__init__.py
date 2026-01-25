@@ -39,7 +39,31 @@ from .health import get_health, run_health_check, format_health_report
 from .persistence.ticket_cleanup import run_automatic_cleanup, apply_retention_policy, cleanup_test_tickets
 from .persistence.cleanup_config import CleanupConfig, get_cleanup_config
 
-__version__ = "5.0.73"
+
+def _resolve_version() -> str:
+    """Best-effort version resolution for both editable checkouts and installed packages."""
+    try:
+        from pathlib import Path
+        import tomllib
+
+        repo_root = Path(__file__).resolve().parents[2]
+        pyproject = repo_root / "pyproject.toml"
+        if not pyproject.exists():
+            raise FileNotFoundError(pyproject)
+        data = tomllib.loads(pyproject.read_text(encoding="utf-8"))
+        return str(data.get("project", {}).get("version") or "0.0.0")
+    except Exception:
+        pass
+
+    try:
+        from importlib import metadata as importlib_metadata  # py3.8+
+
+        return importlib_metadata.version("actifix")
+    except Exception:
+        return "0.0.0"
+
+
+__version__ = _resolve_version()
 __author__ = "Actifix Framework"
 __description__ = "Generic Error Tracking and Management Framework with AI Integration"
 

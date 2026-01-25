@@ -34,6 +34,7 @@ modules:
   entrypoints:
   - src/actifix/main.py
   - src/actifix/bootstrap.py
+  - src/actifix/thread_cleanup.py
   contracts:
   - ensures environment setup
   - launches core services in correct order

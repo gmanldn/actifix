@@ -214,7 +214,8 @@ def is_port_in_use(port: int) -> bool:
 def start_frontend(port: int) -> subprocess.Popen:
     """Launch the static frontend server."""
     cmd = [sys.executable, "-m", "http.server", str(port)]
-    return subprocess.Popen(cmd, cwd=FRONTEND_DIR, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    serve_dir = FRONTEND_DIR / "dist" if (FRONTEND_DIR / "dist").exists() else FRONTEND_DIR
+    return subprocess.Popen(cmd, cwd=serve_dir, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 def kill_processes_on_port(port: int) -> None:
     """Terminate any processes listening on the given TCP port."""
@@ -628,20 +629,60 @@ def start_version_monitor(
     interval_seconds: float = 60.0,
     stop_event: Optional[threading.Event] = None,
 ) -> threading.Thread:
-    """Monitor pyproject version changes and bounce the frontend when needed."""
+    """Ensure the served frontend stays in sync with pyproject version."""
+
+    def _read_index_asset_version(frontend_dir: Path) -> Optional[str]:
+        index_path = frontend_dir / "index.html"
+        if not index_path.exists():
+            return None
+        try:
+            text = index_path.read_text(encoding="utf-8")
+        except OSError:
+            return None
+        match = re.search(r'window\\.ACTIFIX_ASSET_VERSION\\s*=\\s*["\\\']([^"\\\']+)["\\\']', text)
+        return match.group(1).strip() if match else None
+
+    def _read_app_ui_version(frontend_dir: Path) -> Optional[str]:
+        app_path = frontend_dir / "app.js"
+        if not app_path.exists():
+            return None
+        try:
+            text = app_path.read_text(encoding="utf-8")
+        except OSError:
+            return None
+        match = re.search(r"const\\s+UI_VERSION\\s*=\\s*['\\\"]([^'\\\"]+)['\\\"]", text)
+        return match.group(1).strip() if match else None
 
     def monitor_loop() -> None:
         last_version = read_project_version(project_root)
+        frontend_root = FRONTEND_DIR
+        served_frontend = frontend_root / "dist" if (frontend_root / "dist").exists() else frontend_root
         while True:
             if stop_event and stop_event.is_set():
                 break
             time.sleep(interval_seconds)
             current_version = read_project_version(project_root)
-            if current_version != last_version:
+            index_version = _read_index_asset_version(served_frontend)
+            ui_version = _read_app_ui_version(served_frontend)
+
+            mismatch = False
+            if current_version and index_version and current_version != index_version:
+                mismatch = True
+            if current_version and ui_version and current_version != ui_version:
+                mismatch = True
+
+            if current_version != last_version or mismatch:
                 log_info(
-                    f"Version change detected: "
-                    f"{last_version or 'unknown'} -> {current_version or 'unknown'}"
+                    "Frontend version sync triggered: "
+                    f"pyproject={current_version or 'unknown'} "
+                    f"index={index_version or 'unknown'} "
+                    f"ui={ui_version or 'unknown'}"
                 )
+                try:
+                    build_frontend(project_root)
+                except Exception as exc:
+                    log_warning(f"Frontend rebuild failed during sync monitor: {exc}")
+
                 try:
                     kill_processes_on_port(manager.port)
                 except Exception:
