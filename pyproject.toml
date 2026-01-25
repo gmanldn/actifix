@@ -11,7 +11,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-web = ["flask", "flask-cors"]
+web = ["flask", "flask-cors", "flask-socketio"]
 
 [project.entry-points."actifix.plugins"]
 core = "actifix.plugins.builtin:CorePlugin"

@@ -27,25 +27,33 @@ except ImportError:
     Flask = None
     CORS = None
 
+try:
+    from flask_socketio import SocketIO, emit
+    SOCKETIO_AVAILABLE = True
+except ImportError:
+    SOCKETIO_AVAILABLE = False
+    SocketIO = None
+    emit = None
+
 
 def _ensure_web_dependencies() -> bool:
     """
     Ensure Flask dependencies are installed. Auto-install if missing.
-    
+
     Returns:
         True if dependencies are available, False otherwise.
     """
-    global FLASK_AVAILABLE, Flask, CORS
+    global FLASK_AVAILABLE, SOCKETIO_AVAILABLE, Flask, CORS, SocketIO, emit
 
-    if FLASK_AVAILABLE:
+    if FLASK_AVAILABLE and SOCKETIO_AVAILABLE:
         return True
 
     print("Flask dependencies not found. Installing...")
-    print("Running: pip install flask flask-cors")
+    print("Running: pip install flask flask-cors flask-socketio")
 
     try:
         result = subprocess.run(
-            [sys.executable, "-m", "pip", "install", "flask", "flask-cors"],
+            [sys.executable, "-m", "pip", "install", "flask", "flask-cors", "flask-socketio"],
             capture_output=True,
             text=True,
             check=True,
@@ -53,7 +61,9 @@ def _ensure_web_dependencies() -> bool:
         print("✓ Successfully installed Flask dependencies")
         from flask import Flask, jsonify, request
         from flask_cors import CORS
+        from flask_socketio import SocketIO, emit
         FLASK_AVAILABLE = True
+        SOCKETIO_AVAILABLE = True
         return True
     except subprocess.CalledProcessError as e:
         print(f"✗ Failed to install Flask dependencies: {e}")
@@ -96,6 +106,31 @@ from .modules.registry import (
 # Server start time for uptime calculation
 SERVER_START_TIME = time.time()
 SYSTEM_OWNERS = {"runtime", "infra", "core", "persistence", "testing", "tooling"}
+
+# Global SocketIO instance for real-time updates
+_socketio_instance: Optional["SocketIO"] = None
+
+
+def get_socketio() -> Optional["SocketIO"]:
+    """Get the global SocketIO instance."""
+    return _socketio_instance
+
+
+def emit_ticket_event(event_type: str, ticket_data: dict) -> None:
+    """
+    Emit a ticket event to all connected WebSocket clients.
+
+    Args:
+        event_type: Type of event ('ticket_created', 'ticket_updated', 'ticket_completed', 'ticket_deleted')
+        ticket_data: Ticket data to broadcast
+    """
+    socketio = get_socketio()
+    if socketio is None:
+        return
+    try:
+        socketio.emit(event_type, ticket_data, namespace="/tickets")
+    except Exception:
+        pass  # Silently ignore WebSocket errors
 MODULE_STATUS_SCHEMA_VERSION = "module-statuses.v1"
 MODULE_ACCESS_PUBLIC = "public"
 MODULE_ACCESS_LOCAL_ONLY = "local-only"
@@ -842,7 +877,31 @@ def create_app(
     werkzeug_logger = logging.getLogger('werkzeug')
     werkzeug_logger.setLevel(logging.ERROR)
     CORS(app)  # Enable CORS for frontend
-    
+
+    # Initialize SocketIO for real-time WebSocket updates
+    global _socketio_instance
+    socketio = None
+    if SOCKETIO_AVAILABLE:
+        from flask_socketio import SocketIO
+        socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
+        _socketio_instance = socketio
+        app.extensions["socketio"] = socketio
+
+        @socketio.on("connect", namespace="/tickets")
+        def handle_ticket_connect():
+            """Handle client connection to tickets namespace."""
+            pass
+
+        @socketio.on("disconnect", namespace="/tickets")
+        def handle_ticket_disconnect():
+            """Handle client disconnection from tickets namespace."""
+            pass
+
+        @socketio.on("subscribe", namespace="/tickets")
+        def handle_subscribe(data):
+            """Handle subscription to specific ticket updates."""
+            pass
+
     # Store project root and API binding info in app config
     app.config['PROJECT_ROOT'] = root
     app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0  # Disable static file caching in development
@@ -1067,7 +1126,7 @@ def create_app(
             "script-src": "'self' 'unsafe-inline'",  # Needed for inline scripts in frontend
             "style-src": "'self' 'unsafe-inline'",   # Needed for inline styles in frontend
             "img-src": "'self' data: https:",
-            "connect-src": "'self'",
+            "connect-src": "'self' ws: wss:",  # Allow WebSocket connections
             "font-src": "'self'",
             "object-src": "'none'",
             "base-uri": "'self'",
@@ -1286,6 +1345,15 @@ def create_app(
             summary=summary,
             test_documentation_url=test_documentation_url
         )
+
+        # Emit WebSocket event for ticket completion
+        if result.get('processed') and result.get('ticket_id'):
+            emit_ticket_event('ticket_completed', {
+                'ticket_id': result.get('ticket_id'),
+                'priority': result.get('priority'),
+                'timestamp': datetime.now(timezone.utc).isoformat(),
+            })
+
         return jsonify({
             'processed': result.get('processed', False),
             'ticket_id': result.get('ticket_id'),
@@ -1559,9 +1627,29 @@ def create_app(
         # Check authentication
         if not _check_auth(request):
             return jsonify({'error': 'Authorization required'}), 401
-        
+
         return jsonify({
             'status': 'ok',
+            'timestamp': datetime.now(timezone.utc).isoformat(),
+        })
+
+    @app.route('/api/websocket/status', methods=['GET'])
+    def api_websocket_status():
+        """Return WebSocket availability and connection info."""
+        # Check authentication
+        if not _check_auth(request):
+            return jsonify({'error': 'Authorization required'}), 401
+
+        ws_available = socketio is not None
+        return jsonify({
+            'available': ws_available,
+            'namespace': '/tickets' if ws_available else None,
+            'events': {
+                'ticket_created': 'Emitted when a new ticket is created',
+                'ticket_updated': 'Emitted when a ticket is updated',
+                'ticket_completed': 'Emitted when a ticket is marked complete',
+                'ticket_deleted': 'Emitted when a ticket is deleted',
+            } if ws_available else {},
             'timestamp': datetime.now(timezone.utc).isoformat(),
         })
 
@@ -1718,6 +1806,14 @@ def create_app(
             })
 
             preview = ai_notes[:150] + '...' if len(ai_notes) > 150 else ai_notes
+
+            # Emit WebSocket event for ticket creation
+            emit_ticket_event('ticket_created', {
+                'ticket_id': entry.entry_id,
+                'priority': entry.priority.value,
+                'message': idea[:100],
+                'timestamp': datetime.now(timezone.utc).isoformat(),
+            })
 
             return jsonify({
                 'success': True,
@@ -1915,7 +2011,7 @@ def run_api_server(
 ) -> None:
     """
     Run the API server.
-    
+
     Args:
         host: Host to bind to.
         port: Port to bind to.
@@ -1924,8 +2020,12 @@ def run_api_server(
     """
     app = create_app(project_root, host=host, port=port)
     registry = app.extensions.get("actifix_module_registry")
+    socketio = app.extensions.get("socketio")
     try:
-        app.run(host=host, port=port, debug=debug, threaded=True)
+        if socketio is not None:
+            socketio.run(app, host=host, port=port, debug=debug)
+        else:
+            app.run(host=host, port=port, debug=debug, threaded=True)
     finally:
         if isinstance(registry, ModuleRegistry):
             registry.shutdown()
