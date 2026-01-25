@@ -1,0 +1,111 @@
+*** Begin Patch
+*** Update File: src/actifix/main.py
+@@
+-import argparse
++import argparse
+@@
+ from .raise_af import record_error, enforce_raise_af_only, TicketPriority
+@@
+ from .testing import TestRunner
++import os
+@@
+ def cmd_modules(args: argparse.Namespace) -> int:
+@@
+         record_error(
+             message=f"Module CLI failed ({args.modules_action}): {exc}",
+             source="main.py:cmd_modules",
+             error_type=type(exc).__name__,
+             priority=TicketPriority.P2,
+         )
+         raise
++
++
++def cmd_doctor(args: argparse.Namespace) -> int:
++    """Diagnose Actifix environment and configuration.
++
++    This command checks that essential configuration variables are set, verifies that
++    the Actifix configuration can be loaded, runs a health check, and reports
++    basic ticket statistics. It returns 0 if all diagnostics pass or 1 if any
++    issues are detected.
++    """
++    project_root = Path(args.project_root or Path.cwd())
++    ok = True
++    # Use ActifixContext to ensure environment setup and logging
++    with ActifixContext(project_root=project_root):
++        # Verify ACTIFIX_CHANGE_ORIGIN is correctly set
++        change_origin = os.environ.get("ACTIFIX_CHANGE_ORIGIN")
++        if change_origin != "raise_af":
++            print("✗ ACTIFIX_CHANGE_ORIGIN is not set to 'raise_af'.")
++            print("  Please run: export ACTIFIX_CHANGE_ORIGIN=raise_af")
++            ok = False
++
++        # Attempt to load configuration
++        try:
++            load_config()
++        except Exception as exc:
++            print(f"✗ Failed to load configuration: {exc}")
++            ok = False
++
++        # Run system health check
++        health = run_health_check(print_report=True)
++        if not health.healthy:
++            ok = False
++
++        # Report ticket statistics
++        stats = get_ticket_stats()
++        print(f"\nTickets: total={stats['total']}, open={stats['open']}, completed={stats['completed']}")
++
++    return 0 if ok else 1
+@@ def main(argv: Optional[list[str]] = None) -> int:
+     # Process command
+     process_parser = subparsers.add_parser("process", help="Process pending tickets")
+@@
+     # Modules command
+     modules_parser = subparsers.add_parser("modules", help="Manage module status")
+@@
++    # Doctor command
++    doctor_parser = subparsers.add_parser("doctor", help="Diagnose environment and configuration")
+@@
+     commands = {
+@@
+         "modules": cmd_modules,
++        "doctor": cmd_doctor,
+     }
+*** End Patch
+*** End Patch
+*** Begin Patch
+*** Update File: docs/DEVELOPMENT.md
+@@
+ Other checks:
+ ```bash
+ python3 -m actifix.main test
+ python3 -m actifix.main health
+ python3 test.py --pattern architecture_validation
+ ```
++
++## Doctor command
++
++Actifix includes a `doctor` command to diagnose common environment and configuration issues.
++Running this command will:
++
++- Verify that the `ACTIFIX_CHANGE_ORIGIN` environment variable is set to `raise_af`.
++- Attempt to load the current Actifix configuration and report any errors.
++- Run the built‑in health check and print its report.
++- Summarise open and completed ticket counts.
++
++Usage:
++
++```bash
++python3 -m actifix.main doctor
++```
++
++The command exits with code 0 if all checks pass, or 1 if any issues are detected. Use it as a first step when troubleshooting your development environment.
+*** End Patch
+*** End Patch
+*** Begin Patch
+*** Update File: docs/INDEX.md
+@@
+   - **TEST PERFORMANCE** `TEST_PERFORMANCE_OPTIMIZATION.md` - speed, timeouts, and profiling
++  - **DOCTOR COMMAND** `DEVELOPMENT.md#doctor-command` - diagnose environment and configuration
+*** End Patch
+*** End Patch

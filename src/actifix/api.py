@@ -2224,11 +2224,149 @@ def create_app(
         password = data.get('password', '')
         if not password:
             return jsonify({'valid': False, 'error': 'Password required'}), 400
-        
+
         if _verify_admin_password(password):
             return jsonify({'valid': True})
         else:
             return jsonify({'valid': False, 'error': 'Invalid password'}), 401
+
+    @app.route('/api/schema/tickets', methods=['GET'])
+    def api_schema_tickets():
+        """Export JSON Schema for ticket data structure."""
+        try:
+            schema = {
+                "$schema": "http://json-schema.org/draft-07/schema#",
+                "title": "Actifix Ticket",
+                "description": "Ticket data structure for Actifix error management system",
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "description": "Unique ticket identifier (e.g., ACT-20260125-ABC12)"
+                    },
+                    "priority": {
+                        "type": "string",
+                        "enum": ["P0", "P1", "P2", "P3", "P4"],
+                        "description": "Priority level (P0=critical/1hr, P1=high/4hr, P2=medium/24hr, P3=low/72hr, P4=minimal/1wk)"
+                    },
+                    "error_type": {
+                        "type": "string",
+                        "description": "Type of issue (Feature, BugFix, Refactor, etc.)"
+                    },
+                    "message": {
+                        "type": "string",
+                        "description": "Human-readable ticket message/description"
+                    },
+                    "source": {
+                        "type": "string",
+                        "description": "Source location (file:line or module:function)"
+                    },
+                    "run_label": {
+                        "type": ["string", "null"],
+                        "description": "Runtime environment label (e.g., production-api, test)"
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": ["Open", "In Progress", "Completed"],
+                        "description": "Current ticket status"
+                    },
+                    "priority_level": {
+                        "type": "integer",
+                        "description": "Numeric priority (0=P0, 1=P1, etc.) for sorting"
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "ISO 8601 creation timestamp"
+                    },
+                    "updated_at": {
+                        "type": ["string", "null"],
+                        "format": "date-time",
+                        "description": "ISO 8601 last update timestamp"
+                    },
+                    "stack_trace": {
+                        "type": ["string", "null"],
+                        "description": "Full stack trace if applicable"
+                    },
+                    "ai_remediation_notes": {
+                        "type": ["string", "null"],
+                        "description": "AI-generated analysis and remediation suggestions"
+                    },
+                    "completion_summary": {
+                        "type": ["string", "null"],
+                        "description": "Summary of how ticket was resolved"
+                    },
+                    "documented": {
+                        "type": "boolean",
+                        "description": "Whether the issue is documented"
+                    },
+                    "functioning": {
+                        "type": "boolean",
+                        "description": "Whether the fix is functioning correctly"
+                    },
+                    "tested": {
+                        "type": "boolean",
+                        "description": "Whether the fix has been tested"
+                    },
+                    "completed": {
+                        "type": "boolean",
+                        "description": "Whether the ticket is complete"
+                    }
+                },
+                "required": ["id", "priority", "error_type", "message", "source", "status"]
+            }
+            return jsonify(schema)
+        except Exception as e:
+            record_error(
+                message=f"Failed to export ticket schema: {e}",
+                source="api.py:api_schema_tickets",
+                priority=TicketPriority.P2,
+            )
+            return jsonify({'error': 'Failed to export schema'}), 500
+
+    @app.route('/api/schema/events', methods=['GET'])
+    def api_schema_events():
+        """Export JSON Schema for event data structure."""
+        try:
+            schema = {
+                "$schema": "http://json-schema.org/draft-07/schema#",
+                "title": "Actifix Event",
+                "description": "Event log entry in Actifix system",
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "description": "Unique event identifier"
+                    },
+                    "type": {
+                        "type": "string",
+                        "enum": ["audit", "setup", "error"],
+                        "description": "Event type classification"
+                    },
+                    "message": {
+                        "type": "string",
+                        "description": "Event description"
+                    },
+                    "timestamp": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "ISO 8601 event timestamp"
+                    },
+                    "details": {
+                        "type": ["object", "null"],
+                        "description": "Additional structured event metadata"
+                    }
+                },
+                "required": ["id", "type", "message", "timestamp"]
+            }
+            return jsonify(schema)
+        except Exception as e:
+            record_error(
+                message=f"Failed to export event schema: {e}",
+                source="api.py:api_schema_events",
+                priority=TicketPriority.P2,
+            )
+            return jsonify({'error': 'Failed to export schema'}), 500
 
     return app
 
