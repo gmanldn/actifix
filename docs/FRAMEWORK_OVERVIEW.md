@@ -134,6 +134,7 @@ See `CHANGELOG.md` for full history. Recent highlights:
 
 | Version | Highlights |
 |---------|------------|
+| **6.0.19** (2026-01-25) | **AgentVoice (AgentThoughts)** enforced for modules (info+error stream in `agent_voice` table, capped at 1,000,000 rows). **Start launcher** reports full runtime status and hard-restarts services on version change. |
 | **4.0.49** (2026-01-21) | **ShootyMcShoot module**: React hello world holding page at `/modules/shootymcshoot` (127.0.0.1:8040). Follows ModuleBase pattern with metadata, health endpoint, local-only access. |
 | **4.0.48** (2026-01-18) | **Ideas pane (=¡)**: Submit natural language feature requests/ideas via dashboard. AI analyzes and generates detailed tickets with priority, technical implementation details, success criteria, and remediation notes. Tickets created via `/api/ideas` ’ `ai_client.generate_fix()` ’ `record_error(source='gui_ideas')`. |
 | **4.0.43** (2026-01-21) | Added OpenRouter Grok4 Fast support in AI provider options so the dashboard can pick the high-speed Grok4 endpoint when requested. |

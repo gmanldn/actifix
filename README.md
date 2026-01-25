@@ -3,6 +3,8 @@
 > The framework that tracks and improves itself.
 > Read `AGENTS.md` before making changes.
 
+Note: `CLAUDE.md` is a repo-local symlink to `AGENTS.md` for tool compatibility; treat them as the same instructions.
+
 Actifix captures, prioritizes, and deduplicates production errors. Tickets include rich context for AI copilots, and the framework can monitor its own development to keep regressions visible. Everything is stdlib-first with resilient persistence in `data/actifix.db`.
 
 ## Highlights

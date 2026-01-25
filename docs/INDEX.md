@@ -55,4 +55,4 @@ This index keeps documentation discoverable and aligned with the Actifix workflo
 | MONITORING | Updated | Operational guidance and queries. |
 | TROUBLESHOOTING | Updated | Common issues aligned to actual commands. |
 
-_Last updated: 2026-01-21_
+_Last updated: 2026-01-25_
