@@ -144,6 +144,10 @@ class ActifixConfig:
     webhook_urls: str = ""  # Comma-separated URLs for ticket event notifications
     webhook_enabled: bool = True  # Webhook dispatch enabled by default
 
+    # Completion Hooks
+    completion_hook_scripts: str = ""  # Comma-separated paths to scripts to run after ticket completion
+    completion_hooks_enabled: bool = True  # Completion hooks enabled by default
+
 
 def _parse_bool(value: str) -> bool:
     """Parse boolean from string."""
@@ -313,6 +317,9 @@ def load_config(
 
         webhook_urls=_get_env_sanitized("ACTIFIX_WEBHOOK_URLS", "", value_type="string"),
         webhook_enabled=_parse_bool(_get_env_sanitized("ACTIFIX_WEBHOOK_ENABLED", "1", value_type="boolean")),
+
+        completion_hook_scripts=_get_env_sanitized("ACTIFIX_COMPLETION_HOOK_SCRIPTS", "", value_type="string"),
+        completion_hooks_enabled=_parse_bool(_get_env_sanitized("ACTIFIX_COMPLETION_HOOKS_ENABLED", "1", value_type="boolean")),
     )
     
     # Validate configuration

@@ -149,6 +149,12 @@
       "label": "webhooks"
     },
     {
+      "id": "core.completion_hooks",
+      "domain": "core",
+      "owner": "core",
+      "label": "completion_hooks"
+    },
+    {
       "id": "core.do_af",
       "domain": "core",
       "owner": "core",
@@ -601,6 +607,16 @@
       "reason": "core.webhooks depends on runtime.config"
     },
     {
+      "from": "core.completion_hooks",
+      "to": "infra.logging",
+      "reason": "core.completion_hooks depends on infra.logging"
+    },
+    {
+      "from": "core.completion_hooks",
+      "to": "runtime.config",
+      "reason": "core.completion_hooks depends on runtime.config"
+    },
+    {
       "from": "core.do_af",
       "to": "infra.logging",
       "reason": "core.do_af depends on infra.logging"
@@ -624,6 +640,11 @@
       "from": "core.do_af",
       "to": "core.webhooks",
       "reason": "core.do_af depends on core.webhooks"
+    },
+    {
+      "from": "core.do_af",
+      "to": "core.completion_hooks",
+      "reason": "core.do_af depends on core.completion_hooks"
     },
     {
       "from": "core.quarantine",

@@ -21,7 +21,7 @@ Releasing a new version meant updating each location manually, and it was easy t
    `scripts/build_frontend.py` reads `pyproject.toml` via `get_version_from_pyproject()` and rewrites the `UI_VERSION` constant in `actifix-frontend/app.js`. The same version is also embedded in `actifix-frontend/index.html` via `ACTIFIX_ASSET_VERSION` so the served assets advertise the release number.
 
 3. **Release flow**  
-   During a release, update `pyproject.toml` to the new number (e.g., `7.0.2`), run `python3 scripts/build_frontend.py`, and rebuild the `actifix-frontend` assets. The launcher (`scripts/start.py`) and tests (`test/test_version_synchronization.py`) then confirm all surfaces show the new version and highlight any mismatch.
+-   During a release, update `pyproject.toml` to the new number (e.g., `7.0.4`), run `python3 scripts/build_frontend.py`, and rebuild the `actifix-frontend` assets. The launcher (`scripts/start.py`) and tests (`test/test_version_synchronization.py`) then confirm all surfaces show the new version and highlight any mismatch.
 
 ## Usage
 
@@ -39,11 +39,11 @@ This script:
 
 ### Version display
 
-- The React UI compares the API `/api/version` payload with the hardcoded `UI_VERSION`. When they match (as they should after the build script runs) the version badge shows `v7.0.2`; if not, the UI prompts a reload and records a warning to help catch release drift.
+- The React UI compares the API `/api/version` payload with the hardcoded `UI_VERSION`. When they match (as they should after the build script runs) the version badge shows `v7.0.4`; if not, the UI prompts a reload and records a warning to help catch release drift.
 
 ## Testing
 
-- `python3 -m pytest test/test_version_synchronization.py` validates that `pyproject.toml`, the backend `__version__`, the API `/api/version`, and the frontend `UI_VERSION` all agree on the release string (currently `7.0.2`).
+- `python3 -m pytest test/test_version_synchronization.py` validates that `pyproject.toml`, the backend `__version__`, the API `/api/version`, and the frontend `UI_VERSION` all agree on the release string (currently `7.0.4`).
 - The `@pytest.mark.slow` check in the same file ensures no legacy `5.x` numbers remain in the production files so future builds start clean.
 
 Keeping this doc up to date with every release ensures the release gate stays green and the frontend never drifts from the backend version.

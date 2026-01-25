@@ -6,6 +6,8 @@ All Changes Must Start via Raise_AF
 
 1. **Workflow**: Work directly on `develop` with regular pushes; no per-change branches required.
 1.1 **Readme** Always read the readme
+1.2 **Docs first** Always read `AGENTS.md`, `README.md`, and `docs/INDEX.md` (and any referenced docs) before starting work so every change respects the Actifix rules and architecture.
+1.3 **Actifix rules** Insist on following the Actifix workflow/QA rules for every task—no exceptions.
 3. **Version bump**: Increment version in `pyproject.toml` after every commit
 4. **No plan docs**: Never create `*_PLAN.md`, `ROADMAP.md`, `DESIGN.md` files
 5. **No new documentation files**: Do not create new documentation files (e.g., feature-specific `.md` files). Instead, blend content into existing docs:

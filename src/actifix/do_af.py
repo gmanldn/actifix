@@ -738,6 +738,31 @@ def mark_ticket_complete(
                 # Webhook failures should not block ticket completion
                 pass
 
+            # Execute completion hooks if enabled
+            try:
+                from .config import get_config
+                config = get_config()
+                if config.completion_hooks_enabled:
+                    from .completion_hooks import execute_completion_hooks
+                    updated_ticket = repo.get_ticket(ticket_id)
+                    if updated_ticket:
+                        hook_results = execute_completion_hooks(updated_ticket)
+                        if hook_results.get("hooks_failed", 0) > 0:
+                            log_event(
+                                "COMPLETION_HOOKS_PARTIAL_FAILURE",
+                                f"Some completion hooks failed for ticket {ticket_id}",
+                                ticket_id=ticket_id,
+                                extra=hook_results,
+                            )
+            except Exception as e:
+                # Hook failures should not block ticket completion
+                log_event(
+                    "COMPLETION_HOOKS_ERROR",
+                    f"Error executing completion hooks: {e}",
+                    ticket_id=ticket_id,
+                    extra={"error": str(e)},
+                )
+
         return success
 
     except ValueError as e:

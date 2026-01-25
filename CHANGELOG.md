@@ -13,6 +13,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [7.0.4] - 2026-01-29
+
+### Added
+- Reinforced the AGENTS workflow so every agent must read the README, AGENTS, and `docs/INDEX.md` before touching the code, ensuring Actifix rules are obeyed before tasks begin.
+
+### Changed
+- Updated `AGENTS.md` to insist on obeying the Actifix rules and on reading the core documentation prior to work, with the release history/table now noting the strengthened guardrails.
+
+### Fixed
+- None (boilerplate release for workflow enforcement).
+
 ## [7.0.2] - 2026-01-28
 
 ### Added

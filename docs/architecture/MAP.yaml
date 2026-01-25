@@ -322,6 +322,20 @@ modules:
   - infra.logging
   - runtime.config
 
+- id: core.completion_hooks
+  domain: core
+  owner: core
+  summary: Completion hooks for running custom scripts after ticket completion
+  entrypoints:
+  - src/actifix/completion_hooks.py
+  contracts:
+  - execute user-defined scripts in safe mode with timeout
+  - pass ticket data via environment variables
+  - log execution results via centralized logging
+  depends_on:
+  - infra.logging
+  - runtime.config
+
 - id: core.do_af
   domain: core
   owner: core
@@ -338,6 +352,7 @@ modules:
   - core.ai_client
   - infra.persistence.ticket_repo
   - core.webhooks
+  - core.completion_hooks
 
 - id: core.quarantine
   domain: core

@@ -161,6 +161,7 @@ See `CHANGELOG.md` for full history. Recent highlights:
 
 | Version | Highlights |
 |---------|------------|
+| **7.0.4** (2026-01-29) | Workflow enforcement release that now requires agents to read the README, AGENTS, and `docs/INDEX.md` (plus referenced docs) before making changes, keeping Actifix rules first. |
 | **7.0.2** (2026-01-28) | Patch release that makes `scripts/start.py` aggressively clean up stale Actifix processes and compiled bytecode before every launch so the runtime always begins from a clean slate. |
 | **7.0.1** (2026-01-27) | Patch release that keeps the version-sync story aligned (docs, assets, UI/API) while capturing the latest release workflow content before the next milestone. |
 | **7.0.0** (2026-01-26) | Big-point release aligning API and UI versions with refreshed release notes, synchronizing the version sync guidance, and keeping the screenscan/status story front-and-center before unlocking the next milestone. |
