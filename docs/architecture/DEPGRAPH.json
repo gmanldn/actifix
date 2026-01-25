@@ -131,6 +131,12 @@
       "label": "ticket_repo"
     },
     {
+      "id": "infra.metrics",
+      "domain": "infra",
+      "owner": "infra",
+      "label": "metrics"
+    },
+    {
       "id": "core.raise_af",
       "domain": "core",
       "owner": "core",
@@ -1232,6 +1238,26 @@
       "from": "core.agent_voice",
       "to": "infra.persistence.agent_voice_repo",
       "reason": "core.agent_voice depends on infra.persistence.agent_voice_repo"
+    },
+    {
+      "from": "infra.metrics",
+      "to": "infra.logging",
+      "reason": "infra.metrics depends on infra.logging"
+    },
+    {
+      "from": "infra.metrics",
+      "to": "runtime.state",
+      "reason": "infra.metrics depends on runtime.state"
+    },
+    {
+      "from": "infra.metrics",
+      "to": "infra.persistence.ticket_repo",
+      "reason": "infra.metrics depends on infra.persistence.ticket_repo"
+    },
+    {
+      "from": "infra.metrics",
+      "to": "infra.health",
+      "reason": "infra.metrics depends on infra.health"
     }
   ]
 }

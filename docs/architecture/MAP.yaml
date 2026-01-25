@@ -278,6 +278,22 @@ modules:
   - infra.persistence.database
   - core.raise_af
 
+- id: infra.metrics
+  domain: infra
+  owner: infra
+  summary: Prometheus-compatible metrics export covering tickets, health, and storage status
+  entrypoints:
+  - src/actifix/metrics.py
+  contracts:
+  - expose ticket/priority counts and completion stats via Prometheus exposition format
+  - surface health/storage gauges and generation timestamps
+  - emit log events when metrics collection fails
+  depends_on:
+  - infra.logging
+  - runtime.state
+  - infra.persistence.ticket_repo
+  - infra.health
+
 - id: core.raise_af
   domain: core
   owner: core
