@@ -30,3 +30,12 @@ def test_header_and_nav_use_shared_tokens():
     assert "padding: 0 var(--spacing-xl)" in content
     assert "--nav-icon-size" in content
     assert "height: var(--nav-item-height)" in content
+
+
+def test_metric_tiles_use_updated_layout():
+    """Metric tiles should use the shared gaps and expose the new tag class."""
+    content = BASE_CSS_PATH.read_text(encoding="utf-8")
+    assert "metric-tile" in content
+    assert "gap: var(--spacing-sm)" in content
+    assert "min-height: 160px" in content
+    assert "metric-tile-tag" in content

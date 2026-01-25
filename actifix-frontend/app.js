@@ -8,7 +8,7 @@ const { useState, useEffect, useRef, createElement: h } = React;
 
 // API Configuration
 const API_BASE = 'http://localhost:5001/api';
-const UI_VERSION = '6.0.27';
+const UI_VERSION = '6.0.28';
 const REFRESH_INTERVAL = 5000;
 const LOG_REFRESH_INTERVAL = 3000;
 const TICKET_REFRESH_INTERVAL = 4000;
@@ -503,7 +503,7 @@ const MetricTile = ({ label, value, subvalue, icon, color, trend }) => {
     ),
     h('div', { className: 'metric-tile-value', style: color ? { color } : {} }, value),
     subvalue && h('div', { className: 'metric-tile-subvalue' }, subvalue),
-    trend && h('div', { className: 'metric-tile-trend' }, trend)
+    trend && h('div', { className: 'metric-tile-tag' }, trend)
   );
 };
 
