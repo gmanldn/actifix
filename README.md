@@ -152,6 +152,7 @@ Agents sync via git pull/push after commits.
 
 ### Last-minute version check
 Before your final commit or before bumping `pyproject.toml` (or any other version marker), fetch the latest `develop` from the remote, verify the remote version still matches your baseline, and only then increment/push. This last-minute sync prevents agents from stepping on each other's work when versions change concurrently.
+If the remote version has already advanced, merge or rebase the incoming work, rerun `scripts/build_frontend.py`, and ensure the asset version constants still align before bumping/pushing again.
 
 ## Documentation
 - `docs/INDEX.md` - documentation hub

@@ -8,7 +8,7 @@ All Changes Must Start via Raise_AF
 1.1 **Readme** Always read the readme
 1.2 **Docs first** Always read `AGENTS.md`, `README.md`, and `docs/INDEX.md` (and any referenced docs) before starting work so every change respects the Actifix rules and architecture.
 1.3 **Actifix rules** Insist on following the Actifix workflow/QA rules for every task—no exceptions.
-1.4 **Last-minute sync** Immediately before committing or bumping the version (including `pyproject.toml`), fetch the current `develop` and confirm the latest version/state hasn't changed; resolve any incoming updates before you increment or push to avoid colliding with other agents.
+1.4 **Last-minute sync** Immediately before committing or bumping the version (including `pyproject.toml`), fetch the current `develop`, confirm the remote `pyproject.toml` (and frontend asset version constants) still match what you plan to bump, and resolve or merge any incoming changes before you increment or push to avoid colliding with other agents.
 3. **Version bump**: Increment version in `pyproject.toml` after every commit
 4. **No plan docs**: Never create `*_PLAN.md`, `ROADMAP.md`, `DESIGN.md` files
 5. **No new documentation files**: Do not create new documentation files (e.g., feature-specific `.md` files). Instead, blend content into existing docs:
