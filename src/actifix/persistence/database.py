@@ -15,11 +15,14 @@ import contextlib
 import os
 import json
 import sqlite3
+import sys
 import threading
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional, List, Dict, Any, Iterator
+
+from ..log_utils import log_event
 
 # Schema version for migrations
 SCHEMA_VERSION = 6
@@ -512,8 +515,13 @@ class DatabasePool:
                 # Non-fatal: columns may already exist
                 try:
                     conn.rollback()
-                except Exception:
-                    pass
+                except Exception as rollback_error:
+                    log_event(
+                        "DATABASE_ROLLBACK_FAILED",
+                        f"Failed to rollback migration v2->v3: {rollback_error}",
+                        extra={"migration": "v2_to_v3", "error": str(rollback_error)},
+                    )
+                    print(f"WARNING: Database migration rollback failed: {rollback_error}", file=sys.stderr)
 
         # Migration from v3 to v4: Add soft delete support
         if from_version <= 3 and to_version >= 4:
@@ -540,8 +548,13 @@ class DatabasePool:
             except sqlite3.Error as e:
                 try:
                     conn.rollback()
-                except Exception:
-                    pass
+                except Exception as rollback_error:
+                    log_event(
+                        "DATABASE_ROLLBACK_FAILED",
+                        f"Failed to rollback migration v3->v4: {rollback_error}",
+                        extra={"migration": "v3_to_v4", "error": str(rollback_error)},
+                    )
+                    print(f"WARNING: Database migration rollback failed: {rollback_error}", file=sys.stderr)
 
         # Migration from v5 to v6: Add agent_voice table
         if from_version <= 5 and to_version >= 6:
@@ -592,8 +605,13 @@ class DatabasePool:
             except sqlite3.Error as e:
                 try:
                     conn.rollback()
-                except Exception:
-                    pass
+                except Exception as rollback_error:
+                    log_event(
+                        "DATABASE_ROLLBACK_FAILED",
+                        f"Failed to rollback migration v4->v5: {rollback_error}",
+                        extra={"migration": "v4_to_v5", "error": str(rollback_error)},
+                    )
+                    print(f"WARNING: Database migration rollback failed: {rollback_error}", file=sys.stderr)
 
         # Update version tracking
         conn.execute(
@@ -853,6 +871,15 @@ def log_database_audit(
         return True
     except Exception as e:
         # Log audit failure but don't raise to avoid disrupting main operations
-        import sys
+        log_event(
+            "DATABASE_AUDIT_FAILED",
+            f"Failed to log database audit: {e}",
+            extra={
+                "table": table_name,
+                "operation": operation,
+                "record_id": record_id,
+                "error": str(e),
+            },
+        )
         print(f"Failed to log database audit: {e}", file=sys.stderr)
         return False

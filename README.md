@@ -150,6 +150,9 @@ python3 Do_AF.py 1  # or fix manually per AGENTS.md
 
 Agents sync via git pull/push after commits.
 
+### Last-minute version check
+Before your final commit or before bumping `pyproject.toml` (or any other version marker), fetch the latest `develop` from the remote, verify the remote version still matches your baseline, and only then increment/push. This last-minute sync prevents agents from stepping on each other's work when versions change concurrently.
+
 ## Documentation
 - `docs/INDEX.md` - documentation hub
 - `docs/QUICKSTART.md` - hands-on setup
