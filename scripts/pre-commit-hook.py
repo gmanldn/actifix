@@ -15,6 +15,7 @@ from pathlib import Path
 import re
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+SRC_ROOT = REPO_ROOT / "src"
 
 def get_staged_files():
     """Get list of staged files."""
@@ -80,6 +81,83 @@ def _read_version_from_pyproject(pyproject_path: Path) -> str | None:
     match = re.search(r'^version\\s*=\\s*\"([^\"]+)\"', content, re.MULTILINE)
     return match.group(1) if match else None
 
+
+def _parse_version_tuple(version: str) -> tuple[int, int, int] | None:
+    match = re.match(r"^(\\d+)\\.(\\d+)\\.(\\d+)$", version.strip())
+    if not match:
+        return None
+    return tuple(int(part) for part in match.groups())
+
+
+def _read_remote_version() -> str | None:
+    fetch = subprocess.run(
+        ["git", "fetch", "origin", "develop"],
+        cwd=str(REPO_ROOT),
+        capture_output=True,
+        text=True,
+    )
+    if fetch.returncode != 0:
+        print(f"⚠️  Warning: git fetch failed: {fetch.stderr.strip()}")
+    result = subprocess.run(
+        ["git", "show", "origin/develop:pyproject.toml"],
+        cwd=str(REPO_ROOT),
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        return None
+    match = re.search(r'^version\\s*=\\s*\"([^\"]+)\"', result.stdout, re.MULTILINE)
+    return match.group(1) if match else None
+
+
+def _write_version_to_pyproject(pyproject_path: Path, new_version: str) -> bool:
+    try:
+        sys.path.insert(0, str(SRC_ROOT))
+        from actifix.log_utils import atomic_write
+    except Exception as exc:
+        print(f"✗ Failed to load atomic_write: {exc}")
+        return False
+
+    content = pyproject_path.read_text(encoding="utf-8")
+    updated = re.sub(
+        r'version\\s*=\\s*\"(\\d+)\\.(\\d+)\\.(\\d+)\"',
+        f'version = "{new_version}"',
+        content,
+        count=1,
+    )
+    atomic_write(pyproject_path, updated)
+    return True
+
+
+def _sync_remote_version_guard(pyproject_path: Path) -> bool:
+    local_version = _read_version_from_pyproject(pyproject_path)
+    remote_version = _read_remote_version()
+    if not local_version or not remote_version:
+        return True
+
+    local_tuple = _parse_version_tuple(local_version)
+    remote_tuple = _parse_version_tuple(remote_version)
+    if not local_tuple or not remote_tuple:
+        return True
+
+    if local_tuple >= remote_tuple:
+        return True
+
+    new_version = (remote_tuple[0], remote_tuple[1], remote_tuple[2] + 1)
+    new_version_str = f"{new_version[0]}.{new_version[1]}.{new_version[2]}"
+    print(
+        "✗ Local version is behind origin/develop. "
+        f"Updating to {new_version_str}."
+    )
+    if not _write_version_to_pyproject(pyproject_path, new_version_str):
+        return False
+    if not _run_frontend_sync():
+        print("✗ Frontend sync failed after version bump")
+        return False
+    subprocess.run(["git", "add", str(pyproject_path)], cwd=str(REPO_ROOT))
+    _stage_frontend_version_files()
+    return True
+
 def _read_asset_version(index_path: Path) -> str | None:
     content = index_path.read_text(encoding="utf-8")
     match = re.search(r'ACTIFIX_ASSET_VERSION\\s*=\\s*\"([^\"]+)\"', content)
@@ -139,6 +217,9 @@ def check_version_consistency() -> bool:
 
     if not pyproject.exists():
         return True
+
+    if not _sync_remote_version_guard(pyproject):
+        return False
 
     pyproject_version = _read_version_from_pyproject(pyproject)
     asset_version = _read_asset_version(frontend_index) if frontend_index.exists() else None
