@@ -60,6 +60,7 @@ QUICK_PYTEST_FILES = [
     "test/test_view_agent_thoughts.py",
     "test/test_start_module_surface.py",
     "test/test_start_restart_policy.py",
+    "test/test_agent_voice_module_enforcement.py",
 ]
 
 # Coverage runs should stay representative enough to satisfy the global threshold,

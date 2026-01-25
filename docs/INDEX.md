@@ -10,6 +10,7 @@ This index keeps documentation discoverable and aligned with the Actifix workflo
 - **MODULE CONFIGURATION** `FRAMEWORK_OVERVIEW.md#module-configuration` - module defaults and override schema
 - **MODULE METADATA + HEALTH** `FRAMEWORK_OVERVIEW.md#module-metadata-and-permissions` - module metadata schema and health aggregation.
 - **MODULE LIFECYCLE** `FRAMEWORK_OVERVIEW.md#module-lifecycle-and-helpers` - ModuleBase helpers, ModuleRegistry discovery, and status persistence.
+- **AGENTVOICE (AGENTTHOUGHTS)** `FRAMEWORK_OVERVIEW.md#agentvoice-agentthoughts-review-log` - module info/error review stream in `data/actifix.db`.
 
 ## Operators and support
 - **MONITORING** `MONITORING.md` - health checks, metrics, and alerting

@@ -152,6 +152,21 @@ See `CHANGELOG.md` for full history. Recent highlights:
 - Use Raise_AF, DoAF, or the CLI for ticket lifecycle operations.
 - Configuration is environment-first; see `docs/INSTALLATION.md`.
 
+## AgentVoice (AgentThoughts) Review Log
+
+Actifix maintains an `agent_voice` table (also referred to as "AgentThoughts") inside `data/actifix.db`.
+This is a review/audit stream intended to show what modules and agents are doing over time.
+
+Rules:
+- Every module must emit *informational* AgentVoice rows for key lifecycle events (startup/config/registration).
+- Every module must emit *error* AgentVoice rows when capturing errors (in addition to Raise_AF tickets).
+- Retention is capped at 1,000,000 rows; oldest rows are pruned automatically.
+
+Enforcement points (centralized so coverage is consistent):
+- `ModuleBase.log_gui_init()` emits AgentVoice INFO (best-effort).
+- `ModuleBase.record_module_error()` emits AgentVoice ERROR (best-effort) and then calls `record_error()` to persist the canonical ticket.
+- `actifix.api._register_module_blueprint()` emits AgentVoice INFO/ERROR for module registration outcomes (registered/disabled/failed), so modules are covered even if they don't explicitly call ModuleBase.
+
 ## Roadmap
 1. **Ticket processing**: DoAF reliability and remediation automation.
 2. **Operational tooling**: dashboards, health automation, and alerting.

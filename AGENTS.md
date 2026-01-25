@@ -14,6 +14,7 @@ All Changes Must Start via Raise_AF
    - Update `docs/DEVELOPMENT.md` for development workflow changes
    - Maintain the existing documentation hierarchy
 6. **All errors via raise_af**: Use `actifix.raise_af.record_error()` for all error capture
+6.1 **AgentVoice required**: All modules must emit informational + error rows into the `agent_voice` (AgentThoughts) table for review. Use ModuleBase helpers and/or `actifix.agent_voice.record_agent_voice()` (best-effort; never replace Raise_AF).
 7. **Raise_AF gate**: Set `ACTIFIX_CHANGE_ORIGIN=raise_af` before running Actifix or making changes (enforced)
 8. **Architecture graph first**: Always open `docs/architecture/MAP.yaml` and `docs/architecture/DEPGRAPH.json` before starting work so you understand the canonical module/edge graph, and ensure every change is reflected there before committing
 9. **Rules** 

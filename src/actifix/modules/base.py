@@ -120,6 +120,41 @@ class ModuleBase:
             extra=payload,
             source=f"modules.{self.module_key}:ModuleBase.log_gui_init",
         )
+        # Best-effort AgentVoice (AgentThoughts) capture for review purposes.
+        try:
+            from actifix.agent_voice import record_agent_voice
+
+            record_agent_voice(
+                f"{self.module_id} gui init",
+                agent_id=self.module_id,
+                run_label=self._run_label(),
+                level="INFO",
+                extra=payload,
+            )
+        except Exception:
+            # record_agent_voice already records failures via raise_af; don't block startup.
+            pass
+
+    def record_module_info(
+        self,
+        thought: str,
+        *,
+        run_label: str | None = None,
+        extra: Mapping[str, object] | None = None,
+    ) -> None:
+        """Record a module informational AgentVoice row (best-effort)."""
+        try:
+            from actifix.agent_voice import record_agent_voice
+
+            record_agent_voice(
+                redact_secrets_from_text(thought),
+                agent_id=self.module_id,
+                run_label=self._run_label(run_label),
+                level="INFO",
+                extra=dict(extra) if extra else None,
+            )
+        except Exception:
+            pass
 
     def _run_label(self, override: str | None = None) -> str:
         if override:
@@ -137,6 +172,19 @@ class ModuleBase:
     ) -> None:
         """Record a sanitized module error with a default run label."""
         safe_message = redact_secrets_from_text(message)
+        # Best-effort AgentVoice (AgentThoughts) capture for review purposes.
+        try:
+            from actifix.agent_voice import record_agent_voice
+
+            record_agent_voice(
+                safe_message,
+                agent_id=self.module_id,
+                run_label=self._run_label(run_label),
+                level="ERROR",
+                extra={"source": source, "error_type": error_type},
+            )
+        except Exception:
+            pass
         record_error(
             message=safe_message,
             source=source,

@@ -305,6 +305,23 @@ def _register_module_blueprint(
     """Register a module blueprint with consistent logging and guards."""
     expected_prefix = f"/modules/{module_name}"
     module_id = f"modules.{module_name}"
+
+    def _agent_voice_best_effort(thought: str, *, level: str = "INFO", extra: dict | None = None) -> None:
+        # Modules must feed info/errors into AgentVoice for review. This is best-effort:
+        # failures are captured by raise_af inside record_agent_voice, but we don't block startup.
+        try:
+            from actifix.agent_voice import record_agent_voice
+
+            record_agent_voice(
+                thought,
+                agent_id=module_id,
+                run_label=f"{module_name}-gui",
+                level=level,
+                extra=extra,
+            )
+        except Exception:
+            pass
+
     try:
         if registry and registry.is_disabled(module_id):
             log_event(
@@ -312,6 +329,10 @@ def _register_module_blueprint(
                 f"Skipped disabled module: {module_name}",
                 extra={"module": module_name, "module_id": module_id},
                 source="api.py:_register_module_blueprint",
+            )
+            _agent_voice_best_effort(
+                f"Skipped disabled module: {module_name}",
+                extra={"module": module_name, "module_id": module_id},
             )
             return False
         status_payload = _read_module_status_payload(status_file)
@@ -321,6 +342,10 @@ def _register_module_blueprint(
                 f"Skipped disabled module: {module_name}",
                 extra={"module": module_name, "module_id": module_id},
                 source="api.py:_register_module_blueprint",
+            )
+            _agent_voice_best_effort(
+                f"Skipped disabled module: {module_name}",
+                extra={"module": module_name, "module_id": module_id},
             )
             return False
 
@@ -337,6 +362,11 @@ def _register_module_blueprint(
                 run_label=f"{module_name}-gui",
                 error_type="ModuleMetadataError",
                 priority=TicketPriority.P2,
+            )
+            _agent_voice_best_effort(
+                f"Module metadata invalid for {module_name}: {', '.join(metadata_errors)}",
+                level="ERROR",
+                extra={"module": module_name, "module_id": module_id, "errors": metadata_errors},
             )
             if registry:
                 registry.mark_status(module_id, "error")
@@ -360,6 +390,11 @@ def _register_module_blueprint(
                 run_label=f"{module_name}-gui",
                 error_type="ModuleDependencyError",
                 priority=TicketPriority.P2,
+            )
+            _agent_voice_best_effort(
+                f"Module dependency validation failed for {module_name}: {', '.join(dependency_errors)}",
+                level="ERROR",
+                extra={"module": module_name, "module_id": module_id, "errors": dependency_errors},
             )
             if registry:
                 registry.mark_status(module_id, "error")
@@ -403,6 +438,10 @@ def _register_module_blueprint(
             },
             source="api.py:_register_module_blueprint",
         )
+        _agent_voice_best_effort(
+            f"Registered module blueprint: {module_name}",
+            extra={"module": module_name, "module_id": module_id, "url_prefix": expected_prefix, "module_path": module_path},
+        )
         return True
     except Exception as exc:
         record_error(
@@ -411,6 +450,11 @@ def _register_module_blueprint(
             run_label=f"{module_name}-gui",
             error_type=type(exc).__name__,
             priority=TicketPriority.P2,
+        )
+        _agent_voice_best_effort(
+            f"Module registration failed for {module_name}: {exc}",
+            level="ERROR",
+            extra={"module": module_name, "module_id": module_id, "error_type": type(exc).__name__},
         )
         if registry:
             registry.mark_status(module_id, "error")
