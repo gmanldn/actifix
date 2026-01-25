@@ -47,3 +47,8 @@ def test_restart_process_for_new_version_execs(monkeypatch, tmp_path):
 
     assert called["execv"] is True
 
+
+def test_start_defines_shooty_lock():
+    from scripts import start
+
+    assert hasattr(start, "_SHOOTY_SERVER_LOCK")
