@@ -32,6 +32,7 @@ import webbrowser
 import signal
 import platform
 import atexit
+import shutil
 from pathlib import Path
 from typing import Optional
 from datetime import timedelta
@@ -210,6 +211,16 @@ def clean_bytecode_cache() -> None:
     else:
         log_info("Bytecode cache is clean")
 
+    cleaned_dirs = 0
+    for cache_dir in SRC_DIR.rglob("__pycache__"):
+        try:
+            shutil.rmtree(cache_dir)
+            cleaned_dirs += 1
+        except OSError:
+            pass
+    if cleaned_dirs:
+        log_success(f"Removed {cleaned_dirs} stale __pycache__ directories")
+
 
 def ensure_scaffold() -> None:
     """Create Actifix directories and files if missing."""
@@ -327,6 +338,85 @@ def kill_processes_on_port(port: int) -> None:
         log_success(f"Terminated {killed} process(es)")
 
 
+def _is_process_alive(pid: int) -> bool:
+    """Return True if the PID still exists."""
+    try:
+        os.kill(pid, 0)
+        return True
+    except OSError:
+        return False
+
+
+def _force_terminate_pid(pid: int) -> bool:
+    """Try to terminate a PID gracefully, escalate to SIGKILL if needed."""
+    system = platform.system()
+    try:
+        if system == "Windows":
+            subprocess.run(["taskkill", "/F", "/PID", str(pid)], check=True, capture_output=True, timeout=10)
+        else:
+            os.kill(pid, signal.SIGTERM)
+            time.sleep(0.15)
+            if _is_process_alive(pid):
+                os.kill(pid, signal.SIGKILL)
+        log_info(f"Terminated PID {pid}")
+        return True
+    except Exception as exc:
+        log_warning(f"Failed to terminate PID {pid}: {exc}")
+        return False
+
+
+def _list_pids_by_pattern(pattern: str) -> list[int]:
+    """Return matching PIDs for a given command pattern."""
+    try:
+        result = subprocess.run(["pgrep", "-f", pattern], capture_output=True, text=True, timeout=10)
+        if result.returncode == 0:
+            return [int(pid.strip()) for pid in result.stdout.splitlines() if pid.strip().isdigit()]
+    except FileNotFoundError:
+        pass
+    except Exception as exc:
+        log_warning(f"Pattern lookup '{pattern}' failed: {exc}")
+    try:
+        result = subprocess.run(["ps", "aux"], capture_output=True, text=True, timeout=10)
+        lines = result.stdout.splitlines()
+        matches: list[int] = []
+        for line in lines:
+            if pattern in line:
+                parts = line.split()
+                if len(parts) > 1 and parts[1].isdigit():
+                    matches.append(int(parts[1]))
+        return matches
+    except Exception:
+        return []
+
+
+def _cleanup_processes_by_pattern(pattern: str, current_pid: int) -> bool:
+    """Kill all processes whose command matches `pattern`, excluding current pid."""
+    killed = 0
+    for pid in _list_pids_by_pattern(pattern):
+        if pid == current_pid:
+            continue
+        if _force_terminate_pid(pid):
+            killed += 1
+    if killed:
+        log_success(f"Cleaned up {killed} lingering '{pattern}' process(es)")
+        return True
+    return False
+
+
+def _cleanup_extra_processes(current_pid: int) -> bool:
+    """Aggressively remove any remaining Actifix-related runners."""
+    patterns = [
+        "scripts/start.py",
+        "python.*actifix",
+        "actifix\\.modules",
+    ]
+    cleaned = False
+    for pattern in patterns:
+        if _cleanup_processes_by_pattern(pattern, current_pid):
+            cleaned = True
+    return cleaned
+
+
 def cleanup_existing_instances() -> None:
     """Kill any existing Actifix processes before starting new ones."""
     log_info("Checking for existing Actifix instances...")
@@ -393,6 +483,9 @@ def cleanup_existing_instances() -> None:
             log_warning(f"Port {port} is in use")
             kill_processes_on_port(port)
             cleaned = True
+
+    if _cleanup_extra_processes(current_pid):
+        cleaned = True
 
     if cleaned:
         log_success("Cleaned up existing instances")
