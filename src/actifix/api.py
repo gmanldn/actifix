@@ -443,6 +443,9 @@ def _register_module_blueprint(
                 app=app,
                 blueprint=blueprint,
             )
+            registry.mark_status(module_id, "active")
+        else:
+            _mark_module_status(status_file, module_id, "active")
         log_event(
             "MODULE_REGISTERED",
             f"Registered module blueprint: {module_name}",

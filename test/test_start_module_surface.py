@@ -38,6 +38,7 @@ def test_start_module_probe_retries_only_on_connection_refused(monkeypatch):
         return False, 0, "timed out"
 
     monkeypatch.setattr(start, "_probe_http_status", fake_probe)
+    monkeypatch.setattr(start, "SLOW_MODULE_PROBE_NAMES", set())
     # Trigger the probe loop by calling announce_api_modules with API ready bypassed.
     monkeypatch.setattr(start, "_wait_for_api_ready", lambda *_args, **_kwargs: True)
     # Replace side-effectful logging/agent voice with no-ops.

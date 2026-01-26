@@ -71,9 +71,10 @@ ENV_POKERTOOL_PORT = "ACTIFIX_POKERTOOL_PORT"
 # Optional API modules we want to surface in startup output.
 API_MODULE_HEALTH_PATHS = {
     "Hollogram": "/modules/hollogram/health",
-    # Note: url_prefix for this module uses a hyphen.
     "Dev_Assistant": "/modules/dev_assistant/health",
 }
+
+SLOW_MODULE_PROBE_NAMES = {"Dev_Assistant", "Hollogram"}
 
 
 def _get_runtime_ports_from_env() -> list[int]:
@@ -595,15 +596,21 @@ def announce_api_modules(host: str, port: int) -> None:
         url = f"{base}{path}"
         # Retry briefly: API thread may have started but not yet accepted connections.
         ok, status, err = False, 0, ""
-        for _ in range(5):
-            ok, status, err = _probe_http_status(url)
+        max_attempts = 8 if name in SLOW_MODULE_PROBE_NAMES else 5
+        timeout = 2.0 if name in SLOW_MODULE_PROBE_NAMES else 0.75
+        for _ in range(max_attempts):
+            ok, status, err = _probe_http_status(url, timeout=timeout)
             if ok:
                 break
             # Retry only when the TCP connection is refused; timeouts typically mean
             # the handler is present but slow (don't stall startup output).
-            if "Connection refused" not in err and "Errno 61" not in err:
-                break
-            time.sleep(0.2)
+            if "Connection refused" in err or "Errno 61" in err:
+                time.sleep(0.2)
+                continue
+            if name in SLOW_MODULE_PROBE_NAMES and ("timed out" in err or "Timeout" in err):
+                time.sleep(0.2)
+                continue
+            break
         if ok and status == 200:
             log_success(f"{name}: OK ({url})")
             record_agent_voice(
@@ -620,7 +627,7 @@ def announce_api_modules(host: str, port: int) -> None:
             log_warning(f"{name}: unreachable ({url}) - {err}")
         hint = None
         if name == "Dev_Assistant":
-            hint = "If missing, install 'requests' and restart."
+            hint = "If missing, ensure Ollama is running on http://localhost:11434."
             log_info(hint)
         record_agent_voice(
             f"{name} module not available",
