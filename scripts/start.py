@@ -596,21 +596,30 @@ def announce_api_modules(host: str, port: int) -> None:
         url = f"{base}{path}"
         # Retry briefly: API thread may have started but not yet accepted connections.
         ok, status, err = False, 0, ""
-        max_attempts = 8 if name in SLOW_MODULE_PROBE_NAMES else 5
-        timeout = 2.0 if name in SLOW_MODULE_PROBE_NAMES else 0.75
-        for _ in range(max_attempts):
-            ok, status, err = _probe_http_status(url, timeout=timeout)
-            if ok:
+        if name in SLOW_MODULE_PROBE_NAMES:
+            deadline = time.monotonic() + 12.0
+            while time.monotonic() < deadline:
+                ok, status, err = _probe_http_status(url, timeout=3.0)
+                if ok:
+                    break
+                if "Connection refused" in err or "Errno 61" in err:
+                    time.sleep(0.3)
+                    continue
+                if "timed out" in err or "Timeout" in err:
+                    time.sleep(0.3)
+                    continue
                 break
-            # Retry only when the TCP connection is refused; timeouts typically mean
-            # the handler is present but slow (don't stall startup output).
-            if "Connection refused" in err or "Errno 61" in err:
-                time.sleep(0.2)
-                continue
-            if name in SLOW_MODULE_PROBE_NAMES and ("timed out" in err or "Timeout" in err):
-                time.sleep(0.2)
-                continue
-            break
+        else:
+            for _ in range(5):
+                ok, status, err = _probe_http_status(url)
+                if ok:
+                    break
+                # Retry only when the TCP connection is refused; timeouts typically mean
+                # the handler is present but slow (don't stall startup output).
+                if "Connection refused" in err or "Errno 61" in err:
+                    time.sleep(0.2)
+                    continue
+                break
         if ok and status == 200:
             log_success(f"{name}: OK ({url})")
             record_agent_voice(
