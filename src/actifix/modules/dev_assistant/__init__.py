@@ -100,7 +100,7 @@ def create_blueprint(
     host: Optional[str] = None,
     port: Optional[int] = None,
     model: Optional[str] = None,
-    url_prefix: Optional[str] = "/modules/dev_assistant",
+    url_prefix: Optional[str] = "/modules/dev-assistant",
 ) -> "Blueprint":
     """Create and return the Flask blueprint for the DevAssistant module.
 
