@@ -124,8 +124,35 @@ def _normalize_completion_file_entry(entry: str) -> str:
     return entry.strip()
 
 
+def _strip_source_suffix(source_path: str) -> str:
+    """
+    Remove extra metadata after the file path (e.g., ``:function``) while
+    preserving Windows drive letters.
+    """
+    if not source_path:
+        return ""
+    sanitized = source_path.strip()
+    if not sanitized:
+        return ""
+
+    last_colon = sanitized.rfind(":")
+    if last_colon == -1:
+        return sanitized
+
+    last_slash = max(sanitized.rfind("/"), sanitized.rfind("\\"))
+
+    # Preserve bare Windows drive references without additional metadata.
+    if len(sanitized) >= 2 and sanitized[1] == ":" and last_colon == 1 and last_slash == -1:
+        return sanitized
+
+    if last_slash >= 0 and last_colon <= last_slash:
+        return sanitized
+
+    return sanitized[:last_colon].rstrip()
+
+
 def _select_completion_files(project_root: Path, source: str) -> list[str]:
-    source_path = (source or "").split(":")[0].strip()
+    source_path = _strip_source_suffix((source or "").split(":")[0])
     candidates = []
     if source_path:
         candidates.append(source_path)
@@ -135,13 +162,16 @@ def _select_completion_files(project_root: Path, source: str) -> list[str]:
         "src/actifix/do_af.py",
     ])
     for candidate in candidates:
-        resolved = (project_root / candidate).resolve()
+        stripped = _strip_source_suffix(candidate)
+        if not stripped:
+            continue
+        resolved = (project_root / stripped).resolve()
         try:
             resolved.relative_to(project_root)
         except ValueError:
             continue
         if resolved.exists():
-            return [candidate]
+            return [str(resolved.relative_to(project_root))]
     return []
 
 

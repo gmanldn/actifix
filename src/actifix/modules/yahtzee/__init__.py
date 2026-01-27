@@ -490,9 +490,16 @@ _HTML_PAGE = """<!doctype html>
       </section>
 
       <section class="card">
+          <input id="sessionCode" type="text" placeholder="e.g. yhatzee-8k2l1p or paste.rs/yhatzee-8k2l1p">
+>>>>>>> Stashed changes:src/actifix/modules/yahtzee/__init__.py
+        </label>
         <h2>Session Sync</h2>
         <label>Session code
           <input id="sessionCode" type="text" placeholder="e.g. yahtzee-8k2l1p or paste.rs/yahtzee-8k2l1p">
+        </label>
+=======
+          <input id="sessionCode" type="text" placeholder="e.g. yhatzee-8k2l1p or paste.rs/yhatzee-8k2l1p">
+>>>>>>> Stashed changes:src/actifix/modules/yhatzee/__init__.py
         </label>
         <div class="session-actions">
           <button id="createSessionBtn" class="button secondary">Create Session</button>
@@ -789,8 +796,15 @@ _HTML_PAGE = """<!doctype html>
       sync.pollTimer = setInterval(pollRemote, sync.pollingMs);
     }
 
+      const generated = `yhatzee-${Math.random().toString(36).slice(2, 8)}`;
+>>>>>>> Stashed changes:src/actifix/modules/yahtzee/__init__.py
+      const input = normalizeSessionCode(sessionCodeInput.value) || generated;
     function createSession() {
       const generated = `yahtzee-${Math.random().toString(36).slice(2, 8)}`;
+      const input = normalizeSessionCode(sessionCodeInput.value) || generated;
+=======
+      const generated = `yhatzee-${Math.random().toString(36).slice(2, 8)}`;
+>>>>>>> Stashed changes:src/actifix/modules/yhatzee/__init__.py
       const input = normalizeSessionCode(sessionCodeInput.value) || generated;
       sync.sessionId = input;
       sync.enabled = true;

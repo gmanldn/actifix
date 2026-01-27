@@ -126,7 +126,15 @@ def resolve_provider_selection(
             label="openrouter_grok4_fast",
         )
 
-    if not normalized or normalized in {
+    if not normalized:
+        return ProviderSelection(
+            provider=None,
+            model=model_value,
+            strict_preferred=False,
+            label="auto",
+        )
+
+    if normalized in {
         "default",
         DEFAULT_FREE_MODEL,
         "free",

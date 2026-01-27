@@ -30,6 +30,7 @@ This index keeps documentation discoverable and aligned with the Actifix workflo
 
 ## Development and testing
 - **DEVELOPMENT GUIDE** `DEVELOPMENT.md` - workflow, quality gates, ticket completion
+- **HIGH-VALUE BACKLOG PLANNING** `DEVELOPMENT.md#high-value-backlog-planning` - how we translate priority HV ideas into implementable deliveries
 - **QUICKDEV** `QUICKDEV.md` - fast module-building workflow
 - **MODULE SCAFFOLDING CLI** `DEVELOPMENT.md#module-cli` - create module skeletons with tests and defaults.
 - **TESTING** `TESTING.md` - test runner, quality gates, and coverage

@@ -9,7 +9,7 @@ const { useState, useEffect, useRef, createElement: h } = React;
 // API Configuration
 // Dynamically construct API_BASE using window.location to match the frontend port
 const API_BASE = `${window.location.protocol}//${window.location.hostname}:5001/api`;
-const UI_VERSION = '7.0.45';
+const UI_VERSION = '7.0.46';
 const REFRESH_INTERVAL = 5000;
 const LOG_REFRESH_INTERVAL = 3000;
 const TICKET_REFRESH_INTERVAL = 4000;
@@ -1140,9 +1140,10 @@ const TicketsView = () => {
             selectedTicket.completion_summary && h('div', { style: fieldStyle },
               h('strong', null, 'Summary: '), selectedTicket.completion_summary
             ),
-            selectedTicket.completion_notes && h('div', { style: fieldStyle },
-              h('strong', null, 'Notes: '), selectedTicket.completion_notes
+            selectedTicket.completion_notes && h('div', { style: { ...fieldStyle, fontWeight: 'bold', color: '#10b981', background: 'rgba(16,185,129,0.1)', padding: '8px', borderRadius: '4px', borderLeft: '3px solid #10b981' } },
+              h('strong', null, '📝 Completion Notes: '), selectedTicket.completion_notes
             ),
+
             selectedTicket.test_steps && h('div', { style: fieldStyle },
               h('strong', null, 'Test Steps: '), selectedTicket.test_steps
             ),

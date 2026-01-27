@@ -188,6 +188,17 @@ def _parse_module_rate_limit_overrides(raw: str) -> dict[str, dict[str, int]]:
     return overrides
 
 
+def _resolve_docs_root(project_root: Path) -> Path:
+    docs_root = project_root / "docs" / "architecture"
+    if docs_root.exists():
+        return project_root
+    fallback_root = Path(__file__).resolve().parents[2]
+    fallback_docs = fallback_root / "docs" / "architecture"
+    if fallback_docs.exists():
+        return fallback_root
+    return project_root
+
+
 def _parse_map_dependencies(project_root: Path) -> set[tuple[str, str]]:
     """Parse MAP.yaml to build module dependency edges as a fallback."""
     map_path = project_root / "docs" / "architecture" / "MAP.yaml"
@@ -261,14 +272,15 @@ def _validate_module_metadata(module_name: str, metadata: Optional[dict]) -> lis
 
 
 def _load_depgraph_edges(project_root: Path) -> set[tuple[str, str]]:
-    depgraph_path = project_root / "docs" / "architecture" / "DEPGRAPH.json"
+    docs_root = _resolve_docs_root(project_root)
+    depgraph_path = docs_root / "docs" / "architecture" / "DEPGRAPH.json"
     if not depgraph_path.exists():
         record_error(
             message="DEPGRAPH.json missing for module dependency validation",
             source="api.py:_load_depgraph_edges",
             priority=TicketPriority.P2,
         )
-        return _parse_map_dependencies(project_root)
+        return _parse_map_dependencies(docs_root)
     try:
         data = json.loads(depgraph_path.read_text(encoding="utf-8"))
         edges = data.get("edges", []) if isinstance(data, dict) else []
@@ -279,7 +291,7 @@ def _load_depgraph_edges(project_root: Path) -> set[tuple[str, str]]:
             source="api.py:_load_depgraph_edges",
             priority=TicketPriority.P2,
         )
-        return _parse_map_dependencies(project_root)
+        return _parse_map_dependencies(docs_root)
 
 
 def _validate_module_dependencies(

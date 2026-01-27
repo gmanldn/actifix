@@ -154,6 +154,18 @@ def check_sla_breaches(paths: Optional[ActifixPaths] = None) -> list[dict]:
     return breaches
 
 
+def get_disk_usage(dir_path: Path) -> Optional[float]:
+    """Get disk usage percentage for directory."""
+    try:
+        stat = os.statvfs(dir_path)
+        total = stat.f_blocks * stat.f_frsize
+        free = stat.f_bavail * stat.f_frsize
+        used_percent = ((total - free) / total) * 100
+        return used_percent
+    except Exception:
+        return None
+
+
 def get_health(paths: Optional[ActifixPaths] = None) -> ActifixHealthCheck:
     """
     Perform comprehensive health check.
@@ -188,6 +200,36 @@ def get_health(paths: Optional[ActifixPaths] = None) -> ActifixHealthCheck:
     except (OSError, PermissionError) as e:
         files_writable = False
         errors.append(f"Cannot write to {paths.base_dir}: {e}")
+    
+    # Disk usage monitoring for .actifix/ and data/
+    disk_threshold_warn = 90.0
+    disk_threshold_crit = 95.0
+    actifix_disk = get_disk_usage(paths.state_dir)
+    data_disk = get_disk_usage(paths.data_dir)
+    
+    if actifix_disk:
+        if actifix_disk > disk_threshold_crit:
+            errors.append(f".actifix/ disk usage critical: {actifix_disk:.1f}%")
+        elif actifix_disk > disk_threshold_warn:
+            warnings.append(f".actifix/ disk usage high: {actifix_disk:.1f}%")
+    
+    if actifix_disk:
+        if actifix_disk > disk_threshold_crit:
+            errors.append(f".actifix/ disk usage critical: {actifix_disk:.1f}%")
+            from .log_utils import log_event
+            log_event("DISK_CRITICAL_ACTIFIX", f".actifix/ usage {actifix_disk:.1f}% >95%", priority="P1")
+        elif actifix_disk > disk_threshold_warn:
+            warnings.append(f".actifix/ disk usage high: {actifix_disk:.1f}%")
+    
+    if data_disk:
+        if data_disk > disk_threshold_crit:
+            errors.append(f"data/ disk usage critical: {data_disk:.1f}%")
+            from .log_utils import log_event
+            log_event("DISK_CRITICAL_DATA", f"data/ usage {data_disk:.1f}% >95%", priority="P1")
+        elif data_disk > disk_threshold_warn:
+            warnings.append(f"data/ disk usage high: {data_disk:.1f}%")
+
+
     
     # Get ticket stats
     stats = get_ticket_stats(paths)

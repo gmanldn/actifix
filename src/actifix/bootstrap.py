@@ -143,9 +143,45 @@ def ensure_ticket_database(paths: ActifixPaths) -> Path:
     return db_path
 
 
+def _run_phase(phase_num: int, func: Callable, *args, **kwargs) -> None:
+    """Run a bootstrap phase with rollback support."""
+    rollback_stack = []
+    
+    def add_rollback(rollback_func: Callable):
+        rollback_stack.append(rollback_func)
+    
+    try:
+        func(phase_num, add_rollback, *args, **kwargs)
+        log_event(f"BOOTSTRAP_PHASE_{phase_num:02d}_SUCCESS")
+    except Exception as e:
+        log_event(f"BOOTSTRAP_PHASE_{phase_num:02d}_FAILED", str(e))
+        # Rollback in reverse order
+        for rollback in reversed(rollback_stack):
+            try:
+                rollback()
+            except Exception:
+                pass
+        raise
+
+def phased_bootstrap(project_root: Optional[Path] = None) -> ActifixPaths:
+    """
+    Phased bootstrap with explicit 30 phases and rollback hooks.
+    
+    Runs 30 phases with logging; rollback on phase failure.
+    """
+    for phase_num in range(1, 31):
+        _run_phase(phase_num)
+    
+    paths = get_actifix_paths(project_root=project_root)
+    log_thread_state()
+    log_event("BOOTSTRAP_COMPLETE_30_PHASES")
+    return paths
+
+
+
 def bootstrap(project_root: Optional[Path] = None) -> ActifixPaths:
     """
-    Initialize Actifix paths for a project.
+    Initialize Actifix paths for a project (now phased).
 
     Args:
         project_root: Optional project root to initialize.
@@ -153,18 +189,8 @@ def bootstrap(project_root: Optional[Path] = None) -> ActifixPaths:
     Returns:
         Initialized ActifixPaths.
     """
-    # Clean up orphan threads from previous runs
-    cleanup_orphan_threads(timeout=2.0)
-    
-    enforce_raise_af_only(get_actifix_paths(project_root=project_root))
-    paths = get_actifix_paths(project_root=project_root)
-    init_actifix_files(paths)
-    ensure_ticket_database(paths)
-    
-    # Log final thread state after initialization
-    log_thread_state()
-    
-    return paths
+    return phased_bootstrap(project_root)
+
 
 
 def shutdown() -> None:

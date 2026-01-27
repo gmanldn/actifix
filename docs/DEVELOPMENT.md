@@ -184,6 +184,17 @@ the API server and static host start; the built bundle is gitignored.
 - Update `docs/INDEX.md` any time sections move.
 - Avoid new standalone documentation files; merge into existing guides.
 
+## High-value backlog planning
+
+The high-value idea queue currently holds P0 tickets such as `ACT-20260125-F0EA2` (saved filters/views), `ACT-20260125-AAD9E` (quick ticket/module search), `ACT-20260125-AA866` (recent activity feed), `ACT-20260125-2DD93` (severity badges and SLA timers), and several module SDK/experience requests (performance budgets, upgrade checklists, validators, testing examples, and scaffolding guidance). Treat this stream as an established backlog:
+
+1. **Capture clarity** – For each HV ticket, record the intended behavior via `actifix.record_error(...)` (Raise_AF) if you need additional context, referencing the existing idea ID and describing any probing you've done.
+2. **Break it down** – Draft a short spec in an existing doc (e.g., `docs/FRAMEWORK_OVERVIEW.md#module-configuration` or the relevant section of this guide) explaining how the feature interacts with the module/UI/AI surfaces, the data flow, and the required validations.
+3. **Plan outcomes** – Identify the code paths, tests, and documentation updates needed for each piece so that DoAF can close its completion gates without manual intervention. Link those efforts back to the HV ticket in the completion notes and include the involved files (per the completion gating rules above).
+4. **Track progress** – Update this section or the relevant doc when you convert an HV idea into concrete commits so agents and humans can see what is next in the queue without scanning the entire ticket list.
+
+This approach keeps the priority lane lean, ensures every HV improvement has traceable requirements, and lets DoAF/agents focus on implementing rather than guessing what belongs in `Files:` or `Implementation:`.
+
 ## Daemon Mode (macOS)
 To run Actifix persistently as a user daemon (auto-start on login, auto-restart if crashed):
 
