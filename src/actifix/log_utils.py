@@ -297,22 +297,30 @@ def log_event(
             except Exception:
                 extra_json = str(extra)
 
-        # Log to database (independent try-except to not block file logging)
+        # Non-blocking background logging to DB event repository
+        def _background_db_log():
+            try:
+                from .persistence.event_repo import get_event_repository
+                repo = get_event_repository()
+                repo.log_event(
+                    event_type=event_type,
+                    message=message,
+                    ticket_id=ticket_id,
+                    correlation_id=correlation_id,
+                    extra_json=extra_json,
+                    source=source,
+                    level=level,
+                )
+            except Exception:
+                pass
+
         try:
-            from .persistence.event_repo import get_event_repository
-            repo = get_event_repository()
-            repo.log_event(
-                event_type=event_type,
-                message=message,
-                ticket_id=ticket_id,
-                correlation_id=correlation_id,
-                extra_json=extra_json,
-                source=source,
-                level=level,
-            )
+            executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="actifix_log")
+            executor.submit(_background_db_log)
+            executor.shutdown(wait=False)
         except Exception:
-            # Silently fail database logging to not block file logging
             pass
+
 
     except Exception:
         # Silently fail to avoid recursive logging errors

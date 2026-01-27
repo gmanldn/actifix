@@ -115,6 +115,36 @@ Override example:
 }
 ```
 
+### Module config schema example
+
+`ACTIFIX_MODULE_CONFIG_OVERRIDES` receives a JSON object where each top-level key is the override identifier listed in the table above and each value is a dictionary of module-specific settings. Actifix merges those dictionaries into each module's defaults during startup, so you can tweak hosts, ports, feature flags, logging, or any other per-module option without editing Python modules directly.
+
+Example payload (line breaks just for readability):
+
+```json
+{
+  "yahtzee": {
+    "host": "127.0.0.2",
+    "port": 9101,
+    "enabled": true,
+    "logging": {"level": "debug"}
+  },
+  "superquiz": {
+    "host": "127.0.0.1",
+    "port": 9103,
+    "extra_headers": {"x-agent": "true"}
+  }
+}
+```
+
+Set it in the environment or a config file (the parser stores the JSON string on `ActifixConfig.module_config_overrides_json`):
+
+```bash
+export ACTIFIX_MODULE_CONFIG_OVERRIDES='{"yahtzee": {"enabled": false}}'
+```
+
+The override dictionary is merged after the module loader reads `MODULE_DEFAULTS` so modules continue to rely on the shared sanitize/override helpers described elsewhere in the docs.
+
 Launching `scripts/start.py` now brings the PokerTool service online alongside the other modules. Use `--pokertool-port` to move it off `127.0.0.1:8060` or `--no-pokertool` to skip it when you only need the frontend/API stack. The module writes a `POKERTOOL_SERVICE_START` event to Actifix’s structured log repository so you can verify the service published a heartbeat while the launcher is running.
 
 The launcher now starts the standalone SuperQuiz GUI on its configured host/port (default `127.0.0.1:8070`) and probes `/health` to validate Flask and related dependencies before reporting the endpoint alongside the dashboard, backend, and Yahtzee servers. Use `--superquiz-port` to adjust the binding or `--no-superquiz` to skip the extra GUI when you do not need it.
