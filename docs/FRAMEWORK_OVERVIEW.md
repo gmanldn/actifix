@@ -136,6 +136,23 @@ Key points:
 - **Error capture**: Failures emit Raise_AF tickets with `TicketPriority.P2`, keeping the
   ticket stream consistent with Actifix quality expectations.
 
+## External log ingestion
+
+`scripts/ingest_error_logs.py` ingests external logs (plain text or JSONL) and
+creates Actifix tickets from each entry.
+
+Highlights:
+
+- **Formats**: Use `--format auto|plain|jsonl` to control parsing. JSONL supports
+  payloads with `message`, `priority`, `error_type`, `source`, `run_label`, and
+  optional `stack_trace` fields.
+- **Defaults**: `--priority`, `--error-type`, and `--run-label` apply to plain
+  lines and act as fallbacks for JSONL entries missing those fields.
+- **Sources**: `--source-prefix` controls how the default `source` is built
+  (`ingest_error_logs.py:<file>:<line>` or `ingest_error_logs.py:stdin:<line>`).
+- **Safety**: `--no-context` disables file/system context capture, and
+  `--max-lines` caps the number of entries processed.
+
 ## Background ticket agent
 Actifix can run a long-lived ticket agent loop with lease renewal and idle backoff:
 
@@ -183,6 +200,7 @@ See `CHANGELOG.md` for full history. Recent highlights:
 
 | Version | Highlights |
 |---------|------------|
+| **7.0.36** (2026-01-27) | Enhanced external log ingestion with JSONL support, run label overrides, context controls, and tests for the ingest pipeline. |
 | **7.0.33** (2026-01-27) | Added GitHub issue sync capabilities (`scripts/github_issue_sync.py`, new ticket metadata fields, and documentation) so high-value tickets can be tracked in GitHub with recorded issue URLs. |
 | **7.0.32** (2026-01-27) | Added compatibility helpers so `ActifixHealthCheck` exposes `database_ok` and `ActifixPaths` exposes `database_path`, preventing metrics exports or tooling from raising `AttributeError` when those attributes are referenced. |
 | **7.0.7** (2026-01-29) | Launcher now rebuilds the frontend via `scripts/build_frontend.py` before starting services so the GUI matches the backend version every time. The new `test/test_start_frontend_sync.py` ensures the build step fires and surfaces failures cleanly. |

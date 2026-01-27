@@ -13,6 +13,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [7.0.36] - 2026-01-27
+
+### Added
+- Extended `scripts/ingest_error_logs.py` to ingest JSONL payloads, support run labels, override defaults, and cap processing with `--max-lines`, plus new tests and documentation.
+
+### Changed
+- External log ingestion now enables capture explicitly and can emit parse-error tickets when JSONL lines fail validation.
+
 ## [7.0.33] - 2026-01-27
 
 ### Added
