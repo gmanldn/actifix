@@ -28,6 +28,7 @@ This index keeps documentation discoverable and aligned with the Actifix workflo
 ## Development and testing
 - **DEVELOPMENT GUIDE** `DEVELOPMENT.md` - workflow, quality gates, ticket completion
 - **QUICKDEV** `QUICKDEV.md` - fast module-building workflow
+- **MODULE SCAFFOLDING CLI** `DEVELOPMENT.md#module-cli` - create module skeletons with tests and defaults.
 - **TESTING** `TESTING.md` - test runner, quality gates, and coverage
   - **TEST PERFORMANCE** `TEST_PERFORMANCE_OPTIMIZATION.md` - speed, timeouts, and profiling
   - **DOCTOR COMMAND** `DEVELOPMENT.md#doctor-command` - diagnose environment and configuration

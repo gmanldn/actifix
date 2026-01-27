@@ -347,6 +347,12 @@
       "label": "config"
     },
     {
+      "id": "modules.scaffold",
+      "domain": "modules",
+      "owner": "modules",
+      "label": "scaffold"
+    },
+    {
       "id": "modules.superquiz",
       "domain": "modules",
       "owner": "modules",
@@ -1008,6 +1014,11 @@
       "from": "modules.config",
       "to": "core.raise_af",
       "reason": "modules.config depends on core.raise_af"
+    },
+    {
+      "from": "modules.scaffold",
+      "to": "infra.logging",
+      "reason": "modules.scaffold depends on infra.logging"
     },
     {
       "from": "modules.superquiz",

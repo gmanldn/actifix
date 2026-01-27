@@ -301,6 +301,12 @@ This document summarizes the modules in the Actifix architecture. Use `MAP.yaml`
 - Depends on: `infra.logging`, `core.raise_af`
 - Contracts: track module registration and shutdown hooks; emit module lifecycle log events; invoke module `module_register`/`module_unregister` hooks
 
+### modules.scaffold
+- Summary: module scaffolding helpers for CLI workflows
+- Entrypoints: `src/actifix/modules/scaffold.py`
+- Depends on: `infra.logging`
+- Contracts: generate module boilerplate and health tests; enforce module naming and location conventions
+
 ### modules.superquiz
 - Summary: multi-player quiz experience served via the dashboard API
 - Entrypoints: `src/actifix/modules/superquiz/__init__.py`

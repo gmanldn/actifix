@@ -51,3 +51,32 @@ def test_modules_enable_disable(tmp_path, monkeypatch):
 
     data = json.loads(status_file.read_text(encoding="utf-8"))
     assert "modules.yahtzee" in data["statuses"]["active"]
+
+
+def test_modules_create_scaffold(tmp_path, monkeypatch):
+    monkeypatch.setenv("ACTIFIX_CHANGE_ORIGIN", "raise_af")
+    init_actifix_files(get_actifix_paths(project_root=tmp_path))
+
+    code = main.main(
+        ["--project-root", str(tmp_path), "modules", "create", "sample_mod", "--port", "8123"]
+    )
+    assert code == 0
+
+    module_file = tmp_path / "src" / "actifix" / "modules" / "sample_mod" / "__init__.py"
+    test_file = tmp_path / "test" / "test_module_sample_mod.py"
+    assert module_file.exists()
+    assert test_file.exists()
+
+    content = module_file.read_text(encoding="utf-8")
+    assert "modules.sample_mod" in content
+    assert '"port": 8123' in content
+
+    test_content = test_file.read_text(encoding="utf-8")
+    assert "create_module_test_client" in test_content
+    assert "sample_mod" in test_content
+
+    # Ensure create refuses overwriting without force
+    code = main.main(
+        ["--project-root", str(tmp_path), "modules", "create", "sample_mod"]
+    )
+    assert code == 1

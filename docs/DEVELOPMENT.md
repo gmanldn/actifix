@@ -118,6 +118,7 @@ Use the CLI to list and toggle modules:
 python3 -m actifix.main modules list
 python3 -m actifix.main modules disable modules.yahtzee
 python3 -m actifix.main modules enable modules.yahtzee
+python3 -m actifix.main modules create sample_module --port 8123
 ```
 
 ## Module testing harness

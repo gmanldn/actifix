@@ -13,6 +13,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [7.0.37] - 2026-01-27
+
+### Added
+- `actifix.main modules create` scaffolding CLI that generates a new module with entrypoints, defaults, and a corresponding module health test.
+
+### Changed
+- Module CLI docs now cover the new scaffold command and highlight the architecture update reminder.
+
 ## [7.0.36] - 2026-01-27
 
 ### Added

@@ -768,6 +768,17 @@ modules:
   depends_on:
   - runtime.config
   - core.raise_af
+- id: modules.scaffold
+  domain: modules
+  owner: modules
+  summary: Module scaffolding helpers for CLI workflows
+  entrypoints:
+  - src/actifix/modules/scaffold.py
+  contracts:
+  - generate module boilerplate and health tests
+  - enforce module naming and location conventions
+  depends_on:
+  - infra.logging
 - id: modules.superquiz
   domain: modules
   owner: modules

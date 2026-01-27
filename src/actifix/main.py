@@ -176,6 +176,7 @@ def _normalize_module_id(module_id: str) -> str:
 def cmd_modules(args: argparse.Namespace) -> int:
     """List or toggle module status."""
     from .state_paths import get_actifix_paths
+    from .state_paths import init_actifix_files
     from .api import (
         _load_modules,
         _read_module_status_payload,
@@ -200,12 +201,36 @@ def cmd_modules(args: argparse.Namespace) -> int:
                 print(f"{module['name']}: {module['status']}")
             return 0
 
+        action = args.modules_action
+
+        if action == "create":
+            if not args.module_id:
+                raise ValueError("module_id is required for create action")
+            from .modules.scaffold import create_module_scaffold
+
+            init_actifix_files(paths)
+            result = create_module_scaffold(
+                args.module_id,
+                project_root=project_root,
+                host=args.host or "127.0.0.1",
+                port=int(args.port) if args.port else 8100,
+                force=bool(args.force),
+            )
+            print(
+                "Created module scaffold:\n"
+                f"- module: {result['module_key']}\n"
+                f"- module file: {result['module_file']}\n"
+                f"- test file: {result['test_file']}\n"
+                "Reminder: add the module to docs/architecture/MAP.yaml and "
+                "docs/architecture/DEPGRAPH.json before committing module changes."
+            )
+            return 0
+
         if not args.module_id:
             raise ValueError("module_id is required for enable/disable actions")
         module_id = _normalize_module_id(args.module_id)
         status_payload = _read_module_status_payload(status_file)
         statuses = status_payload["statuses"]
-        action = args.modules_action
 
         for key in list(statuses.keys()):
             if module_id in statuses[key]:
@@ -361,13 +386,30 @@ def main(argv: Optional[list[str]] = None) -> int:
     modules_parser = subparsers.add_parser("modules", help="Manage module status")
     modules_parser.add_argument(
         "modules_action",
-        choices=["list", "enable", "disable"],
+        choices=["list", "enable", "disable", "create"],
         help="Module action",
     )
     modules_parser.add_argument(
         "module_id",
         nargs="?",
         help="Module identifier (e.g., modules.yahtzee)",
+    )
+    modules_parser.add_argument(
+        "--host",
+        type=str,
+        default=None,
+        help="Module host (create only)",
+    )
+    modules_parser.add_argument(
+        "--port",
+        type=int,
+        default=None,
+        help="Module port (create only)",
+    )
+    modules_parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Overwrite existing module scaffold (create only)",
     )
     
     # Doctor command

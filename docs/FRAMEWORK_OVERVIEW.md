@@ -200,6 +200,7 @@ See `CHANGELOG.md` for full history. Recent highlights:
 
 | Version | Highlights |
 |---------|------------|
+| **7.0.37** (2026-01-27) | Added a module scaffolding CLI (`actifix.main modules create`) that generates module entrypoints, defaults, and a health test stub for faster module authoring. |
 | **7.0.36** (2026-01-27) | Enhanced external log ingestion with JSONL support, run label overrides, context controls, and tests for the ingest pipeline. |
 | **7.0.33** (2026-01-27) | Added GitHub issue sync capabilities (`scripts/github_issue_sync.py`, new ticket metadata fields, and documentation) so high-value tickets can be tracked in GitHub with recorded issue URLs. |
 | **7.0.32** (2026-01-27) | Added compatibility helpers so `ActifixHealthCheck` exposes `database_ok` and `ActifixPaths` exposes `database_path`, preventing metrics exports or tooling from raising `AttributeError` when those attributes are referenced. |
