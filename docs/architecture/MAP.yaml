@@ -499,6 +499,7 @@ modules:
   - runtime.config
   - infra.logging
   - runtime.state
+  - security.credentials
 
 - id: core.error_taxonomy
   domain: core

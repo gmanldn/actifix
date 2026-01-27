@@ -41,6 +41,21 @@ export ACTIFIX_CHANGE_ORIGIN=raise_af
 python3 -m actifix.main record DocChange "starting work" "docs/DEVELOPMENT.md:1" --priority P3
 ```
 
+## API key management
+Use the secure credential manager helper to store API keys without committing them to disk:
+```bash
+export ACTIFIX_CHANGE_ORIGIN=raise_af
+python3 set_api.py
+```
+
+Keys are stored in the OS credential store (Keychain/Credential Manager) or the encrypted fallback under `.actifix/credentials`. Actifix will read stored keys for OpenRouter/OpenAI/Anthropic/GitHub when environment variables are absent.
+
+For non-interactive Do_AF runs, set a provider/model explicitly (OpenRouter example):
+```bash
+export ACTIFIX_AI_PROVIDER=openrouter_grok4_fast
+export ACTIFIX_AI_MODEL=openrouter/grok-4o-fast
+```
+
 ## Ticket completion quality gate
 Tickets cannot be marked complete without evidence. Required fields:
 - `completion_notes`: min 20 characters (what was done)

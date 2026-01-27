@@ -1269,6 +1269,11 @@
       "from": "infra.metrics",
       "to": "infra.health",
       "reason": "infra.metrics depends on infra.health"
+    },
+    {
+      "from": "core.ai_client",
+      "to": "security.credentials",
+      "reason": "core.ai_client depends on security.credentials"
     }
   ]
 }

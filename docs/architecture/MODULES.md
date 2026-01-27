@@ -146,7 +146,7 @@ This document summarizes the modules in the Actifix architecture. Use `MAP.yaml`
 ### core.ai_client
 - Summary: multi-provider AI integration with fallback chain
 - Entrypoints: `src/actifix/ai_client.py`
-- Depends on: `runtime.config`, `infra.logging`, `runtime.state`
+- Depends on: `runtime.config`, `infra.logging`, `runtime.state`, `security.credentials`
 - Contracts: provider integration; fallback; cost tracking
 
 ### core.error_taxonomy

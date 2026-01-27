@@ -368,6 +368,17 @@ class AIClient:
             return True
         return False
 
+    def _get_stored_credential(self, name: str) -> Optional[str]:
+        try:
+            from .security.credentials import get_credential_manager
+        except Exception:
+            return None
+        try:
+            manager = get_credential_manager()
+            return manager.retrieve_credential(name)
+        except Exception:
+            return None
+
     def _default_model_for(
         self,
         provider: AIProvider,
@@ -705,7 +716,7 @@ class AIClient:
 
     def _call_openrouter(self, prompt: str, ticket_info: Dict[str, Any], model: str) -> AIResponse:
         """Call OpenRouter API (OpenAI-compatible endpoint)."""
-        api_key = os.environ.get("OPENROUTER_API_KEY")
+        api_key = os.environ.get("OPENROUTER_API_KEY") or self._get_stored_credential("openrouter_api_key")
         if not api_key:
             return AIResponse(
                 content="",
@@ -761,7 +772,8 @@ class AIClient:
         preferred_model: Optional[str] = None,
     ) -> AIResponse:
         model = preferred_model or DEFAULT_FREE_MODEL
-        if "openrouter" in model.lower() and os.environ.get("OPENROUTER_API_KEY"):
+        openrouter_key = os.environ.get("OPENROUTER_API_KEY") or self._get_stored_credential("openrouter_api_key")
+        if openrouter_key and ("openrouter" in model.lower() or model == DEFAULT_FREE_MODEL):
             return self._call_openrouter(prompt, ticket_info, model)
         # Non-interactive fallback disables manual prompt
         if os.getenv("ACTIFIX_NONINTERACTIVE") == "1" or not sys.stdin.isatty():
@@ -936,11 +948,19 @@ RESPONSE FORMAT:
 
     def _has_claude_api_key(self) -> bool:
         """Check if Anthropic API key is available."""
-        return bool(os.environ.get("ANTHROPIC_API_KEY") or self.config.ai_api_key)
+        return bool(
+            os.environ.get("ANTHROPIC_API_KEY")
+            or self.config.ai_api_key
+            or self._get_stored_credential("anthropic_api_key")
+        )
 
     def _has_openai_api_key(self) -> bool:
         """Check if OpenAI API key is available."""
-        return bool(os.environ.get("OPENAI_API_KEY") or self.config.ai_api_key)
+        return bool(
+            os.environ.get("OPENAI_API_KEY")
+            or self.config.ai_api_key
+            or self._get_stored_credential("openai_api_key")
+        )
 
     def _is_ollama_available(self) -> bool:
         """Check if Ollama is running locally."""

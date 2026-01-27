@@ -210,6 +210,17 @@ Key points:
 - **Error capture**: Failures emit Raise_AF tickets with `TicketPriority.P2`, keeping the
   ticket stream consistent with Actifix quality expectations.
 
+## Secure API key storage
+
+Use `python3 set_api.py` (or `python3 scripts/set_api.py`) to store provider credentials in the OS credential manager. Keys are never printed back to stdout and are read automatically when environment variables are missing. Supported keys include:
+
+- OpenRouter (`OPENROUTER_API_KEY`)
+- OpenAI (`OPENAI_API_KEY`)
+- Anthropic (`ANTHROPIC_API_KEY`)
+- GitHub issue sync (`ACTIFIX_GITHUB_TOKEN`)
+
+For automated Do_AF usage, set the provider/model (e.g., `ACTIFIX_AI_PROVIDER=openrouter_grok4_fast`) so the dispatcher knows which stored key to use.
+
 ## Alert webhooks (Slack/Discord)
 
 Actifix can emit high-priority alerts to Slack or Discord via generic webhooks.

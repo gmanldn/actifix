@@ -22,6 +22,7 @@ This index keeps documentation discoverable and aligned with the Actifix workflo
 - **GITHUB ISSUE SYNC** `FRAMEWORK_OVERVIEW.md#github-issue-sync` - instructions for publishing tickets to GitHub and tracking the resulting issue metadata.
 - **ALERT WEBHOOKS (SLACK/DISCORD)** `FRAMEWORK_OVERVIEW.md#alert-webhooks-slackdiscord` - configure high-priority alerts for integrations.
 - **EXTERNAL LOG INGESTION** `FRAMEWORK_OVERVIEW.md#external-log-ingestion` - ingest plain/JSONL logs and create tickets with controlled defaults.
+- **SECURE API KEY STORAGE** `FRAMEWORK_OVERVIEW.md#secure-api-key-storage` - store provider keys in the OS credential manager via `set_api.py`.
 
 ## Operators and support
 - **MONITORING** `MONITORING.md` - health checks, metrics, and alerting
