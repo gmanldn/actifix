@@ -9,7 +9,7 @@ const { useState, useEffect, useRef, createElement: h } = React;
 // API Configuration
 // Dynamically construct API_BASE using window.location to match the frontend port
 const API_BASE = `${window.location.protocol}//${window.location.hostname}:5001/api`;
-const UI_VERSION = '7.0.40';
+const UI_VERSION = '7.0.41';
 const REFRESH_INTERVAL = 5000;
 const LOG_REFRESH_INTERVAL = 3000;
 const TICKET_REFRESH_INTERVAL = 4000;
@@ -1862,10 +1862,11 @@ const ModulesView = () => {
               ),
               h('div', { className: 'table-cell actions' },
                 h('button', {
-                  className: `btn-small ${m.status === 'disabled' ? 'btn-success' : 'btn-warning'}`,
-                  onClick: () => handleToggle(m.name),
-                  title: `Toggle ${m.name}`
+                  className: `btn-small ${m.status === 'disabled' ? 'btn-success' : 'btn-warning'} ${['screenscan'].some(c => m.name.toLowerCase().includes(c)) && m.status === 'active' ? 'critical-warning' : ''}`,
+                  onClick: () => handleToggle(m.name, m.status),
+                  title: `Toggle ${m.name}${['screenscan'].some(c => m.name.toLowerCase().includes(c)) ? ' (CRITICAL - screenscan always-on)' : ''}`
                 }, m.status === 'disabled' ? 'Enable' : 'Disable')
+
               ),
               h('div', { className: 'table-cell summary truncate' }, m.summary || '—')
             )
