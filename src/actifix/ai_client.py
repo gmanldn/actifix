@@ -542,7 +542,11 @@ class AIClient:
         try:
             import anthropic  # type: ignore
 
-            api_key = os.environ.get("ANTHROPIC_API_KEY") or self.config.ai_api_key
+            api_key = (
+                os.environ.get("ANTHROPIC_API_KEY")
+                or self.config.ai_api_key
+                or self._get_stored_credential("anthropic_api_key")
+            )
             if not api_key:
                 return AIResponse(
                     content="",
@@ -623,7 +627,11 @@ class AIClient:
         try:
             import openai  # type: ignore
 
-            api_key = os.environ.get("OPENAI_API_KEY") or self.config.ai_api_key
+            api_key = (
+                os.environ.get("OPENAI_API_KEY")
+                or self.config.ai_api_key
+                or self._get_stored_credential("openai_api_key")
+            )
             if not api_key:
                 return AIResponse(
                     content="",
