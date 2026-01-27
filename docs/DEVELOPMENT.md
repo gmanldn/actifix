@@ -121,6 +121,9 @@ python3 -m actifix.main modules enable modules.yahtzee
 python3 -m actifix.main modules create sample_module --port 8123
 ```
 
+**Persistence Safety**: Always use `atomic_write()` from `log_utils` for module state persistence. Raw `open/write` risks corruption under crash/load; atomic helpers ensure durability.
+
+
 ## Module testing harness
 Use the module testing helpers to spin up blueprints in isolation:
 ```python
