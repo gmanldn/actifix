@@ -13,12 +13,12 @@ def test_module_registration_failure_marks_error(tmp_path, monkeypatch):
 
     monkeypatch.setenv("ACTIFIX_CHANGE_ORIGIN", "raise_af")
 
-    import actifix.modules.yhatzee as yhatzee
+    import actifix.modules.yahtzee as yahtzee
 
     def boom(*_args, **_kwargs):
         raise RuntimeError("boom")
 
-    monkeypatch.setattr(yhatzee, "create_blueprint", boom)
+    monkeypatch.setattr(yahtzee, "create_blueprint", boom)
 
     app = api.create_app(project_root=tmp_path)
     assert app is not None
@@ -27,4 +27,4 @@ def test_module_registration_failure_marks_error(tmp_path, monkeypatch):
     assert status_file.exists()
 
     data = json.loads(status_file.read_text(encoding="utf-8"))
-    assert "modules.yhatzee" in data["statuses"]["error"]
+    assert "modules.yahtzee" in data["statuses"]["error"]

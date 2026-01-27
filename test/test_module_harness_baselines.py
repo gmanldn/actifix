@@ -6,16 +6,16 @@ import pytest
 from actifix.testing import create_module_test_client
 
 
-def test_yhatzee_module_harness():
+def test_yahtzee_module_harness():
     pytest.importorskip("flask")
 
     # Set minimal health response for testing
     os.environ["ACTIFIX_MODULE_HEALTH_MINIMAL"] = "1"
     try:
-        client = create_module_test_client("yhatzee", url_prefix=None)
+        client = create_module_test_client("yahtzee", url_prefix=None)
         response = client.get("/")
         assert response.status_code == 200
-        assert b"Yhatzee" in response.data
+        assert b"Yahtzee" in response.data
 
         health = client.get("/health")
         assert health.status_code == 200

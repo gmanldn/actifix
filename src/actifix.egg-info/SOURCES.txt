@@ -36,7 +36,7 @@ src/actifix/modules/pokertool/detector.py
 src/actifix/modules/pokertool/ml.py
 src/actifix/modules/pokertool/solvers.py
 src/actifix/modules/superquiz/__init__.py
-src/actifix/modules/yhatzee/__init__.py
+src/actifix/modules/yahtzee/__init__.py
 src/actifix/persistence/__init__.py
 src/actifix/persistence/atomic.py
 src/actifix/persistence/cleanup_config.py
@@ -168,4 +168,4 @@ test/test_ticket_throttling_integration.py
 test/test_ticket_throttling_limits.py
 test/test_version_monitor.py
 test/test_version_synchronization.py
-test/test_yhatzee.py
+test/test_yahtzee.py

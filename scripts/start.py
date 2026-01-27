@@ -54,18 +54,20 @@ SRC_DIR = ROOT / "src"
 FRONTEND_DIR = ROOT / "actifix-frontend"
 DEFAULT_FRONTEND_PORT = 8080
 DEFAULT_API_PORT = 5001
-DEFAULT_YHATZEE_PORT = 8090
+DEFAULT_YAHTZEE_PORT = 8090
 DEFAULT_SUPERQUIZ_PORT = 8070
 DEFAULT_SHOOTY_PORT = 8040
+DEFAULT_HOLLOGRAM_PORT = 8050
 DEFAULT_POKERTOOL_PORT = 8060
 VERSION_LINE_RE = re.compile(r'^version\s*=\s*["\'](?P<version>[^"\']+)["\']', re.MULTILINE)
 
 # Environment keys for the running instance ports (used by the version monitor).
 ENV_FRONTEND_PORT = "ACTIFIX_FRONTEND_PORT"
 ENV_API_PORT = "ACTIFIX_API_PORT"
-ENV_YHATZEE_PORT = "ACTIFIX_YHATZEE_PORT"
+ENV_YAHTZEE_PORT = "ACTIFIX_YAHTZEE_PORT"
 ENV_SUPERQUIZ_PORT = "ACTIFIX_SUPERQUIZ_PORT"
 ENV_SHOOTY_PORT = "ACTIFIX_SHOOTY_PORT"
+ENV_HOLLOGRAM_PORT = "ACTIFIX_HOLLOGRAM_PORT"
 ENV_POKERTOOL_PORT = "ACTIFIX_POKERTOOL_PORT"
 
 # Optional API modules we want to surface in startup output.
@@ -83,9 +85,10 @@ def _get_runtime_ports_from_env() -> list[int]:
     for key, default in [
         (ENV_FRONTEND_PORT, DEFAULT_FRONTEND_PORT),
         (ENV_API_PORT, DEFAULT_API_PORT),
-        (ENV_YHATZEE_PORT, DEFAULT_YHATZEE_PORT),
+        (ENV_YAHTZEE_PORT, DEFAULT_YAHTZEE_PORT),
         (ENV_SUPERQUIZ_PORT, DEFAULT_SUPERQUIZ_PORT),
         (ENV_SHOOTY_PORT, DEFAULT_SHOOTY_PORT),
+        (ENV_HOLLOGRAM_PORT, DEFAULT_HOLLOGRAM_PORT),
         (ENV_POKERTOOL_PORT, DEFAULT_POKERTOOL_PORT),
     ]:
         raw = os.environ.get(key)
@@ -116,12 +119,14 @@ def restart_process_for_new_version(project_root: Path, reason: str, ports: Opti
 # Global singleton instances - only one of each can exist
 _API_SERVER_INSTANCE: Optional[threading.Thread] = None
 _API_SERVER_LOCK = threading.Lock()
-_YHATZEE_SERVER_INSTANCE: Optional[threading.Thread] = None
-_YHATZEE_SERVER_LOCK = threading.Lock()
+_YAHTZEE_SERVER_INSTANCE: Optional[threading.Thread] = None
+_YAHTZEE_SERVER_LOCK = threading.Lock()
 _SUPERQUIZ_SERVER_INSTANCE: Optional[threading.Thread] = None
 _SUPERQUIZ_SERVER_LOCK = threading.Lock()
 _SHOOTY_SERVER_INSTANCE: Optional[threading.Thread] = None
 _SHOOTY_SERVER_LOCK = threading.Lock()
+_HOLLOGRAM_SERVER_INSTANCE: Optional[threading.Thread] = None
+_HOLLOGRAM_SERVER_LOCK = threading.Lock()
 _FRONTEND_MANAGER_INSTANCE: Optional['FrontendManager'] = None
 _FRONTEND_LOCK = threading.Lock()
 _POKERTOOL_THREAD: Optional[threading.Thread] = None
@@ -486,9 +491,10 @@ def cleanup_existing_instances() -> None:
     for port in [
         DEFAULT_FRONTEND_PORT,
         DEFAULT_API_PORT,
-        DEFAULT_YHATZEE_PORT,
+        DEFAULT_YAHTZEE_PORT,
         DEFAULT_SUPERQUIZ_PORT,
         DEFAULT_SHOOTY_PORT,
+        DEFAULT_HOLLOGRAM_PORT,
         DEFAULT_POKERTOOL_PORT,
     ]:
         if is_port_in_use(port):
@@ -653,12 +659,14 @@ def report_runtime_status(args: argparse.Namespace, host: str = "127.0.0.1") -> 
     services.append(("Frontend", args.frontend_port, f"http://localhost:{args.frontend_port}"))
     if not args.no_api:
         services.append(("API", args.api_port, f"http://localhost:{args.api_port}/api/"))
-    if not args.no_yhatzee:
-        services.append(("Yhatzee", args.yhatzee_port, f"http://localhost:{args.yhatzee_port}/"))
+    if not args.no_yahtzee:
+        services.append(("Yahtzee", args.yahtzee_port, f"http://localhost:{args.yahtzee_port}/"))
     if not args.no_superquiz:
         services.append(("SuperQuiz", args.superquiz_port, f"http://localhost:{args.superquiz_port}/"))
     if not args.no_shooty:
         services.append(("ShootyMcShoot", args.shooty_port, f"http://localhost:{args.shooty_port}/"))
+    if not args.no_hollogram:
+        services.append(("Hollogram", args.hollogram_port, f"http://localhost:{args.hollogram_port}/"))
     if not args.no_pokertool:
         services.append(("PokerTool", args.pokertool_port, f"http://localhost:{args.pokertool_port}/"))
 
@@ -671,34 +679,34 @@ def report_runtime_status(args: argparse.Namespace, host: str = "127.0.0.1") -> 
         announce_api_modules(host, args.api_port)
 
 
-def start_yhatzee_server(port: int, project_root: Path, host: str = "127.0.0.1") -> threading.Thread:
-    """Launch the Yhatzee GUI server in a background thread."""
-    global _YHATZEE_SERVER_INSTANCE
+def start_yahtzee_server(port: int, project_root: Path, host: str = "127.0.0.1") -> threading.Thread:
+    """Launch the Yahtzee GUI server in a background thread."""
+    global _YAHTZEE_SERVER_INSTANCE
 
-    with _YHATZEE_SERVER_LOCK:
-        if _YHATZEE_SERVER_INSTANCE is not None and _YHATZEE_SERVER_INSTANCE.is_alive():
-            log_warning("Yhatzee server already running - refusing to start duplicate instance")
-            return _YHATZEE_SERVER_INSTANCE
+    with _YAHTZEE_SERVER_LOCK:
+        if _YAHTZEE_SERVER_INSTANCE is not None and _YAHTZEE_SERVER_INSTANCE.is_alive():
+            log_warning("Yahtzee server already running - refusing to start duplicate instance")
+            return _YAHTZEE_SERVER_INSTANCE
 
-        log_info(f"Starting Yhatzee GUI server on {host}:{port}...")
+        log_info(f"Starting Yahtzee GUI server on {host}:{port}...")
 
         try:
-            from actifix.modules.yhatzee import run_gui
+            from actifix.modules.yahtzee import run_gui
         except ImportError as exc:
-            log_error("Yhatzee module requires Flask/Flask-CORS (install via pip install -e '.[web]')")
+            log_error("Yahtzee module requires Flask/Flask-CORS (install via pip install -e '.[web]')")
             raise exc
 
         def run_server():
             try:
                 run_gui(host=host, port=port, project_root=project_root, debug=False)
             except Exception as exc:
-                log_error(f"Yhatzee GUI server error: {exc}")
+                log_error(f"Yahtzee GUI server error: {exc}")
 
     thread = threading.Thread(target=run_server, daemon=True)
     thread.start()
-    _YHATZEE_SERVER_INSTANCE = thread
+    _YAHTZEE_SERVER_INSTANCE = thread
     time.sleep(0.3)
-    log_success(f"Yhatzee GUI server running at http://{host}:{port}")
+    log_success(f"Yahtzee GUI server running at http://{host}:{port}")
     return thread
 
 
@@ -784,6 +792,55 @@ def start_shooty_server(port: int, project_root: Path, host: str = "127.0.0.1") 
         _SHOOTY_SERVER_INSTANCE = thread
         time.sleep(0.3)
         log_success(f"ShootyMcShoot GUI server running at http://{host}:{port}")
+        return thread
+
+
+def _wait_for_hollogram_health(host: str, port: int, timeout: float = 5.0) -> bool:
+    """Wait for the Hollogram GUI /health endpoint to respond."""
+    deadline = time.monotonic() + timeout
+    url = f"http://{host}:{port}/health"
+    while time.monotonic() < deadline:
+        ok, status, _ = _probe_http_status(url, timeout=1.0)
+        if ok and status == 200:
+            return True
+        time.sleep(0.2)
+    return False
+
+
+def start_hollogram_server(port: int, project_root: Path, host: str = "127.0.0.1") -> threading.Thread:
+    """Launch the Hollogram GUI server in a background thread."""
+    global _HOLLOGRAM_SERVER_INSTANCE
+
+    with _HOLLOGRAM_SERVER_LOCK:
+        if _HOLLOGRAM_SERVER_INSTANCE is not None and _HOLLOGRAM_SERVER_INSTANCE.is_alive():
+            log_warning("Hollogram GUI server already running - refusing to start duplicate instance")
+            return _HOLLOGRAM_SERVER_INSTANCE
+
+        log_info(f"Starting Hollogram GUI server on {host}:{port}...")
+
+        try:
+            from actifix.modules.hollogram import run_gui
+        except ImportError as exc:
+            log_error("Hollogram module requires Flask/Flask-CORS (install via pip install -e '.[web]')")
+            raise exc
+
+        def run_server():
+            try:
+                run_gui(host=host, port=port, project_root=project_root, debug=False)
+            except Exception as exc:
+                log_error(f"Hollogram GUI server error: {exc}")
+
+        thread = threading.Thread(target=run_server, daemon=True)
+        thread.start()
+        _HOLLOGRAM_SERVER_INSTANCE = thread
+        time.sleep(0.3)
+
+        if not _wait_for_hollogram_health(host, port):
+            message = "Hollogram GUI failed to respond on /health (check Flask/dependencies)"
+            log_error(message)
+            raise RuntimeError(message)
+
+        log_success(f"Hollogram GUI server running at http://{host}:{port}")
         return thread
 
 
@@ -1101,15 +1158,15 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
         help="Run health check after init and exit",
     )
     parser.add_argument(
-        "--yhatzee-port",
+        "--yahtzee-port",
         type=int,
-        default=DEFAULT_YHATZEE_PORT,
-        help=f"Port for the standalone Yhatzee GUI (default: {DEFAULT_YHATZEE_PORT})",
+        default=DEFAULT_YAHTZEE_PORT,
+        help=f"Port for the standalone Yahtzee GUI (default: {DEFAULT_YAHTZEE_PORT})",
     )
     parser.add_argument(
-        "--no-yhatzee",
+        "--no-yahtzee",
         action="store_true",
-        help="Do not start the standalone Yhatzee GUI",
+        help="Do not start the standalone Yahtzee GUI",
     )
     parser.add_argument(
         "--superquiz-port",
@@ -1132,6 +1189,17 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
         "--no-shooty",
         action="store_true",
         help="Do not start the standalone ShootyMcShoot GUI",
+    )
+    parser.add_argument(
+        "--hollogram-port",
+        type=int,
+        default=DEFAULT_HOLLOGRAM_PORT,
+        help=f"Port for the standalone Hollogram GUI (default: {DEFAULT_HOLLOGRAM_PORT})",
+    )
+    parser.add_argument(
+        "--no-hollogram",
+        action="store_true",
+        help="Do not start the standalone Hollogram GUI",
     )
     parser.add_argument(
         "--pokertool-port",
@@ -1238,19 +1306,22 @@ def main(argv: Optional[list[str]] = None) -> int:
     # Persist the configured ports for other threads (e.g., version monitor).
     os.environ[ENV_FRONTEND_PORT] = str(args.frontend_port)
     os.environ[ENV_API_PORT] = str(args.api_port)
-    os.environ[ENV_YHATZEE_PORT] = str(args.yhatzee_port)
+    os.environ[ENV_YAHTZEE_PORT] = str(args.yahtzee_port)
     os.environ[ENV_SUPERQUIZ_PORT] = str(args.superquiz_port)
     os.environ[ENV_SHOOTY_PORT] = str(args.shooty_port)
+    os.environ[ENV_HOLLOGRAM_PORT] = str(args.hollogram_port)
     os.environ[ENV_POKERTOOL_PORT] = str(args.pokertool_port)
 
     total_steps = 3
     if not args.no_api:
         total_steps += 1
-    if not args.no_yhatzee:
+    if not args.no_yahtzee:
         total_steps += 1
     if not args.no_superquiz:
         total_steps += 1
     if not args.no_shooty:
+        total_steps += 1
+    if not args.no_hollogram:
         total_steps += 1
     if not args.no_pokertool:
         total_steps += 1
@@ -1331,14 +1402,14 @@ def main(argv: Optional[list[str]] = None) -> int:
             log_error("Try manually: pkill -f 'start.py' or use --api-port <PORT>")
             return 1
 
-    if not args.no_yhatzee and is_port_in_use(args.yhatzee_port):
-        log_warning(f"Yhatzee port {args.yhatzee_port} still in use, forcing cleanup")
-        kill_processes_on_port(args.yhatzee_port)
+    if not args.no_yahtzee and is_port_in_use(args.yahtzee_port):
+        log_warning(f"Yahtzee port {args.yahtzee_port} still in use, forcing cleanup")
+        kill_processes_on_port(args.yahtzee_port)
         time.sleep(0.5)
 
-        if is_port_in_use(args.yhatzee_port):
-            log_error(f"Could not free Yhatzee port {args.yhatzee_port}")
-            log_error("Try manually: pkill -f 'start.py' or use --yhatzee-port <PORT>")
+        if is_port_in_use(args.yahtzee_port):
+            log_error(f"Could not free Yahtzee port {args.yahtzee_port}")
+            log_error("Try manually: pkill -f 'start.py' or use --yahtzee-port <PORT>")
             return 1
 
     if not args.no_superquiz and is_port_in_use(args.superquiz_port):
@@ -1361,6 +1432,16 @@ def main(argv: Optional[list[str]] = None) -> int:
             log_error("Try manually: pkill -f 'start.py' or use --shooty-port <PORT>")
             return 1
 
+    if not args.no_hollogram and is_port_in_use(args.hollogram_port):
+        log_warning(f"Hollogram port {args.hollogram_port} still in use, forcing cleanup")
+        kill_processes_on_port(args.hollogram_port)
+        time.sleep(0.5)
+
+        if is_port_in_use(args.hollogram_port):
+            log_error(f"Could not free Hollogram port {args.hollogram_port}")
+            log_error("Try manually: pkill -f 'start.py' or use --hollogram-port <PORT>")
+            return 1
+
     if not args.no_pokertool and is_port_in_use(args.pokertool_port):
         log_warning(f"PokerTool port {args.pokertool_port} still in use, forcing cleanup")
         kill_processes_on_port(args.pokertool_port)
@@ -1375,9 +1456,10 @@ def main(argv: Optional[list[str]] = None) -> int:
     api_thread = None
     api_watchdog_thread = None
     version_monitor_thread: Optional[threading.Thread] = None
-    yhatzee_thread: Optional[threading.Thread] = None
+    yahtzee_thread: Optional[threading.Thread] = None
     superquiz_thread: Optional[threading.Thread] = None
     shooty_thread: Optional[threading.Thread] = None
+    hollogram_thread: Optional[threading.Thread] = None
     pokertool_thread: Optional[threading.Thread] = None
     ticket_agent_thread: Optional[threading.Thread] = None
     stop_event = threading.Event()
@@ -1415,14 +1497,14 @@ def main(argv: Optional[list[str]] = None) -> int:
             log_error(f"Failed to start ticket agent: {e}")
             return 1
 
-    # Step 5: Start Yhatzee GUI
-    if not args.no_yhatzee:
+    # Step 5: Start Yahtzee GUI
+    if not args.no_yahtzee:
         current_step += 1
-        log_step(current_step, total_steps, "Starting Yhatzee GUI")
+        log_step(current_step, total_steps, "Starting Yahtzee GUI")
         try:
-            yhatzee_thread = start_yhatzee_server(args.yhatzee_port, ROOT)
+            yahtzee_thread = start_yahtzee_server(args.yahtzee_port, ROOT)
         except Exception as e:
-            log_error(f"Failed to start Yhatzee GUI: {e}")
+            log_error(f"Failed to start Yahtzee GUI: {e}")
             return 1
 
     if not args.no_superquiz:
@@ -1441,6 +1523,15 @@ def main(argv: Optional[list[str]] = None) -> int:
             shooty_thread = start_shooty_server(args.shooty_port, ROOT)
         except Exception as e:
             log_error(f"Failed to start ShootyMcShoot GUI: {e}")
+            return 1
+
+    if not args.no_hollogram:
+        current_step += 1
+        log_step(current_step, total_steps, "Starting Hollogram GUI")
+        try:
+            hollogram_thread = start_hollogram_server(args.hollogram_port, ROOT)
+        except Exception as e:
+            log_error(f"Failed to start Hollogram GUI: {e}")
             return 1
 
     if not args.no_pokertool:
@@ -1472,9 +1563,9 @@ def main(argv: Optional[list[str]] = None) -> int:
     if not args.no_api:
         api_url = f"http://localhost:{args.api_port}/api/"
         print(f"{Color.BOLD}{Color.GREEN}API:{Color.RESET}       {Color.CYAN}{api_url}{Color.RESET}")
-    if not args.no_yhatzee:
-        yhatzee_url = f"http://localhost:{args.yhatzee_port}/"
-        print(f"{Color.BOLD}{Color.GREEN}Yhatzee:{Color.RESET}   {Color.CYAN}{yhatzee_url}{Color.RESET}")
+    if not args.no_yahtzee:
+        yahtzee_url = f"http://localhost:{args.yahtzee_port}/"
+        print(f"{Color.BOLD}{Color.GREEN}Yahtzee:{Color.RESET}   {Color.CYAN}{yahtzee_url}{Color.RESET}")
     if not args.no_superquiz:
         superquiz_url = f"http://localhost:{args.superquiz_port}/"
         print(f"{Color.BOLD}{Color.GREEN}SuperQuiz:{Color.RESET} {Color.CYAN}{superquiz_url}{Color.RESET}")
@@ -1482,6 +1573,10 @@ def main(argv: Optional[list[str]] = None) -> int:
     if not args.no_shooty:
         shooty_url = f"http://localhost:{args.shooty_port}/"
         print(f"{Color.BOLD}{Color.GREEN}ShootyMcShoot:{Color.RESET} {Color.CYAN}{shooty_url}{Color.RESET}")
+
+    if not args.no_hollogram:
+        hollogram_url = f"http://localhost:{args.hollogram_port}/"
+        print(f"{Color.BOLD}{Color.GREEN}Hollogram:{Color.RESET} {Color.CYAN}{hollogram_url}{Color.RESET}")
 
     if not args.no_pokertool:
         pokertool_url = f"http://localhost:{args.pokertool_port}/"

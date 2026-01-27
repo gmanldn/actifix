@@ -14,7 +14,7 @@ SEARCH_KEYWORDS = (
     "actifix",
     "do_af.py",
     "start.py",
-    "yhatzee",
+    "yahtzee",
     "api.py",
     "yfinance",
 )

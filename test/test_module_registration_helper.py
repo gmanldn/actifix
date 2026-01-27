@@ -92,7 +92,7 @@ def test_create_app_registers_module_blueprint(tmp_path, monkeypatch):
 
     app = api.create_app(project_root=tmp_path)
     client = app.test_client()
-    response = client.get("/modules/yhatzee/health", environ_base={"REMOTE_ADDR": "127.0.0.1"})
+    response = client.get("/modules/yahtzee/health", environ_base={"REMOTE_ADDR": "127.0.0.1"})
     assert response.status_code == 200
 
 

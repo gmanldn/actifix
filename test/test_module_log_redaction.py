@@ -7,7 +7,7 @@ import pytest
 
 @pytest.mark.parametrize(
     "module_path",
-    ["actifix.modules.yhatzee", "actifix.modules.superquiz"],
+    ["actifix.modules.yahtzee", "actifix.modules.superquiz"],
 )
 def test_module_error_redaction(monkeypatch, module_path):
     module = importlib.import_module(module_path)

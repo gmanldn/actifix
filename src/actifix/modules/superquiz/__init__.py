@@ -253,6 +253,16 @@ def _module_helper(project_root: Optional[Union[str, Path]] = None) -> ModuleBas
     )
 
 
+def _resolve_module_config(
+    project_root: Optional[Union[str, Path]] = None,
+    host: Optional[str] = None,
+    port: Optional[int] = None,
+) -> tuple[str, int]:
+    """Return the resolved host/port after applying overrides."""
+    helper = _module_helper(project_root)
+    return helper.resolve_host_port(host, port)
+
+
 def _http_get_json(url: str, timeout: int = 8) -> object:
     """Fetch JSON from URL with SSL certificate verification disabled for resilience."""
     request = Request(url, headers={"User-Agent": USER_AGENT})

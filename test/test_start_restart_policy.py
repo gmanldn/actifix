@@ -18,9 +18,10 @@ def test_cleanup_existing_instances_kills_all_in_use_ports(monkeypatch):
     for port in [
         start.DEFAULT_FRONTEND_PORT,
         start.DEFAULT_API_PORT,
-        start.DEFAULT_YHATZEE_PORT,
+        start.DEFAULT_YAHTZEE_PORT,
         start.DEFAULT_SUPERQUIZ_PORT,
         start.DEFAULT_SHOOTY_PORT,
+        start.DEFAULT_HOLLOGRAM_PORT,
         start.DEFAULT_POKERTOOL_PORT,
     ]:
         assert port in killed

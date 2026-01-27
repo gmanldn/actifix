@@ -307,8 +307,8 @@ This document summarizes the modules in the Actifix architecture. Use `MAP.yaml`
 - Depends on: `runtime.state`, `infra.logging`, `core.raise_af`, `runtime.api`
 - Contracts: expose the SuperQuiz GUI at `/modules/superquiz` on the runtime API server while continuing to use centralized logging and error capture
 
-### modules.yhatzee
-- Summary: two-player Yhatzee game module whose GUI is embedded in the dashboard API
-- Entrypoints: `src/actifix/modules/yhatzee/__init__.py`
+### modules.yahtzee
+- Summary: two-player Yahtzee game module whose GUI is embedded in the dashboard API
+- Entrypoints: `src/actifix/modules/yahtzee/__init__.py`
 - Depends on: `runtime.state`, `infra.logging`, `core.raise_af`, `runtime.api`
-- Contracts: expose the two-player Yhatzee GUI at `/modules/yhatzee` on the runtime API server while continuing to use centralized logging and error capture
+- Contracts: expose the two-player Yahtzee GUI at `/modules/yahtzee` on the runtime API server while continuing to use centralized logging and error capture

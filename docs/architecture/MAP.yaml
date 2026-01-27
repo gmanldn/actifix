@@ -787,14 +787,14 @@ modules:
   - modules.pokertool.core
 
 
-- id: modules.yhatzee
+- id: modules.yahtzee
   domain: modules
   owner: modules
-  summary: Two-player Yhatzee experience served via the dashboard API
+  summary: Two-player Yahtzee experience served via the dashboard API
   entrypoints:
-  - src/actifix/modules/yhatzee/__init__.py
+  - src/actifix/modules/yahtzee/__init__.py
   contracts:
-  - expose the two-player Yhatzee GUI at /modules/yhatzee on the runtime API server
+  - expose the two-player Yahtzee GUI at /modules/yahtzee on the runtime API server
   - use Actifix logging and error capture interfaces from the shared runtime
   depends_on:
   - runtime.state

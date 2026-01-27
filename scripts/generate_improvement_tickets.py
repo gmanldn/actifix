@@ -305,7 +305,7 @@ TICKETS = [
     ("Add module marketplace concept", "src/actifix/modules/registry.py:900", "Feature", "P4",
      "Design module discovery from remote registry. Implement install_module(url) from git repo. Validate module before installation. Support module updates. Add /api/modules/available endpoint."),
 
-    ("Implement Yhatzee game improvements", "src/actifix/modules/yhatzee:1", "Feature", "P3",
+    ("Implement Yahtzee game improvements", "src/actifix/modules/yahtzee:1", "Feature", "P3",
      "Add score validation preventing invalid entries. Implement game history persistence. Add leaderboard tracking wins. Support game replay viewing. Add AI opponent option."),
 
     ("Add SuperQuiz enhancements", "src/actifix/modules/superquiz:1", "Feature", "P3",

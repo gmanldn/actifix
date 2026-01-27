@@ -367,7 +367,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     modules_parser.add_argument(
         "module_id",
         nargs="?",
-        help="Module identifier (e.g., modules.yhatzee)",
+        help="Module identifier (e.g., modules.yahtzee)",
     )
     
     # Doctor command

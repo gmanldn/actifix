@@ -17,7 +17,7 @@ __all__ = [
     "build_module_env",
     "get_module_context",
     "get_module_config",
-    "yhatzee",
+    "yahtzee",
 ]
 
 

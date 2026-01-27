@@ -1,4 +1,4 @@
-"""Yhatzee module with a localhost GUI for a two-player game."""
+"""Yahtzee module with a localhost GUI for a two-player game."""
 
 from __future__ import annotations
 
@@ -19,9 +19,9 @@ MODULE_DEFAULTS = {
 }
 ACCESS_RULE = "local-only"
 MODULE_METADATA = {
-    "name": "modules.yhatzee",
+    "name": "modules.yahtzee",
     "version": "1.0.0",
-    "description": "Two-player Yhatzee module with local GUI.",
+    "description": "Two-player Yahtzee module with local GUI.",
     "capabilities": {
         "gui": True,
         "health": True,
@@ -43,28 +43,38 @@ MODULE_DEPENDENCIES = [
 
 
 def _module_helper(project_root: Optional[Union[str, Path]] = None) -> ModuleBase:
-    """Build a ModuleBase helper for Yhatzee."""
+    """Build a ModuleBase helper for Yahtzee."""
     return ModuleBase(
-        module_key="yhatzee",
+        module_key="yahtzee",
         defaults=MODULE_DEFAULTS,
         metadata=MODULE_METADATA,
         project_root=project_root,
     )
 
 
+def _resolve_module_config(
+    project_root: Optional[Union[str, Path]] = None,
+    host: Optional[str] = None,
+    port: Optional[int] = None,
+) -> tuple[str, int]:
+    """Return the resolved host/port after applying overrides."""
+    helper = _module_helper(project_root)
+    return helper.resolve_host_port(host, port)
+
+
 def create_blueprint(
     project_root: Optional[Union[str, Path]] = None,
     host: Optional[str] = None,
     port: Optional[int] = None,
-    url_prefix: Optional[str] = "/modules/yhatzee",
+    url_prefix: Optional[str] = "/modules/yahtzee",
 ) -> Blueprint:
-    """Create the Flask blueprint that serves the Yhatzee GUI."""
+    """Create the Flask blueprint that serves the Yahtzee GUI."""
     helper = _module_helper(project_root)
     try:
         from flask import Blueprint, Response  # Local import keeps Flask optional
 
         resolved_host, resolved_port = helper.resolve_host_port(host, port)
-        blueprint = Blueprint("yhatzee", __name__, url_prefix=url_prefix)
+        blueprint = Blueprint("yahtzee", __name__, url_prefix=url_prefix)
 
         @blueprint.route("/")
         def index():
@@ -78,8 +88,8 @@ def create_blueprint(
         return blueprint
     except Exception as exc:
         helper.record_module_error(
-            message=f"Failed to create Yhatzee blueprint: {exc}",
-            source="modules/yhatzee/__init__.py:create_blueprint",
+            message=f"Failed to create Yahtzee blueprint: {exc}",
+            source="modules/yahtzee/__init__.py:create_blueprint",
             error_type=type(exc).__name__,
             priority=TicketPriority.P2,
         )
@@ -91,7 +101,7 @@ def create_app(
     host: Optional[str] = None,
     port: Optional[int] = None,
 ) -> "Flask":
-    """Create the Flask app that serves the Yhatzee GUI."""
+    """Create the Flask app that serves the Yahtzee GUI."""
     try:
         from flask import Flask  # Local import to keep optional dependency optional
 
@@ -102,8 +112,8 @@ def create_app(
     except Exception as exc:
         helper = _module_helper(project_root)
         helper.record_module_error(
-            message=f"Failed to create Yhatzee GUI app: {exc}",
-            source="modules/yhatzee/__init__.py:create_app",
+            message=f"Failed to create Yahtzee GUI app: {exc}",
+            source="modules/yahtzee/__init__.py:create_app",
             error_type=type(exc).__name__,
             priority=TicketPriority.P2,
         )
@@ -116,22 +126,22 @@ def run_gui(
     project_root: Optional[Union[str, Path]] = None,
     debug: bool = False,
 ) -> None:
-    """Run the Yhatzee GUI on localhost."""
+    """Run the Yahtzee GUI on localhost."""
     helper = _module_helper(project_root)
     resolved_host, resolved_port = helper.resolve_host_port(host, port)
     try:
         app = create_app(project_root=project_root, host=resolved_host, port=resolved_port)
         log_event(
-            "YHATZEE_GUI_START",
-            f"Yhatzee GUI running at http://{resolved_host}:{resolved_port}",
-            extra={"host": resolved_host, "port": resolved_port, "module": "modules.yhatzee"},
-            source="modules.yhatzee.run_gui",
+            "YAHTZEE_GUI_START",
+            f"Yahtzee GUI running at http://{resolved_host}:{resolved_port}",
+            extra={"host": resolved_host, "port": resolved_port, "module": "modules.yahtzee"},
+            source="modules.yahtzee.run_gui",
         )
         app.run(host=resolved_host, port=resolved_port, debug=debug)
     except Exception as exc:
         helper.record_module_error(
-            message=f"Failed to start Yhatzee GUI: {exc}",
-            source="modules/yhatzee/__init__.py:run_gui",
+            message=f"Failed to start Yahtzee GUI: {exc}",
+            source="modules/yahtzee/__init__.py:run_gui",
             error_type=type(exc).__name__,
             priority=TicketPriority.P1,
         )
@@ -143,7 +153,7 @@ _HTML_PAGE = """<!doctype html>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Yhatzee Module</title>
+  <title>Yahtzee Module</title>
   <style>
     :root {
       color-scheme: light;
@@ -446,7 +456,7 @@ _HTML_PAGE = """<!doctype html>
     <header>
       <div>
         <div class="subtitle">Actifix Module</div>
-        <h1>Yhatzee</h1>
+        <h1>Yahtzee</h1>
         <div class="port-display" id="portDisplay">Running on port <span id="portValue">8090</span></div>
       </div>
       <button id="resetBtn" class="button secondary">Reset Game</button>
@@ -482,7 +492,7 @@ _HTML_PAGE = """<!doctype html>
       <section class="card">
         <h2>Session Sync</h2>
         <label>Session code
-          <input id="sessionCode" type="text" placeholder="e.g. yhatzee-8k2l1p or paste.rs/yhatzee-8k2l1p">
+          <input id="sessionCode" type="text" placeholder="e.g. yahtzee-8k2l1p or paste.rs/yahtzee-8k2l1p">
         </label>
         <div class="session-actions">
           <button id="createSessionBtn" class="button secondary">Create Session</button>
@@ -527,7 +537,7 @@ _HTML_PAGE = """<!doctype html>
       { id: "full_house", label: "Full house", score: dice => isFullHouse(dice) ? 25 : 0 },
       { id: "small_straight", label: "Small straight", score: dice => isSmallStraight(dice) ? 30 : 0 },
       { id: "large_straight", label: "Large straight", score: dice => isLargeStraight(dice) ? 40 : 0 },
-      { id: "yhatzee", label: "Yhatzee", score: dice => hasOfKind(dice, 5) ? 50 : 0 },
+      { id: "yahtzee", label: "Yahtzee", score: dice => hasOfKind(dice, 5) ? 50 : 0 },
       { id: "chance", label: "Chance", score: dice => sum(dice) }
     ];
 
@@ -780,7 +790,7 @@ _HTML_PAGE = """<!doctype html>
     }
 
     function createSession() {
-      const generated = `yhatzee-${Math.random().toString(36).slice(2, 8)}`;
+      const generated = `yahtzee-${Math.random().toString(36).slice(2, 8)}`;
       const input = normalizeSessionCode(sessionCodeInput.value) || generated;
       sync.sessionId = input;
       sync.enabled = true;

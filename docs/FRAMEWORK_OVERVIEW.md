@@ -60,9 +60,9 @@ Required keys:
 Example:
 ```json
 {
-  "name": "modules.yhatzee",
+  "name": "modules.yahtzee",
   "version": "1.0.0",
-  "description": "Two-player Yhatzee module with local GUI.",
+  "description": "Two-player Yahtzee module with local GUI.",
   "capabilities": {"gui": true, "health": true},
   "data_access": {"state_dir": true},
   "network": {"external_requests": false},
@@ -92,21 +92,24 @@ Module defaults come from Actifix config with optional overrides via `ACTIFIX_MO
 | Module | Default host | Default port | Override key |
 |--------|--------------|--------------|--------------|
 | shootymcshoot | 127.0.0.1 | 8040 | shootymcshoot |
-| yhatzee | 127.0.0.1 | 8090 | yhatzee |
+| hollogram | 127.0.0.1 | 8050 | hollogram |
+| yahtzee | 127.0.0.1 | 8090 | yahtzee |
 | superquiz | 127.0.0.1 | 8070 | superquiz |
 | pokertool | 127.0.0.1 | 8060 | pokertool |
 
 Override example:
 ```json
 {
-  "yhatzee": {"port": 9101, "host": "127.0.0.2"},
+  "yahtzee": {"port": 9101, "host": "127.0.0.2"},
   "superquiz": {"port": 9103}
 }
 ```
 
 Launching `scripts/start.py` now brings the PokerTool service online alongside the other modules. Use `--pokertool-port` to move it off `127.0.0.1:8060` or `--no-pokertool` to skip it when you only need the frontend/API stack. The module writes a `POKERTOOL_SERVICE_START` event to Actifix’s structured log repository so you can verify the service published a heartbeat while the launcher is running.
 
-The launcher now starts the standalone SuperQuiz GUI on its configured host/port (default `127.0.0.1:8070`) and probes `/health` to validate Flask and related dependencies before reporting the endpoint alongside the dashboard, backend, and Yhatzee servers. Use `--superquiz-port` to adjust the binding or `--no-superquiz` to skip the extra GUI when you do not need it.
+The launcher now starts the standalone SuperQuiz GUI on its configured host/port (default `127.0.0.1:8070`) and probes `/health` to validate Flask and related dependencies before reporting the endpoint alongside the dashboard, backend, and Yahtzee servers. Use `--superquiz-port` to adjust the binding or `--no-superquiz` to skip the extra GUI when you do not need it.
+
+The launcher now starts the Hollogram GUI on its configured host/port (default `127.0.0.1:8050`). Use `--hollogram-port` to adjust the binding or `--no-hollogram` to skip the GUI when you only need the API module.
 
 ## Ticket lifecycle (high-level)
 1. Exception raised or manual capture call.
@@ -145,8 +148,8 @@ The following tickets track the gap closures in detail:
 `GET /api/modules/<module_id>/health` returns the aggregated health response:
 ```json
 {
-  "module": "yhatzee",
-  "module_id": "modules.yhatzee",
+  "module": "yahtzee",
+  "module_id": "modules.yahtzee",
   "module_status": "active",
   "status": "ok",
   "http_status": 200,

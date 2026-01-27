@@ -14,7 +14,7 @@ def _write_depgraph(project_root: Path) -> None:
     arch_dir.mkdir(parents=True, exist_ok=True)
     depgraph = {
         "nodes": [
-            {"id": "modules.yhatzee", "domain": "modules", "owner": "modules", "label": "yhatzee"},
+            {"id": "modules.yahtzee", "domain": "modules", "owner": "modules", "label": "yahtzee"},
             {"id": "modules.superquiz", "domain": "modules", "owner": "modules", "label": "superquiz"},
         ],
         "edges": [],
@@ -31,7 +31,7 @@ def test_modules_list_command(tmp_path, monkeypatch, capsys):
     captured = capsys.readouterr()
 
     assert code == 0
-    assert "modules.yhatzee" in captured.out
+    assert "modules.yahtzee" in captured.out
     assert "modules.superquiz" in captured.out
 
 
@@ -39,15 +39,15 @@ def test_modules_enable_disable(tmp_path, monkeypatch):
     monkeypatch.setenv("ACTIFIX_CHANGE_ORIGIN", "raise_af")
     init_actifix_files(get_actifix_paths(project_root=tmp_path))
 
-    code = main.main(["--project-root", str(tmp_path), "modules", "disable", "modules.yhatzee"])
+    code = main.main(["--project-root", str(tmp_path), "modules", "disable", "modules.yahtzee"])
     assert code == 0
 
     status_file = tmp_path / ".actifix" / "module_statuses.json"
     data = json.loads(status_file.read_text(encoding="utf-8"))
-    assert "modules.yhatzee" in data["statuses"]["disabled"]
+    assert "modules.yahtzee" in data["statuses"]["disabled"]
 
-    code = main.main(["--project-root", str(tmp_path), "modules", "enable", "modules.yhatzee"])
+    code = main.main(["--project-root", str(tmp_path), "modules", "enable", "modules.yahtzee"])
     assert code == 0
 
     data = json.loads(status_file.read_text(encoding="utf-8"))
-    assert "modules.yhatzee" in data["statuses"]["active"]
+    assert "modules.yahtzee" in data["statuses"]["active"]

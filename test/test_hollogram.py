@@ -70,6 +70,24 @@ def test_blueprint_creation():
     assert blueprint.name == "hollogram"
 
 
+def test_gui_blueprint_creation():
+    """Test that the GUI blueprint can be created."""
+    from actifix.modules.hollogram import create_gui_blueprint
+
+    try:
+        from flask import Flask
+    except ImportError:
+        pytest.skip("Flask not installed; skipping GUI blueprint test")
+
+    app = Flask(__name__)
+    blueprint = create_gui_blueprint()
+    app.register_blueprint(blueprint)
+    with app.test_client() as client:
+        resp = client.get("/")
+        assert resp.status_code == 200
+        assert "Hollogram Research Console" in resp.get_data(as_text=True)
+
+
 def test_health_endpoint():
     """Test the /health endpoint."""
     from actifix.modules.hollogram import create_blueprint

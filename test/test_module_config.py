@@ -5,13 +5,13 @@ import json
 import pytest
 
 from actifix.modules import get_module_config
-from actifix.modules import yhatzee, superquiz
+from actifix.modules import yahtzee, superquiz
 
 
 def test_module_config_defaults(tmp_path, monkeypatch):
     monkeypatch.setenv("ACTIFIX_CHANGE_ORIGIN", "raise_af")
     config = get_module_config(
-        "yhatzee",
+        "yahtzee",
         {"host": "127.0.0.1", "port": 8000},
         project_root=str(tmp_path),
     )
@@ -23,10 +23,10 @@ def test_module_config_override(tmp_path, monkeypatch):
     monkeypatch.setenv("ACTIFIX_CHANGE_ORIGIN", "raise_af")
     monkeypatch.setenv(
         "ACTIFIX_MODULE_CONFIG_OVERRIDES",
-        json.dumps({"yhatzee": {"port": 9101}}),
+        json.dumps({"yahtzee": {"port": 9101}}),
     )
     config = get_module_config(
-        "yhatzee",
+        "yahtzee",
         {"host": "127.0.0.1", "port": 8000},
         project_root=str(tmp_path),
     )
@@ -40,12 +40,12 @@ def test_modules_use_config_overrides(tmp_path, monkeypatch):
         "ACTIFIX_MODULE_CONFIG_OVERRIDES",
         json.dumps(
             {
-                "yhatzee": {"port": 9102, "host": "127.0.0.2"},
+                "yahtzee": {"port": 9102, "host": "127.0.0.2"},
                 "superquiz": {"port": 9103},
             }
         ),
     )
-    host, port = yhatzee._resolve_module_config(str(tmp_path), None, None)
+    host, port = yahtzee._resolve_module_config(str(tmp_path), None, None)
     assert host == "127.0.0.2"
     assert port == 9102
 

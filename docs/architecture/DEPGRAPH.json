@@ -353,10 +353,10 @@
       "label": "superquiz"
     },
     {
-      "id": "modules.yhatzee",
+      "id": "modules.yahtzee",
       "domain": "modules",
       "owner": "modules",
-      "label": "yhatzee"
+      "label": "yahtzee"
     },
     {
       "id": "modules.pokertool",
@@ -1035,24 +1035,24 @@
       "reason": "modules.superquiz depends on modules.pokertool.core"
     },
     {
-      "from": "modules.yhatzee",
+      "from": "modules.yahtzee",
       "to": "runtime.state",
-      "reason": "modules.yhatzee depends on runtime.state"
+      "reason": "modules.yahtzee depends on runtime.state"
     },
     {
-      "from": "modules.yhatzee",
+      "from": "modules.yahtzee",
       "to": "infra.logging",
-      "reason": "modules.yhatzee depends on infra.logging"
+      "reason": "modules.yahtzee depends on infra.logging"
     },
     {
-      "from": "modules.yhatzee",
+      "from": "modules.yahtzee",
       "to": "core.raise_af",
-      "reason": "modules.yhatzee depends on core.raise_af"
+      "reason": "modules.yahtzee depends on core.raise_af"
     },
     {
-      "from": "modules.yhatzee",
+      "from": "modules.yahtzee",
       "to": "runtime.api",
-      "reason": "modules.yhatzee depends on runtime.api"
+      "reason": "modules.yahtzee depends on runtime.api"
     },
     {
       "from": "modules.pokertool",

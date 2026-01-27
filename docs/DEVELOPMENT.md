@@ -116,8 +116,8 @@ The command exits with code 0 if all checks pass, or 1 if any issues are detecte
 Use the CLI to list and toggle modules:
 ```bash
 python3 -m actifix.main modules list
-python3 -m actifix.main modules disable modules.yhatzee
-python3 -m actifix.main modules enable modules.yhatzee
+python3 -m actifix.main modules disable modules.yahtzee
+python3 -m actifix.main modules enable modules.yahtzee
 ```
 
 ## Module testing harness
@@ -125,7 +125,7 @@ Use the module testing helpers to spin up blueprints in isolation:
 ```python
 from actifix.testing import create_module_test_client
 
-client = create_module_test_client("yhatzee", url_prefix=None)
+client = create_module_test_client("yahtzee", url_prefix=None)
 assert client.get("/health").status_code == 200
 ```
 

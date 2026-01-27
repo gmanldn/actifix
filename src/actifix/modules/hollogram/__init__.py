@@ -21,13 +21,14 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional, Union, List, Dict, Any
 
+from actifix.log_utils import log_event
 from actifix.modules.base import ModuleBase
 from actifix.modules.config import get_module_config
 from actifix.raise_af import TicketPriority
 
 MODULE_DEFAULTS = {
     "host": "127.0.0.1",
-    "port": 8080,
+    "port": 8050,
     "max_query_length": 2000,
     "history_limit": 100,
 }
@@ -36,7 +37,7 @@ MODULE_METADATA = {
     "name": "modules.hollogram",
     "version": "1.0.0",
     "description": "AI-powered medical research assistant for educational purposes.",
-    "capabilities": {"ai": True, "health": True, "research": True},
+    "capabilities": {"ai": True, "health": True, "research": True, "gui": True},
     "data_access": {"state_dir": True},
     "network": {"external_requests": True},
     "permissions": ["logging", "network_http"],
@@ -571,6 +572,437 @@ def create_blueprint(
         raise
 
 
-def run_gui(*args, **kwargs) -> None:
-    """This module does not provide a GUI."""
-    raise NotImplementedError("Hollogram does not implement a graphical interface.")
+def create_gui_blueprint(
+    project_root: Optional[Union[str, Path]] = None,
+    host: Optional[str] = None,
+    port: Optional[int] = None,
+    url_prefix: Optional[str] = None,
+) -> "Blueprint":
+    """Create the Flask blueprint that serves the Hollogram GUI."""
+    helper = _module_helper(project_root)
+    try:
+        from flask import Blueprint, Response
+
+        resolved_host, resolved_port = helper.resolve_host_port(host, port)
+        blueprint = Blueprint("hollogram_gui", __name__, url_prefix=url_prefix)
+
+        @blueprint.route("/")
+        def index():
+            return Response(_GUI_HTML, mimetype="text/html")
+
+        @blueprint.route("/health")
+        def health():
+            return helper.health_response()
+
+        helper.log_gui_init(resolved_host, resolved_port, event_name="HOLLOGRAM_GUI_INIT")
+        return blueprint
+    except Exception as exc:
+        helper.record_module_error(
+            message=f"Failed to create Hollogram GUI blueprint: {exc}",
+            source="modules/hollogram/__init__.py:create_gui_blueprint",
+            error_type=type(exc).__name__,
+            priority=TicketPriority.P2,
+        )
+        raise
+
+
+def create_gui_app(
+    project_root: Optional[Union[str, Path]] = None,
+    host: Optional[str] = None,
+    port: Optional[int] = None,
+) -> "Flask":
+    """Create the Flask app that serves the Hollogram GUI."""
+    try:
+        from flask import Flask
+
+        app = Flask(__name__)
+        blueprint = create_gui_blueprint(project_root=project_root, host=host, port=port, url_prefix=None)
+        app.register_blueprint(blueprint)
+        return app
+    except Exception as exc:
+        helper = _module_helper(project_root)
+        helper.record_module_error(
+            message=f"Failed to create Hollogram GUI app: {exc}",
+            source="modules/hollogram/__init__.py:create_gui_app",
+            error_type=type(exc).__name__,
+            priority=TicketPriority.P2,
+        )
+        raise
+
+
+def run_gui(
+    host: Optional[str] = None,
+    port: Optional[int] = None,
+    project_root: Optional[Union[str, Path]] = None,
+    debug: bool = False,
+) -> None:
+    """Run the Hollogram GUI on the configured host/port."""
+    helper = _module_helper(project_root)
+    resolved_host, resolved_port = helper.resolve_host_port(host, port)
+    try:
+        app = create_gui_app(project_root=project_root, host=resolved_host, port=resolved_port)
+        log_event(
+            "HOLLOGRAM_GUI_START",
+            f"Hollogram GUI running at http://{resolved_host}:{resolved_port}",
+            extra={"host": resolved_host, "port": resolved_port, "module": "modules.hollogram"},
+            source="modules.hollogram.run_gui",
+        )
+        app.run(host=resolved_host, port=resolved_port, debug=debug)
+    except Exception as exc:
+        helper.record_module_error(
+            message=f"Failed to start Hollogram GUI: {exc}",
+            source="modules/hollogram/__init__.py:run_gui",
+            error_type=type(exc).__name__,
+            priority=TicketPriority.P1,
+        )
+        raise
+
+
+_GUI_HTML = """<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hollogram Research Console</title>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f3efe6;
+      --panel: #fbf8f2;
+      --ink: #1f1e1a;
+      --muted: #6d685f;
+      --accent: #0f6b5a;
+      --accent-2: #d96f3a;
+      --border: #d7cfc1;
+      --shadow: 0 24px 70px rgba(17, 14, 4, 0.12);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Space Grotesk", "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at 12% 10%, #ffffff 0%, #f7f1e2 35%, #ece5d7 68%),
+        linear-gradient(120deg, #f9f4ea, #efe8da);
+      color: var(--ink);
+      min-height: 100vh;
+    }
+    header {
+      padding: 42px 24px 12px;
+      text-align: center;
+    }
+    h1 {
+      font-family: "Fraunces", serif;
+      font-size: clamp(36px, 6vw, 64px);
+      margin: 0;
+      letter-spacing: -1px;
+    }
+    h1 span {
+      color: var(--accent);
+    }
+    .tagline {
+      margin-top: 12px;
+      color: var(--muted);
+      font-size: 16px;
+    }
+    main {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 0 24px 60px;
+      display: grid;
+      gap: 24px;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 22px;
+      padding: 24px;
+      box-shadow: var(--shadow);
+    }
+    .panel h2 {
+      margin-top: 0;
+      font-size: 20px;
+      letter-spacing: 0.4px;
+    }
+    .stack {
+      display: grid;
+      gap: 14px;
+    }
+    label {
+      font-size: 13px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--muted);
+    }
+    input, select, textarea {
+      width: 100%;
+      padding: 12px 14px;
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      font-size: 15px;
+      font-family: inherit;
+      background: #fff;
+      color: var(--ink);
+    }
+    textarea { min-height: 160px; resize: vertical; }
+    .row {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .row > * { flex: 1; min-width: 180px; }
+    .button {
+      appearance: none;
+      border: none;
+      background: linear-gradient(135deg, var(--accent), #0b4a3e);
+      color: #fff;
+      padding: 12px 18px;
+      border-radius: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+      box-shadow: 0 12px 28px rgba(15, 107, 90, 0.3);
+    }
+    .button.secondary {
+      background: linear-gradient(135deg, var(--accent-2), #b35126);
+      box-shadow: 0 12px 28px rgba(217, 111, 58, 0.3);
+    }
+    .button:disabled { opacity: 0.6; cursor: not-allowed; }
+    .button:hover:not(:disabled) { transform: translateY(-1px); }
+    .note {
+      font-size: 13px;
+      color: var(--muted);
+    }
+    .output {
+      white-space: pre-wrap;
+      line-height: 1.6;
+      font-size: 15px;
+    }
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .chip {
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: #fff;
+      border: 1px solid var(--border);
+      font-size: 12px;
+    }
+    .history-item {
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 12px;
+      background: #fff;
+      display: grid;
+      gap: 6px;
+    }
+    .history-meta {
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .status {
+      padding: 8px 12px;
+      border-radius: 12px;
+      background: #fef5ea;
+      border: 1px solid #f2d7be;
+      color: #9a4d1e;
+      font-size: 13px;
+    }
+    @media (max-width: 768px) {
+      main { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Hollogram <span>Research Console</span></h1>
+    <div class="tagline">Educational medical research assistant with safety-first responses.</div>
+  </header>
+  <main>
+    <section class="panel stack">
+      <h2>Research Brief</h2>
+      <div class="stack">
+        <label for="apiBase">API Base URL</label>
+        <input id="apiBase" type="text" value="http://127.0.0.1:5001" />
+        <div class="row">
+          <div class="stack">
+            <label for="category">Topic category</label>
+            <select id="category"></select>
+          </div>
+          <div class="stack">
+            <label for="historyLimit">History limit</label>
+            <input id="historyLimit" type="number" min="1" max="100" value="20" />
+          </div>
+        </div>
+        <label for="query">Research question</label>
+        <textarea id="query" placeholder="Ask about anatomy, medications, procedures, or research methods..."></textarea>
+        <label>
+          <input id="disclaimer" type="checkbox" />
+          I understand this is educational information only.
+        </label>
+        <button class="button" id="sendBtn">Submit research query</button>
+        <div class="status" id="status">Ready.</div>
+      </div>
+    </section>
+
+    <section class="panel stack">
+      <h2>Response</h2>
+      <div class="output" id="response">Your response will appear here.</div>
+      <div>
+        <h3>Citations</h3>
+        <div class="chips" id="citations"></div>
+      </div>
+    </section>
+
+    <section class="panel stack">
+      <h2>Recent History</h2>
+      <button class="button secondary" id="refreshHistory">Refresh history</button>
+      <div class="stack" id="historyList"></div>
+    </section>
+  </main>
+
+  <script>
+    const apiBaseInput = document.getElementById("apiBase");
+    const categorySelect = document.getElementById("category");
+    const queryInput = document.getElementById("query");
+    const disclaimerInput = document.getElementById("disclaimer");
+    const sendBtn = document.getElementById("sendBtn");
+    const statusEl = document.getElementById("status");
+    const responseEl = document.getElementById("response");
+    const citationsEl = document.getElementById("citations");
+    const historyBtn = document.getElementById("refreshHistory");
+    const historyList = document.getElementById("historyList");
+    const historyLimitInput = document.getElementById("historyLimit");
+
+    function setStatus(text, busy = false) {
+      statusEl.textContent = text;
+      sendBtn.disabled = busy;
+    }
+
+    async function fetchJson(path, options = {}) {
+      const url = apiBaseInput.value.replace(/\\/$/, "") + path;
+      const resp = await fetch(url, options);
+      if (!resp.ok) {
+        const text = await resp.text();
+        throw new Error(text || `HTTP ${resp.status}`);
+      }
+      return resp.json();
+    }
+
+    async function loadCategories() {
+      try {
+        const data = await fetchJson("/modules/hollogram/topics");
+        categorySelect.innerHTML = "";
+        data.topics.forEach(topic => {
+          const opt = document.createElement("option");
+          opt.value = topic.id;
+          opt.textContent = `${topic.name} — ${topic.description}`;
+          categorySelect.appendChild(opt);
+        });
+      } catch (err) {
+        setStatus(`Failed to load topics: ${err.message}`);
+      }
+    }
+
+    function renderCitations(list) {
+      citationsEl.innerHTML = "";
+      if (!list || !list.length) {
+        const chip = document.createElement("div");
+        chip.className = "chip";
+        chip.textContent = "No citations returned.";
+        citationsEl.appendChild(chip);
+        return;
+      }
+      list.forEach(item => {
+        const chip = document.createElement("div");
+        chip.className = "chip";
+        chip.textContent = item;
+        citationsEl.appendChild(chip);
+      });
+    }
+
+    async function runQuery() {
+      const query = queryInput.value.trim();
+      if (!query) {
+        setStatus("Add a research question first.");
+        return;
+      }
+      if (!disclaimerInput.checked) {
+        setStatus("Please accept the disclaimer before continuing.");
+        return;
+      }
+      setStatus("Submitting research query...", true);
+      responseEl.textContent = "";
+      try {
+        const payload = {
+          query,
+          category: categorySelect.value,
+          disclaimer_accepted: disclaimerInput.checked
+        };
+        const data = await fetchJson("/modules/hollogram/research", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify(payload)
+        });
+        if (data.urgent) {
+          responseEl.textContent = data.message + "\\n\\n" + data.action_required;
+          renderCitations([]);
+          setStatus("Urgent guidance returned.");
+          return;
+        }
+        responseEl.textContent = data.response || "No response returned.";
+        renderCitations(data.citations || []);
+        setStatus("Done.");
+        await loadHistory();
+      } catch (err) {
+        responseEl.textContent = "Error: " + err.message;
+        renderCitations([]);
+        setStatus("Query failed.");
+      } finally {
+        sendBtn.disabled = false;
+      }
+    }
+
+    async function loadHistory() {
+      historyList.innerHTML = "";
+      const limit = Math.max(1, Math.min(100, Number(historyLimitInput.value || 20)));
+      try {
+        const data = await fetchJson(`/modules/hollogram/history?limit=${limit}`);
+        if (!data.history || !data.history.length) {
+          const item = document.createElement("div");
+          item.className = "note";
+          item.textContent = "No history recorded yet.";
+          historyList.appendChild(item);
+          return;
+        }
+        data.history.forEach(entry => {
+          const card = document.createElement("div");
+          card.className = "history-item";
+          card.innerHTML = `
+            <div><strong>${entry.query}</strong></div>
+            <div class="history-meta">${entry.category} · ${entry.timestamp}</div>
+            <div class="note">${entry.response}</div>
+          `;
+          historyList.appendChild(card);
+        });
+      } catch (err) {
+        const item = document.createElement("div");
+        item.className = "note";
+        item.textContent = "History unavailable: " + err.message;
+        historyList.appendChild(item);
+      }
+    }
+
+    sendBtn.addEventListener("click", runQuery);
+    historyBtn.addEventListener("click", loadHistory);
+
+    loadCategories();
+    loadHistory();
+  </script>
+</body>
+</html>
+"""

@@ -42,7 +42,7 @@ def test_module_health_timeout(tmp_path, monkeypatch):
 
     app = api.create_app(project_root=tmp_path)
     client = app.test_client()
-    response = client.get("/api/modules/yhatzee/health")
+    response = client.get("/api/modules/yahtzee/health")
 
     assert response.status_code == 504
     payload = response.get_json()
