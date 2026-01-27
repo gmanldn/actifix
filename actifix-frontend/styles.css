@@ -114,7 +114,7 @@ h1, h2, h3, h4, h5, h6, .panel-title, .metric-label {
 
 .header-stats {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   gap: var(--spacing-sm);
 }
 
@@ -394,6 +394,8 @@ h1, h2, h3, h4, h5, h6, .panel-title, .metric-label {
   font-size: var(--text-sm);
   color: var(--text-muted);
   font-family: var(--font-family-sans);
+  white-space: normal;
+  word-wrap: break-word;
 }
 
 .metric-tile-trend {

@@ -133,6 +133,16 @@ client = create_module_test_client("yahtzee", url_prefix=None)
 assert client.get("/health").status_code == 200
 ```
 
+For more complete coverage, validate both the GUI route and the health check in the same test:
+```python
+from actifix.testing import create_module_test_client
+
+def test_yahtzee_module_routes():
+    client = create_module_test_client("yahtzee", url_prefix=None)
+    assert client.get("/").status_code == 200
+    assert client.get("/health").get_json() == {"status": "ok"}
+```
+
 ## Module configuration
 Module defaults and overrides live in `docs/FRAMEWORK_OVERVIEW.md#module-configuration`.
 Set overrides via `ACTIFIX_MODULE_CONFIG_OVERRIDES` (JSON).

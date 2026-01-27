@@ -145,6 +145,40 @@ export ACTIFIX_MODULE_CONFIG_OVERRIDES='{"yahtzee": {"enabled": false}}'
 
 The override dictionary is merged after the module loader reads `MODULE_DEFAULTS` so modules continue to rely on the shared sanitize/override helpers described elsewhere in the docs.
 
+### Module performance budgets
+
+Performance budgets keep module UX responsive and ensure `modules.screenscan` and core API health remain stable. Use these targets when designing or upgrading modules:
+
+- **Route latency**: keep typical module endpoints under 150ms P95; anything above 300ms should trigger async/background processing.
+- **Startup time**: blueprints should register within 2 seconds; longer initialization must be deferred or cached.
+- **Memory growth**: avoid unbounded caches; retain short windows (e.g., 60s ring buffers) and prune regularly.
+- **Threading**: background workers must be non-blocking and report health; avoid long-running work on request threads.
+
+### Module upgrade checklist template
+
+Use this checklist when upgrading a module or introducing a new GUI:
+
+1. Confirm `MODULE_METADATA` and `MODULE_DEPENDENCIES` align with `docs/architecture/DEPGRAPH.json`.
+2. Update any module defaults or overrides in `MODULE_DEFAULTS` and ensure `ACTIFIX_MODULE_CONFIG_OVERRIDES` examples still apply.
+3. Validate `/health` and main GUI routes using `create_module_test_client` or integration tests.
+4. Emit AgentVoice info + error rows for major lifecycle events and exceptions.
+5. Record any new errors with `record_error()` and add regression tests where practical.
+
+### AgentVoice patterns (module example)
+
+Modules should emit both informational and error rows into AgentVoice. The shared `ModuleBase` helpers handle this when you call `helper.log_event(...)` and `helper.record_module_error(...)`, but a minimal example looks like:
+
+```python
+from actifix.agent_voice import record_agent_voice
+
+record_agent_voice(
+    "Module init complete",
+    agent_id="yahtzee",
+    run_label="yahtzee-gui",
+    level="INFO",
+)
+```
+
 Launching `scripts/start.py` now brings the PokerTool service online alongside the other modules. Use `--pokertool-port` to move it off `127.0.0.1:8060` or `--no-pokertool` to skip it when you only need the frontend/API stack. The module writes a `POKERTOOL_SERVICE_START` event to Actifix’s structured log repository so you can verify the service published a heartbeat while the launcher is running.
 
 The launcher now starts the standalone SuperQuiz GUI on its configured host/port (default `127.0.0.1:8070`) and probes `/health` to validate Flask and related dependencies before reporting the endpoint alongside the dashboard, backend, and Yahtzee servers. Use `--superquiz-port` to adjust the binding or `--no-superquiz` to skip the extra GUI when you do not need it.
