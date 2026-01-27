@@ -418,13 +418,23 @@ def _register_module_blueprint(
 
         blueprint = create_blueprint(project_root=project_root, host=host, port=port)
         blueprint_prefix = getattr(blueprint, "url_prefix", None)
-        if blueprint_prefix is None:
-            app.register_blueprint(blueprint, url_prefix=expected_prefix)
-        elif blueprint_prefix == expected_prefix:
-            app.register_blueprint(blueprint)
+
+        # Normalize hyphen/underscore for robustness
+        def normalize_prefix(p: str) -> str:
+            return p.replace('-', '_')
+
+        expected_norm = normalize_prefix(expected_prefix)
+        blueprint_norm = normalize_prefix(blueprint_prefix) if blueprint_prefix else None
+
+        if blueprint_norm is None or blueprint_norm == expected_norm:
+            if blueprint_prefix is None:
+                app.register_blueprint(blueprint, url_prefix=expected_prefix)
+            else:
+                app.register_blueprint(blueprint)
         else:
             raise ValueError(
-                f"Module {module_name} url_prefix mismatch: {blueprint_prefix} != {expected_prefix}"
+                f"Module {module_name} url_prefix mismatch: {blueprint_prefix} != {expected_prefix} "
+                f"(normalized: {blueprint_norm} != {expected_norm})"
             )
         register_access(module_name, access_rule)
         register_rate_limit(module_name)
