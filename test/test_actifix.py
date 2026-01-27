@@ -28,6 +28,13 @@ class TestActifixPaths:
             # Compare resolved paths to handle symlink resolution (e.g., /var -> /private/var on macOS)
             assert paths.base_dir == base.resolve()
 
+    def test_database_path_property(self):
+        from actifix.state_paths import get_actifix_paths
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            paths = get_actifix_paths(base_dir=Path(tmpdir) / "actifix")
+            assert paths.database_path == paths.base_dir / "actifix.db"
+
 
 class TestLogUtils:
     """Tests for log_utils module."""
@@ -143,6 +150,18 @@ class TestHealth:
             health = get_health(paths)
             assert health.status in ["OK", "WARNING", "ERROR", "SLA_BREACH"]
             assert health.open_tickets == 0
+
+    def test_database_ok_alias(self):
+        from actifix.health import get_health
+        from actifix.state_paths import get_actifix_paths, init_actifix_files
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            paths = get_actifix_paths(base_dir=Path(tmpdir) / "actifix")
+            init_actifix_files(paths)
+
+            health = get_health(paths)
+            assert hasattr(health, "database_ok")
+            assert health.database_ok == health.files_exist
 
 
 class TestIntegration:

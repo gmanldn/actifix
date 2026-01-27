@@ -164,6 +164,7 @@ See `CHANGELOG.md` for full history. Recent highlights:
 
 | Version | Highlights |
 |---------|------------|
+| **7.0.32** (2026-01-27) | Added compatibility helpers so `ActifixHealthCheck` exposes `database_ok` and `ActifixPaths` exposes `database_path`, preventing metrics exports or tooling from raising `AttributeError` when those attributes are referenced. |
 | **7.0.7** (2026-01-29) | Launcher now rebuilds the frontend via `scripts/build_frontend.py` before starting services so the GUI matches the backend version every time. The new `test/test_start_frontend_sync.py` ensures the build step fires and surfaces failures cleanly. |
 | **7.0.4** (2026-01-29) | Workflow enforcement release that now requires agents to read the README, AGENTS, and `docs/INDEX.md` (plus referenced docs) before making changes, keeping Actifix rules first. |
 | **7.0.2** (2026-01-28) | Patch release that makes `scripts/start.py` aggressively clean up stale Actifix processes and compiled bytecode before every launch so the runtime always begins from a clean slate. |

@@ -87,7 +87,7 @@ def export_prometheus_metrics(paths: Optional[ActifixPaths] = None) -> str:
         # Database health
         lines.append("# HELP actifix_database_healthy Database health status (1=healthy, 0=unhealthy)")
         lines.append("# TYPE actifix_database_healthy gauge")
-        db_healthy = 1 if health_data.files_exist else 0
+        db_healthy = 1 if health_data.database_ok else 0
         lines.append(f"actifix_database_healthy {db_healthy}")
         lines.append("")
 
@@ -144,7 +144,7 @@ def get_metrics_summary(paths: Optional[ActifixPaths] = None) -> Dict[str, Any]:
             },
             "health": {
             "overall_status": health_data.status,
-            "database": "healthy" if health_data.files_exist else "unhealthy",
+            "database": "healthy" if health_data.database_ok else "unhealthy",
             "storage": "healthy" if health_data.files_writable else "unhealthy",
             },
             "timestamp": int(time.time()),

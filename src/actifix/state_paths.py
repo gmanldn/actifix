@@ -48,6 +48,11 @@ class ActifixPaths:
     log_file: Path
 
     @property
+    def database_path(self) -> Path:
+        """Return the canonical SQLite database location."""
+        return self.base_dir / "actifix.db"
+
+    @property
     def data_dir(self) -> Path:
         """Alias for the Actifix data directory (base_dir)."""
         return self.base_dir

@@ -50,6 +50,11 @@ class ActifixHealthCheck:
     warnings: list = field(default_factory=list)
     errors: list = field(default_factory=list)
 
+    @property
+    def database_ok(self) -> bool:
+        """Return whether the database artifact check passed."""
+        return self.files_exist
+
 
 def _parse_iso_datetime(iso_str: str) -> Optional[datetime]:
     """Parse ISO datetime string."""

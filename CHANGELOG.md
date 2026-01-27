@@ -13,6 +13,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [7.0.32] - 2026-01-27
+
+### Fixed
+- Exposed `ActifixHealthCheck.database_ok` and `ActifixPaths.database_path` so metrics exports and instrumentation referencing those fields no longer raise `AttributeError` (addresses ACT-20260125-56327 and ACT-20260125-70349).
+
 ## [7.0.7] - 2026-01-29
 
 ### Added
