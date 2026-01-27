@@ -292,18 +292,13 @@ def _validate_module_dependencies(
     if not isinstance(dependencies, list):
         return ["dependencies_invalid"]
     if not depgraph_edges:
-        log_event(
-            "MODULE_DEPENDENCY_VALIDATION_SKIPPED",
-            f"Skipped dependency validation for {module_name}: DEPGRAPH.json unavailable",
-            extra={"module": module_name, "dependencies": dependencies},
-            source="api.py:_validate_module_dependencies",
-        )
-        return []
+        return ["depgraph_missing"]
     module_id = f"modules.{module_name}"
     missing = [dep for dep in dependencies if (module_id, dep) not in depgraph_edges]
     if missing:
         return [f"missing_edges: {sorted(missing)}"]
     return []
+
 
 
 def _register_module_blueprint(

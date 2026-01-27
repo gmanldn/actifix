@@ -670,6 +670,9 @@ def report_runtime_status(args: argparse.Namespace, host: str = "127.0.0.1") -> 
     if not args.no_pokertool:
         services.append(("PokerTool", args.pokertool_port, f"http://localhost:{args.pokertool_port}/"))
 
+    if not args.no_hollogram:
+        services.append(("Hollogram", args.hollogram_port, f"http://localhost:{args.hollogram_port}/"))
+
     for name, port, url in services:
         running = is_port_in_use(int(port))
         marker = "RUNNING" if running else "DOWN"
