@@ -117,6 +117,25 @@ The launcher now starts the Hollogram GUI on its configured host/port (default `
 3. Ticket stored in `data/actifix.db`.
 4. DoAF or CLI processes tickets, records completion evidence, and updates status.
 
+## GitHub issue sync
+
+`scripts/github_issue_sync.py` can publish selected tickets to GitHub so that
+your broader engineering workflows track the most critical Actifix findings.
+
+Key points:
+
+- **Repository**: Set `ACTIFIX_GITHUB_REPO=owner/repo` (or pass `--repo`) to declare the
+  target repository. The script requires a GitHub token, either via
+  `ACTIFIX_GITHUB_TOKEN` or by storing a credential named `github_token`.
+- **Selection**: Provide `--tickets` or `--run-label` to pick which open tickets
+  should be synced. Use `--force` to re-sync already-synchronized tickets.
+- **Templates**: Override `--title-template`/`--body-template` to adjust the GitHub issue title/body.
+- **Metadata**: Successful syncs populate the new ticket columns
+  (`github_issue_url`, `github_issue_number`, `github_sync_state`, `github_sync_message`),
+  allowing other tooling to detect which issues already have GitHub coverage.
+- **Error capture**: Failures emit Raise_AF tickets with `TicketPriority.P2`, keeping the
+  ticket stream consistent with Actifix quality expectations.
+
 ## Background ticket agent
 Actifix can run a long-lived ticket agent loop with lease renewal and idle backoff:
 
@@ -164,6 +183,7 @@ See `CHANGELOG.md` for full history. Recent highlights:
 
 | Version | Highlights |
 |---------|------------|
+| **7.0.33** (2026-01-27) | Added GitHub issue sync capabilities (`scripts/github_issue_sync.py`, new ticket metadata fields, and documentation) so high-value tickets can be tracked in GitHub with recorded issue URLs. |
 | **7.0.32** (2026-01-27) | Added compatibility helpers so `ActifixHealthCheck` exposes `database_ok` and `ActifixPaths` exposes `database_path`, preventing metrics exports or tooling from raising `AttributeError` when those attributes are referenced. |
 | **7.0.7** (2026-01-29) | Launcher now rebuilds the frontend via `scripts/build_frontend.py` before starting services so the GUI matches the backend version every time. The new `test/test_start_frontend_sync.py` ensures the build step fires and surfaces failures cleanly. |
 | **7.0.4** (2026-01-29) | Workflow enforcement release that now requires agents to read the README, AGENTS, and `docs/INDEX.md` (plus referenced docs) before making changes, keeping Actifix rules first. |

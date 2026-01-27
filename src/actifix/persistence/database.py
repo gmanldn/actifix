@@ -25,7 +25,7 @@ from typing import Optional, List, Dict, Any, Iterator
 from ..log_utils import log_event
 
 # Schema version for migrations
-SCHEMA_VERSION = 6
+SCHEMA_VERSION = 7
 
 
 class DatabaseSecurityError(Exception):
@@ -160,6 +160,10 @@ CREATE TABLE IF NOT EXISTS tickets (
     test_documentation_url TEXT,                       -- Optional: Link to test artifacts
     completion_verified_by TEXT,                       -- Optional: Who verified
     completion_verified_at TIMESTAMP,                  -- Optional: When verified
+    github_issue_url TEXT,
+    github_issue_number INTEGER,
+    github_sync_state TEXT DEFAULT 'pending',
+    github_sync_message TEXT,
     format_version TEXT DEFAULT '1.0',
 
     -- Checklist fields
@@ -561,6 +565,40 @@ class DatabasePool:
             # Execute the full schema (CREATE IF NOT EXISTS protects existing tables)
             conn.executescript(SCHEMA_SQL)
 
+        # Migration from v6 to v7: Add GitHub sync metadata
+        if from_version <= 6 and to_version >= 7:
+            try:
+                cursor = conn.execute("PRAGMA table_info(tickets)")
+                column_names = {row[1] for row in cursor.fetchall()}
+
+                if 'github_issue_url' not in column_names:
+                    conn.execute(
+                        "ALTER TABLE tickets ADD COLUMN github_issue_url TEXT"
+                    )
+                if 'github_issue_number' not in column_names:
+                    conn.execute(
+                        "ALTER TABLE tickets ADD COLUMN github_issue_number INTEGER"
+                    )
+                if 'github_sync_state' not in column_names:
+                    conn.execute(
+                        "ALTER TABLE tickets ADD COLUMN github_sync_state TEXT DEFAULT 'pending'"
+                    )
+                if 'github_sync_message' not in column_names:
+                    conn.execute(
+                        "ALTER TABLE tickets ADD COLUMN github_sync_message TEXT"
+                    )
+
+                conn.commit()
+            except sqlite3.Error as e:
+                try:
+                    conn.rollback()
+                except Exception as rollback_error:
+                    log_event(
+                        "DATABASE_ROLLBACK_FAILED",
+                        f"Failed to rollback migration v6->v7: {rollback_error}",
+                        extra={"migration": "v6_to_v7", "error": str(rollback_error)},
+                    )
+                    print(f"WARNING: Database migration rollback failed: {rollback_error}", file=sys.stderr)
         # Migration from v4 to v5: Add database audit log table
         if from_version <= 4 and to_version >= 5:
             try:

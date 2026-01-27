@@ -1130,7 +1130,7 @@ class TicketRepository:
             rows = cursor.fetchall()
 
             return [self._row_to_dict(row) for row in rows]
-    
+
     def _row_to_dict(self, row: sqlite3.Row) -> Dict[str, Any]:
         """Convert database row to dict."""
         return {
@@ -1161,6 +1161,10 @@ class TicketRepository:
             'test_documentation_url': row['test_documentation_url'],
             'completion_verified_by': row['completion_verified_by'],
             'completion_verified_at': deserialize_timestamp(row['completion_verified_at']),
+            'github_issue_url': _maybe_get(row, 'github_issue_url'),
+            'github_issue_number': _maybe_get(row, 'github_issue_number'),
+            'github_sync_state': _maybe_get(row, 'github_sync_state'),
+            'github_sync_message': _maybe_get(row, 'github_sync_message'),
             'format_version': row['format_version'],
             'documented': bool(row['documented']),
             'functioning': bool(row['functioning']),
@@ -1169,6 +1173,10 @@ class TicketRepository:
             'deleted': bool(row['deleted']),
             'deleted_at': deserialize_timestamp(row['deleted_at']),
         }
+
+
+def _maybe_get(row: sqlite3.Row, key: str):
+    return row[key] if key in row.keys() else None
 
 
 # Global repository instance

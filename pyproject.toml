@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "actifix"
-version = "7.0.32"
+version = "7.0.33"
 dependencies = [
     "gitignore_parser>=0.1.3",
 ]

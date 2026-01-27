@@ -13,6 +13,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [7.0.33] - 2026-01-27
+
+### Added
+- GitHub issue sync helper (`scripts/github_issue_sync.py`) plus schema metadata so selected tickets can publish issues in `owner/repo`, record `github_issue_url`/`github_issue_number`, and keep `github_sync_state`/`github_sync_message` for reviews.
+
+### Changed
+- Extended documentation and release notes to describe the GitHub sync workflow and configuration.
+
 ## [7.0.32] - 2026-01-27
 
 ### Fixed
