@@ -1038,6 +1038,17 @@ def record_error(
             # Webhook failures should not block ticket creation
             pass
 
+        # Send alert notification for high-priority tickets (Slack/Discord)
+        try:
+            if config.alert_webhook_enabled:
+                from .webhooks import send_ticket_alert_webhook
+                ticket_dict = repo.get_ticket(entry.entry_id)
+                if ticket_dict:
+                    send_ticket_alert_webhook(ticket_dict)
+        except Exception:
+            # Webhook failures should not block ticket creation
+            pass
+
         replay_fallback_queue(base_dir_path)
     except Exception:
         log_event(

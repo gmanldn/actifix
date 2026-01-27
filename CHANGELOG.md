@@ -13,6 +13,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [7.0.39] - 2026-01-27
+
+### Added
+- Added Slack/Discord alert webhook support for P0/P1 ticket creation.
+
+### Changed
+- Webhook dispatch now records AgentVoice and Raise_AF errors on delivery failures.
+
 ## [7.0.38] - 2026-01-27
 
 ### Added

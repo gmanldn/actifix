@@ -144,6 +144,11 @@ class ActifixConfig:
     webhook_urls: str = ""  # Comma-separated URLs for ticket event notifications
     webhook_enabled: bool = True  # Webhook dispatch enabled by default
 
+    # Alert Webhooks (Slack/Discord) for high-priority tickets
+    alert_webhook_urls: str = ""  # Comma-separated URLs for P0/P1 alerts
+    alert_webhook_enabled: bool = True
+    alert_webhook_priorities: str = "P0,P1"
+
     # Completion Hooks
     completion_hook_scripts: str = ""  # Comma-separated paths to scripts to run after ticket completion
     completion_hooks_enabled: bool = True  # Completion hooks enabled by default
@@ -317,6 +322,13 @@ def load_config(
 
         webhook_urls=_get_env_sanitized("ACTIFIX_WEBHOOK_URLS", "", value_type="string"),
         webhook_enabled=_parse_bool(_get_env_sanitized("ACTIFIX_WEBHOOK_ENABLED", "1", value_type="boolean")),
+        alert_webhook_urls=_get_env_sanitized("ACTIFIX_ALERT_WEBHOOK_URLS", "", value_type="string"),
+        alert_webhook_enabled=_parse_bool(
+            _get_env_sanitized("ACTIFIX_ALERT_WEBHOOK_ENABLED", "1", value_type="boolean")
+        ),
+        alert_webhook_priorities=_get_env_sanitized(
+            "ACTIFIX_ALERT_WEBHOOK_PRIORITIES", "P0,P1", value_type="string"
+        ),
 
         completion_hook_scripts=_get_env_sanitized("ACTIFIX_COMPLETION_HOOK_SCRIPTS", "", value_type="string"),
         completion_hooks_enabled=_parse_bool(_get_env_sanitized("ACTIFIX_COMPLETION_HOOKS_ENABLED", "1", value_type="boolean")),

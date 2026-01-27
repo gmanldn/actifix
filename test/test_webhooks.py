@@ -12,8 +12,10 @@ from actifix.webhooks import (
     send_webhook_notification,
     send_ticket_created_webhook,
     send_ticket_completed_webhook,
+    send_ticket_alert_webhook,
     _sanitize_ticket_for_webhook,
 )
+from actifix.config import reset_config
 
 
 class WebhookTestHandler(BaseHTTPRequestHandler):
@@ -210,3 +212,29 @@ def test_send_ticket_completed_webhook(webhook_server):
     received = WebhookTestHandler.received_webhooks[-1]
     assert received["event"] == "ticket.completed"
     assert received["ticket"]["status"] == "Completed"
+
+
+def test_send_ticket_alert_webhook(webhook_server, monkeypatch):
+    """Test Slack/Discord alert webhook helper."""
+    monkeypatch.setenv("ACTIFIX_ALERT_WEBHOOK_URLS", webhook_server)
+    monkeypatch.setenv("ACTIFIX_ALERT_WEBHOOK_ENABLED", "1")
+    monkeypatch.setenv("ACTIFIX_ALERT_WEBHOOK_PRIORITIES", "P0,P1")
+    reset_config()
+
+    ticket = {
+        "id": "ACT-333",
+        "priority": "P0",
+        "message": "Critical outage",
+        "source": "api.py:42",
+    }
+
+    success_count = send_ticket_alert_webhook(ticket)
+    assert success_count == 1
+    received = WebhookTestHandler.received_webhooks[-1]
+    assert received["event"] == "ticket.alert"
+    assert "text" in received
+    assert "content" in received
+
+    ticket["priority"] = "P2"
+    success_count = send_ticket_alert_webhook(ticket)
+    assert success_count == 0

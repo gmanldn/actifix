@@ -136,6 +136,20 @@ Key points:
 - **Error capture**: Failures emit Raise_AF tickets with `TicketPriority.P2`, keeping the
   ticket stream consistent with Actifix quality expectations.
 
+## Alert webhooks (Slack/Discord)
+
+Actifix can emit high-priority alerts to Slack or Discord via generic webhooks.
+Configure these in the environment:
+
+```
+ACTIFIX_ALERT_WEBHOOK_URLS="https://hooks.slack.com/services/..."
+ACTIFIX_ALERT_WEBHOOK_PRIORITIES="P0,P1"
+ACTIFIX_ALERT_WEBHOOK_ENABLED=1
+```
+
+Alerts are fired on ticket creation when the priority matches (default: P0/P1).
+Payloads include both `text` and `content` fields so they work with Slack and Discord.
+
 ## External log ingestion
 
 `scripts/ingest_error_logs.py` ingests external logs (plain text or JSONL) and
@@ -202,6 +216,7 @@ See `CHANGELOG.md` for full history. Recent highlights:
 
 | Version | Highlights |
 |---------|------------|
+| **7.0.39** (2026-01-27) | Added Slack/Discord alert webhooks for P0/P1 ticket creation and surfaced webhook delivery failures via AgentVoice + Raise_AF. |
 | **7.0.38** (2026-01-27) | Locked down remote access to logs/system/schema/Sentry ingestion with token-based auth, while keeping loopback requests trusted by default for local workflows. |
 | **7.0.37** (2026-01-27) | Added a module scaffolding CLI (`actifix.main modules create`) that generates module entrypoints, defaults, and a health test stub for faster module authoring. |
 | **7.0.36** (2026-01-27) | Enhanced external log ingestion with JSONL support, run label overrides, context controls, and tests for the ingest pipeline. |
