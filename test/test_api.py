@@ -273,6 +273,29 @@ class TestAPIEndpoints:
         assert 'uptime_seconds' in server
         assert 'start_time' in server
 
+    def test_remote_requests_require_auth(self, test_client):
+        """Remote requests should require auth for integration endpoints."""
+        remote_env = {"REMOTE_ADDR": "10.10.10.10"}
+
+        response = test_client.get('/api/logs', environ_base=remote_env)
+        assert response.status_code == 401
+
+        response = test_client.get('/api/system', environ_base=remote_env)
+        assert response.status_code == 401
+
+        response = test_client.get('/api/schema/tickets', environ_base=remote_env)
+        assert response.status_code == 401
+
+        response = test_client.get('/api/schema/events', environ_base=remote_env)
+        assert response.status_code == 401
+
+        response = test_client.post(
+            '/api/ingest/sentry',
+            json={"event_id": "remote-test"},
+            environ_base=remote_env,
+        )
+        assert response.status_code == 401
+
     def test_yahtzee_module_page(self, test_client):
         """Yahtzee module should render its HTML via the API."""
         response = test_client.get('/modules/yahtzee/')

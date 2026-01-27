@@ -1656,6 +1656,10 @@ def create_app(
     @app.route('/api/logs', methods=['GET'])
     def api_logs():
         """Get log entries (database-backed, with optional setup log file)."""
+        # Check authentication
+        if not _check_auth(request):
+            return jsonify({'error': 'Authorization required'}), 401
+
         log_type = request.args.get('type', 'audit')
         max_lines = request.args.get('lines', 100, type=int)
         if log_type == "setup":
@@ -1752,6 +1756,10 @@ def create_app(
     @app.route('/api/system', methods=['GET'])
     def api_system():
         """Get system information."""
+        # Check authentication
+        if not _check_auth(request):
+            return jsonify({'error': 'Authorization required'}), 401
+
         uptime_seconds = time.time() - SERVER_START_TIME
         hours, remainder = divmod(int(uptime_seconds), 3600)
         minutes, seconds = divmod(remainder, 60)
@@ -2153,6 +2161,10 @@ def create_app(
         Accepts Sentry event format and creates Actifix tickets.
         Compatible with Sentry SDK error reporting.
         """
+        # Check authentication (local-only default)
+        if not _check_auth(request):
+            return jsonify({'error': 'Authorization required'}), 401
+
         try:
             # Parse Sentry event from request
             event = request.get_json()
@@ -2360,6 +2372,10 @@ def create_app(
     @app.route('/api/schema/tickets', methods=['GET'])
     def api_schema_tickets():
         """Export JSON Schema for ticket data structure."""
+        # Check authentication
+        if not _check_auth(request):
+            return jsonify({'error': 'Authorization required'}), 401
+
         try:
             schema = {
                 "$schema": "http://json-schema.org/draft-07/schema#",
@@ -2454,6 +2470,10 @@ def create_app(
     @app.route('/api/schema/events', methods=['GET'])
     def api_schema_events():
         """Export JSON Schema for event data structure."""
+        # Check authentication
+        if not _check_auth(request):
+            return jsonify({'error': 'Authorization required'}), 401
+
         try:
             schema = {
                 "$schema": "http://json-schema.org/draft-07/schema#",

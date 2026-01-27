@@ -152,6 +152,8 @@ Highlights:
   (`ingest_error_logs.py:<file>:<line>` or `ingest_error_logs.py:stdin:<line>`).
 - **Safety**: `--no-context` disables file/system context capture, and
   `--max-lines` caps the number of entries processed.
+- **Auth**: remote integrations must include `Authorization: Bearer <token>`;
+  loopback requests are allowed by default for local development.
 
 ## Background ticket agent
 Actifix can run a long-lived ticket agent loop with lease renewal and idle backoff:
@@ -200,6 +202,7 @@ See `CHANGELOG.md` for full history. Recent highlights:
 
 | Version | Highlights |
 |---------|------------|
+| **7.0.38** (2026-01-27) | Locked down remote access to logs/system/schema/Sentry ingestion with token-based auth, while keeping loopback requests trusted by default for local workflows. |
 | **7.0.37** (2026-01-27) | Added a module scaffolding CLI (`actifix.main modules create`) that generates module entrypoints, defaults, and a health test stub for faster module authoring. |
 | **7.0.36** (2026-01-27) | Enhanced external log ingestion with JSONL support, run label overrides, context controls, and tests for the ingest pipeline. |
 | **7.0.33** (2026-01-27) | Added GitHub issue sync capabilities (`scripts/github_issue_sync.py`, new ticket metadata fields, and documentation) so high-value tickets can be tracked in GitHub with recorded issue URLs. |

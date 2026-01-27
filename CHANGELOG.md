@@ -13,6 +13,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [7.0.38] - 2026-01-27
+
+### Added
+- Added API tests asserting remote requests to integration endpoints require authentication.
+
+### Changed
+- Enforced auth checks for remote access to logs, system info, schema endpoints, and Sentry ingestion while keeping loopback requests trusted by default.
+
 ## [7.0.37] - 2026-01-27
 
 ### Added

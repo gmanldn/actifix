@@ -15,6 +15,10 @@ Actifix uses a secure authentication system with:
 - **JWT token-based authentication** for API access
 - **SQLite database** for storing user credentials and tokens
 
+By default, Actifix treats loopback requests as trusted for read-only access.
+Non-local requests must include an admin password or `Authorization: Bearer <token>`
+for protected endpoints, including integration routes like `/api/ingest/sentry`.
+
 **New Flow:**
 1. Dashboard boots instantly - view tickets, stats, logs without login
 2. Click admin actions → password modal → enter admin password → actions enabled
@@ -271,7 +275,9 @@ The API implements rate limiting to prevent brute force attacks:
 
 ### Protected Endpoints (Require Authentication)
 
-All API endpoints except `/api/auth/login` and `/api/auth/create-first-user` require authentication.
+All API endpoints except `/api/auth/login`, `/api/auth/create-first-user`, and
+`/api/auth/verify-password` require authentication. Local loopback requests are
+allowed by default, while remote integrations must use an admin password or token.
 
 Example protected endpoints:
 - `/api/health` - System health check
