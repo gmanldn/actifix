@@ -9,7 +9,7 @@ const { useState, useEffect, useRef, createElement: h } = React;
 // API Configuration
 // Dynamically construct API_BASE using window.location to match the frontend port
 const API_BASE = `${window.location.protocol}//${window.location.hostname}:5001/api`;
-const UI_VERSION = '7.0.41';
+const UI_VERSION = '7.0.42';
 const REFRESH_INTERVAL = 5000;
 const LOG_REFRESH_INTERVAL = 3000;
 const TICKET_REFRESH_INTERVAL = 4000;
@@ -819,6 +819,14 @@ const TicketsView = () => {
   const [priorityFilter, setPriorityFilter] = useState('All');
   const [statusFilter, setStatusFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [savedViews, setSavedViews] = useState([]);
+  const SAVED_VIEWS_KEY = 'actifix_saved_views_v1';
+
+  useEffect(() => {
+    const saved = localStorage.getItem(SAVED_VIEWS_KEY);
+    if (saved) setSavedViews(JSON.parse(saved));
+  }, []);
+
 
   const fetchTicket = async (ticketId) => {
     if (!ticketId) return;
@@ -927,6 +935,22 @@ const TicketsView = () => {
       onClick: handleCardClick,
       onKeyDown: handleCardKeyDown
     },
+      h('div', { className: 'ticket-select' },
+        h('input', {
+          type: 'checkbox',
+          checked: selectedTickets.has(ticket.ticket_id),
+          onChange: (e) => {
+            const newSet = new Set(selectedTickets);
+            if (e.target.checked) {
+              newSet.add(ticket.ticket_id);
+            } else {
+              newSet.delete(ticket.ticket_id);
+            }
+            setSelectedTickets(newSet);
+          }
+        })
+      ),
+
       h('div', { className: 'ticket-card-header' },
         h('span', { className: `priority-badge ${priority.toLowerCase()}` }, priority),
         h('span', { className: `status-badge ${ticket.status}` }, ticket.status),
@@ -1126,6 +1150,42 @@ const TicketsView = () => {
               h('strong', null, 'Test Results: '), selectedTicket.test_results
             )
           ),
+          selectedTicket.completion_notes && selectedTicket.message && h('div', { style: sectionStyle },
+            h('div', { style: labelStyle }, 'Changes Diff'),
+            h('div', { style: { display: 'flex', gap: 'var(--spacing-md)', fontSize: '12px' } },
+              h('div', { style: { flex: 1, background: '#1a1a1a', padding: 'var(--spacing-sm)', borderRadius: 'var(--radius-sm)', maxHeight: '200px', overflow: 'auto' } },
+                h('div', { style: labelStyle }, 'Before (Issue)'),
+                h('pre', { style: { margin: 0, whiteSpace: 'pre-wrap', fontFamily: 'IBM Plex Mono, monospace' } }, selectedTicket.message.substring(0, 1000))
+              ),
+              h('div', { style: { flex: 1, background: '#1e3a1e', padding: 'var(--spacing-sm)', borderRadius: 'var(--radius-sm)', maxHeight: '200px', overflow: 'auto' } },
+                h('div', { style: labelStyle }, 'After (Resolution)'),
+                h('pre', { style: { margin: 0, whiteSpace: 'pre-wrap', fontFamily: 'IBM Plex Mono, monospace' } }, selectedTicket.completion_notes.substring(0, 1000))
+              )
+            )
+          ),
+          h('div', { style: sectionStyle },
+            h('div', { style: labelStyle }, 'Remediation Checklist'),
+            h('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 'var(--spacing-sm)' } },
+              [
+                { label: 'Documented', key: 'documented', status: selectedTicket.documented },
+                { label: 'Functioning', key: 'functioning', status: selectedTicket.functioning },
+                { label: 'Tested', key: 'tested', status: selectedTicket.tested },
+                { label: 'Completed', key: 'completed', status: selectedTicket.completed }
+              ].map(({ label, status }) =>
+                h('label', { style: { display: 'flex', alignItems: 'center', fontSize: '13px' } },
+                  h('input', {
+                    type: 'checkbox',
+                    checked: status || false,
+                    disabled: true,
+                    style: { marginRight: 'var(--spacing-xs)' }
+                  }),
+                  label
+                )
+              )
+            )
+          ),
+
+
           selectedTicket.file_context && Object.keys(selectedTicket.file_context).length > 0 && h('div', { style: sectionStyle },
             h('div', { style: labelStyle }, 'File Context'),
             Object.entries(selectedTicket.file_context).map(([file, content]) =>
@@ -1821,10 +1881,17 @@ const ModulesView = () => {
     return sortDir === 'asc' ? ' ↑' : ' ↓';
   };
 
+  const CRITICAL_MODULE_HINTS = ['screenscan'];
+  const isCriticalModule = (module) => {
+    const identifier = ((module.name || module.id || module.module_id) || '').toLowerCase();
+    return CRITICAL_MODULE_HINTS.some((needle) => identifier.includes(needle));
+  };
+
   const renderModuleTable = (title, modules, icon) => {
     const sortedModules = sortModules(modules);
     return h('div', { className: 'panel modules-panel' },
       h('div', { className: 'panel-header modules-header' },
+        h('div', { className: 'modules-note' }, 'Critical modules (screenscan, etc.) display extra warnings before toggling.'),
         h('div', { className: 'panel-title' },
           h('span', { className: 'panel-title-icon' }, icon),
           title
@@ -1862,10 +1929,11 @@ const ModulesView = () => {
               ),
               h('div', { className: 'table-cell actions' },
                 h('button', {
-                  className: `btn-small ${m.status === 'disabled' ? 'btn-success' : 'btn-warning'} ${['screenscan'].some(c => m.name.toLowerCase().includes(c)) && m.status === 'active' ? 'critical-warning' : ''}`,
+                  className: `btn-small ${m.status === 'disabled' ? 'btn-success' : 'btn-warning'} ${isCriticalModule(m) && m.status === 'active' ? 'critical-warning' : ''}`,
                   onClick: () => handleToggle(m.name, m.status),
-                  title: `Toggle ${m.name}${['screenscan'].some(c => m.name.toLowerCase().includes(c)) ? ' (CRITICAL - screenscan always-on)' : ''}`
-                }, m.status === 'disabled' ? 'Enable' : 'Disable')
+                  title: `Toggle ${m.name}${isCriticalModule(m) ? ' (Critical module – keep enabled)' : ''}`
+                }, m.status === 'disabled' ? 'Enable' : 'Disable'),
+                isCriticalModule(m) && h('span', { className: 'critical-chip', title: 'This module is critical and should stay enabled whenever possible.' }, 'Critical module')
 
               ),
               h('div', { className: 'table-cell summary truncate' }, m.summary || '—')

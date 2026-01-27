@@ -13,6 +13,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [7.0.42] - 2026-01-27
+
+### Added
+- Show inline warning chips and titles for critical modules (screenscan) so operators know not to disable always-on services.
+
+### Changed
+- Modules pane now includes a short note about critical module warnings and updated styling to highlight critical toggles.
+
 ## [7.0.40] - 2026-01-27
 
 ### Added

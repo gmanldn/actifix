@@ -15,6 +15,7 @@ This index keeps documentation discoverable and aligned with the Actifix workflo
 - **MODULE METADATA + HEALTH** `FRAMEWORK_OVERVIEW.md#module-metadata-and-permissions` - module metadata schema and health aggregation.
 - **MODULE LIFECYCLE** `FRAMEWORK_OVERVIEW.md#module-lifecycle-and-helpers` - ModuleBase helpers, ModuleRegistry discovery, and status persistence.
 - **AGENTVOICE (AGENTTHOUGHTS)** `FRAMEWORK_OVERVIEW.md#agentvoice-agentthoughts-review-log` - module info/error review stream in `data/actifix.db`.
+- **MODULE MANAGEMENT HINTS** `FRAMEWORK_OVERVIEW.md#module-management-hints` - critical module toggles now surface warning chips and tooltips.
 - **GITHUB ISSUE SYNC** `FRAMEWORK_OVERVIEW.md#github-issue-sync` - instructions for publishing tickets to GitHub and tracking the resulting issue metadata.
 - **ALERT WEBHOOKS (SLACK/DISCORD)** `FRAMEWORK_OVERVIEW.md#alert-webhooks-slackdiscord` - configure high-priority alerts for integrations.
 - **EXTERNAL LOG INGESTION** `FRAMEWORK_OVERVIEW.md#external-log-ingestion` - ingest plain/JSONL logs and create tickets with controlled defaults.

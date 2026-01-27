@@ -27,6 +27,12 @@ Actifix is a self-improving error management system that captures prioritized ti
 The dashboard includes a first-run walkthrough to orient new users to the main panes
 and workflows. You can reopen the walkthrough anytime from the header help icon.
 
+## Module management hints
+The Modules pane now highlights critical modules such as `screenscan` with a warning chip
+and an animated toggle button state so operators are reminded that those services must
+stay enabled except under controlled maintenance. The new hint also appears near the
+toggle button tooltip to explain the risk of disabling always-on modules.
+
 ## Architecture primer
 Core modules and their roles:
 - **bootstrap**: system initialization and development tracking (`src/actifix/bootstrap.py`).

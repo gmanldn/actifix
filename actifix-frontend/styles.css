@@ -718,6 +718,40 @@ h1, h2, h3, h4, h5, h6, .panel-title, .metric-label {
   padding: 4px 10px;
 }
 
+.modules-note {
+  font-size: 11px;
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.critical-chip {
+  margin-left: var(--spacing-sm);
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 10px;
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.critical-warning {
+  animation: pulse-warning 1.2s infinite alternate;
+  border-color: #dc2626;
+  color: #dc2626;
+}
+
+@keyframes pulse-warning {
+  from {
+    box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.4);
+  }
+  to {
+    box-shadow: 0 0 0 6px rgba(220, 38, 38, 0);
+  }
+}
+
 .modules-table {
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
