@@ -7,6 +7,7 @@ This index keeps documentation discoverable and aligned with the Actifix workflo
 - **QUICKSTART** `QUICKSTART.md` - fastest path to running Actifix
 - **INSTALLATION** `INSTALLATION.md` - installation and configuration details
 - **FRAMEWORK OVERVIEW** [`FRAMEWORK_OVERVIEW.md#dashboard-panes`](FRAMEWORK_OVERVIEW.md#dashboard-panes) - architecture, dashboard panes (incl. new Ideas pane), release notes, roadmap
+- **ONBOARDING WALKTHROUGH** `FRAMEWORK_OVERVIEW.md#onboarding-walkthrough` - first-run dashboard tour and reopen instructions.
 - **RELEASE NOTES** [`FRAMEWORK_OVERVIEW.md#release-notes-and-version-history`](FRAMEWORK_OVERVIEW.md#release-notes-and-version-history) - version history and highlights featuring the 7.0.7 release
 - **BACKGROUND TICKET AGENT** `FRAMEWORK_OVERVIEW.md#background-ticket-agent` - background DoAF loop usage and behavior
 - **BACKGROUND TICKET AGENT ROADMAP** `FRAMEWORK_OVERVIEW.md#background-ticket-agent-roadmap` - readiness gaps and tracked tickets for background processing

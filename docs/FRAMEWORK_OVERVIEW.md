@@ -23,6 +23,10 @@ Actifix is a self-improving error management system that captures prioritized ti
 - Module endpoints support access rules: public, local-only, auth-required.
 - Module endpoints are rate limited per module (default 60/min, 600/hour, 2000/day).
 
+## Onboarding walkthrough
+The dashboard includes a first-run walkthrough to orient new users to the main panes
+and workflows. You can reopen the walkthrough anytime from the header help icon.
+
 ## Architecture primer
 Core modules and their roles:
 - **bootstrap**: system initialization and development tracking (`src/actifix/bootstrap.py`).
@@ -216,6 +220,7 @@ See `CHANGELOG.md` for full history. Recent highlights:
 
 | Version | Highlights |
 |---------|------------|
+| **7.0.40** (2026-01-27) | Added a first-run onboarding walkthrough for the dashboard with a header help shortcut to reopen it. |
 | **7.0.39** (2026-01-27) | Added Slack/Discord alert webhooks for P0/P1 ticket creation and surfaced webhook delivery failures via AgentVoice + Raise_AF. |
 | **7.0.38** (2026-01-27) | Locked down remote access to logs/system/schema/Sentry ingestion with token-based auth, while keeping loopback requests trusted by default for local workflows. |
 | **7.0.37** (2026-01-27) | Added a module scaffolding CLI (`actifix.main modules create`) that generates module entrypoints, defaults, and a health test stub for faster module authoring. |

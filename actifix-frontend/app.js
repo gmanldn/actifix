@@ -9,7 +9,7 @@ const { useState, useEffect, useRef, createElement: h } = React;
 // API Configuration
 // Dynamically construct API_BASE using window.location to match the frontend port
 const API_BASE = `${window.location.protocol}//${window.location.hostname}:5001/api`;
-const UI_VERSION = '7.0.39';
+const UI_VERSION = '7.0.40';
 const REFRESH_INTERVAL = 5000;
 const LOG_REFRESH_INTERVAL = 3000;
 const TICKET_REFRESH_INTERVAL = 4000;
@@ -26,6 +26,10 @@ const setAdminPasswordInStorage = (value) => {
 };
 const clearAuthToken = () => setAdminPasswordInStorage('');
 const isAuthenticated = () => !!getAdminPassword();
+
+const ONBOARDING_STORAGE_KEY = 'actifix_onboarding_v1';
+const hasCompletedOnboarding = () => localStorage.getItem(ONBOARDING_STORAGE_KEY) === '1';
+const markOnboardingCompleted = () => localStorage.setItem(ONBOARDING_STORAGE_KEY, '1');
 
 const buildAdminHeaders = (initial = {}) => {
   const headers = { ...initial };
@@ -396,7 +400,7 @@ const FixToolbar = ({ onFix, isFixing, status }) => {
 };
 
 // Header Component
-const Header = ({ onFix, isFixing, fixStatus, theme, onToggleTheme, onLogout }) => {
+const Header = ({ onFix, isFixing, fixStatus, theme, onToggleTheme, onLogout, onOpenOnboarding }) => {
   const [connected, setConnected] = useState(false);
   const [time, setTime] = useState(new Date().toLocaleTimeString());
   const { data: health } = useFetch('/health', REFRESH_INTERVAL);
@@ -454,6 +458,20 @@ const Header = ({ onFix, isFixing, fixStatus, theme, onToggleTheme, onLogout }) 
       ),
       h(FixToolbar, { onFix, isFixing, status: fixStatus }),
       h(VersionBadge),
+      h('button', {
+        onClick: onOpenOnboarding,
+        title: 'Open onboarding walkthrough',
+        className: 'theme-toggle-btn',
+        style: {
+          background: 'transparent',
+          border: '1px solid var(--border)',
+          borderRadius: '999px',
+          padding: '4px 8px',
+          fontSize: '16px',
+          cursor: 'pointer',
+          color: 'var(--text-primary)'
+        }
+      }, '❓'),
       h('button', {
         onClick: onToggleTheme,
         title: `Switch to ${theme === 'dark' ? 'Portal light' : theme === 'portal' ? 'Azure light' : 'Dark'} theme`,
@@ -2543,6 +2561,39 @@ const LoginModal = ({ onClose, onSuccess }) => {
   );
 };
 
+const OnboardingModal = ({ step, stepIndex, totalSteps, onNext, onBack, onSkip, onNavigate }) => (
+  h('div', { className: 'onboarding-backdrop' },
+    h('div', { className: 'onboarding-card' },
+      h('div', { className: 'onboarding-header' },
+        h('span', { className: 'onboarding-pill' }, `Step ${stepIndex + 1} of ${totalSteps}`),
+        h('h2', null, step.title)
+      ),
+      h('p', { className: 'onboarding-body' }, step.body),
+      step.action && h('button', {
+        className: 'btn onboarding-action',
+        onClick: () => onNavigate(step.action.view),
+      }, step.action.label),
+      h('div', { className: 'onboarding-footer' },
+        h('button', {
+          className: 'btn btn-secondary',
+          onClick: onSkip,
+        }, 'Skip'),
+        h('div', { className: 'onboarding-nav' },
+          h('button', {
+            className: 'btn btn-secondary',
+            onClick: onBack,
+            disabled: stepIndex === 0,
+          }, 'Back'),
+          h('button', {
+            className: 'btn btn-primary',
+            onClick: onNext,
+          }, stepIndex + 1 === totalSteps ? 'Done' : 'Next')
+        )
+      )
+    )
+  )
+);
+
 // Main App Component
 const App = () => {
   const [activeView, setActiveView] = useState('overview');
@@ -2552,7 +2603,36 @@ const App = () => {
   const [theme, setTheme] = useState('dark');
   const [hasPassword, setHasPassword] = useState(!!getAdminPassword());
   const [showLoginModal, setShowLoginModal] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [onboardingStep, setOnboardingStep] = useState(0);
   const logFlashTimer = useRef(null);
+
+  const onboardingSteps = [
+    {
+      title: 'Welcome to Actifix',
+      body: 'This quick walkthrough highlights the key panes and actions so you can start triaging tickets immediately.',
+    },
+    {
+      title: 'Overview health snapshot',
+      body: 'Monitor open tickets, SLA pressure, and system health at a glance before diving deeper.',
+      action: { label: 'Open Overview', view: 'overview' },
+    },
+    {
+      title: 'Tickets + triage',
+      body: 'Use the Tickets pane to drill into P0/P1 issues, review context, and confirm completion evidence.',
+      action: { label: 'Open Tickets', view: 'tickets' },
+    },
+    {
+      title: 'Modules + Ideas',
+      body: 'Use Modules for GUI integrations and Ideas to capture product requests that auto-generate tickets.',
+      action: { label: 'Open Modules', view: 'modules' },
+    },
+    {
+      title: 'Settings + Logs',
+      body: 'Use Settings for AI provider config and Logs to track recent events while you work.',
+      action: { label: 'Open Settings', view: 'settings' },
+    },
+  ];
 
   const handleLogout = () => {
     clearAuthToken();
@@ -2570,6 +2650,12 @@ const App = () => {
     const savedTheme = localStorage.getItem('actifix-theme') || 'dark';
     setTheme(savedTheme);
     document.documentElement.dataset.theme = savedTheme;
+  }, []);
+
+  useEffect(() => {
+    if (!hasCompletedOnboarding()) {
+      setShowOnboarding(true);
+    }
   }, []);
 
   const toggleTheme = () => {
@@ -2598,6 +2684,34 @@ const App = () => {
     logFlashTimer.current = setTimeout(() => {
       setLogAlert(false);
     }, 4200);
+  };
+
+  const openOnboarding = () => {
+    setOnboardingStep(0);
+    setShowOnboarding(true);
+  };
+
+  const closeOnboarding = () => {
+    markOnboardingCompleted();
+    setShowOnboarding(false);
+  };
+
+  const handleOnboardingNext = () => {
+    if (onboardingStep + 1 >= onboardingSteps.length) {
+      closeOnboarding();
+    } else {
+      setOnboardingStep((current) => Math.min(current + 1, onboardingSteps.length - 1));
+    }
+  };
+
+  const handleOnboardingBack = () => {
+    setOnboardingStep((current) => Math.max(current - 1, 0));
+  };
+
+  const handleOnboardingNavigate = (view) => {
+    if (view) {
+      setActiveView(view);
+    }
   };
 
   const handleFix = async () => {
@@ -2667,12 +2781,21 @@ const App = () => {
 
   return h('div', { className: 'dashboard' },
     h(NavigationRail, { activeView, onViewChange: setActiveView, logAlert }),
-    h(Header, { onFix: handleFix, isFixing, fixStatus, theme, onToggleTheme: toggleTheme, onLogout: handleLogout, hasPassword, onLoginClick: openLoginModal }),
+    h(Header, { onFix: handleFix, isFixing, fixStatus, theme, onToggleTheme: toggleTheme, onLogout: handleLogout, onOpenOnboarding: openOnboarding, hasPassword, onLoginClick: openLoginModal }),
     h('main', { className: 'dashboard-content' },
       renderView()
     ),
     h(Footer),
-    showLoginModal && h(LoginModal, { onClose: () => setShowLoginModal(false), onSuccess: handleLoginSuccess })
+    showLoginModal && h(LoginModal, { onClose: () => setShowLoginModal(false), onSuccess: handleLoginSuccess }),
+    showOnboarding && h(OnboardingModal, {
+      step: onboardingSteps[onboardingStep],
+      stepIndex: onboardingStep,
+      totalSteps: onboardingSteps.length,
+      onNext: handleOnboardingNext,
+      onBack: handleOnboardingBack,
+      onSkip: closeOnboarding,
+      onNavigate: handleOnboardingNavigate,
+    })
   );
 };
 

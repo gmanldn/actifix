@@ -13,6 +13,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [7.0.40] - 2026-01-27
+
+### Added
+- Added a first-run onboarding walkthrough to the dashboard with a header help shortcut.
+
 ## [7.0.39] - 2026-01-27
 
 ### Added
