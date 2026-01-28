@@ -10,6 +10,7 @@ This index keeps documentation discoverable and aligned with the Actifix workflo
 - **ONBOARDING WALKTHROUGH** `FRAMEWORK_OVERVIEW.md#onboarding-walkthrough` - first-run dashboard tour and reopen instructions.
 - **RELEASE NOTES** [`FRAMEWORK_OVERVIEW.md#release-notes-and-version-history`](FRAMEWORK_OVERVIEW.md#release-notes-and-version-history) - version history and highlights featuring the 7.0.7 release
 - **BACKGROUND TICKET AGENT** `FRAMEWORK_OVERVIEW.md#background-ticket-agent` - background DoAF loop usage and behavior
+- **MULTI-AI RELAY AGENT PROPOSAL** `FRAMEWORK_OVERVIEW.md#multi-ai-relay-agent-proposal-planned` - planned handoff workflow, context snapshots, and provider order
 - **BACKGROUND TICKET AGENT ROADMAP** `FRAMEWORK_OVERVIEW.md#background-ticket-agent-roadmap` - readiness gaps and tracked tickets for background processing
 - **MODULE CONFIGURATION** `FRAMEWORK_OVERVIEW.md#module-configuration` - module defaults and override schema
 - **MODULE PERFORMANCE BUDGETS** `FRAMEWORK_OVERVIEW.md#module-performance-budgets` - latency, startup, and memory targets

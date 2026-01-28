@@ -246,6 +246,27 @@ ticket acquisition, dispatch, success, and failure.
 The launcher can run the agent alongside services via:
 `python3 scripts/start.py --ticket-agent`.
 
+### Multi-AI relay agent proposal (planned)
+The background agent currently relies on a single AI provider per run. The proposed
+multi-AI relay agent adds a deterministic handoff chain so long-running sessions can
+rotate between assistants when tokens are exhausted, while preserving context and
+respecting the Raise_AF workflow.
+
+**Proposal highlights (tracked in ACT-20260128-07539 / ACT-20260128-810F6 / ACT-20260128-C7682):**
+- **Ordered provider chain**: configurable list of AI providers/models (`ACTIFIX_AI_RELAY_ORDER`)
+  with explicit max-token/session budgets per provider.
+- **Context snapshots**: after each ticket step, write a compact summary into AgentVoice
+  (`agent_voice` table) plus a structured handoff payload in the ticket metadata (no secrets).
+- **Deterministic handoff**: when token budget is reached or provider fails, the relay
+  selects the next provider and resumes using the latest snapshot.
+- **Raise_AF compliance**: every relay step continues to require `ACTIFIX_CHANGE_ORIGIN=raise_af`
+  and records failures via `record_error()` before moving on.
+- **Safety constraints**: no raw logs/screenshots stored; scrub secrets and avoid persisting
+  large payloads in tickets.
+
+The relay agent is intentionally staged as a proposal so we can align implementation,
+testing, and documentation before automation is enabled in production.
+
 ## Background ticket agent roadmap
 Actifix is ready for manual/CLI processing today, but background ticket agents need dedicated work.
 The following tickets track the gap closures in detail:
