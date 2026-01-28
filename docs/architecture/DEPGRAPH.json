@@ -419,6 +419,12 @@
       "label": "cli_framework"
     },
     {
+      "id": "runtime.bootstrap_phases",
+      "domain": "runtime",
+      "owner": "runtime",
+      "label": "bootstrap_phases"
+    },
+    {
       "id": "modules.screenscan",
       "domain": "modules",
       "owner": "modules",
@@ -1316,6 +1322,21 @@
       "from": "runtime.cli_framework",
       "to": "infra.logging",
       "reason": "runtime.cli_framework depends on infra.logging"
+    },
+    {
+      "from": "runtime.bootstrap_phases",
+      "to": "infra.logging",
+      "reason": "runtime.bootstrap_phases depends on infra.logging"
+    },
+    {
+      "from": "runtime.bootstrap_phases",
+      "to": "core.raise_af",
+      "reason": "runtime.bootstrap_phases depends on core.raise_af"
+    },
+    {
+      "from": "runtime.bootstrap_phases",
+      "to": "infra.health",
+      "reason": "runtime.bootstrap_phases depends on infra.health"
     }
   ]
 }

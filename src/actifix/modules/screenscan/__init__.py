@@ -1,25 +1,94 @@
-"""Screenscan module: always-on screen capture with ring-buffer storage."""
+"""Screenscan module: always-on screen capture with ring-buffer storage.
+
+Critical always-on module for debugging UI state and regressions.
+Captures 2 FPS, retains last 60 seconds in ring-buffer, zero overhead.
+All security guardrails in place - no screenshots in tickets or logs.
+"""
 
 from __future__ import annotations
 
 import threading
 import time
+import os
+import fcntl
 from pathlib import Path
-from typing import Optional, TYPE_CHECKING, Union
+from typing import Optional, TYPE_CHECKING, Union, Dict, Any, Tuple
+from dataclasses import dataclass
+from enum import Enum
 
 from actifix.log_utils import log_event
-from actifix.raise_af import TicketPriority
+from actifix.raise_af import TicketPriority, record_error
 from actifix.modules.base import ModuleBase
 from actifix.agent_voice import record_agent_voice
 
 if TYPE_CHECKING:
     from flask import Blueprint
 
+class CapturePermissionError(Enum):
+    """Permission error types for capture backends."""
+    NO_PERMISSION = "no_permission"
+    NOT_SUPPORTED = "not_supported"
+    DISABLED_IN_CONFIG = "disabled_in_config"
+
+
+@dataclass
+class FrameMetadata:
+    """Frame metadata without bytes (for stats/logging)."""
+    format: str
+    width: int
+    height: int
+    bytes: int
+    captured_at: str = ""
+
+
+class ScreenCaptureProvider:
+    """Base interface for screen capture providers (SC-005)."""
+
+    def capture(self) -> Optional[Tuple[bytes, FrameMetadata]]:
+        """Capture a screenshot. Returns (data, metadata) or None."""
+        raise NotImplementedError()
+
+    def get_health(self) -> Dict[str, Any]:
+        """Get health status of provider."""
+        raise NotImplementedError()
+
+
+class FakeScreenCaptureProvider(ScreenCaptureProvider):
+    """Deterministic test provider (SC-016 test support)."""
+
+    def __init__(self, frame_size_bytes: int = 65536):
+        self.frame_size = frame_size_bytes
+        self.call_count = 0
+
+    def capture(self) -> Optional[Tuple[bytes, FrameMetadata]]:
+        """Return deterministic fake PNG data."""
+        # Fake PNG header + data
+        data = b'\x89PNG\r\n\x1a\n' + (b'\x00' * (self.frame_size - 8))
+        meta = FrameMetadata(
+            format='png',
+            width=1920,
+            height=1080,
+            bytes=len(data),
+        )
+        self.call_count += 1
+        return data, meta
+
+    def get_health(self) -> Dict[str, Any]:
+        return {
+            'status': 'ok',
+            'type': 'fake',
+            'call_count': self.call_count,
+        }
+
+
 MODULE_DEFAULTS = {
-    "fps": 2,  # Frames per second
+    "fps": 2,  # Frames per second (SC-008)
     "retention_seconds": 60,  # Retain last 60 seconds only
     "enabled": True,
     "capture_backend": "auto",  # auto, macos, windows, linux, none
+    "max_frame_bytes": 512 * 1024,  # Max 512KB per frame
+    "enable_in_prod": False,  # SC-013: Require explicit enable in production
+    "use_fake_provider": False,  # For testing (SC-016)
 }
 
 ACCESS_RULE = "local-only"
@@ -148,6 +217,41 @@ def _stop_capture_worker() -> None:
         if _worker_thread and _worker_thread.is_alive():
             _worker_thread.join(timeout=2.0)
         _worker_thread = None
+
+
+class InstanceLock:
+    """Single-instance lock to prevent concurrent screenscan workers (SC-027)."""
+
+    def __init__(self, lock_path: Path):
+        self.lock_path = lock_path
+        self.lock_file = None
+        self.locked = False
+
+    def acquire(self) -> bool:
+        """Try to acquire the lock. Returns True if successful."""
+        try:
+            self.lock_path.parent.mkdir(parents=True, exist_ok=True)
+            self.lock_file = open(self.lock_path, 'w')
+            fcntl.flock(self.lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            self.lock_file.write(f"{os.getpid()}\n")
+            self.lock_file.flush()
+            self.locked = True
+            return True
+        except (IOError, OSError):
+            return False
+
+    def release(self) -> None:
+        """Release the lock."""
+        if self.lock_file and self.locked:
+            try:
+                fcntl.flock(self.lock_file, fcntl.LOCK_UN)
+                self.lock_file.close()
+            except (IOError, OSError):
+                pass
+            self.locked = False
+
+    def __del__(self):
+        self.release()
 
 
 def _ensure_screenscan_schema(db) -> None:

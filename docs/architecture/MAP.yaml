@@ -85,6 +85,23 @@ modules:
   - consolidate 30+ CLI command variants into single framework
   depends_on:
   - infra.logging
+- id: runtime.bootstrap_phases
+  domain: runtime
+  owner: runtime
+  summary: Phase lifecycle registry with dependency tracking and cascading rollback
+  entrypoints:
+  - src/actifix/bootstrap_phases.py
+  contracts:
+  - explicit phase definitions with dependencies and timeouts
+  - topological sort for execution order
+  - structured event emission for phase start/end/failure
+  - cascading rollback in reverse dependency order
+  - correlation ID tracking for observability
+  - consolidate 27 phase definition tickets into unified system
+  depends_on:
+  - infra.logging
+  - core.raise_af
+  - infra.health
 - id: runtime.state
   domain: runtime
   owner: runtime
