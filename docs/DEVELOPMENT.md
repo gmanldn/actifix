@@ -306,9 +306,10 @@ The remaining readiness work is tracked in:
 ### Multi-AI relay agent
 To support long-running ticket processing across multiple AI assistants, the relay
 agent introduces an ordered provider chain, context handoff snapshots, and mandatory
-quality gates per ticket. Use `scripts/do_af_local_automation.py` to run the
-per-ticket automation sequence (tests, version bump, frontend rebuild, commit, push)
-so the agent workflow stays reproducible in local environments.
+quality gates per ticket. Use `scripts/do_af_local_automation.py` (with
+`ACTIFIX_CHANGE_ORIGIN=raise_af` plus the ticket ID) to run the per-ticket automation
+sequence (tests, version bump, frontend rebuild, commit, push) so the agent workflow
+stays reproducible in local environments.
 
 **Relay config:**
 - `ACTIFIX_AI_RELAY_ORDER` - comma-separated provider list (e.g. `claude_api,openai,free_alternative`).

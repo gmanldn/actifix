@@ -32,6 +32,13 @@ Be reluctant to make new scripts or entire new systems unless you've checked for
 
 11. **Automation hook helper**: For automation tickets (e.g., ACT-20260128-810F6, ACT-20260128-E7C5A) use `scripts/ do_af_local_automation.py --ticket <TICKET-ID>` to run lint/tests, bump `pyproject.toml`, rebuild the frontend, and push the commit after every local automation run before calling `mark_ticket_complete()`.
 
+## Agent Guidelines
+- prefer `rg`/`rg --files` for search; fallback only when unavailable.
+- choose repository-specific tools (`read_file`, `apply_patch`, `git`, etc.) over raw shell commands when possible.
+- when reading files, batch and parallelize tool calls as much as feasible, using `multi_tool_use.parallel` when allowed.
+- preserve ASCII encoding, avoid reformating or adding comments without necessity, and follow repository conventions for error handling and logging.
+- stay autonomous: implement, test, and deliver results in a single flow unless blocked; do not end turns with only analysis.
+
 ```bash
 # Commit convention
 git commit -m "type(scope): description"
