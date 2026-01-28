@@ -240,6 +240,10 @@ def test_process_next_ticket_with_handler(tmp_path):
     paths = get_actifix_paths(project_root=tmp_path)
     init_actifix_files(paths)
 
+    # Create README.md for completion validation
+    readme = Path(paths.project_root) / "README.md"
+    readme.write_text("test repo", encoding="utf-8")
+
     entry = _create_ticket("ACT-20260111-ZZZZ", TicketPriority.P3)
 
     def handler(info: TicketInfo) -> bool:
