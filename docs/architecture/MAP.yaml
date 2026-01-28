@@ -293,6 +293,24 @@ modules:
   depends_on:
   - infra.logging
 
+- id: infra.persistence.sqlite_robustness
+  domain: infra
+  owner: persistence
+  summary: SQLite robustness manager with WAL safety, corruption detection, and backup/restore
+  entrypoints:
+  - src/actifix/persistence/sqlite_robustness.py
+  contracts:
+  - enforce safety PRAGMAs (WAL, synchronous modes)
+  - detect corruption and quarantine corrupted databases
+  - backup/restore with checkpointing and verification
+  - periodic maintenance (checkpoint, VACUUM)
+  - lock storm detection and recovery
+  - consolidate 30 SQLite robustness tickets into single framework
+  depends_on:
+  - infra.logging
+  - core.raise_af
+  - infra.health
+
 - id: infra.persistence.ticket_repo
   domain: infra
   owner: persistence

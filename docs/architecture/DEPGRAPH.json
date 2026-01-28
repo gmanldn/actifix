@@ -125,6 +125,12 @@
       "label": "database"
     },
     {
+      "id": "infra.persistence.sqlite_robustness",
+      "domain": "infra",
+      "owner": "persistence",
+      "label": "sqlite_robustness"
+    },
+    {
       "id": "infra.persistence.ticket_repo",
       "domain": "infra",
       "owner": "persistence",
@@ -597,6 +603,21 @@
       "from": "infra.persistence.database",
       "to": "infra.logging",
       "reason": "infra.persistence.database depends on infra.logging"
+    },
+    {
+      "from": "infra.persistence.sqlite_robustness",
+      "to": "infra.logging",
+      "reason": "infra.persistence.sqlite_robustness depends on infra.logging"
+    },
+    {
+      "from": "infra.persistence.sqlite_robustness",
+      "to": "core.raise_af",
+      "reason": "infra.persistence.sqlite_robustness depends on core.raise_af"
+    },
+    {
+      "from": "infra.persistence.sqlite_robustness",
+      "to": "infra.health",
+      "reason": "infra.persistence.sqlite_robustness depends on infra.health"
     },
     {
       "from": "infra.persistence.ticket_repo",
