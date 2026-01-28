@@ -88,6 +88,9 @@ Actifix paths handy, exposes a default health response, and centralizes `log_eve
 `record_error` calls so every module records errors with a consistent run label
 (e.g., `superquiz-gui`).
 
+`ModuleBase` also includes `health_handler()` for standard `/health` endpoints and
+`error_boundary(...)` to wrap route handlers with Raise_AF + AgentVoice error capture.
+
 The API also walks every `modules.*` node declared in `docs/architecture/DEPGRAPH.json`
 via `ModuleRegistry`. The registry lazy-imports `actifix.modules.<name>`, persists
 enable/disable/error states inside `.actifix/module_statuses.json` (atomic writes,

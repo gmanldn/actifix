@@ -6,10 +6,11 @@
 from __future__ import annotations
 
 import os
+from functools import wraps
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Callable, Any
 
 from actifix.log_utils import log_event
 from actifix.raise_af import TicketPriority, record_error, redact_secrets_from_text
@@ -94,6 +95,39 @@ class ModuleBase:
             "module": self.module_key,
             "module_id": self.module_id,
         }
+
+    def health_handler(self) -> Callable[[], dict[str, object]]:
+        """Return a callable suitable for a /health route."""
+        def _handler() -> dict[str, object]:
+            return self.health_response()
+        return _handler
+
+    def error_boundary(
+        self,
+        *,
+        source: str,
+        error_type: str = "ModuleError",
+        priority: TicketPriority | str = TicketPriority.P2,
+        response: Optional[Callable[[Exception], Any]] = None,
+    ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+        """Decorator that wraps a handler with error capture and a safe response."""
+        def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
+            @wraps(func)
+            def wrapper(*args, **kwargs):
+                try:
+                    return func(*args, **kwargs)
+                except Exception as exc:
+                    self.record_module_error(
+                        message=f"{self.module_key} handler failed: {exc}",
+                        source=source,
+                        error_type=error_type,
+                        priority=priority,
+                    )
+                    if response:
+                        return response(exc)
+                    return {"error": str(exc)}, 500
+            return wrapper
+        return decorator
 
     def log_gui_init(
         self,

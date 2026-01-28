@@ -95,12 +95,15 @@ def create_blueprint(
             blueprint = Blueprint("{module_key}", __name__)
 
         @blueprint.route("/")
+        @helper.error_boundary(source="modules/{module_key}/__init__.py:index")
         def index():
             return jsonify({{"module": "{module_key}", "status": "ok"}})
 
+        health_handler = helper.health_handler()
+
         @blueprint.route("/health")
         def health():
-            return helper.health_response()
+            return health_handler()
 
         helper.log_gui_init(resolved_host, resolved_port)
         return blueprint
