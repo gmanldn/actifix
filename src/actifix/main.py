@@ -139,6 +139,54 @@ def cmd_diagnostics(args: argparse.Namespace) -> int:
         return 1
 
 
+def cmd_logs(args: argparse.Namespace) -> int:
+    """View recent Actifix event logs."""
+    from .persistence.event_repo import EventRepository, EventFilter
+
+    with ActifixContext(project_root=Path(args.project_root or Path.cwd())):
+        try:
+            if args.logs_action != "tail":
+                raise ValueError("logs_action is required (e.g., 'tail')")
+
+            filter = EventFilter(
+                event_type=args.event_type,
+                ticket_id=args.ticket_id,
+                correlation_id=args.correlation_id,
+                level=args.level,
+                source=args.source,
+                limit=args.limit,
+            )
+            repo = EventRepository()
+            events = repo.get_events(filter)
+            if not events:
+                print("No events found.")
+                return 0
+
+            print("=== Recent Event Log Entries ===")
+            for event in reversed(events):
+                timestamp = event.get("timestamp", "n/a")
+                level = event.get("level", "INFO")
+                event_type = event.get("event_type", "unknown")
+                message = event.get("message", "")
+                source = event.get("source", "")
+                ticket_id = event.get("ticket_id", "")
+                print(
+                    f"{timestamp} [{level}] {event_type} {message}"
+                    f"{' | source=' + source if source else ''}"
+                    f"{' | ticket=' + ticket_id if ticket_id else ''}"
+                )
+            return 0
+        except Exception as exc:
+            record_error(
+                message=f"Logs tail failed: {exc}",
+                source="actifix/main.py:cmd_logs",
+                error_type=type(exc).__name__,
+                priority=TicketPriority.P2,
+            )
+            print("Failed to read logs. See Actifix tickets.")
+            return 1
+
+
 def cmd_test(args: argparse.Namespace) -> int:
     """Run Actifix self-tests."""
     with ActifixContext(project_root=Path(args.project_root or Path.cwd())):
@@ -379,6 +427,17 @@ def main(argv: Optional[list[str]] = None) -> int:
         help="Exclude tickets from bundle",
     )
 
+    # Logs command
+    logs_parser = subparsers.add_parser("logs", help="Inspect event logs")
+    logs_subparsers = logs_parser.add_subparsers(dest="logs_action")
+    logs_tail_parser = logs_subparsers.add_parser("tail", help="Show recent event log entries")
+    logs_tail_parser.add_argument("--limit", type=int, default=50, help="Number of events to show")
+    logs_tail_parser.add_argument("--level", help="Filter by log level (INFO, WARNING, ERROR, etc.)")
+    logs_tail_parser.add_argument("--event-type", help="Filter by event type")
+    logs_tail_parser.add_argument("--source", help="Filter by source")
+    logs_tail_parser.add_argument("--ticket-id", help="Filter by ticket ID")
+    logs_tail_parser.add_argument("--correlation-id", help="Filter by correlation ID")
+
     # Test command
     test_parser = subparsers.add_parser("test", help="Run self-tests")
 
@@ -430,6 +489,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         "stats": cmd_stats,
         "quarantine": cmd_quarantine,
         "diagnostics": cmd_diagnostics,
+        "logs": cmd_logs,
         "test": cmd_test,
         "modules": cmd_modules,
         "doctor": cmd_doctor,

@@ -34,6 +34,9 @@ sqlite3 data/actifix.db "SELECT id, priority, created_at FROM tickets WHERE stat
 
 # Recent events
 sqlite3 data/actifix.db "SELECT timestamp, level, event_type, message FROM event_log ORDER BY timestamp DESC LIMIT 50;"
+
+# Recent events via CLI
+python3 -m actifix.main logs tail --limit 50
 ```
 
 ## Log locations
