@@ -207,6 +207,9 @@ def cleanup_test_tickets(
             stats['test_tickets_found'] += 1
             ticket_id = ticket.get('id') or ticket.get('ticket_id')
             if ticket_id:
+                if ticket.get('locked_by'):
+                    stats['locked_test_tickets_skipped'] = stats.get('locked_test_tickets_skipped', 0) + 1
+                    continue
                 tickets_to_clean.append(ticket_id)
 
     stats['test_tickets_cleaned'] = len(tickets_to_clean)
@@ -355,6 +358,7 @@ def run_automatic_cleanup(
         'dry_run': dry_run,
         'retention_policy': {},
         'test_cleanup': {},
+        'duplicate_cleanup': {},
     }
 
     # Apply retention policy to completed tickets
@@ -374,6 +378,14 @@ def run_automatic_cleanup(
             dry_run=dry_run
         )
         results['test_cleanup'] = test_stats
+
+    # Cleanup duplicate tickets
+    duplicate_stats = cleanup_duplicate_tickets(
+        repo,
+        min_age_hours=24.0,
+        dry_run=dry_run
+    )
+    results['duplicate_cleanup'] = duplicate_stats
 
     return results
 
@@ -399,8 +411,20 @@ def print_cleanup_report(results: Dict[str, Any]) -> None:
         print("TEST TICKET CLEANUP:")
         print("-" * 80)
         test = results['test_cleanup']
-        print(f"  Open test tickets found: {test.get('test_tickets_found', 0)}")
-        print(f"  Test tickets cleaned: {test.get('test_tickets_cleaned', 0)}")
+    print(f"  Open test tickets found: {test.get('test_tickets_found', 0)}")
+    print(f"  Test tickets cleaned: {test.get('test_tickets_cleaned', 0)}")
+    locked_skipped = test.get('locked_test_tickets_skipped', 0)
+    if locked_skipped:
+        print(f"  Locked test tickets skipped: {locked_skipped}")
+
+    if 'duplicate_cleanup' in results:
+        print("\n" + "-" * 80)
+        print("DUPLICATE TICKET CLEANUP:")
+        print("-" * 80)
+        dup = results['duplicate_cleanup']
+        print(f"  Duplicate groups found: {dup.get('duplicate_groups', 0)}")
+        print(f"  Duplicates closed: {dup.get('duplicates_closed', 0)}")
+        print(f"  Duplicates skipped (locked/recent): {dup.get('duplicates_skipped_locked', 0) + dup.get('duplicates_skipped_recent', 0)}")
 
     print("\n" + "=" * 80)
     if results['dry_run']:
