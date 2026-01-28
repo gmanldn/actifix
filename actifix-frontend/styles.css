@@ -1027,7 +1027,7 @@ h1, h2, h3, h4, h5, h6, .panel-title, .metric-label {
 .priority-lanes {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: var(--spacing-md);
+  gap: var(--spacing-sm);
 }
 
 .priority-lane {
@@ -1121,10 +1121,10 @@ h1, h2, h3, h4, h5, h6, .panel-title, .metric-label {
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-left: 3px solid var(--lane-accent);
   border-radius: var(--radius-md);
-  padding: var(--spacing-md);
+  padding: var(--spacing-sm);
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-sm);
+  gap: var(--spacing-xs);
   box-shadow: var(--shadow-sm);
   transition: transform 0.2s ease, border-color 0.2s ease;
   font-family: var(--font-family-sans);
