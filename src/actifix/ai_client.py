@@ -128,10 +128,10 @@ def resolve_provider_selection(
 
     if not normalized:
         return ProviderSelection(
-            provider=None,
-            model=model_value,
-            strict_preferred=False,
-            label="auto",
+            provider=AIProvider.FREE_ALTERNATIVE,
+            model=DEFAULT_FREE_MODEL,
+            strict_preferred=True,
+            label=DEFAULT_FREE_MODEL,
         )
 
     if normalized in {
