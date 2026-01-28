@@ -1025,6 +1025,23 @@ modules:
     - core.raise_af
     - runtime.api
 
+- id: modules.testmanifest
+  domain: modules
+  owner: modules
+  summary: Scaffolded test manifest module produced by the module CLI workflow
+  entrypoints:
+    - src/actifix/modules/testmanifest/__init__.py
+  contracts:
+    - expose a lightweight GUI with index/health endpoints for module validation tooling
+    - exercise ModuleBase logging, health, and dependency helpers in a safe example
+  depends_on:
+    - modules.base
+    - modules.config
+    - runtime.state
+    - infra.logging
+    - core.raise_af
+    - runtime.api
+
 contracts:
 - id: contract.logging
   summary: All modules must log via centralized logging system with correlation IDs

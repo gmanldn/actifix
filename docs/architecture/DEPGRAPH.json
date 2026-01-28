@@ -1,12 +1,12 @@
 {
   "schema_version": "arch-depgraph.v1",
   "meta": {
-    "generated_at": "2026-01-20T18:08:36.934780+00:00",
-    "generator": "codex-architecture-sync",
+    "generated_at": "2026-01-28T05:34:31.180581+00:00",
+    "generator": "map-to-depgraph",
     "generator_version": "1.0.0",
-    "source_commit": "current_development",
+    "source_commit": "develop",
     "notes": [
-      "Synced dependency graph with updated MAP.yaml modules and dependencies."
+      "Regenerated from MAP.yaml to keep nodes+edges in sync with module definitions."
     ]
   },
   "nodes": [
@@ -27,6 +27,18 @@
       "domain": "runtime",
       "owner": "runtime",
       "label": "config"
+    },
+    {
+      "id": "runtime.cli_framework",
+      "domain": "runtime",
+      "owner": "runtime",
+      "label": "cli_framework"
+    },
+    {
+      "id": "runtime.bootstrap_phases",
+      "domain": "runtime",
+      "owner": "runtime",
+      "label": "bootstrap_phases"
     },
     {
       "id": "runtime.state",
@@ -359,6 +371,12 @@
       "label": "scaffold"
     },
     {
+      "id": "modules.screenscan",
+      "domain": "modules",
+      "owner": "modules",
+      "label": "screenscan"
+    },
+    {
       "id": "modules.superquiz",
       "domain": "modules",
       "owner": "modules",
@@ -413,34 +431,22 @@
       "label": "artclass"
     },
     {
+      "id": "modules.hollogram",
+      "domain": "modules",
+      "owner": "modules",
+      "label": "hollogram"
+    },
+    {
       "id": "modules.shootymcshoot",
       "domain": "modules",
       "owner": "modules",
       "label": "shootymcshoot"
     },
     {
-      "id": "runtime.cli_framework",
-      "domain": "runtime",
-      "owner": "runtime",
-      "label": "cli_framework"
-    },
-    {
-      "id": "runtime.bootstrap_phases",
-      "domain": "runtime",
-      "owner": "runtime",
-      "label": "bootstrap_phases"
-    },
-    {
-      "id": "modules.screenscan",
+      "id": "modules.testmanifest",
       "domain": "modules",
       "owner": "modules",
-      "label": "screenscan"
-    },
-    {
-      "id": "modules.hollogram",
-      "domain": "modules",
-      "owner": "modules",
-      "label": "hollogram"
+      "label": "testmanifest"
     }
   ],
   "edges": [
@@ -498,6 +504,26 @@
       "from": "runtime.config",
       "to": "infra.logging",
       "reason": "runtime.config depends on infra.logging"
+    },
+    {
+      "from": "runtime.cli_framework",
+      "to": "infra.logging",
+      "reason": "runtime.cli_framework depends on infra.logging"
+    },
+    {
+      "from": "runtime.bootstrap_phases",
+      "to": "infra.logging",
+      "reason": "runtime.bootstrap_phases depends on infra.logging"
+    },
+    {
+      "from": "runtime.bootstrap_phases",
+      "to": "core.raise_af",
+      "reason": "runtime.bootstrap_phases depends on core.raise_af"
+    },
+    {
+      "from": "runtime.bootstrap_phases",
+      "to": "infra.health",
+      "reason": "runtime.bootstrap_phases depends on infra.health"
     },
     {
       "from": "runtime.state",
@@ -600,6 +626,11 @@
       "reason": "infra.persistence.ticket_cleanup depends on infra.persistence.ticket_repo"
     },
     {
+      "from": "infra.persistence.agent_voice_repo",
+      "to": "infra.persistence.database",
+      "reason": "infra.persistence.agent_voice_repo depends on infra.persistence.database"
+    },
+    {
       "from": "infra.persistence.database",
       "to": "infra.logging",
       "reason": "infra.persistence.database depends on infra.logging"
@@ -635,6 +666,26 @@
       "reason": "infra.persistence.ticket_repo depends on core.raise_af"
     },
     {
+      "from": "infra.metrics",
+      "to": "infra.logging",
+      "reason": "infra.metrics depends on infra.logging"
+    },
+    {
+      "from": "infra.metrics",
+      "to": "runtime.state",
+      "reason": "infra.metrics depends on runtime.state"
+    },
+    {
+      "from": "infra.metrics",
+      "to": "infra.persistence.ticket_repo",
+      "reason": "infra.metrics depends on infra.persistence.ticket_repo"
+    },
+    {
+      "from": "infra.metrics",
+      "to": "infra.health",
+      "reason": "infra.metrics depends on infra.health"
+    },
+    {
       "from": "core.raise_af",
       "to": "infra.logging",
       "reason": "core.raise_af depends on infra.logging"
@@ -658,6 +709,16 @@
       "from": "core.raise_af",
       "to": "core.webhooks",
       "reason": "core.raise_af depends on core.webhooks"
+    },
+    {
+      "from": "core.agent_voice",
+      "to": "core.raise_af",
+      "reason": "core.agent_voice depends on core.raise_af"
+    },
+    {
+      "from": "core.agent_voice",
+      "to": "infra.persistence.agent_voice_repo",
+      "reason": "core.agent_voice depends on infra.persistence.agent_voice_repo"
     },
     {
       "from": "core.webhooks",
@@ -828,6 +889,11 @@
       "from": "core.ai_client",
       "to": "runtime.state",
       "reason": "core.ai_client depends on runtime.state"
+    },
+    {
+      "from": "core.ai_client",
+      "to": "security.credentials",
+      "reason": "core.ai_client depends on security.credentials"
     },
     {
       "from": "core.error_taxonomy",
@@ -1065,6 +1131,31 @@
       "reason": "modules.scaffold depends on infra.logging"
     },
     {
+      "from": "modules.screenscan",
+      "to": "runtime.state",
+      "reason": "modules.screenscan depends on runtime.state"
+    },
+    {
+      "from": "modules.screenscan",
+      "to": "infra.logging",
+      "reason": "modules.screenscan depends on infra.logging"
+    },
+    {
+      "from": "modules.screenscan",
+      "to": "core.raise_af",
+      "reason": "modules.screenscan depends on core.raise_af"
+    },
+    {
+      "from": "modules.screenscan",
+      "to": "runtime.api",
+      "reason": "modules.screenscan depends on runtime.api"
+    },
+    {
+      "from": "modules.screenscan",
+      "to": "infra.persistence.database",
+      "reason": "modules.screenscan depends on infra.persistence.database"
+    },
+    {
       "from": "modules.superquiz",
       "to": "runtime.state",
       "reason": "modules.superquiz depends on runtime.state"
@@ -1225,36 +1316,6 @@
       "reason": "modules.artclass depends on runtime.api"
     },
     {
-      "from": "modules.shootymcshoot",
-      "to": "runtime.state",
-      "reason": "modules.shootymcshoot depends on runtime.state"
-    },
-    {
-      "from": "modules.shootymcshoot",
-      "to": "infra.logging",
-      "reason": "modules.shootymcshoot depends on infra.logging"
-    },
-    {
-      "from": "modules.shootymcshoot",
-      "to": "core.raise_af",
-      "reason": "modules.shootymcshoot depends on core.raise_af"
-    },
-    {
-      "from": "modules.shootymcshoot",
-      "to": "runtime.api",
-      "reason": "modules.shootymcshoot depends on runtime.api"
-    },
-    {
-      "from": "modules.hollogram",
-      "to": "modules.base",
-      "reason": "modules.hollogram depends on modules.base"
-    },
-    {
-      "from": "modules.hollogram",
-      "to": "modules.config",
-      "reason": "modules.hollogram depends on modules.config"
-    },
-    {
       "from": "modules.hollogram",
       "to": "runtime.state",
       "reason": "modules.hollogram depends on runtime.state"
@@ -1280,89 +1341,64 @@
       "reason": "modules.hollogram depends on core.ai_client"
     },
     {
-      "from": "infra.persistence.agent_voice_repo",
-      "to": "infra.persistence.database",
-      "reason": "infra.persistence.agent_voice_repo depends on infra.persistence.database"
+      "from": "modules.hollogram",
+      "to": "modules.base",
+      "reason": "modules.hollogram depends on modules.base"
     },
     {
-      "from": "core.agent_voice",
-      "to": "core.raise_af",
-      "reason": "core.agent_voice depends on core.raise_af"
+      "from": "modules.hollogram",
+      "to": "modules.config",
+      "reason": "modules.hollogram depends on modules.config"
     },
     {
-      "from": "core.agent_voice",
-      "to": "infra.persistence.agent_voice_repo",
-      "reason": "core.agent_voice depends on infra.persistence.agent_voice_repo"
-    },
-    {
-      "from": "infra.metrics",
-      "to": "infra.logging",
-      "reason": "infra.metrics depends on infra.logging"
-    },
-    {
-      "from": "infra.metrics",
+      "from": "modules.shootymcshoot",
       "to": "runtime.state",
-      "reason": "infra.metrics depends on runtime.state"
+      "reason": "modules.shootymcshoot depends on runtime.state"
     },
     {
-      "from": "infra.metrics",
-      "to": "infra.persistence.ticket_repo",
-      "reason": "infra.metrics depends on infra.persistence.ticket_repo"
-    },
-    {
-      "from": "infra.metrics",
-      "to": "infra.health",
-      "reason": "infra.metrics depends on infra.health"
-    },
-    {
-      "from": "core.ai_client",
-      "to": "security.credentials",
-      "reason": "core.ai_client depends on security.credentials"
-    },
-    {
-      "from": "modules.screenscan",
-      "to": "runtime.state",
-      "reason": "modules.screenscan depends on runtime.state"
-    },
-    {
-      "from": "modules.screenscan",
+      "from": "modules.shootymcshoot",
       "to": "infra.logging",
-      "reason": "modules.screenscan depends on infra.logging"
+      "reason": "modules.shootymcshoot depends on infra.logging"
     },
     {
-      "from": "modules.screenscan",
+      "from": "modules.shootymcshoot",
       "to": "core.raise_af",
-      "reason": "modules.screenscan depends on core.raise_af"
+      "reason": "modules.shootymcshoot depends on core.raise_af"
     },
     {
-      "from": "modules.screenscan",
+      "from": "modules.shootymcshoot",
       "to": "runtime.api",
-      "reason": "modules.screenscan depends on runtime.api"
+      "reason": "modules.shootymcshoot depends on runtime.api"
     },
     {
-      "from": "modules.screenscan",
-      "to": "infra.persistence.database",
-      "reason": "modules.screenscan depends on infra.persistence.database"
+      "from": "modules.testmanifest",
+      "to": "modules.base",
+      "reason": "modules.testmanifest depends on modules.base"
     },
     {
-      "from": "runtime.cli_framework",
+      "from": "modules.testmanifest",
+      "to": "modules.config",
+      "reason": "modules.testmanifest depends on modules.config"
+    },
+    {
+      "from": "modules.testmanifest",
+      "to": "runtime.state",
+      "reason": "modules.testmanifest depends on runtime.state"
+    },
+    {
+      "from": "modules.testmanifest",
       "to": "infra.logging",
-      "reason": "runtime.cli_framework depends on infra.logging"
+      "reason": "modules.testmanifest depends on infra.logging"
     },
     {
-      "from": "runtime.bootstrap_phases",
-      "to": "infra.logging",
-      "reason": "runtime.bootstrap_phases depends on infra.logging"
-    },
-    {
-      "from": "runtime.bootstrap_phases",
+      "from": "modules.testmanifest",
       "to": "core.raise_af",
-      "reason": "runtime.bootstrap_phases depends on core.raise_af"
+      "reason": "modules.testmanifest depends on core.raise_af"
     },
     {
-      "from": "runtime.bootstrap_phases",
-      "to": "infra.health",
-      "reason": "runtime.bootstrap_phases depends on infra.health"
+      "from": "modules.testmanifest",
+      "to": "runtime.api",
+      "reason": "modules.testmanifest depends on runtime.api"
     }
   ]
 }
