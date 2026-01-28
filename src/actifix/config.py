@@ -153,6 +153,9 @@ class ActifixConfig:
     completion_hook_scripts: str = ""  # Comma-separated paths to scripts to run after ticket completion
     completion_hooks_enabled: bool = True  # Completion hooks enabled by default
 
+    # Ideas Throttling
+    ideas_throttle_rate: int = 5  # Max ideas tickets per hour (default 5/hour)
+
 
 def _parse_bool(value: str) -> bool:
     """Parse boolean from string."""
@@ -332,6 +335,7 @@ def load_config(
 
         completion_hook_scripts=_get_env_sanitized("ACTIFIX_COMPLETION_HOOK_SCRIPTS", "", value_type="string"),
         completion_hooks_enabled=_parse_bool(_get_env_sanitized("ACTIFIX_COMPLETION_HOOKS_ENABLED", "1", value_type="boolean")),
+        ideas_throttle_rate=_parse_int(_get_env_sanitized("ACTIFIX_IDEAS_THROTTLE_RATE", "5", value_type="numeric"), 5),
     )
     
     # Validate configuration

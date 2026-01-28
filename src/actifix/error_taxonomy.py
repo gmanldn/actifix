@@ -322,6 +322,21 @@ class ErrorClassifier:
                     "Review integration configuration",
                     "Implement retry logic"
                 ]
+            ),
+            # High-Value Ideas (down-classify to P2)
+            ErrorPattern(
+                name="high_value_ideas",
+                category=ErrorCategory.BUSINESS_LOGIC,
+                severity=ErrorSeverity.MEDIUM,
+                priority=TicketPriority.P2,
+                keywords=["high-value", "hv", "ideas", "interop"],
+                regex_patterns=[r"high[-_]?value", r"ideas/high_value", r"run label.*high-value-ideas", r"dashboard ideas"],
+                description="High-value feature ideas from dashboard Ideas pane",
+                remediation_hints=[
+                    "Group similar ideas into consolidated tickets",
+                    "Prioritize based on business impact",
+                    "Implement backlog grooming for HV tickets"
+                ]
             )
         ]
 
