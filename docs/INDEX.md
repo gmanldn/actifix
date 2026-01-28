@@ -71,4 +71,4 @@ This index keeps documentation discoverable and aligned with the Actifix workflo
 | TROUBLESHOOTING | Updated | Common issues aligned to actual commands. |
 | VERSION_SYNC_SOLUTION | Updated | Version synchronization guidance refreshed for the current release and canonical pyproject flow. |
 
-_Last updated: 2026-01-29_
+_Last updated: 2026-01-28

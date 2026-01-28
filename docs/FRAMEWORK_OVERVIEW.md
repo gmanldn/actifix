@@ -5,36 +5,14 @@ Actifix is a self-improving error management system that captures prioritized ti
 ## What Actifix provides
 
 **Dashboard Panes**:
-- =Ê **Overview**: Health metrics, recent tickets, system stats
-- <« **Tickets**: Priority lanes (P0-P4), ticket details modal
-- =Ü **Logs**: Live structured logs with filtering
-- ™ **System**: Resources, paths, git status, recent events
-- >é **Modules**: System/user modules with toggle controls
-- =¡ **Ideas**: Submit requests ’ AI generates actionable tickets
-- =' **Settings**: AI provider config, status, feedback log
+- **Overview**: Health metrics, recent tickets, system stats
+- **Tickets**: Priority lanes (P0-P4), ticket details modal
+- **Logs**: Live structured logs with filtering
+- **System**: Resources, paths, git status, recent events
+- **Modules**: System/user modules with toggle controls
+- **Ideas**: Submit requests ’ AI generates actionable tickets
+- **Settings**: AI provider config, status, feedback log
 
-- Structured error capture with priority classification (P0-P4).
-- Deduplication via duplicate guards and ticket repository checks.
-- Context capture (stack traces, file snippets, system state) with configurable limits.
-- Durable persistence backed by `data/actifix.db`, with fallback queue support.
-- Self-development mode to keep regressions visible during work.
-- Module error logs redact secrets before ticket persistence.
-- Module blueprints register in a sandbox; failures mark module status as error.
-- Module endpoints support access rules: public, local-only, auth-required.
-- Module endpoints are rate limited per module (default 60/min, 600/hour, 2000/day).
-
-## Onboarding walkthrough
-The dashboard includes a first-run walkthrough to orient new users to the main panes
-and workflows. You can reopen the walkthrough anytime from the header help icon.
-
-## Module management hints
-The Modules pane now highlights critical modules such as `screenscan` with a warning chip
-and an animated toggle button state so operators are reminded that those services must
-stay enabled except under controlled maintenance. The new hint also appears near the
-toggle button tooltip to explain the risk of disabling always-on modules.
-
-## Architecture primer
-Core modules and their roles:
 - **bootstrap**: system initialization and development tracking (`src/actifix/bootstrap.py`).
 - **raise_af**: error capture and ticket creation (`src/actifix/raise_af.py`).
 - **do_af**: ticket processing and remediation (`src/actifix/do_af.py`).
@@ -42,13 +20,7 @@ Core modules and their roles:
 - **health**: system health checks and status reporting.
 
 Canonical architecture references:
-- `docs/architecture/MAP.yaml`
-- `docs/architecture/DEPGRAPH.json`
-- `docs/architecture/MODULES.md`
-
-## Multi-Agent Development Workflow
-
-Actifix supports multiple AI agents working **directly on `develop`** simultaneously (no per-change branches required):
+- **directly on `develop`** simultaneously (no per-change branches required):
 
 - **Isolated State**: Database (`data/actifix.db`), logs, state untracked in `.gitignore`. Use `scripts/setup-agent.sh` for unique `ACTIFIX_DATA_DIR` per agent.
 - **No Branches**: Work/push directly to `develop`. Sync via `git pull` before starting.
@@ -179,20 +151,8 @@ The `screenscan` module provides always-on screenshot capture with ring-buffer s
 ```
 
 **Configuration Keys**:
-- `fps` (int): Frames per second to capture (default: 2). Recommended range: 1-4.
-- `retention_seconds` (int): Seconds of history to retain in ring buffer (default: 60). Constrain memory usage by reducing this value.
-- `enabled` (bool): Enable/disable screenscan module (default: true). **WARNING**: Disabling breaks diagnostic debugging; only disable for scheduled maintenance.
-- `capture_backend` (str): Capture method - 'auto' (platform-specific), 'macos', 'windows', 'linux', or 'none' (default: auto). Non-macOS platforms degrade gracefully with health status 'degraded'.
-
-**API Endpoints**:
-- `GET /modules/screenscan/health` - Module health status and worker thread state
-- `GET /modules/screenscan/stats` - Capture statistics (fps, retention, frame count, last capture time)
-- `GET /modules/screenscan/frames?limit=10&include_data=0` - Recent frames (metadata only by default, max 120 frames, max 100MB total)
-
-### Module performance budgets
-
-Performance budgets keep module UX responsive and ensure `modules.screenscan` and core API health remain stable. Use these targets when designing or upgrading modules:
-
+- **WARNING**: Disabling breaks diagnostic debugging; only disable for scheduled maintenance.
+- **API Endpoints**:
 - **Route latency**: keep typical module endpoints under 150ms P95; anything above 300ms should trigger async/background processing.
 - **Startup time**: blueprints should register within 2 seconds; longer initialization must be deferred or cached.
 - **Memory growth**: avoid unbounded caches; retain short windows (e.g., 60s ring buffers) and prune regularly.
@@ -258,39 +218,6 @@ Key points:
 
 Use `python3 set_api.py` (or `python3 scripts/set_api.py`) to store provider credentials in the OS credential manager. Keys are never printed back to stdout and are read automatically when environment variables are missing. Supported keys include:
 
-- OpenRouter (`OPENROUTER_API_KEY`)
-- OpenAI (`OPENAI_API_KEY`)
-- Anthropic (`ANTHROPIC_API_KEY`)
-- GitHub issue sync (`ACTIFIX_GITHUB_TOKEN`)
-- GitHub deploy key (`ACTIFIX_GITHUB_DEPLOY_KEY`)
-
-GitHub deploy keys are stored securely and can be exported to a local key file for `git` operations using
-`actifix.security.credentials.export_github_deploy_key()` (writes to `.actifix/credentials/ssh/github_deploy_key`
-with 0600 permissions by default).
-
-For automated Do_AF usage, set the provider/model (e.g., `ACTIFIX_AI_PROVIDER=openrouter_grok4_fast`) so the dispatcher knows which stored key to use.
-
-## Alert webhooks (Slack/Discord)
-
-Actifix can emit high-priority alerts to Slack or Discord via generic webhooks.
-Configure these in the environment:
-
-```
-ACTIFIX_ALERT_WEBHOOK_URLS="https://hooks.slack.com/services/..."
-ACTIFIX_ALERT_WEBHOOK_PRIORITIES="P0,P1"
-ACTIFIX_ALERT_WEBHOOK_ENABLED=1
-```
-
-Alerts are fired on ticket creation when the priority matches (default: P0/P1).
-Payloads include both `text` and `content` fields so they work with Slack and Discord.
-
-## External log ingestion
-
-`scripts/ingest_error_logs.py` ingests external logs (plain text or JSONL) and
-creates Actifix tickets from each entry.
-
-Highlights:
-
 - **Formats**: Use `--format auto|plain|jsonl` to control parsing. JSONL supports
   payloads with `message`, `priority`, `error_type`, `source`, `run_label`, and
   optional `stack_trace` fields.
@@ -323,42 +250,13 @@ The launcher can run the agent alongside services via:
 Actifix is ready for manual/CLI processing today, but background ticket agents need dedicated work.
 The following tickets track the gap closures in detail:
 
-- `ACT-20260125-FD74D` - Background ticket agent loop with lease renewals, idle backoff, and clean shutdown. (completed)
-- `ACT-20260125-FF6CC` - Non-interactive processing policy with deterministic fallback when AI is unavailable. (completed)
-- `ACT-20260125-35DCB` - AgentVoice instrumentation for DoAF acquisition, dispatch, completion, and failures. (completed)
-- `ACT-20260125-B760C` - Health/monitoring for agent liveness, last-run time, and backlog lag. (completed)
-- `ACT-20260125-2FC6E` - Managed daemon/launcher support for the ticket agent with logs and restart policy. (completed)
-- `ACT-20260125-71BDF` - Tests covering background processing, lease renewal, fallback, and AgentVoice logging.
-
-## Module health aggregation
-`GET /api/modules/<module_id>/health` returns the aggregated health response:
-```json
-{
-  "module": "yahtzee",
-  "module_id": "modules.yahtzee",
-  "module_status": "active",
-  "status": "ok",
-  "http_status": 200,
-  "elapsed_ms": 12,
-  "response": {"status": "ok"}
-}
-```
-Status values: `ok`, `missing`, `timeout`, `error`.
-
-## Release notes and version history
-See `CHANGELOG.md` for full history. Recent highlights:
-
-| Version | Highlights |
-|---------|------------|
-| **7.0.40** (2026-01-27) | Added a first-run onboarding walkthrough for the dashboard with a header help shortcut to reopen it. |
+- **7.0.40** (2026-01-27) | Added a first-run onboarding walkthrough for the dashboard with a header help shortcut to reopen it. |
 | **7.0.39** (2026-01-27) | Added Slack/Discord alert webhooks for P0/P1 ticket creation and surfaced webhook delivery failures via AgentVoice + Raise_AF. |
 | **7.0.38** (2026-01-27) | Locked down remote access to logs/system/schema/Sentry ingestion with token-based auth, while keeping loopback requests trusted by default for local workflows. |
 | **7.0.37** (2026-01-27) | Added a module scaffolding CLI (`actifix.main modules create`) that generates module entrypoints, defaults, and a health test stub for faster module authoring. |
 | **7.0.36** (2026-01-27) | Enhanced external log ingestion with JSONL support, run label overrides, context controls, and tests for the ingest pipeline. |
 | **7.0.33** (2026-01-27) | Added GitHub issue sync capabilities (`scripts/github_issue_sync.py`, new ticket metadata fields, and documentation) so high-value tickets can be tracked in GitHub with recorded issue URLs. |
 | **7.0.32** (2026-01-27) | Added compatibility helpers so `ActifixHealthCheck` exposes `database_ok` and `ActifixPaths` exposes `database_path`, preventing metrics exports or tooling from raising `AttributeError` when those attributes are referenced. |
-| **7.0.7** (2026-01-29) | Launcher now rebuilds the frontend via `scripts/build_frontend.py` before starting services so the GUI matches the backend version every time. The new `test/test_start_frontend_sync.py` ensures the build step fires and surfaces failures cleanly. |
-| **7.0.4** (2026-01-29) | Workflow enforcement release that now requires agents to read the README, AGENTS, and `docs/INDEX.md` (plus referenced docs) before making changes, keeping Actifix rules first. |
 | **7.0.2** (2026-01-28) | Patch release that makes `scripts/start.py` aggressively clean up stale Actifix processes and compiled bytecode before every launch so the runtime always begins from a clean slate. |
 | **7.0.1** (2026-01-27) | Patch release that keeps the version-sync story aligned (docs, assets, UI/API) while capturing the latest release workflow content before the next milestone. |
 | **7.0.0** (2026-01-26) | Big-point release aligning API and UI versions with refreshed release notes, synchronizing the version sync guidance, and keeping the screenscan/status story front-and-center before unlocking the next milestone. |
@@ -389,15 +287,7 @@ This is a review/audit stream intended to show what modules and agents are doing
 Rules:
 - Every module must emit *informational* AgentVoice rows for key lifecycle events (startup/config/registration).
 - Every module must emit *error* AgentVoice rows when capturing errors (in addition to Raise_AF tickets).
-- Retention is capped at 1,000,000 rows; oldest rows are pruned automatically.
-
-Enforcement points (centralized so coverage is consistent):
-- `ModuleBase.log_gui_init()` emits AgentVoice INFO (best-effort).
-- `ModuleBase.record_module_error()` emits AgentVoice ERROR (best-effort) and then calls `record_error()` to persist the canonical ticket.
-- `actifix.api._register_module_blueprint()` emits AgentVoice INFO/ERROR for module registration outcomes (registered/disabled/failed), so modules are covered even if they don't explicitly call ModuleBase.
-
-## Roadmap
-1. **Ticket processing**: DoAF reliability and remediation automation.
+- **Ticket processing**: DoAF reliability and remediation automation.
 2. **Operational tooling**: dashboards, health automation, and alerting.
 3. **AI integration**: provider robustness and prompt compression workflows.
 

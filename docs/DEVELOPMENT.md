@@ -2,6 +2,29 @@
 
 Actifix follows a quality-first workflow: architecture compliance, deterministic testing, and traceable tickets. Every change must honor the Raise_AF gate and keep documentation accurate.
 
+## Canonical ticket workflow (single source of truth)
+Actifix uses **one and only one** ticket workflow. All automation and manual work must follow this sequence:
+
+1. **Raise_AF capture**: create or update tickets exclusively through `actifix.raise_af.record_error(...)` or the CLI. Manual database edits are forbidden.
+2. **Triage and de-duplication**: review open tickets in `scripts/view_tickets.py`. If a ticket repeats an existing issue, link it in notes or consolidate using the consolidation workflow below.
+3. **Implement the fix**: make code changes on `develop`, using existing systems first and following the architecture dependency rules.
+4. **Test + validate**: run the appropriate test gates for the affected area (unit, integration, or full `test.py`).
+5. **Complete the ticket with evidence**: use `mark_ticket_complete(...)` and include `Implementation:` and `Files:` sections plus test evidence.
+6. **Consolidate redundant buckets**: run the consolidation script on a schedule to keep the open backlog minimal (see consolidation cadence below).
+
+Any deviation from this flow is considered out-of-policy.
+
+### Consolidation cadence (required)
+Run `scripts/consolidate_ticket_buckets.py` **at least once per day** to keep the backlog compact. Always start with a dry run, then execute once the report is reviewed:
+
+```bash
+export ACTIFIX_CHANGE_ORIGIN=raise_af
+python3 scripts/consolidate_ticket_buckets.py --limit 25
+python3 scripts/consolidate_ticket_buckets.py --execute
+```
+
+Schedule it with cron/systemd (see `docs/TICKET_CLEANUP.md#scheduled-cleanup` for patterns) and keep the output in logs or notes for auditability.
+
 ## Core rules
 1. **Raise_AF gate**: set `ACTIFIX_CHANGE_ORIGIN=raise_af` before running Actifix or editing files.
 2. **Architecture awareness**: review `docs/architecture/MAP.yaml` and `docs/architecture/DEPGRAPH.json` before structural changes.

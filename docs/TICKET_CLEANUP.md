@@ -208,6 +208,9 @@ To run cleanup automatically on a schedule, use a cron job:
 # Run cleanup daily at 2 AM
 0 2 * * * cd /path/to/actifix/scripts && python3 run_cleanup.py --execute
 
+# Run ticket consolidation daily at 4 AM
+0 4 * * * cd /path/to/actifix/scripts && python3 consolidate_ticket_buckets.py --execute
+
 # Run cleanup weekly on Sunday at 3 AM
 0 3 * * 0 cd /path/to/actifix/scripts && python3 run_cleanup.py --execute
 ```
@@ -237,6 +240,31 @@ Type=oneshot
 WorkingDirectory=/path/to/actifix/scripts
 ExecStart=/usr/bin/python3 run_cleanup.py --execute
 User=your-user
+```
+
+```ini
+# /etc/systemd/system/actifix-ticket-consolidation.service
+[Unit]
+Description=Actifix Ticket Consolidation
+
+[Service]
+Type=oneshot
+WorkingDirectory=/path/to/actifix/scripts
+ExecStart=/usr/bin/python3 consolidate_ticket_buckets.py --execute
+User=your-user
+```
+
+```ini
+# /etc/systemd/system/actifix-ticket-consolidation.timer
+[Unit]
+Description=Actifix Daily Ticket Consolidation
+
+[Timer]
+OnCalendar=daily
+Persistent=true
+
+[Install]
+WantedBy=timers.target
 ```
 
 Then enable and start:
@@ -275,6 +303,25 @@ stats = repo.get_stats()
 
 print(f"Total tickets: {stats['total']}")
 print(f"Deleted tickets: {stats['deleted']}")
+```
+
+Verify scheduled consolidation runs:
+
+```bash
+# Cron: confirm entries exist and review recent output/logs
+crontab -l | grep consolidate_ticket_buckets
+
+# systemd: confirm timer status and last/next run
+systemctl status actifix-ticket-consolidation.timer
+systemctl list-timers --all | grep ticket-consolidation
+```
+
+If consolidation reports missing or stale runs, trigger a manual dry run followed by execution:
+
+```bash
+export ACTIFIX_CHANGE_ORIGIN=raise_af
+python3 scripts/consolidate_ticket_buckets.py --limit 25
+python3 scripts/consolidate_ticket_buckets.py --execute
 ```
 
 ## Best Practices
@@ -317,14 +364,14 @@ deleted = repo.get_deleted_tickets()
 # Recover a specific ticket
 repo.recover_ticket('ACT-20260118-xxx')
 ```
-
 ## Related Files
 
-- `src/actifix/persistence/ticket_cleanup.py` - Cleanup implementation
+- `src/actifix/persistence/ticket_repo.py` - Cleanup implementation
 - `src/actifix/persistence/cleanup_config.py` - Configuration management
 - `src/actifix/raise_af.py` - Enhanced deduplication logic
 - `scripts/run_cleanup.py` - Manual cleanup script
 - `src/actifix/api.py` - REST API endpoints
+- `scripts/consolidate_ticket_buckets.py` - Identify redundant ticket buckets for consolidation
 
 ## Migration Notes
 
