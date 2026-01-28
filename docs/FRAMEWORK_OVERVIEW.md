@@ -106,6 +106,7 @@ Module defaults come from Actifix config with optional overrides via `ACTIFIX_MO
 | yahtzee | 127.0.0.1 | 8090 | yahtzee |
 | superquiz | 127.0.0.1 | 8070 | superquiz |
 | pokertool | 127.0.0.1 | 8060 | pokertool |
+| screenscan | (API only) | (API only) | screenscan |
 
 Override example:
 ```json
@@ -144,6 +145,43 @@ export ACTIFIX_MODULE_CONFIG_OVERRIDES='{"yahtzee": {"enabled": false}}'
 ```
 
 The override dictionary is merged after the module loader reads `MODULE_DEFAULTS` so modules continue to rely on the shared sanitize/override helpers described elsewhere in the docs.
+
+### Screenscan module configuration
+
+The `screenscan` module provides always-on screenshot capture with ring-buffer storage for debugging UI state. It is a critical always-on module and must remain enabled except under controlled maintenance.
+
+**Default Configuration**:
+```json
+{
+  "fps": 2,
+  "retention_seconds": 60,
+  "enabled": true,
+  "capture_backend": "auto"
+}
+```
+
+**Override Example**:
+```json
+{
+  "screenscan": {
+    "fps": 1,
+    "retention_seconds": 30,
+    "enabled": true,
+    "capture_backend": "macos"
+  }
+}
+```
+
+**Configuration Keys**:
+- `fps` (int): Frames per second to capture (default: 2). Recommended range: 1-4.
+- `retention_seconds` (int): Seconds of history to retain in ring buffer (default: 60). Constrain memory usage by reducing this value.
+- `enabled` (bool): Enable/disable screenscan module (default: true). **WARNING**: Disabling breaks diagnostic debugging; only disable for scheduled maintenance.
+- `capture_backend` (str): Capture method - 'auto' (platform-specific), 'macos', 'windows', 'linux', or 'none' (default: auto). Non-macOS platforms degrade gracefully with health status 'degraded'.
+
+**API Endpoints**:
+- `GET /modules/screenscan/health` - Module health status and worker thread state
+- `GET /modules/screenscan/stats` - Capture statistics (fps, retention, frame count, last capture time)
+- `GET /modules/screenscan/frames?limit=10&include_data=0` - Recent frames (metadata only by default, max 120 frames, max 100MB total)
 
 ### Module performance budgets
 
@@ -218,6 +256,11 @@ Use `python3 set_api.py` (or `python3 scripts/set_api.py`) to store provider cre
 - OpenAI (`OPENAI_API_KEY`)
 - Anthropic (`ANTHROPIC_API_KEY`)
 - GitHub issue sync (`ACTIFIX_GITHUB_TOKEN`)
+- GitHub deploy key (`ACTIFIX_GITHUB_DEPLOY_KEY`)
+
+GitHub deploy keys are stored securely and can be exported to a local key file for `git` operations using
+`actifix.security.credentials.export_github_deploy_key()` (writes to `.actifix/credentials/ssh/github_deploy_key`
+with 0600 permissions by default).
 
 For automated Do_AF usage, set the provider/model (e.g., `ACTIFIX_AI_PROVIDER=openrouter_grok4_fast`) so the dispatcher knows which stored key to use.
 
