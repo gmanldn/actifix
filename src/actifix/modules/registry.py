@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib
 import json
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from threading import RLock
@@ -16,6 +17,17 @@ from actifix.state_paths import get_actifix_paths
 
 MODULE_STATUS_SCHEMA_VERSION = "module-statuses.v1"
 MODULE_STATUS_KEYS = {"active", "disabled", "error"}
+MODULE_METADATA_REQUIRED_FIELDS = {
+    "name",
+    "version",
+    "description",
+    "capabilities",
+    "data_access",
+    "network",
+    "permissions",
+}
+MODULE_VERSION_PATTERN = re.compile(r"^\d+\.\d+\.\d+$")
+MODULE_ACCESS_RULES = {"public", "local-only", "auth-required"}
 
 
 def _default_module_status_payload() -> dict[str, Any]:
@@ -153,6 +165,68 @@ def _lazy_import_module(module_label: str) -> tuple[str, object, Optional[dict[s
     module = importlib.import_module(module_path)
     metadata = getattr(module, "MODULE_METADATA", None)
     return module_path, module, metadata
+
+
+def validate_module_metadata(module_label: str, metadata: Optional[dict[str, Any]]) -> list[str]:
+    """Validate a module's metadata payload for release readiness."""
+    errors: list[str] = []
+    if not isinstance(metadata, dict):
+        return ["metadata_missing"]
+
+    missing = MODULE_METADATA_REQUIRED_FIELDS - set(metadata.keys())
+    if missing:
+        errors.append(f"missing_fields: {sorted(missing)}")
+
+    name = metadata.get("name")
+    expected_names = {f"modules.{module_label}", module_label}
+    if not isinstance(name, str) or not name.strip():
+        errors.append("name_invalid")
+    elif name.strip() not in expected_names:
+        errors.append("name_mismatch")
+
+    version = metadata.get("version")
+    if not isinstance(version, str) or not version.strip():
+        errors.append("version_invalid")
+    elif not MODULE_VERSION_PATTERN.match(version.strip()):
+        errors.append("version_not_semver")
+
+    description = metadata.get("description")
+    if not isinstance(description, str) or not description.strip():
+        errors.append("description_invalid")
+
+    for key in ("capabilities", "data_access", "network"):
+        if not isinstance(metadata.get(key), dict):
+            errors.append(f"{key}_invalid")
+
+    permissions = metadata.get("permissions")
+    if not isinstance(permissions, list) or not all(isinstance(p, str) for p in permissions):
+        errors.append("permissions_invalid")
+
+    return errors
+
+
+def validate_module_package(module_label: str, module: object, metadata: Optional[dict[str, Any]]) -> list[str]:
+    """Validate module package exports and metadata."""
+    errors = validate_module_metadata(module_label, metadata)
+
+    defaults = getattr(module, "MODULE_DEFAULTS", None)
+    if not isinstance(defaults, dict):
+        errors.append("defaults_missing")
+    else:
+        if "host" not in defaults:
+            errors.append("default_host_missing")
+        if "port" not in defaults:
+            errors.append("default_port_missing")
+
+    access_rule = getattr(module, "ACCESS_RULE", None)
+    if access_rule and access_rule not in MODULE_ACCESS_RULES:
+        errors.append("access_rule_invalid")
+
+    create_blueprint = getattr(module, "create_blueprint", None)
+    if not callable(create_blueprint):
+        errors.append("create_blueprint_missing")
+
+    return errors
 
 
 @dataclass(frozen=True)

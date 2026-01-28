@@ -99,6 +99,9 @@ enable/disable/error states inside `.actifix/module_statuses.json` (atomic write
 drives the same state file that `python3 -m actifix.main modules enable/disable`
 updates so the CLI, launcher, and tests all read from one source of truth.
 
+For release readiness, validate module metadata with:
+`python3 -m actifix.main modules validate`
+
 ## Module configuration
 Module defaults come from Actifix config with optional overrides via `ACTIFIX_MODULE_CONFIG_OVERRIDES`.
 

@@ -366,6 +366,47 @@ def cmd_modules(args: argparse.Namespace) -> int:
             for module in modules.get("user", []):
                 print(f"{module['name']}: {module['status']}")
             return 0
+        if args.modules_action == "validate":
+            from .modules.registry import (
+                _discover_module_nodes,
+                _lazy_import_module,
+                validate_module_package,
+            )
+
+            nodes = _discover_module_nodes(project_root)
+            failures = 0
+            print("=== Module Metadata Validation ===")
+            for node in nodes:
+                module_id = node.get("id")
+                if not module_id or not module_id.startswith("modules."):
+                    continue
+                module_label = module_id.split(".", 1)[1]
+                try:
+                    module_path, module, metadata = _lazy_import_module(module_label)
+                except Exception as exc:
+                    failures += 1
+                    record_error(
+                        message=f"Failed to import module {module_id}: {exc}",
+                        source="actifix/main.py:cmd_modules",
+                        error_type=type(exc).__name__,
+                        priority=TicketPriority.P2,
+                    )
+                    print(f"{module_id}: import_failed ({exc})")
+                    continue
+
+                errors = validate_module_package(module_label, module, metadata)
+                if errors:
+                    failures += 1
+                    record_error(
+                        message=f"Module {module_id} metadata validation failed: {errors}",
+                        source="actifix/main.py:cmd_modules",
+                        error_type="ModuleMetadataError",
+                        priority=TicketPriority.P2,
+                    )
+                    print(f"{module_id}: FAIL -> {', '.join(errors)}")
+                else:
+                    print(f"{module_id}: OK")
+            return 0 if failures == 0 else 1
 
         action = args.modules_action
 
@@ -592,7 +633,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     modules_parser = subparsers.add_parser("modules", help="Manage module status")
     modules_parser.add_argument(
         "modules_action",
-        choices=["list", "enable", "disable", "create"],
+        choices=["list", "enable", "disable", "create", "validate"],
         help="Module action",
     )
     modules_parser.add_argument(
