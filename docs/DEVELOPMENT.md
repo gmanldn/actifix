@@ -303,24 +303,23 @@ The remaining readiness work is tracked in:
 - `ACT-20260125-2FC6E` - Managed daemon/launcher support for the ticket agent with logs and restart policy. (completed)
 - `ACT-20260125-71BDF` - Tests covering background processing, lease renewal, fallback, and AgentVoice logging.
 
-### Multi-AI relay agent proposal (planned)
-To support long-running ticket processing across multiple AI assistants, the planned
-relay agent introduces an ordered provider chain, context handoff snapshots, and
-mandatory quality gates per ticket.
+### Multi-AI relay agent
+To support long-running ticket processing across multiple AI assistants, the relay
+agent introduces an ordered provider chain, context handoff snapshots, and mandatory
+quality gates per ticket.
 
-**Proposal tickets:**
-- `ACT-20260128-07539` - Define multi-AI relay workflow with ordered handoff and Raise_AF compliance.
-- `ACT-20260128-810F6` - Add lint/test + version bump + commit + push automation hooks.
-- `ACT-20260128-C7682` - Persist AgentVoice context handoff snapshots for relay agents.
+**Relay config:**
+- `ACTIFIX_AI_RELAY_ORDER` - comma-separated provider list (e.g. `claude_api,openai,free_alternative`).
+- `ACTIFIX_AI_RELAY_TOKEN_BUDGETS` - comma-separated `provider:tokens` pairs.
+- `ACTIFIX_AI_RELAY_DEFAULT_TOKEN_BUDGET` - fallback budget per provider (default 4000).
+- `ACTIFIX_AI_RELAY_HANDOFF_ON_FAILURE` - set `false` to stop after first failure.
 
-**Proposed flow (per ticket):**
+**Relay flow (per ticket):**
 1. Acquire/lease ticket in DoAF agent.
-2. Select the next AI provider in `ACTIFIX_AI_RELAY_ORDER` and record the choice in AgentVoice.
-3. Process ticket work until token budget exhausted or completion achieved.
-4. On handoff, write a compact summary into AgentVoice + ticket metadata (no secrets).
-5. Run lint/tests for the touched scope, then bump `pyproject.toml` and rebuild frontend assets.
-6. Perform last-minute sync (`git fetch origin develop`) before commit.
-7. Commit with ticket ID, push to `develop`, then mark ticket complete with evidence.
+2. Select the next provider from `ACTIFIX_AI_RELAY_ORDER` and record the choice in AgentVoice.
+3. Attempt the fix; on success, mark the ticket complete with standard completion evidence.
+4. On failure or budget exhaustion, record a handoff summary into AgentVoice and move to the next provider.
+5. Follow the standard workflow for lint/tests, version bump, frontend rebuild, and commit/push.
 
 The relay agent does **not** auto-complete tickets without tests; it enforces
 the existing completion gates and version sync policy described above.

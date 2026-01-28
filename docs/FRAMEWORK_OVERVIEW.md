@@ -246,26 +246,28 @@ ticket acquisition, dispatch, success, and failure.
 The launcher can run the agent alongside services via:
 `python3 scripts/start.py --ticket-agent`.
 
-### Multi-AI relay agent proposal (planned)
-The background agent currently relies on a single AI provider per run. The proposed
-multi-AI relay agent adds a deterministic handoff chain so long-running sessions can
-rotate between assistants when tokens are exhausted, while preserving context and
-respecting the Raise_AF workflow.
+### Multi-AI relay agent
+The background agent now supports a relay chain that rotates across AI providers while
+preserving context and Raise_AF compliance. Relay dispatch records each provider selection,
+handoff summary, and failure into AgentVoice so another provider can continue from the
+latest snapshot without leaking sensitive data.
 
-**Proposal highlights (tracked in ACT-20260128-07539 / ACT-20260128-810F6 / ACT-20260128-C7682):**
-- **Ordered provider chain**: configurable list of AI providers/models (`ACTIFIX_AI_RELAY_ORDER`)
-  with explicit max-token/session budgets per provider.
-- **Context snapshots**: after each ticket step, write a compact summary into AgentVoice
-  (`agent_voice` table) plus a structured handoff payload in the ticket metadata (no secrets).
-- **Deterministic handoff**: when token budget is reached or provider fails, the relay
-  selects the next provider and resumes using the latest snapshot.
-- **Raise_AF compliance**: every relay step continues to require `ACTIFIX_CHANGE_ORIGIN=raise_af`
-  and records failures via `record_error()` before moving on.
-- **Safety constraints**: no raw logs/screenshots stored; scrub secrets and avoid persisting
-  large payloads in tickets.
+**Relay configuration:**
+- **Provider order**: `ACTIFIX_AI_RELAY_ORDER` (comma-separated list, e.g. `claude_api,openai,free_alternative`).
+- **Token budgets**: `ACTIFIX_AI_RELAY_TOKEN_BUDGETS` (comma-separated `provider:tokens` pairs, e.g. `claude_api:4000,openai:4000`).
+- **Default token budget**: `ACTIFIX_AI_RELAY_DEFAULT_TOKEN_BUDGET` (integer, default 4000).
+- **Handoff on failure**: `ACTIFIX_AI_RELAY_HANDOFF_ON_FAILURE` (`true`/`false`, default true).
 
-The relay agent is intentionally staged as a proposal so we can align implementation,
-testing, and documentation before automation is enabled in production.
+**Relay flow:**
+1. Select the next provider in `ACTIFIX_AI_RELAY_ORDER` and log it to AgentVoice.
+2. Attempt the fix via the AI client using the configured model and provider.
+3. On success, mark the ticket complete with standard completion notes and tests.
+4. On failure or budget exhaustion, record a handoff summary via AgentVoice and move to the next provider.
+
+**Safety constraints:**
+- No raw logs/screenshots are stored in tickets or AgentVoice.
+- Every failure still records `record_error()` before exiting the relay chain.
+- Completion gates remain unchanged (Implementation + Files + tests required).
 
 ## Background ticket agent roadmap
 Actifix is ready for manual/CLI processing today, but background ticket agents need dedicated work.

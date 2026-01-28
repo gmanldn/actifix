@@ -20,17 +20,20 @@ import contextlib
 import json
 import os
 import re
+import subprocess
 import threading
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Optional, Callable, Iterator, TYPE_CHECKING
+from typing import Optional, Callable, Iterator, TYPE_CHECKING, Dict, Any, List
 
 from .log_utils import atomic_write, log_event
 from .raise_af import enforce_raise_af_only, record_error, TicketPriority
 from .state_paths import ActifixPaths, get_actifix_paths, init_actifix_files
 from .config import get_config, load_config
+from .agent_voice import record_agent_voice, record_relay_handoff
+from .ai_client import get_ai_client, resolve_provider_selection, AIProvider
 
 if TYPE_CHECKING:
     from .persistence.ticket_repo import TicketRepository
@@ -235,6 +238,26 @@ class BackgroundAgentConfig:
     use_ai: bool = True
     priority_filter: Optional[list[str]] = None
     fallback_complete: bool = False
+
+
+@dataclass
+class RelayAgentConfig:
+    provider_order: List[str]
+    token_budgets: Dict[str, int]
+    default_token_budget: int
+    handoff_on_failure: bool
+
+    def select_next_provider(self, current: Optional[str]) -> Optional[str]:
+        if not self.provider_order:
+            return None
+        if current not in self.provider_order:
+            return self.provider_order[0]
+        idx = self.provider_order.index(current)
+        next_idx = (idx + 1) % len(self.provider_order)
+        return self.provider_order[next_idx]
+
+    def budget_for(self, provider: str) -> int:
+        return self.token_budgets.get(provider, self.default_token_budget)
 
 
 class _LeaseRenewer(threading.Thread):
@@ -466,148 +489,10 @@ def _process_locked_ticket(
             return None
 
         if use_ai and not ai_handler:
-            try:
-                from .ai_client import get_ai_client, resolve_provider_selection
-
-                ai_client = get_ai_client()
-                config = get_config()
-                selection = resolve_provider_selection(config.ai_provider, config.ai_model)
-
-                log_event(
-                    "AI_PROVIDER_SELECTED",
-                    f"AI preference: {selection.label}",
-                    ticket_id=ticket.ticket_id,
-                    extra={
-                        "preferred_provider": selection.label,
-                        "preferred_model": selection.model,
-                        "strict_preferred": selection.strict_preferred,
-                    },
-                )
-                _agent_voice_best_effort(
-                    f"AI provider selected: {selection.label}",
-                    run_label="do-af-dispatch",
-                    extra={
-                        "ticket_id": ticket.ticket_id,
-                        "provider": selection.label,
-                        "model": selection.model,
-                    },
-                )
-
-                ticket_dict = {
-                    "id": ticket.ticket_id,
-                    "priority": ticket.priority,
-                    "error_type": ticket.error_type,
-                    "message": ticket.message,
-                    "source": ticket.source,
-                    "stack_trace": getattr(ticket, "stack_trace", ""),
-                    "created": ticket.created,
-                }
-
-                log_event(
-                    "AI_PROCESSING",
-                    f"Requesting AI fix for ticket: {ticket.ticket_id}",
-                    ticket_id=ticket.ticket_id,
-                )
-                _agent_voice_best_effort(
-                    f"AI processing started for {ticket.ticket_id}",
-                    run_label="do-af-dispatch",
-                    extra={"ticket_id": ticket.ticket_id},
-                )
-
-                ai_response = ai_client.generate_fix(
-                    ticket_dict,
-                    preferred_provider=selection.provider,
-                    preferred_model=selection.model,
-                    strict_preferred=selection.strict_preferred,
-                )
-
-                if ai_response.success:
-                    summary = f"Fixed via {ai_response.provider.value} ({ai_response.model})"
-                    if ai_response.cost_usd:
-                        summary += f" - Cost: ${ai_response.cost_usd:.4f}"
-
-                    if mark_ticket_complete(
-                        ticket.ticket_id,
-                        completion_notes=_format_completion_notes(
-                            (
-                                f"Fixed by {ai_response.provider.value} using {ai_response.model}: "
-                                f"{ai_response.content[:200]}"
-                            ),
-                            _select_completion_files(paths.project_root, ticket.source),
-                        ),
-                        test_steps=(
-                            f"Validated AI remediation output from {ai_response.provider.value}."
-                        ),
-                        test_results=(
-                            f"AI response successful with {ai_response.tokens_used} tokens used."
-                        ),
-                        summary=summary,
-                        paths=paths,
-                        use_lock=False,
-                    ):
-                        release_lock = False
-
-                    log_event(
-                        "AI_DISPATCH_SUCCESS",
-                        f"AI successfully fixed ticket: {ticket.ticket_id}",
-                        ticket_id=ticket.ticket_id,
-                        extra={
-                            "provider": ai_response.provider.value,
-                            "model": ai_response.model,
-                            "tokens": ai_response.tokens_used,
-                            "cost": ai_response.cost_usd,
-                            "fix_preview": ai_response.content[:100] + "..."
-                            if len(ai_response.content) > 100
-                            else ai_response.content,
-                        },
-                    )
-                    _agent_voice_best_effort(
-                        f"AI dispatch success for {ticket.ticket_id}",
-                        run_label="do-af-dispatch",
-                        extra={
-                            "ticket_id": ticket.ticket_id,
-                            "provider": ai_response.provider.value,
-                            "model": ai_response.model,
-                        },
-                    )
-                    return ticket
-
-                log_event(
-                    "AI_DISPATCH_FAILED",
-                    f"AI failed to fix ticket: {ai_response.error}",
-                    ticket_id=ticket.ticket_id,
-                    extra={"error": ai_response.error},
-                )
-                _agent_voice_best_effort(
-                    f"AI dispatch failed for {ticket.ticket_id}: {ai_response.error}",
-                    level="ERROR",
-                    run_label="do-af-dispatch",
-                    extra={"ticket_id": ticket.ticket_id},
-                )
-                return None
-
-            except Exception as exc:
-                log_event(
-                    "AI_DISPATCH_EXCEPTION",
-                    f"AI processing exception: {exc}",
-                    ticket_id=ticket.ticket_id,
-                    extra={"error": str(exc)},
-                )
-                _agent_voice_best_effort(
-                    f"AI dispatch exception for {ticket.ticket_id}: {exc}",
-                    level="ERROR",
-                    run_label="do-af-dispatch",
-                    extra={"ticket_id": ticket.ticket_id},
-                )
-                record_error(
-                    message=f"AI dispatch failed for {ticket.ticket_id}: {exc}",
-                    source="actifix/do_af.py:_process_locked_ticket",
-                    error_type=type(exc).__name__,
-                    priority=TicketPriority.P2,
-                    run_label="do-af-dispatch",
-                    capture_context=True,
-                )
-                raise
+            relay_ticket = _relay_dispatch(ticket, repo, paths)
+            if relay_ticket and relay_ticket.completed:
+                release_lock = False
+            return relay_ticket
 
         if ai_handler:
             try:
@@ -1150,6 +1035,219 @@ def process_tickets(
     
     return processed
 
+
+def _relay_dispatch(
+    ticket: TicketInfo,
+    repo: "TicketRepository",
+    paths: ActifixPaths,
+) -> Optional[TicketInfo]:
+    """Dispatch a ticket through the relay chain of AI providers."""
+    config = get_config()
+    relay_config = _load_relay_config(BackgroundAgentConfig())
+    ai_client = get_ai_client()
+    provider_order = relay_config.provider_order
+
+    ticket_record = repo.get_ticket(ticket.ticket_id) or {}
+    ticket_dict = {
+        "id": ticket.ticket_id,
+        "priority": ticket.priority,
+        "error_type": ticket.error_type,
+        "message": ticket.message,
+        "source": ticket.source,
+        "stack_trace": ticket_record.get("stack_trace", ""),
+        "created": ticket.created,
+    }
+
+    for idx, provider_label in enumerate(provider_order):
+        selection = resolve_provider_selection(provider_label, config.ai_model)
+        budget = relay_config.budget_for(provider_label)
+        next_provider = provider_order[idx + 1] if idx + 1 < len(provider_order) else None
+
+        log_event(
+            "AI_PROVIDER_SELECTED",
+            f"Relay provider selected: {selection.label}",
+            ticket_id=ticket.ticket_id,
+            extra={
+                "preferred_provider": selection.label,
+                "preferred_model": selection.model,
+                "strict_preferred": selection.strict_preferred,
+                "relay_index": idx,
+            },
+        )
+        _agent_voice_best_effort(
+            f"Relay provider selected: {selection.label}",
+            run_label="do-af-dispatch",
+            extra={
+                "ticket_id": ticket.ticket_id,
+                "provider": selection.label,
+                "model": selection.model,
+                "relay_index": idx,
+            },
+        )
+
+        log_event(
+            "AI_PROCESSING",
+            f"Relay processing ticket: {ticket.ticket_id}",
+            ticket_id=ticket.ticket_id,
+            extra={"provider": selection.label, "relay_index": idx},
+        )
+        _agent_voice_best_effort(
+            f"Relay processing started for {ticket.ticket_id}",
+            run_label="do-af-dispatch",
+            extra={"ticket_id": ticket.ticket_id, "provider": selection.label},
+        )
+
+        ai_response = ai_client.generate_fix(
+            ticket_dict,
+            preferred_provider=selection.provider,
+            preferred_model=selection.model,
+            strict_preferred=selection.strict_preferred,
+        )
+
+        tokens_used = ai_response.tokens_used or 0
+        budget_exceeded = bool(tokens_used and tokens_used >= budget)
+
+        if ai_response.success:
+            summary = f"Fixed via {ai_response.provider.value} ({ai_response.model})"
+            if ai_response.cost_usd:
+                summary += f" - Cost: ${ai_response.cost_usd:.4f}"
+
+            if mark_ticket_complete(
+                ticket.ticket_id,
+                completion_notes=_format_completion_notes(
+                    (
+                        f"Fixed by {ai_response.provider.value} using {ai_response.model}: "
+                        f"{ai_response.content[:200]}"
+                    ),
+                    _select_completion_files(paths.project_root, ticket.source),
+                ),
+                test_steps=(
+                    f"Validated AI remediation output from {ai_response.provider.value}."
+                ),
+                test_results=(
+                    f"AI response successful with {ai_response.tokens_used} tokens used."
+                ),
+                summary=summary,
+                paths=paths,
+                use_lock=False,
+            ):
+                ticket.completed = True
+                log_event(
+                    "AI_DISPATCH_SUCCESS",
+                    f"Relay AI fixed ticket: {ticket.ticket_id}",
+                    ticket_id=ticket.ticket_id,
+                    extra={
+                        "provider": ai_response.provider.value,
+                        "model": ai_response.model,
+                        "tokens_used": ai_response.tokens_used,
+                        "relay_index": idx,
+                    },
+                )
+                _agent_voice_best_effort(
+                    f"Relay AI success for {ticket.ticket_id}",
+                    run_label="do-af-dispatch",
+                    extra={
+                        "ticket_id": ticket.ticket_id,
+                        "provider": ai_response.provider.value,
+                        "model": ai_response.model,
+                    },
+                )
+                return ticket
+            handoff_reason = (
+                "AI response succeeded but ticket completion validation failed"
+            )
+        else:
+            handoff_reason = ai_response.error or "AI response unsuccessful"
+        if budget_exceeded:
+            handoff_reason = f"Token budget exceeded ({tokens_used}/{budget})"
+
+        log_event(
+            "AI_DISPATCH_FAILED",
+            f"Relay provider failed for {ticket.ticket_id}: {handoff_reason}",
+            ticket_id=ticket.ticket_id,
+            extra={
+                "provider": selection.label,
+                "model": selection.model,
+                "relay_index": idx,
+                "tokens_used": ai_response.tokens_used,
+                "budget": budget,
+            },
+        )
+        _agent_voice_best_effort(
+            f"Relay provider failed for {ticket.ticket_id}: {handoff_reason}",
+            level="ERROR",
+            run_label="do-af-dispatch",
+            extra={
+                "ticket_id": ticket.ticket_id,
+                "provider": selection.label,
+                "model": selection.model,
+            },
+        )
+
+        if relay_config.handoff_on_failure and next_provider:
+            try:
+                record_relay_handoff(
+                    ticket_id=ticket.ticket_id,
+                    provider=selection.label,
+                    next_provider=next_provider,
+                    tokens_used=ai_response.tokens_used,
+                    budget=budget,
+                    summary=handoff_reason,
+                    run_label="do-af-dispatch",
+                    extra={
+                        "relay_index": idx,
+                        "model": selection.model,
+                        "handoff_reason": handoff_reason,
+                    },
+                )
+            except Exception:
+                pass
+            log_event(
+                "AI_DISPATCH_HANDOFF",
+                f"Relay handoff from {selection.label} to {next_provider}",
+                ticket_id=ticket.ticket_id,
+                extra={
+                    "provider": selection.label,
+                    "next_provider": next_provider,
+                    "relay_index": idx,
+                },
+            )
+            _agent_voice_best_effort(
+                f"Relay handoff to {next_provider} for {ticket.ticket_id}",
+                run_label="do-af-dispatch",
+                extra={
+                    "ticket_id": ticket.ticket_id,
+                    "provider": selection.label,
+                    "next_provider": next_provider,
+                },
+            )
+            continue
+
+        if not relay_config.handoff_on_failure:
+            break
+
+    record_error(
+        message=f"Relay dispatch failed for {ticket.ticket_id}",
+        source="actifix/do_af.py:_relay_dispatch",
+        error_type="RelayDispatchFailed",
+        priority=TicketPriority.P2,
+        run_label="do-af-dispatch",
+        capture_context=True,
+    )
+    return None
+
+
+def _load_relay_config(config: BackgroundAgentConfig) -> RelayAgentConfig:
+    actifix_config = get_config()
+    return RelayAgentConfig(
+        provider_order=actifix_config.relay_provider_order or [actifix_config.ai_provider or AIProvider.FREE_ALTERNATIVE.value],
+        token_budgets={
+            provider: actifix_config.relay_token_budgets.get(provider, actifix_config.relay_default_token_budget)
+            for provider in actifix_config.relay_provider_order or [actifix_config.ai_provider or AIProvider.FREE_ALTERNATIVE.value]
+        },
+        default_token_budget=actifix_config.relay_default_token_budget,
+        handoff_on_failure=actifix_config.relay_handoff_on_failure,
+    )
 
 def run_background_agent(
     config: BackgroundAgentConfig,

@@ -8,7 +8,7 @@ import os
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional, Any
+from typing import Optional, Any, List, Dict
 
 from .state_paths import ActifixPaths, get_actifix_paths
 
@@ -82,7 +82,7 @@ class ActifixConfig:
     # Paths
     project_root: Path
     paths: ActifixPaths
-    
+
     # Error capture
     capture_enabled: bool = True
     max_rollup_errors: int = 20
@@ -156,6 +156,12 @@ class ActifixConfig:
     # Ideas Throttling
     ideas_throttle_rate: int = 5  # Max ideas tickets per hour (default 5/hour)
 
+    # Relay agent configuration
+    relay_provider_order: List[str] = field(default_factory=list)
+    relay_token_budgets: Dict[str, int] = field(default_factory=dict)
+    relay_default_token_budget: int = 4000
+    relay_handoff_on_failure: bool = True
+
 
 def _parse_bool(value: str) -> bool:
     """Parse boolean from string."""
@@ -176,6 +182,29 @@ def _parse_float(value: str, default: float) -> float:
         return float(value)
     except (ValueError, TypeError):
         return default
+
+
+def _parse_relay_provider_list(value: str) -> List[str]:
+    if not value:
+        return []
+    return [item.strip() for item in value.split(",") if item.strip()]
+
+
+def _parse_relay_token_budgets(value: str) -> Dict[str, int]:
+    budgets: Dict[str, int] = {}
+    if not value:
+        return budgets
+    for pair in value.split(","):
+        if not pair.strip():
+            continue
+        if ":" in pair:
+            key, amount = pair.split(":", 1)
+            key = key.strip()
+            try:
+                budgets[key] = int(amount.strip())
+            except ValueError:
+                continue
+    return budgets
 
 
 def load_config(
@@ -336,6 +365,19 @@ def load_config(
         completion_hook_scripts=_get_env_sanitized("ACTIFIX_COMPLETION_HOOK_SCRIPTS", "", value_type="string"),
         completion_hooks_enabled=_parse_bool(_get_env_sanitized("ACTIFIX_COMPLETION_HOOKS_ENABLED", "1", value_type="boolean")),
         ideas_throttle_rate=_parse_int(_get_env_sanitized("ACTIFIX_IDEAS_THROTTLE_RATE", "5", value_type="numeric"), 5),
+        relay_provider_order=_parse_relay_provider_list(
+            _get_env_sanitized("ACTIFIX_AI_RELAY_ORDER", "", value_type="string")
+        ),
+        relay_token_budgets=_parse_relay_token_budgets(
+            _get_env_sanitized("ACTIFIX_AI_RELAY_TOKEN_BUDGETS", "", value_type="string")
+        ),
+        relay_default_token_budget=_parse_int(
+            _get_env_sanitized("ACTIFIX_AI_RELAY_DEFAULT_TOKEN_BUDGET", "4000", value_type="numeric"),
+            4000,
+        ),
+        relay_handoff_on_failure=_parse_bool(
+            _get_env_sanitized("ACTIFIX_AI_RELAY_HANDOFF_ON_FAILURE", "1", value_type="boolean")
+        ),
     )
     
     # Validate configuration
