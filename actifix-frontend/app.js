@@ -9,7 +9,7 @@ const { useState, useEffect, useRef, createElement: h } = React;
 // API Configuration
 // Dynamically construct API_BASE using window.location to match the frontend port
 const API_BASE = `${window.location.protocol}//${window.location.hostname}:5001/api`;
-const UI_VERSION = '7.0.61';
+const UI_VERSION = '7.0.62';
 const REFRESH_INTERVAL = 5000;
 const LOG_REFRESH_INTERVAL = 3000;
 const TICKET_REFRESH_INTERVAL = 4000;
@@ -107,6 +107,14 @@ const PRIORITY_LABELS = {
   P2: 'Medium',
   P3: 'Low',
   P4: 'Deferred',
+};
+
+const SLA_HOURS = {
+  'P0': 1,
+  'P1': 4,
+  'P2': 24,
+  'P3': 72,
+  'P4': 168, // 1 week
 };
 
 const normalizePriority = (priority) => (
@@ -950,11 +958,27 @@ const TicketsView = () => {
         })
       ),
 
-      h('div', { className: 'ticket-card-header' },
-        h('span', { className: `priority-badge ${priority.toLowerCase()}` }, priority),
-        h('span', { className: `status-badge ${ticket.status}` }, ticket.status),
-        h('span', { className: 'ticket-id' }, ticket.ticket_id?.slice(0, 10) || 'N/A')
-      ),
+            h('div', { className: 'ticket-card-header' },
+              h('span', { className: `priority-badge ${priority.toLowerCase()}` }, priority),
+              h('span', { className: `status-badge ${ticket.status}` }, ticket.status),
+              (() => {
+                const createdDate = new Date(ticket.created);
+                const ageHours = (Date.now() - createdDate) / 3600000;
+                const slaHours = SLA_HOURS[priority] || 168;
+                const overdueHours = Math.max(0, ageHours - slaHours);
+                if (overdueHours > 0) {
+                  return h('span', {
+                    className: 'sla-badge overdue',
+                    title: `SLA breach: ${Math.round(overdueHours)}h overdue (P${priority} SLA: ${slaHours}h)`
+                  }, `⏰ ${Math.round(overdueHours)}h`);
+                }
+                return h('span', {
+                  className: 'sla-badge',
+                  title: `Age: ${Math.round(ageHours)}h (P${priority} SLA: ${slaHours}h)`
+                }, `⏰ ${Math.round(ageHours)}h`);
+              })(),
+              h('span', { className: 'ticket-id' }, ticket.ticket_id?.slice(0, 10) || 'N/A')
+            ),
       h('div', { className: 'ticket-card-title' }, ticket.error_type || 'Unknown'),
       h('div', { className: 'ticket-card-message' }, ticket.message || ''),
       h('div', { className: 'ticket-card-meta' },

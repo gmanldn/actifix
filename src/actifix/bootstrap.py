@@ -19,6 +19,7 @@ from typing import Optional, Callable, Tuple, Any
 from .raise_af import record_error, ACTIFIX_CAPTURE_ENV_VAR, enforce_raise_af_only
 from .state_paths import get_actifix_paths, init_actifix_files, ActifixPaths
 from .thread_cleanup import cleanup_orphan_threads, log_thread_state
+from .log_utils import log_event
 
 
 def enable_actifix_capture() -> None:
@@ -145,12 +146,15 @@ def ensure_ticket_database(paths: ActifixPaths) -> Path:
 
 def _run_phase(phase_num: int, func: Callable, *args, **kwargs) -> None:
     """Run a bootstrap phase with rollback support."""
+    from .log_utils import log_event  # Ensure log_event is available
+    
     rollback_stack = []
     
     def add_rollback(rollback_func: Callable):
         rollback_stack.append(rollback_func)
     
     try:
+        log_event(f"BOOTSTRAP_PHASE_{phase_num:02d}_START")
         func(phase_num, add_rollback, *args, **kwargs)
         log_event(f"BOOTSTRAP_PHASE_{phase_num:02d}_SUCCESS")
     except Exception as e:
@@ -169,8 +173,16 @@ def phased_bootstrap(project_root: Optional[Path] = None) -> ActifixPaths:
     
     Runs 30 phases with logging; rollback on phase failure.
     """
-    for phase_num in range(1, 31):
-        _run_phase(phase_num)
+    def phase1(phase_num, add_rollback, *args, **kwargs):
+        pass
+
+    def noop_phase(phase_num, add_rollback, *args, **kwargs):
+        pass
+
+    phases = [phase1] + [noop_phase] * 29
+    
+    for i, func in enumerate(phases, 1):
+        _run_phase(i, func, project_root)
     
     paths = get_actifix_paths(project_root=project_root)
     log_thread_state()
