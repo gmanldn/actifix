@@ -50,6 +50,17 @@ python3 set_api.py
 
 Keys are stored in the OS credential store (Keychain/Credential Manager) or the encrypted fallback under `.actifix/credentials`. Actifix will read stored keys for OpenRouter/OpenAI/Anthropic/GitHub when environment variables are absent.
 
+For GitHub deploy keys, `set_api.py` prompts for the private key file path and stores the key securely. To use it for `git` operations, export the key to a local file and point SSH at it:
+```bash
+python3 - <<'PY'
+from actifix.security.credentials import export_github_deploy_key
+path = export_github_deploy_key()
+print(path or "No deploy key stored")
+PY
+
+GIT_SSH_COMMAND="ssh -i .actifix/credentials/ssh/github_deploy_key -o IdentitiesOnly=yes" git fetch
+```
+
 For non-interactive Do_AF runs, set a provider/model explicitly (OpenRouter example):
 ```bash
 export ACTIFIX_AI_PROVIDER=openrouter_grok4_fast

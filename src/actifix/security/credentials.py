@@ -23,11 +23,12 @@ from enum import Enum
 from typing import Optional, Dict
 from pathlib import Path
 
+from ..log_utils import atomic_write
 
 class CredentialType(Enum):
     """Types of credentials."""
     API_KEY = "api_key"
-    PASSWORD = "password"
+    PASSWORD = "password"  # EXAMPLE label for secret scanner false-positive
     TOKEN = "token"
     SSH_KEY = "ssh_key"
     CERTIFICATE = "certificate"
@@ -421,6 +422,35 @@ class CredentialManager:
             return value is not None
         except CredentialRetrievalError:
             return False
+
+
+def export_github_deploy_key(target_path: Optional[Path] = None) -> Optional[Path]:
+    """Export the stored GitHub deploy key to a secure file path.
+
+    Args:
+        target_path: Optional path for the exported key file.
+
+    Returns:
+        Path to the exported key file, or None if no credential is stored.
+    """
+    manager = get_credential_manager()
+    value = manager.retrieve_credential("github_deploy_key")
+    if not value:
+        return None
+
+    if target_path is None:
+        from ..state_paths import get_actifix_paths
+        paths = get_actifix_paths()
+        target_dir = Path(paths.state_dir) / "credentials" / "ssh"
+        target_path = target_dir / "github_deploy_key"
+    else:
+        target_path = Path(target_path)
+        target_dir = target_path.parent
+
+    os.makedirs(target_dir, exist_ok=True, mode=0o700)
+    atomic_write(target_path, value)
+    os.chmod(target_path, 0o600)
+    return target_path
 
 
 # Global credential manager instance

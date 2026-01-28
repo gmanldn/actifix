@@ -49,6 +49,7 @@ from .credentials import (
     FileSystemCredentialStore,
     CredentialManager,
     get_credential_manager,
+    export_github_deploy_key,
     reset_credential_manager,
 )
 
@@ -89,5 +90,6 @@ __all__ = [
     'FileSystemCredentialStore',
     'CredentialManager',
     'get_credential_manager',
+    'export_github_deploy_key',
     'reset_credential_manager',
 ]

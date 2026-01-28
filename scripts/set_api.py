@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import getpass
 import sys
+from pathlib import Path
 from dataclasses import dataclass
 from typing import Iterable
 
@@ -53,15 +54,45 @@ KEY_SPECS: tuple[KeySpec, ...] = (
         description="GitHub token for issue sync",
         credential_type=CredentialType.TOKEN,
     ),
+    KeySpec(
+        name="github_deploy_key",
+        label="GitHub Deploy Key",
+        env_var="ACTIFIX_GITHUB_DEPLOY_KEY",
+        description="GitHub deploy private key for git operations",
+        credential_type=CredentialType.SSH_KEY,
+    ),
 )
 
 
 def _prompt_for_key(spec: KeySpec) -> str:
+    if spec.credential_type is CredentialType.SSH_KEY:
+        prompt = (
+            f"{spec.label} key path ({spec.env_var}) - {spec.description}\n"
+            "Leave blank to skip: "
+        )
+        return input(prompt)
     prompt = (
         f"{spec.label} key ({spec.env_var}) - {spec.description}\n"
         "Leave blank to skip: "
     )
     return getpass.getpass(prompt)
+
+
+def _resolve_key_value(spec: KeySpec, value: str) -> str:
+    if spec.credential_type is not CredentialType.SSH_KEY:
+        return value
+    try:
+        key_path = Path(value).expanduser()
+        return key_path.read_text()
+    except Exception as exc:
+        record_error(
+            message=f"Failed to read {spec.label} key file: {exc}",
+            source="scripts/set_api.py:_resolve_key_value",
+            error_type=type(exc).__name__,
+            priority=TicketPriority.P2,
+        )
+        print(f"Error reading {spec.label} key file. See Actifix tickets.")
+        return ""
 
 
 def _store_key(spec: KeySpec, value: str) -> None:
@@ -79,7 +110,8 @@ def _configure_keys(specs: Iterable[KeySpec]) -> int:
     skipped = []
 
     for spec in specs:
-        value = _prompt_for_key(spec).strip()
+        raw_value = _prompt_for_key(spec).strip()
+        value = _resolve_key_value(spec, raw_value).strip()
         if not value:
             skipped.append(spec.label)
             continue
