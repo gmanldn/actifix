@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 from typing import Optional
@@ -185,9 +186,26 @@ def create_module_scaffold(
     atomic_write(module_file, _module_template(module_key, host, port))
     atomic_write(test_file, _test_template(module_key))
 
+    manifest_data = {
+        "id": f"modules.{module_key}",
+        "version": "0.1.0",
+        "domain": "modules",
+        "dependencies": [
+            "modules.base",
+            "modules.config",
+            "runtime.state",
+            "infra.logging",
+            "core.raise_af",
+            "runtime.api",
+        ],
+    }
+    manifest_path = module_dir / "MANIFEST.json"
+    atomic_write(manifest_path, json.dumps(manifest_data, indent=2))
+
     return {
         "module_key": module_key,
         "module_dir": str(module_dir),
         "module_file": str(module_file),
         "test_file": str(test_file),
+        "manifest_file": str(manifest_path),
     }

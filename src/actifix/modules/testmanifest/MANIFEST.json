@@ -1,0 +1,13 @@
+{
+  "id": "modules.testmanifest",
+  "version": "0.1.0",
+  "domain": "modules",
+  "dependencies": [
+    "modules.base",
+    "modules.config",
+    "runtime.state",
+    "infra.logging",
+    "core.raise_af",
+    "runtime.api"
+  ]
+}

@@ -137,7 +137,16 @@ def run_gui(
             extra={"host": resolved_host, "port": resolved_port, "module": "modules.yahtzee"},
             source="modules.yahtzee.run_gui",
         )
-        app.run(host=resolved_host, port=resolved_port, debug=debug)
+        # use_reloader=False suppresses Flask's banner output which can cause BrokenPipeError
+        # when stdout is closed or redirected in certain environments
+        app.run(host=resolved_host, port=resolved_port, debug=debug, use_reloader=False)
+    except BrokenPipeError:
+        # BrokenPipeError can occur when Flask tries to write its banner to a closed stdout
+        # This is safe to ignore when the app is running in background/non-interactive mode
+        helper.log_module_info(
+            message="Yahtzee GUI started (stdout not available for banner)",
+            source="modules/yahtzee/__init__.py:run_gui",
+        )
     except Exception as exc:
         helper.record_module_error(
             message=f"Failed to start Yahtzee GUI: {exc}",
