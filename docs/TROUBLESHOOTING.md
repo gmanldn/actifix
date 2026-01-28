@@ -73,6 +73,7 @@ sqlite3 data/actifix.db "SELECT timestamp, level, event_type, message FROM event
 python3 -m actifix.main logs tail --limit 50
 python3 -m actifix.main config diff
 python3 -m actifix.main queue replay
+python3 -m actifix.main tickets cleanup --min-age-hours 24 --execute
 ```
 
 ## Still stuck?

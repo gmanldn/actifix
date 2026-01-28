@@ -305,6 +305,34 @@ def cmd_queue(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_tickets(args: argparse.Namespace) -> int:
+    """Manage tickets."""
+    from .persistence.ticket_cleanup import cleanup_duplicate_tickets
+    from .persistence.ticket_repo import get_ticket_repository
+
+    project_root = Path(args.project_root or Path.cwd())
+    with ActifixContext(project_root=project_root):
+        if args.tickets_action != "cleanup":
+            raise ValueError("tickets_action is required (e.g., 'cleanup')")
+
+        repo = get_ticket_repository()
+        dry_run = not bool(args.execute)
+        results = cleanup_duplicate_tickets(
+            repo,
+            min_age_hours=float(args.min_age_hours),
+            dry_run=dry_run,
+        )
+
+        print("=== Duplicate Ticket Cleanup ===")
+        print(f"Mode: {'DRY RUN' if dry_run else 'EXECUTE'}")
+        print(f"Duplicate groups: {results.get('duplicate_groups', 0)}")
+        print(f"Duplicates found: {results.get('duplicates_found', 0)}")
+        print(f"Duplicates closed: {results.get('duplicates_closed', 0)}")
+        print(f"Skipped locked: {results.get('duplicates_skipped_locked', 0)}")
+        print(f"Skipped recent: {results.get('duplicates_skipped_recent', 0)}")
+        return 0
+
+
 def _normalize_module_id(module_id: str) -> str:
     if "." in module_id:
         return module_id
@@ -538,6 +566,25 @@ def main(argv: Optional[list[str]] = None) -> int:
     queue_subparsers = queue_parser.add_subparsers(dest="queue_action")
     queue_subparsers.add_parser("replay", help="Replay fallback queue entries")
 
+    # Tickets command
+    tickets_parser = subparsers.add_parser("tickets", help="Manage tickets")
+    tickets_subparsers = tickets_parser.add_subparsers(dest="tickets_action")
+    tickets_cleanup = tickets_subparsers.add_parser(
+        "cleanup",
+        help="Auto-complete stale duplicate tickets",
+    )
+    tickets_cleanup.add_argument(
+        "--min-age-hours",
+        type=float,
+        default=24.0,
+        help="Minimum age before auto-completing duplicates (default: 24)",
+    )
+    tickets_cleanup.add_argument(
+        "--execute",
+        action="store_true",
+        help="Apply cleanup (default is dry-run)",
+    )
+
     # Test command
     test_parser = subparsers.add_parser("test", help="Run self-tests")
 
@@ -592,6 +639,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         "logs": cmd_logs,
         "config": cmd_config,
         "queue": cmd_queue,
+        "tickets": cmd_tickets,
         "test": cmd_test,
         "modules": cmd_modules,
         "doctor": cmd_doctor,

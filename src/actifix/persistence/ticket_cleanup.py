@@ -231,6 +231,97 @@ def cleanup_test_tickets(
     return stats
 
 
+def cleanup_duplicate_tickets(
+    repo,
+    min_age_hours: float = 24.0,
+    dry_run: bool = True,
+) -> Dict[str, int]:
+    """
+    Cleanup stale duplicate tickets by auto-completing older duplicates.
+
+    A duplicate is identified by matching (message, source, error_type).
+    The newest ticket in each duplicate group is kept open. Older tickets
+    are auto-completed if they exceed min_age_hours.
+
+    Args:
+        repo: TicketRepository instance.
+        min_age_hours: Minimum age in hours before auto-completing duplicates.
+        dry_run: If True, don't modify tickets, just report.
+
+    Returns:
+        Dict with counts of duplicates found/cleaned/skipped.
+    """
+    from .ticket_repo import TicketFilter
+
+    stats = {
+        'duplicate_groups': 0,
+        'duplicates_found': 0,
+        'duplicates_closed': 0,
+        'duplicates_skipped_locked': 0,
+        'duplicates_skipped_recent': 0,
+    }
+
+    open_tickets = repo.get_tickets(TicketFilter(status='Open'))
+    groups: Dict[tuple, list] = {}
+
+    for ticket in open_tickets:
+        key = (
+            ticket.get('message') or '',
+            ticket.get('source') or '',
+            ticket.get('error_type') or '',
+        )
+        groups.setdefault(key, []).append(ticket)
+
+    now = datetime.now(timezone.utc)
+
+    for tickets in groups.values():
+        if len(tickets) <= 1:
+            continue
+        stats['duplicate_groups'] += 1
+        tickets_sorted = sorted(
+            tickets,
+            key=lambda t: t.get('created_at') or datetime.min.replace(tzinfo=timezone.utc),
+            reverse=True,
+        )
+        newest = tickets_sorted[0]
+        older = tickets_sorted[1:]
+        stats['duplicates_found'] += len(older)
+
+        for ticket in older:
+            if ticket.get('locked_by'):
+                stats['duplicates_skipped_locked'] += 1
+                continue
+            created_at = ticket.get('created_at')
+            if not isinstance(created_at, datetime):
+                stats['duplicates_skipped_recent'] += 1
+                continue
+            age_hours = (now - created_at).total_seconds() / 3600.0
+            if age_hours < min_age_hours:
+                stats['duplicates_skipped_recent'] += 1
+                continue
+            if dry_run:
+                stats['duplicates_closed'] += 1
+                continue
+            try:
+                repo.mark_complete(
+                    ticket['id'],
+                    completion_notes=(
+                        "Implementation: Auto-completed stale duplicate ticket; "
+                        f"newer ticket remains open (latest id {newest.get('id')}).\n"
+                        "Files:\n"
+                        "- src/actifix/persistence/ticket_cleanup.py"
+                    ),
+                    test_steps="Automated duplicate cleanup policy execution.",
+                    test_results="Ticket auto-completed as duplicate per cleanup policy.",
+                    summary="Auto-cleanup: stale duplicate ticket",
+                )
+                stats['duplicates_closed'] += 1
+            except Exception as exc:
+                logger.warning(f"Failed to auto-complete duplicate ticket {ticket.get('id')}: {exc}")
+
+    return stats
+
+
 def run_automatic_cleanup(
     retention_days: int = DEFAULT_RETENTION_DAYS,
     test_ticket_retention_days: int = DEFAULT_TEST_TICKET_RETENTION_DAYS,

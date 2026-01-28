@@ -77,4 +77,8 @@ python3 -m actifix.main config diff
 
 # Replay fallback queue (if storage failures queued entries)
 python3 -m actifix.main queue replay
+
+# Cleanup stale duplicate tickets (dry-run by default)
+python3 -m actifix.main tickets cleanup --min-age-hours 24
+python3 -m actifix.main tickets cleanup --min-age-hours 24 --execute
 ```
