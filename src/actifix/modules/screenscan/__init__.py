@@ -228,33 +228,65 @@ def _capture_frame(backend: str, project_root, helper) -> Optional[dict]:
 
 
 def _capture_macos() -> Optional[dict]:
-    """Capture screenshot on macOS using pyobjc."""
+    """Capture screenshot on macOS using screencapture utility."""
     try:
         import subprocess
-        import base64
+        import os
+        from pathlib import Path
+        from datetime import datetime
 
-        # Use screencapture utility on macOS
-        result = subprocess.run(
-            ["screencapture", "-x", "-m", "/tmp/screenscan_temp.png"],
-            capture_output=True,
-            timeout=2.0,
-        )
+        # Use temporary file with timestamp to avoid race conditions
+        temp_dir = "/tmp"
+        temp_file = os.path.join(temp_dir, f"screenscan_{int(datetime.utcnow().timestamp() * 1000)}.png")
 
-        if result.returncode != 0:
-            return None
+        try:
+            # Use screencapture utility on macOS
+            # -x: no beep
+            # -m: capture main display only (most common case)
+            result = subprocess.run(
+                ["screencapture", "-x", "-m", temp_file],
+                capture_output=True,
+                timeout=1.5,  # Faster timeout
+                check=False,
+            )
 
-        # Read the captured PNG
-        with open("/tmp/screenscan_temp.png", "rb") as f:
-            data = f.read()
+            if result.returncode != 0:
+                return None
 
-        return {
-            "format": "png",
-            "width": 0,  # Could parse PNG header for actual dimensions
-            "height": 0,
-            "data": data,
-            "bytes": len(data),
-        }
+            # Read the captured PNG
+            if not os.path.exists(temp_file):
+                return None
+
+            with open(temp_file, "rb") as f:
+                data = f.read()
+
+            # Verify we got actual PNG data (minimum PNG header)
+            if len(data) < 8 or not data.startswith(b'\x89PNG\r\n\x1a\n'):
+                return None
+
+            return {
+                "format": "png",
+                "width": 0,  # Could parse PNG header for actual dimensions
+                "height": 0,
+                "data": data,
+                "bytes": len(data),
+            }
+        finally:
+            # Clean up temp file
+            try:
+                if os.path.exists(temp_file):
+                    os.remove(temp_file)
+            except Exception:
+                pass
+
+    except FileNotFoundError:
+        # screencapture not found
+        return None
+    except subprocess.TimeoutExpired:
+        # Capture took too long
+        return None
     except Exception:
+        # Any other error
         return None
 
 
@@ -373,8 +405,15 @@ def create_blueprint(
                 from actifix.persistence import get_database
                 import json
 
-                limit = min(int(request.args.get("limit", 10)), 120)
+                # SC-026: API safeguards - enforce limits
+                MAX_LIMIT = 120
+                MAX_TOTAL_BYTES = 100 * 1024 * 1024  # 100MB max total
+
+                limit = min(int(request.args.get("limit", 10)), MAX_LIMIT)
                 include_data = request.args.get("include_data", "0") == "1"
+
+                if limit < 1 or limit > MAX_LIMIT:
+                    return jsonify({"error": f"Invalid limit. Must be between 1 and {MAX_LIMIT}"}), 400
 
                 db = get_database(project_root)
                 conn = db.get_connection()
@@ -391,8 +430,21 @@ def create_blueprint(
                 conn.close()
 
                 frames_list = []
+                total_bytes = 0
+
                 for row in rows:
-                    frames_list.append({
+                    frame_bytes = row[6] if row[6] else 0
+
+                    # Check payload limits
+                    if include_data and (total_bytes + frame_bytes) > MAX_TOTAL_BYTES:
+                        record_agent_voice(
+                            module_key="screenscan",
+                            action="payload_limit_enforced",
+                            details=f"Request would exceed {MAX_TOTAL_BYTES} bytes, truncating",
+                        )
+                        break
+
+                    frame_entry = {
                         "slot": row[0],
                         "frame_seq": row[1],
                         "captured_at": row[2],
@@ -400,10 +452,24 @@ def create_blueprint(
                         "width": row[4],
                         "height": row[5],
                         "bytes": row[6],
-                    })
+                    }
 
-                return jsonify({"frames": frames_list})
+                    frames_list.append(frame_entry)
+                    total_bytes += frame_bytes
+
+                return jsonify({
+                    "frames": frames_list,
+                    "count": len(frames_list),
+                    "total_bytes": total_bytes,
+                    "include_data": include_data,
+                })
             except Exception as e:
+                helper.record_module_error(
+                    message=f"Failed to retrieve frames: {e}",
+                    source="modules/screenscan/__init__.py:frames",
+                    error_type=type(e).__name__,
+                    priority=TicketPriority.P2,
+                )
                 return jsonify({"error": str(e)}), 500
 
         log_event(
@@ -460,16 +526,44 @@ def start_module(project_root: Optional[Union[str, Path]] = None) -> None:
 
 
 def stop_module(project_root: Optional[Union[str, Path]] = None) -> None:
-    """Stop the screenscan module."""
+    """Stop the screenscan module (SC-039: robust shutdown)."""
+    global _worker_thread, _worker_running
+    helper = _module_helper(project_root)
+
     try:
-        _stop_capture_worker()
+        # Signal worker to stop
+        with _worker_lock:
+            _worker_running = False
+
+        # Wait for worker thread to finish (with timeout)
+        if _worker_thread and _worker_thread.is_alive():
+            _worker_thread.join(timeout=3.0)
+
+            # Force cleanup if thread didn't exit cleanly
+            if _worker_thread.is_alive():
+                helper.record_module_error(
+                    message="Screenscan worker thread did not shut down cleanly within timeout",
+                    source="modules/screenscan/__init__.py:stop_module",
+                    error_type="ThreadTimeoutError",
+                    priority=TicketPriority.P2,
+                )
+
+        # Clear thread reference
+        _worker_thread = None
+
         record_agent_voice(
             module_key="screenscan",
             action="module_stopped",
-            details="Screenscan module stopped",
+            details="Screenscan module stopped gracefully",
+        )
+
+        log_event(
+            "SCREENSCAN_STOPPED",
+            "Screenscan module stopped",
+            extra={"module": "modules.screenscan"},
+            source="modules/screenscan/__init__.py:stop_module",
         )
     except Exception as exc:
-        helper = _module_helper(project_root)
         helper.record_module_error(
             message=f"Failed to stop screenscan module: {exc}",
             source="modules/screenscan/__init__.py:stop_module",
