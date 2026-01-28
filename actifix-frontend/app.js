@@ -9,7 +9,7 @@ const { useState, useEffect, useRef, createElement: h } = React;
 // API Configuration
 // Dynamically construct API_BASE using window.location to match the frontend port
 const API_BASE = `${window.location.protocol}//${window.location.hostname}:5001/api`;
-const UI_VERSION = '7.0.50';
+const UI_VERSION = '7.0.51';
 const REFRESH_INTERVAL = 5000;
 const LOG_REFRESH_INTERVAL = 3000;
 const TICKET_REFRESH_INTERVAL = 4000;
@@ -765,7 +765,7 @@ const OverviewView = () => {
       })
     ),
 
-    h(PokerToolPanel),
+    h(RecentActivityPanel),
 
     // Recent Tickets Panel
     h('div', { className: 'panel' },
@@ -780,7 +780,6 @@ const OverviewView = () => {
           )
         )
       ),
-      tickets?.tickets && tickets.tickets.length > 0 ? h('div', { className: 'ticket-list' },
         tickets.tickets.slice(0, 15).map((ticket, i) => {
           const priority = normalizePriority(ticket.priority);
           return h('div', { key: ticket.ticket_id || i, className: 'ticket-item' },

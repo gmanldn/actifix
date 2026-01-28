@@ -413,6 +413,12 @@
       "label": "shootymcshoot"
     },
     {
+      "id": "modules.screenscan",
+      "domain": "modules",
+      "owner": "modules",
+      "label": "screenscan"
+    },
+    {
       "id": "modules.hollogram",
       "domain": "modules",
       "owner": "modules",
@@ -1274,6 +1280,31 @@
       "from": "core.ai_client",
       "to": "security.credentials",
       "reason": "core.ai_client depends on security.credentials"
+    },
+    {
+      "from": "modules.screenscan",
+      "to": "runtime.state",
+      "reason": "modules.screenscan depends on runtime.state"
+    },
+    {
+      "from": "modules.screenscan",
+      "to": "infra.logging",
+      "reason": "modules.screenscan depends on infra.logging"
+    },
+    {
+      "from": "modules.screenscan",
+      "to": "core.raise_af",
+      "reason": "modules.screenscan depends on core.raise_af"
+    },
+    {
+      "from": "modules.screenscan",
+      "to": "runtime.api",
+      "reason": "modules.screenscan depends on runtime.api"
+    },
+    {
+      "from": "modules.screenscan",
+      "to": "infra.persistence.database",
+      "reason": "modules.screenscan depends on infra.persistence.database"
     }
   ]
 }

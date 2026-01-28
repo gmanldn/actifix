@@ -780,6 +780,24 @@ modules:
   - enforce module naming and location conventions
   depends_on:
   - infra.logging
+- id: modules.screenscan
+  domain: modules
+  owner: modules
+  summary: Always-on screen capture with ring-buffer storage for debugging
+  entrypoints:
+  - src/actifix/modules/screenscan/__init__.py
+  contracts:
+  - capture screenshots at configurable FPS with ring-buffer ring-buffer storage
+  - retain last minute of frames (configurable) with constant row count
+  - expose health/stats/frames API endpoints for last-minute UI state
+  - support macOS with graceful degradation on Windows/Linux
+  - all errors recorded via Raise_AF with AgentVoice support
+  depends_on:
+  - runtime.state
+  - infra.logging
+  - core.raise_af
+  - runtime.api
+  - infra.persistence.database
 - id: modules.superquiz
   domain: modules
   owner: modules
