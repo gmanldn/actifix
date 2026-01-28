@@ -946,13 +946,13 @@
     },
     {
       "from": "plugins.sandbox",
-      "to": "infra.logging",
-      "reason": "plugins.sandbox depends on infra.logging"
+      "to": "core.agent_voice",
+      "reason": "plugins.sandbox depends on core.agent_voice"
     },
     {
       "from": "plugins.sandbox",
-      "to": "infra.health",
-      "reason": "plugins.sandbox depends on infra.health"
+      "to": "infra.logging",
+      "reason": "plugins.sandbox depends on infra.logging"
     },
     {
       "from": "plugins.sandbox",

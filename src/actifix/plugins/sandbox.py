@@ -167,11 +167,13 @@ class PluginSandbox:
             registry.register(plugin, app, name=self.name)
             logger.info("Plugin '%s' registered", self.name)
 
-            record_agent_voice(
-                module_key="plugin_sandbox",
-                action="plugin_registered",
-                details=f"Plugin registered: {self.name}"
-            )
+            with suppress(Exception):
+                record_agent_voice(
+                    thought=f"plugin_sandbox: plugin_registered {self.name}",
+                    run_label="plugin-sandbox",
+                    level="INFO",
+                    extra={"plugin_name": self.name},
+                )
 
         except Exception as exc:
             self.record_error(f"Failed to register plugin '{self.name}'", exc)
@@ -443,9 +445,20 @@ class PluginSandbox:
         else:
             event_dict = details
 
-        log_event(f"plugin:{event_type}", details=event_dict)
-        record_agent_voice(
-            module_key="plugin_sandbox",
-            action=event_type,
-            details=f"Plugin event: {event_type}"
-        )
+        with suppress(Exception):
+            log_event(
+                f"plugin:{event_type}",
+                message=f"Plugin event: {event_type}",
+                extra=event_dict,
+                source="PluginSandbox",
+            )
+        extra = {"event_type": event_type}
+        if isinstance(event_dict, dict):
+            extra["plugin"] = event_dict.get("plugin_name")
+        with suppress(Exception):
+            record_agent_voice(
+                thought=f"plugin_sandbox: {event_type}",
+                run_label="plugin-sandbox",
+                level="INFO",
+                extra=extra,
+            )

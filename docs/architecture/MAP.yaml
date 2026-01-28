@@ -729,8 +729,8 @@ modules:
   - consolidate 25 plugin sandbox tickets into single framework
   depends_on:
   - core.raise_af
+  - core.agent_voice
   - infra.logging
-  - infra.health
   - plugins.registry
   - plugins.validation
 - id: plugins.loader
