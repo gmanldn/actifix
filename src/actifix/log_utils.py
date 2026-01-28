@@ -298,6 +298,9 @@ def log_event(
                 extra_json = str(extra)
 
         # Non-blocking background logging to DB event repository
+        # Use synchronous logging in tests or when ACTIFIX_SYNC_LOGGING is set
+        sync_mode = os.environ.get("ACTIFIX_SYNC_LOGGING") == "1"
+
         def _background_db_log():
             try:
                 from .persistence.event_repo import get_event_repository
@@ -314,12 +317,17 @@ def log_event(
             except Exception:
                 pass
 
-        try:
-            executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="actifix_log")
-            executor.submit(_background_db_log)
-            executor.shutdown(wait=False)
-        except Exception:
-            pass
+        if sync_mode:
+            # Synchronous logging for tests - ensures events are persisted before returning
+            _background_db_log()
+        else:
+            # Asynchronous logging for production - non-blocking
+            try:
+                executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="actifix_log")
+                executor.submit(_background_db_log)
+                executor.shutdown(wait=False)
+            except Exception:
+                pass
 
 
     except Exception:

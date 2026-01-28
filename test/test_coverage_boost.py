@@ -177,7 +177,10 @@ def test_mark_ticket_complete_can_reapply_summary_after_reopen(tmp_path):
     assert stored["completion_summary"] == "Second summary"
 
 
-def test_mark_ticket_complete_idempotent_guard(tmp_path):
+def test_mark_ticket_complete_idempotent_guard(tmp_path, monkeypatch):
+    # Enable synchronous logging to ensure events are persisted before assertions
+    monkeypatch.setenv("ACTIFIX_SYNC_LOGGING", "1")
+
     paths = get_actifix_paths(project_root=tmp_path)
     init_actifix_files(paths)
 
