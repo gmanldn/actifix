@@ -6,7 +6,7 @@ All Changes Must Start via Raise_AF
 
 1. **Workflow**: Work directly on `develop` with regular pushes; no per-change branches required.
 1.1 **Readme** Always read the readme
-1.2 **Docs first** Always read `AGENTS.md`, `README.md`, and `docs/INDEX.md` (and any referenced docs) before starting work so every change respects the Actifix rules and architecture.
+1.2 **Docs available** Reference `README.md` and `docs/INDEX.md` for context when needed, but proceed directly with implementation instead of trying to read every referenced document upfront.
 1.3 **Actifix rules** Insist on following the Actifix workflow/QA rules for every task—no exceptions.
 1.4 **Last-minute sync** Immediately before committing or bumping the version (including `pyproject.toml`), fetch the current `develop`, confirm the remote `pyproject.toml` (and frontend asset version constants) still match what you plan to bump, and resolve or merge any incoming changes before you increment or push to avoid colliding with other agents. After the sync, always rerun `scripts/build_frontend.py` and stage the frontend artifacts so the asset constants match the canonical version on every commit.
 2. **Completion evidence is mandatory** Tickets must never be marked complete without real implementation work in the codebase. If no implementation exists, create it first, then test it, then complete the ticket.
