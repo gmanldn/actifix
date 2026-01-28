@@ -71,4 +71,7 @@ python3 -m actifix.main quarantine list
 
 # Ticket stats summary
 python3 -m actifix.main stats
+
+# Config overrides vs defaults
+python3 -m actifix.main config diff
 ```

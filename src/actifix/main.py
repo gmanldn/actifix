@@ -215,6 +215,58 @@ def cmd_test(args: argparse.Namespace) -> int:
         return 0 if result.success else 1
 
 
+def cmd_config(args: argparse.Namespace) -> int:
+    """Inspect configuration."""
+    from dataclasses import fields
+    from .config import ActifixConfig
+    from .state_paths import get_actifix_paths
+
+    project_root = Path(args.project_root or Path.cwd())
+    paths = get_actifix_paths(project_root=project_root)
+
+    if args.config_action != "diff":
+        raise ValueError("config_action is required (e.g., 'diff')")
+
+    default_config = ActifixConfig(project_root=project_root, paths=paths)
+    active_config = load_config(project_root=project_root, fail_fast=False)
+
+    def _redact(field_name: str, value: object) -> object:
+        lowered = field_name.lower()
+        if any(marker in lowered for marker in ("key", "token", "secret", "password")):
+            if value:
+                return "***redacted***"
+        return value
+
+    def _normalize(value: object) -> object:
+        if isinstance(value, Path):
+            return str(value)
+        return value
+
+    diffs = []
+    for field in fields(ActifixConfig):
+        if field.name in {"project_root", "paths"}:
+            continue
+        default_value = _normalize(getattr(default_config, field.name))
+        active_value = _normalize(getattr(active_config, field.name))
+        if default_value != active_value:
+            diffs.append(
+                (
+                    field.name,
+                    _redact(field.name, default_value),
+                    _redact(field.name, active_value),
+                )
+            )
+
+    if not diffs:
+        print("No config overrides detected.")
+        return 0
+
+    print("=== Config Overrides (current vs defaults) ===")
+    for name, default_value, active_value in diffs:
+        print(f"{name}: default={default_value} current={active_value}")
+    return 0
+
+
 def _normalize_module_id(module_id: str) -> str:
     if "." in module_id:
         return module_id
@@ -438,6 +490,11 @@ def main(argv: Optional[list[str]] = None) -> int:
     logs_tail_parser.add_argument("--ticket-id", help="Filter by ticket ID")
     logs_tail_parser.add_argument("--correlation-id", help="Filter by correlation ID")
 
+    # Config command
+    config_parser = subparsers.add_parser("config", help="Inspect configuration")
+    config_subparsers = config_parser.add_subparsers(dest="config_action")
+    config_subparsers.add_parser("diff", help="Show config overrides vs defaults")
+
     # Test command
     test_parser = subparsers.add_parser("test", help="Run self-tests")
 
@@ -490,6 +547,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         "quarantine": cmd_quarantine,
         "diagnostics": cmd_diagnostics,
         "logs": cmd_logs,
+        "config": cmd_config,
         "test": cmd_test,
         "modules": cmd_modules,
         "doctor": cmd_doctor,
