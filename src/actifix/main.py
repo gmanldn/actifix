@@ -267,6 +267,44 @@ def cmd_config(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_queue(args: argparse.Namespace) -> int:
+    """Manage persistence queues."""
+    import json
+    from .raise_af import replay_fallback_queue, LEGACY_FALLBACK_QUEUE
+    from .state_paths import get_actifix_paths, init_actifix_files
+
+    project_root = Path(args.project_root or Path.cwd())
+    paths = get_actifix_paths(project_root=project_root)
+    init_actifix_files(paths)
+
+    if args.queue_action != "replay":
+        raise ValueError("queue_action is required (e.g., 'replay')")
+
+    queue_file = paths.fallback_queue_file
+    legacy_file = paths.base_dir / LEGACY_FALLBACK_QUEUE
+
+    def _count_entries(path: Path) -> int:
+        if not path.exists():
+            return 0
+        try:
+            content = path.read_text(encoding="utf-8").strip() or "[]"
+            data = json.loads(content)
+            return len(data) if isinstance(data, list) else 0
+        except Exception:
+            return 0
+
+    before = _count_entries(queue_file) or _count_entries(legacy_file)
+    if before == 0:
+        print("No fallback queue entries to replay.")
+        return 0
+
+    print(f"Replaying fallback queue entries: {before}")
+    replayed = replay_fallback_queue(base_dir=paths.base_dir)
+    after = _count_entries(queue_file) or _count_entries(legacy_file)
+    print(f"Replayed: {replayed} | Remaining: {after}")
+    return 0
+
+
 def _normalize_module_id(module_id: str) -> str:
     if "." in module_id:
         return module_id
@@ -495,6 +533,11 @@ def main(argv: Optional[list[str]] = None) -> int:
     config_subparsers = config_parser.add_subparsers(dest="config_action")
     config_subparsers.add_parser("diff", help="Show config overrides vs defaults")
 
+    # Queue command
+    queue_parser = subparsers.add_parser("queue", help="Manage persistence queues")
+    queue_subparsers = queue_parser.add_subparsers(dest="queue_action")
+    queue_subparsers.add_parser("replay", help="Replay fallback queue entries")
+
     # Test command
     test_parser = subparsers.add_parser("test", help="Run self-tests")
 
@@ -548,6 +591,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         "diagnostics": cmd_diagnostics,
         "logs": cmd_logs,
         "config": cmd_config,
+        "queue": cmd_queue,
         "test": cmd_test,
         "modules": cmd_modules,
         "doctor": cmd_doctor,

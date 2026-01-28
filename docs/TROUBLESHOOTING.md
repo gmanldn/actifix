@@ -72,6 +72,7 @@ python3 -m actifix.main health
 sqlite3 data/actifix.db "SELECT timestamp, level, event_type, message FROM event_log ORDER BY timestamp DESC LIMIT 50;"
 python3 -m actifix.main logs tail --limit 50
 python3 -m actifix.main config diff
+python3 -m actifix.main queue replay
 ```
 
 ## Still stuck?

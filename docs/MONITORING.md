@@ -74,4 +74,7 @@ python3 -m actifix.main stats
 
 # Config overrides vs defaults
 python3 -m actifix.main config diff
+
+# Replay fallback queue (if storage failures queued entries)
+python3 -m actifix.main queue replay
 ```
