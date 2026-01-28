@@ -951,6 +951,11 @@
     },
     {
       "from": "plugins.sandbox",
+      "to": "infra.health",
+      "reason": "plugins.sandbox depends on infra.health"
+    },
+    {
+      "from": "plugins.sandbox",
       "to": "plugins.registry",
       "reason": "plugins.sandbox depends on plugins.registry"
     },

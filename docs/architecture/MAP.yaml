@@ -715,16 +715,22 @@ modules:
 - id: plugins.sandbox
   domain: plugins
   owner: plugins
-  summary: Isolation layer and safe registration wrapper
+  summary: Plugin sandboxing with isolation, capability control, and timeout enforcement
   entrypoints:
   - src/actifix/plugins/sandbox.py
   contracts:
-  - contain plugin failures during register/unregister
-  - report load failures via raise_af with structured tickets
-  - keep registry state consistent when plugins crash
+  - thread pool isolation with timeout enforcement
+  - explicit plugin API contract and version negotiation
+  - capability flags (database, network, filesystem) with deny-by-default
+  - early metadata validation with fast failure
+  - contain plugin failures and prevent core crashes
+  - report failures via raise_af with structured tickets
+  - keep registry state consistent on plugin crashes
+  - consolidate 25 plugin sandbox tickets into single framework
   depends_on:
   - core.raise_af
   - infra.logging
+  - infra.health
   - plugins.registry
   - plugins.validation
 - id: plugins.loader
