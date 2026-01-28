@@ -155,7 +155,9 @@ def apply_retention_policy(
             should_delete = True
 
         if should_delete:
-            tickets_to_delete.append(ticket['ticket_id'])
+            ticket_id = ticket.get('id') or ticket.get('ticket_id')
+            if ticket_id:
+                tickets_to_delete.append(ticket_id)
 
     stats['total_deleted'] = len(tickets_to_delete)
 
@@ -203,7 +205,9 @@ def cleanup_test_tickets(
     for ticket in open_tickets:
         if is_test_ticket(ticket):
             stats['test_tickets_found'] += 1
-            tickets_to_clean.append(ticket['ticket_id'])
+            ticket_id = ticket.get('id') or ticket.get('ticket_id')
+            if ticket_id:
+                tickets_to_clean.append(ticket_id)
 
     stats['test_tickets_cleaned'] = len(tickets_to_clean)
 
