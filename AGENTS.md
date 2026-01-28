@@ -30,6 +30,8 @@ Never reinvent the wheel, check if a system is already in the codebase. Use that
 Be reluctant to make new scripts or entire new systems unless you've checked for existing code.
 10. **Screenscan is mandatory**: `modules.screenscan` must remain **always-on**. Do not disable it via module CLI/statuses. Changes must keep screenscan health + tests green (ring-buffer retention + worker thread liveness). If screen capture is unsupported (headless/permissions), the module must still stay up and report degraded with actionable remediation, and errors must be recorded via Raise_AF (deduped) plus AgentVoice (best-effort) without ever persisting image bytes into tickets/logs.
 
+11. **Automation hook helper**: For automation tickets (e.g., ACT-20260128-810F6, ACT-20260128-E7C5A) use `scripts/ do_af_local_automation.py --ticket <TICKET-ID>` to run lint/tests, bump `pyproject.toml`, rebuild the frontend, and push the commit after every local automation run before calling `mark_ticket_complete()`.
+
 ```bash
 # Commit convention
 git commit -m "type(scope): description"
