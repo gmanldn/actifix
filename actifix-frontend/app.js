@@ -9,7 +9,7 @@ const { useState, useEffect, useRef, createElement: h } = React;
 // API Configuration
 // Dynamically construct API_BASE using window.location to match the frontend port
 const API_BASE = `${window.location.protocol}//${window.location.hostname}:5001/api`;
-const UI_VERSION = '7.0.68';
+const UI_VERSION = '7.0.69';
 const REFRESH_INTERVAL = 5000;
 const LOG_REFRESH_INTERVAL = 3000;
 const TICKET_REFRESH_INTERVAL = 4000;
@@ -120,6 +120,25 @@ const SLA_HOURS = {
 const normalizePriority = (priority) => (
   PRIORITY_ORDER.includes(priority) ? priority : 'P4'
 );
+
+const getSlaStatus = (created, priority) => {
+  const createdAt = created ? new Date(created) : null;
+  if (!createdAt || Number.isNaN(createdAt.getTime())) {
+    return null;
+  }
+  const ageHours = (Date.now() - createdAt.getTime()) / 3600000;
+  const slaHours = SLA_HOURS[priority] || 168;
+  const remainingHours = Math.max(0, slaHours - ageHours);
+  const overdueHours = Math.max(0, ageHours - slaHours);
+  const isOverdue = overdueHours > 0;
+  return {
+    ageHours,
+    slaHours,
+    remainingHours,
+    overdueHours,
+    isOverdue,
+  };
+};
 
 const groupTicketsByPriority = (tickets) => {
   const grouped = {};
@@ -960,22 +979,26 @@ const TicketsView = () => {
 
             h('div', { className: 'ticket-card-header' },
               h('span', { className: `priority-badge ${priority.toLowerCase()}` }, priority),
+              h('span', { className: `severity-badge ${priority.toLowerCase()}` }, PRIORITY_LABELS[priority] || 'Priority'),
               h('span', { className: `status-badge ${ticket.status}` }, ticket.status),
               (() => {
-                const createdDate = new Date(ticket.created);
-                const ageHours = (Date.now() - createdDate) / 3600000;
-                const slaHours = SLA_HOURS[priority] || 168;
-                const overdueHours = Math.max(0, ageHours - slaHours);
-                if (overdueHours > 0) {
+                const sla = getSlaStatus(ticket.created, priority);
+                if (!sla) {
+                  return h('span', { className: 'sla-badge' }, '⏰ n/a');
+                }
+                const remaining = Math.round(sla.remainingHours);
+                const overdue = Math.round(sla.overdueHours);
+                if (sla.isOverdue) {
                   return h('span', {
                     className: 'sla-badge overdue',
-                    title: `SLA breach: ${Math.round(overdueHours)}h overdue (P${priority} SLA: ${slaHours}h)`
-                  }, `⏰ ${Math.round(overdueHours)}h`);
+                    title: `SLA breach: ${overdue}h overdue (P${priority} SLA: ${sla.slaHours}h)`
+                  }, `SLA +${overdue}h`);
                 }
+                const warning = remaining <= Math.max(1, Math.round(sla.slaHours * 0.25));
                 return h('span', {
-                  className: 'sla-badge',
-                  title: `Age: ${Math.round(ageHours)}h (P${priority} SLA: ${slaHours}h)`
-                }, `⏰ ${Math.round(ageHours)}h`);
+                  className: `sla-badge${warning ? ' warning' : ''}`,
+                  title: `SLA remaining: ${remaining}h (P${priority} SLA: ${sla.slaHours}h)`
+                }, `SLA ${remaining}h`);
               })(),
               h('span', { className: 'ticket-id' }, ticket.ticket_id?.slice(0, 10) || 'N/A')
             ),
@@ -1259,6 +1282,18 @@ const TicketsView = () => {
         const openTickets = group?.open || [];
         const completedTickets = group?.completed || [];
         const label = PRIORITY_LABELS[priority] || 'Priority';
+        const oldestOpen = openTickets.reduce((oldest, ticket) => {
+          const createdAt = ticket?.created ? new Date(ticket.created) : null;
+          if (!createdAt || Number.isNaN(createdAt.getTime())) {
+            return oldest;
+          }
+          if (!oldest) {
+            return ticket;
+          }
+          const oldestDate = new Date(oldest.created);
+          return createdAt < oldestDate ? ticket : oldest;
+        }, null);
+        const laneSla = oldestOpen ? getSlaStatus(oldestOpen.created, priority) : null;
 
         return h('section', {
           key: priority,
@@ -1269,6 +1304,19 @@ const TicketsView = () => {
             h('div', { className: 'priority-lane-title' },
               h('span', { className: `priority-badge ${priority.toLowerCase()}` }, priority),
               h('div', { className: 'priority-lane-label' }, label)
+            ),
+            h('div', { className: 'priority-lane-meta' },
+              h('span', { className: `severity-badge ${priority.toLowerCase()}` }, label),
+              laneSla
+                ? h('span', {
+                  className: `sla-badge${laneSla.isOverdue ? ' overdue' : ''}${laneSla.remainingHours <= Math.max(1, Math.round(laneSla.slaHours * 0.25)) ? ' warning' : ''}`,
+                  title: laneSla.isOverdue
+                    ? `SLA breach: ${Math.round(laneSla.overdueHours)}h overdue (P${priority} SLA: ${laneSla.slaHours}h)`
+                    : `SLA remaining: ${Math.round(laneSla.remainingHours)}h (P${priority} SLA: ${laneSla.slaHours}h)`
+                }, laneSla.isOverdue
+                  ? `SLA +${Math.round(laneSla.overdueHours)}h`
+                  : `SLA ${Math.round(laneSla.remainingHours)}h`)
+                : h('span', { className: 'sla-badge idle' }, 'SLA idle')
             ),
             h('div', { className: 'priority-lane-counts' },
               h('span', { className: 'lane-count open' }, `${openTickets.length} open`),
