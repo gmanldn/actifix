@@ -72,6 +72,19 @@ modules:
   - fail fast on invalid config
   depends_on:
   - infra.logging
+- id: runtime.cli_framework
+  domain: runtime
+  owner: runtime
+  summary: Unified CLI framework for guided commands and interactive workflows
+  entrypoints:
+  - src/actifix/cli_framework.py
+  contracts:
+  - provide reusable CLI components (prompts, output, workflows)
+  - support guided interactive commands
+  - enable structured terminal output with colors and tables
+  - consolidate 30+ CLI command variants into single framework
+  depends_on:
+  - infra.logging
 - id: runtime.state
   domain: runtime
   owner: runtime

@@ -413,6 +413,12 @@
       "label": "shootymcshoot"
     },
     {
+      "id": "runtime.cli_framework",
+      "domain": "runtime",
+      "owner": "runtime",
+      "label": "cli_framework"
+    },
+    {
       "id": "modules.screenscan",
       "domain": "modules",
       "owner": "modules",
@@ -1305,6 +1311,11 @@
       "from": "modules.screenscan",
       "to": "infra.persistence.database",
       "reason": "modules.screenscan depends on infra.persistence.database"
+    },
+    {
+      "from": "runtime.cli_framework",
+      "to": "infra.logging",
+      "reason": "runtime.cli_framework depends on infra.logging"
     }
   ]
 }
