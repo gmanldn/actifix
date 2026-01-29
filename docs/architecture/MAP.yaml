@@ -538,6 +538,19 @@ modules:
   - check dependency graph consistency
   depends_on:
   - infra.logging
+- id: tooling.codebase_explorer
+  domain: tooling
+  owner: tooling
+  summary: Codebase exploration tool for AI agents to navigate and inspect files
+  entrypoints:
+  - scripts/codebase.py
+  contracts:
+  - list all files with sizes and modification dates
+  - read file contents with optional line limits
+  - search for text across codebase
+  - provide codebase statistics and overview
+  - extensively documented for AI agent usage
+  depends_on: []
 - id: core.ai_client
   domain: core
   owner: core

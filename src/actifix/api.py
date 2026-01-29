@@ -1647,6 +1647,182 @@ def create_app(
             return jsonify({'error': 'Ticket not found'}), 404
         return jsonify(ticket)
 
+    @app.route('/api/raise-ticket', methods=['POST'])
+    def api_raise_ticket():
+        """
+        Create a new ticket via API.
+
+        Request body (JSON):
+            {
+                "message": "Error description (required)",
+                "source": "file.py:line or module name (required)",
+                "error_type": "ErrorType (optional, default: APITicket)",
+                "priority": "P0|P1|P2|P3|P4 (optional, default: P2)",
+                "run_label": "Label for this ticket (optional, default: api-created)",
+                "capture_context": false (optional, whether to capture stack/file context)
+            }
+
+        Returns:
+            {
+                "success": true,
+                "ticket_id": "ACT-YYYYMMDD-XXXXX",
+                "message": "Ticket created successfully",
+                "priority": "P2"
+            }
+        """
+        # Check authentication
+        if not _check_auth(request):
+            return jsonify({'error': 'Authorization required'}), 401
+
+        paths = get_actifix_paths(project_root=app.config['PROJECT_ROOT'])
+        data = request.get_json() if request.is_json else {}
+
+        # Validate required fields
+        if not data.get('message'):
+            return jsonify({
+                'error': 'Missing required field: message',
+                'required_fields': ['message', 'source'],
+                'optional_fields': ['error_type', 'priority', 'run_label', 'capture_context']
+            }), 400
+
+        if not data.get('source'):
+            return jsonify({
+                'error': 'Missing required field: source',
+                'hint': 'Provide source as "file.py:line" or module name'
+            }), 400
+
+        # Parse priority
+        priority_str = data.get('priority', 'P2')
+        try:
+            if isinstance(priority_str, str):
+                priority = TicketPriority[priority_str] if priority_str.startswith('P') else TicketPriority[f'P{priority_str}']
+            else:
+                priority = TicketPriority.P2
+        except (KeyError, ValueError):
+            return jsonify({
+                'error': f'Invalid priority: {priority_str}',
+                'valid_priorities': ['P0', 'P1', 'P2', 'P3', 'P4']
+            }), 400
+
+        # Create the ticket
+        try:
+            ticket_id = record_error(
+                message=data['message'],
+                source=data['source'],
+                error_type=data.get('error_type', 'APITicket'),
+                priority=priority,
+                run_label=data.get('run_label', 'api-created'),
+                capture_context=data.get('capture_context', False),
+                paths=paths,
+            )
+
+            # Emit WebSocket event for new ticket
+            emit_ticket_event('ticket_created', {
+                'ticket_id': ticket_id,
+                'error_type': data.get('error_type', 'APITicket'),
+                'priority': priority_str,
+                'timestamp': datetime.now(timezone.utc).isoformat(),
+            })
+
+            return jsonify({
+                'success': True,
+                'ticket_id': ticket_id,
+                'message': 'Ticket created successfully',
+                'priority': priority_str,
+            }), 201
+
+        except Exception as e:
+            return jsonify({
+                'error': f'Failed to create ticket: {str(e)}',
+                'details': str(e)
+            }), 500
+
+    @app.route('/api/complete-ticket', methods=['POST'])
+    def api_complete_ticket():
+        """
+        Mark a ticket as complete.
+
+        Request body (JSON):
+            {
+                "ticket_id": "ACT-YYYYMMDD-XXXXX (required)",
+                "completion_notes": "Detailed completion notes with Implementation and Files sections (required)",
+                "test_steps": "Steps taken to test the fix (required)",
+                "test_results": "Test results and verification (required)",
+                "summary": "Brief summary (optional)",
+                "test_documentation_url": "URL to test documentation (optional)"
+            }
+
+        Returns:
+            {
+                "success": true,
+                "ticket_id": "ACT-YYYYMMDD-XXXXX",
+                "message": "Ticket marked complete"
+            }
+        """
+        # Require authentication for mutations
+        if not _require_auth(request):
+            return jsonify({'error': 'Authorization required (admin password)'}), 401
+
+        paths = get_actifix_paths(project_root=app.config['PROJECT_ROOT'])
+
+        # Enforce Raise_AF-only policy
+        enforce_raise_af_only(paths)
+
+        data = request.get_json() if request.is_json else {}
+
+        # Validate required fields
+        if not data.get('ticket_id'):
+            return jsonify({'error': 'Missing required field: ticket_id'}), 400
+
+        completion_notes = data.get('completion_notes')
+        test_steps = data.get('test_steps')
+        test_results = data.get('test_results')
+
+        if not completion_notes or not test_steps or not test_results:
+            return jsonify({
+                'error': 'completion_notes, test_steps, and test_results are required',
+                'hint': 'Include Implementation and Files sections in completion_notes.'
+            }), 400
+
+        # Import mark_ticket_complete
+        from .do_af import mark_ticket_complete
+
+        try:
+            success = mark_ticket_complete(
+                ticket_id=data['ticket_id'],
+                completion_notes=completion_notes,
+                test_steps=test_steps,
+                test_results=test_results,
+                summary=data.get('summary', ''),
+                test_documentation_url=data.get('test_documentation_url'),
+                paths=paths,
+            )
+
+            if success:
+                # Emit WebSocket event
+                emit_ticket_event('ticket_completed', {
+                    'ticket_id': data['ticket_id'],
+                    'timestamp': datetime.now(timezone.utc).isoformat(),
+                })
+
+                return jsonify({
+                    'success': True,
+                    'ticket_id': data['ticket_id'],
+                    'message': 'Ticket marked complete'
+                }), 200
+            else:
+                return jsonify({
+                    'success': False,
+                    'error': 'Failed to mark ticket complete',
+                    'ticket_id': data['ticket_id']
+                }), 500
+
+        except Exception as e:
+            return jsonify({
+                'error': f'Failed to complete ticket: {str(e)}',
+                'details': str(e)
+            }), 500
+
     @app.route('/api/fix-ticket', methods=['POST'])
     def api_fix_ticket():
         """Fix the highest priority open ticket with detailed logging."""

@@ -239,6 +239,12 @@
       "label": "architecture_validator"
     },
     {
+      "id": "tooling.codebase_explorer",
+      "domain": "tooling",
+      "owner": "tooling",
+      "label": "codebase_explorer"
+    },
+    {
       "id": "core.ai_client",
       "domain": "core",
       "owner": "core",
