@@ -162,6 +162,13 @@ class ActifixConfig:
     relay_default_token_budget: int = 4000
     relay_handoff_on_failure: bool = True
 
+    # AI Context subsystem
+    ai_memory_enabled: bool = True
+    ai_vector_store_enabled: bool = True
+    ai_vector_store_path: str = ""
+    ai_memory_provider: str = "letta"
+    ai_vector_store_provider: str = "sqlite_vss"
+
 
 def _parse_bool(value: str) -> bool:
     """Parse boolean from string."""
@@ -377,6 +384,21 @@ def load_config(
         ),
         relay_handoff_on_failure=_parse_bool(
             _get_env_sanitized("ACTIFIX_AI_RELAY_HANDOFF_ON_FAILURE", "1", value_type="boolean")
+        ),
+        ai_memory_enabled=_parse_bool(
+            _get_env_sanitized("ACTIFIX_AI_MEMORY_ENABLED", "1", value_type="boolean")
+        ),
+        ai_vector_store_enabled=_parse_bool(
+            _get_env_sanitized("ACTIFIX_AI_VECTOR_STORE_ENABLED", "1", value_type="boolean")
+        ),
+        ai_vector_store_path=_get_env_sanitized(
+            "ACTIFIX_AI_VECTOR_STORE_PATH", "", value_type="path"
+        ),
+        ai_memory_provider=_get_env_sanitized(
+            "ACTIFIX_AI_MEMORY_PROVIDER", "letta", value_type="string"
+        ),
+        ai_vector_store_provider=_get_env_sanitized(
+            "ACTIFIX_AI_VECTOR_STORE_PROVIDER", "sqlite_vss", value_type="string"
         ),
     )
     

@@ -1,6 +1,6 @@
 # Actifix Architecture Modules
 
-Last updated: 2026-01-20
+Last updated: 2026-01-29
 Source of truth: `docs/architecture/MAP.yaml`
 
 This document summarizes the modules in the Actifix architecture. Use `MAP.yaml` and `DEPGRAPH.json` for canonical topology and dependency validation.
@@ -147,6 +147,19 @@ This document summarizes the modules in the Actifix architecture. Use `MAP.yaml`
 - Summary: multi-provider AI integration with fallback chain
 - Entrypoints: `src/actifix/ai_client.py`
 - Depends on: `runtime.config`, `infra.logging`, `runtime.state`, `security.credentials`
+- Contracts: Claude Code local auth detection; Claude API integration; OpenAI GPT-4 Turbo integration; Ollama local model support; automatic provider fallback
+
+### core.ai_context
+- Summary: Long-lived AI context subsystem (Letta memory + SQLite-VSS vector store)
+- Entrypoints: `src/actifix/ai_context/__init__.py`, `src/actifix/ai_context/manager.py`, `src/actifix/ai_context/models.py`, `src/actifix/ai_context/memory_store.py`, `src/actifix/ai_context/vector_store.py`, `src/actifix/ai_context/letta_store.py`, `src/actifix/ai_context/sqlite_vss_store.py`
+- Depends on: `runtime.config`, `runtime.state`, `infra.logging`, `core.raise_af`
+- Contracts: provide pluggable memory + vector store interfaces; auto-init storage paths and report degraded states; record errors via Raise_AF and AgentVoice
+- Key Features:
+  - **Memory Store**: Letta-based conversation memory with search capabilities
+  - **Vector Store**: SQLite-VSS for semantic search and embeddings persistence
+  - **Manager**: Coordinates both stores with graceful fallbacks
+  - **Models**: Immutable MemoryRecord and VectorRecord dataclasses
+  - Persistence across sessions with automatic context initialization
 - Contracts: provider integration; fallback; cost tracking
 
 ### core.error_taxonomy

@@ -74,5 +74,23 @@ A task is complete only when:
 - State is recoverable.
 - Corruption is quarantined, not fatal.
 
+## AI Context and Memory System
+### Long-lived context persistence
+Actifix maintains long-lived AI context through a dual-store architecture:
+- **Memory Store**: Conversation history and agent interactions (Letta-based)
+- **Vector Store**: Semantic embeddings for context retrieval (SQLite-VSS)
+
+### Context guarantees
+- Context persists across sessions and system restarts
+- Stores are initialized automatically with graceful degradation
+- Errors in context operations are captured via Raise_AF
+- AgentVoice emissions track context health (best-effort)
+
+### Storage architecture
+- `core.ai_context` provides the unified manager interface
+- Pluggable store implementations allow for future backends
+- SQLite-VSS provides efficient vector similarity search
+- Context data is independent of ticket/event databases
+
 ## Compliance
 Any component or tool interacting with Actifix must enforce these guarantees. Relaxing rules requires an explicit decision record.
