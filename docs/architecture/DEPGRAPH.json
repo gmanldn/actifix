@@ -239,6 +239,12 @@
       "label": "ai_client"
     },
     {
+      "id": "core.ai_context",
+      "domain": "core",
+      "owner": "core",
+      "label": "ai_context"
+    },
+    {
       "id": "core.error_taxonomy",
       "domain": "core",
       "owner": "core",
@@ -894,6 +900,26 @@
       "from": "core.ai_client",
       "to": "security.credentials",
       "reason": "core.ai_client depends on security.credentials"
+    },
+    {
+      "from": "core.ai_context",
+      "to": "runtime.config",
+      "reason": "core.ai_context depends on runtime.config"
+    },
+    {
+      "from": "core.ai_context",
+      "to": "runtime.state",
+      "reason": "core.ai_context depends on runtime.state"
+    },
+    {
+      "from": "core.ai_context",
+      "to": "infra.logging",
+      "reason": "core.ai_context depends on infra.logging"
+    },
+    {
+      "from": "core.ai_context",
+      "to": "core.raise_af",
+      "reason": "core.ai_context depends on core.raise_af"
     },
     {
       "from": "core.error_taxonomy",

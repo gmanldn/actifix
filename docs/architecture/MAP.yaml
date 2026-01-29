@@ -586,6 +586,25 @@ modules:
   - log verification hints via log_utils events
   depends_on:
   - infra.logging
+- id: core.ai_context
+  domain: core
+  owner: core
+  summary: AI context management with vector stores and memory persistence
+  entrypoints:
+  - src/actifix/ai_context/__init__.py
+  - src/actifix/ai_context/manager.py
+  - src/actifix/ai_context/models.py
+  - src/actifix/ai_context/vector_store.py
+  - src/actifix/ai_context/memory_store.py
+  - src/actifix/ai_context/sqlite_vss_store.py
+  - src/actifix/ai_context/letta_store.py
+  contracts:
+  - manage AI conversation context and embeddings
+  - provide vector similarity search
+  - integrate with Letta and SQLite-VSS backends
+  depends_on:
+  - infra.persistence.database
+  - infra.logging
 - id: security.api
   domain: security
   owner: security

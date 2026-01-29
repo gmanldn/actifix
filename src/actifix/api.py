@@ -101,6 +101,7 @@ from .security.rate_limiter import RateLimitConfig, RateLimitError, get_rate_lim
 from .log_utils import log_event
 from .plugins.permissions import PermissionRegistry
 from .ai_client import get_ai_client, resolve_provider_selection
+from .ai_context import get_ai_context_manager
 from .modules.registry import (
     MODULE_STATUS_SCHEMA_VERSION,
     ModuleRegistry,
@@ -1094,10 +1095,15 @@ def create_app(
 
     _create_yahtzee_blueprint = None
     _yahtzee_access_rule = MODULE_ACCESS_PUBLIC
+    _yahtzee_host = host
+    _yahtzee_port = port
     try:
         _, yahtzee_module, _ = module_registry.import_module("yahtzee")
         _create_yahtzee_blueprint = getattr(yahtzee_module, "create_blueprint", None)
         _yahtzee_access_rule = getattr(yahtzee_module, "ACCESS_RULE", MODULE_ACCESS_PUBLIC)
+        yahtzee_defaults = getattr(yahtzee_module, "MODULE_DEFAULTS", {})
+        _yahtzee_host = yahtzee_defaults.get("host", host)
+        _yahtzee_port = yahtzee_defaults.get("port", port)
     except ImportError:
         pass
     except Exception as exc:
@@ -1109,10 +1115,15 @@ def create_app(
 
     _create_superquiz_blueprint = None
     _superquiz_access_rule = MODULE_ACCESS_PUBLIC
+    _superquiz_host = host
+    _superquiz_port = port
     try:
         _, superquiz_module, _ = module_registry.import_module("superquiz")
         _create_superquiz_blueprint = getattr(superquiz_module, "create_blueprint", None)
         _superquiz_access_rule = getattr(superquiz_module, "ACCESS_RULE", MODULE_ACCESS_PUBLIC)
+        superquiz_defaults = getattr(superquiz_module, "MODULE_DEFAULTS", {})
+        _superquiz_host = superquiz_defaults.get("host", host)
+        _superquiz_port = superquiz_defaults.get("port", port)
     except ImportError:
         pass
     except Exception as exc:
@@ -1124,10 +1135,15 @@ def create_app(
 
     _create_shootymcshoot_blueprint = None
     _shootymcshoot_access_rule = MODULE_ACCESS_PUBLIC
+    _shootymcshoot_host = host
+    _shootymcshoot_port = port
     try:
         _, shootymcshoot_module, _ = module_registry.import_module("shootymcshoot")
         _create_shootymcshoot_blueprint = getattr(shootymcshoot_module, "create_blueprint", None)
         _shootymcshoot_access_rule = getattr(shootymcshoot_module, "ACCESS_RULE", MODULE_ACCESS_PUBLIC)
+        shootymcshoot_defaults = getattr(shootymcshoot_module, "MODULE_DEFAULTS", {})
+        _shootymcshoot_host = shootymcshoot_defaults.get("host", host)
+        _shootymcshoot_port = shootymcshoot_defaults.get("port", port)
     except ImportError:
         pass
     except Exception as exc:
@@ -1139,10 +1155,15 @@ def create_app(
 
     _create_dev_assistant_blueprint = None
     _dev_assistant_access_rule = MODULE_ACCESS_PUBLIC
+    _dev_assistant_host = host
+    _dev_assistant_port = port
     try:
         _, dev_assistant_module, _ = module_registry.import_module("dev_assistant")
         _create_dev_assistant_blueprint = getattr(dev_assistant_module, "create_blueprint", None)
         _dev_assistant_access_rule = getattr(dev_assistant_module, "ACCESS_RULE", MODULE_ACCESS_PUBLIC)
+        dev_assistant_defaults = getattr(dev_assistant_module, "MODULE_DEFAULTS", {})
+        _dev_assistant_host = dev_assistant_defaults.get("host", host)
+        _dev_assistant_port = dev_assistant_defaults.get("port", port)
     except ImportError:
         pass
     except Exception as exc:
@@ -1154,10 +1175,15 @@ def create_app(
 
     _create_hollogram_blueprint = None
     _hollogram_access_rule = MODULE_ACCESS_LOCAL_ONLY
+    _hollogram_host = host
+    _hollogram_port = port
     try:
         _, hollogram_module, _ = module_registry.import_module("hollogram")
         _create_hollogram_blueprint = getattr(hollogram_module, "create_blueprint", None)
         _hollogram_access_rule = getattr(hollogram_module, "ACCESS_RULE", MODULE_ACCESS_LOCAL_ONLY)
+        hollogram_defaults = getattr(hollogram_module, "MODULE_DEFAULTS", {})
+        _hollogram_host = hollogram_defaults.get("host", host)
+        _hollogram_port = hollogram_defaults.get("port", port)
     except ImportError:
         pass
     except Exception as exc:
@@ -1173,8 +1199,8 @@ def create_app(
             "yahtzee",
             _create_yahtzee_blueprint,
             project_root=root,
-            host=host,
-            port=port,
+            host=_yahtzee_host,
+            port=_yahtzee_port,
             status_file=status_file,
             access_rule=_yahtzee_access_rule,
             register_access=_register_module_access,
@@ -1189,8 +1215,8 @@ def create_app(
             "superquiz",
             _create_superquiz_blueprint,
             project_root=root,
-            host=host,
-            port=port,
+            host=_superquiz_host,
+            port=_superquiz_port,
             status_file=status_file,
             access_rule=_superquiz_access_rule,
             register_access=_register_module_access,
@@ -1205,8 +1231,8 @@ def create_app(
             "shootymcshoot",
             _create_shootymcshoot_blueprint,
             project_root=root,
-            host=host,
-            port=port,
+            host=_shootymcshoot_host,
+            port=_shootymcshoot_port,
             status_file=status_file,
             access_rule=_shootymcshoot_access_rule,
             register_access=_register_module_access,
@@ -1221,8 +1247,8 @@ def create_app(
             "dev_assistant",
             _create_dev_assistant_blueprint,
             project_root=root,
-            host=host,
-            port=port,
+            host=_dev_assistant_host,
+            port=_dev_assistant_port,
             status_file=status_file,
             access_rule=_dev_assistant_access_rule,
             register_access=_register_module_access,
@@ -1237,8 +1263,8 @@ def create_app(
             "hollogram",
             _create_hollogram_blueprint,
             project_root=root,
-            host=host,
-            port=port,
+            host=_hollogram_host,
+            port=_hollogram_port,
             status_file=status_file,
             access_rule=_hollogram_access_rule,
             register_access=_register_module_access,
@@ -1986,6 +2012,16 @@ def create_app(
             selection = resolve_provider_selection(config.ai_provider, config.ai_model)
             ai_client = get_ai_client()
             status = ai_client.get_status(selection)
+            context_manager = get_ai_context_manager()
+            status.update({
+                "memory_available": context_manager.memory_available(),
+                "vector_available": context_manager.vector_available(),
+                "memory_provider": config.ai_memory_provider,
+                "vector_provider": config.ai_vector_store_provider,
+                "vector_store_path": config.ai_vector_store_path,
+                "memory_enabled": config.ai_memory_enabled,
+                "vector_enabled": config.ai_vector_store_enabled,
+            })
             status.update({
                 "ai_enabled": config.ai_enabled,
                 "feedback_log": _collect_ai_feedback(),
