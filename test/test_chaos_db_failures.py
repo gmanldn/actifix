@@ -5,7 +5,13 @@ from __future__ import annotations
 
 import pytest
 
-from test.chaos_db import chaos_sqlite_connect
+import sys
+from pathlib import Path
+
+# Add test directory to path for local imports
+sys.path.insert(0, str(Path(__file__).parent))
+
+from chaos_db import chaos_sqlite_connect
 
 
 def test_database_connection_failure(monkeypatch, tmp_path):
