@@ -101,13 +101,12 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
 
 
 def _insert_ticket(conn: sqlite3.Connection, row: Dict[str, Any]) -> bool:
-    cols = [
-        "id","priority","error_type","message","source","run_label","created_at","updated_at",
-        "duplicate_guard","status","owner","locked_by","lease_expires","branch","stack_trace",
-        "file_context","system_state","ai_remediation_notes","correlation_id","completion_summary",
-        "documented","functioning","tested","completed"
-    ]
-    values = [row.get(c) for c in cols]
+    cursor = conn.execute("PRAGMA table_info(tickets)")
+    table_col_names = [r[1] for r in cursor.fetchall()]
+    cols = [k for k in row.keys() if k in table_col_names]
+    values = [row[k] for k in cols]
+    if not cols:
+        return False
     try:
         conn.execute(
             f"INSERT INTO tickets ({', '.join(cols)}) VALUES ({', '.join(['?']*len(cols))})",
