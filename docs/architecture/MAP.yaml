@@ -1,6 +1,6 @@
 schema_version: arch-map.v1
 meta:
-  generated_at: "2026-01-20T18:08:36.934780+00:00"
+  generated_at: '2026-01-29T00:46:23.931958+00:00'
   generator: update_architecture_docs.py
   generator_version: 2.0.0
   source_commit: current_development
@@ -10,7 +10,8 @@ meta:
   - Keep aligned with quality gates and architecture compliance
   - Auto-generated - includes persistence and testing subsystems
   - Run record-error simple ticket attack to generate 500 tickets
-  - Synced persistence/core/module entrypoints with current Python layout (base/config/dev_assistant/pokertool core/etc.)
+  - Synced persistence/core/module entrypoints with current Python layout (base/config/dev_assistant/pokertool
+    core/etc.)
 domains:
 - id: runtime
   summary: Bootstrap, configuration, state management, lifecycle
@@ -46,7 +47,8 @@ modules:
 - id: runtime.api
   domain: runtime
   owner: runtime
-  summary: Public API surface and package exports (incl. /api/ideas for GUI Ideas pane)
+  summary: Public API surface and package exports (incl. /api/ideas for GUI Ideas
+    pane)
   entrypoints:
   - src/actifix/__init__.py
   - src/actifix/api.py
@@ -56,6 +58,7 @@ modules:
   depends_on:
   - core.raise_af
   - core.ai_client
+  - core.ai_context
   - bootstrap.main
   - runtime.state
   - infra.health
@@ -292,7 +295,6 @@ modules:
   - WAL mode for concurrency
   depends_on:
   - infra.logging
-
 - id: infra.persistence.sqlite_robustness
   domain: infra
   owner: persistence
@@ -310,7 +312,6 @@ modules:
   - infra.logging
   - core.raise_af
   - infra.health
-
 - id: infra.persistence.ticket_repo
   domain: infra
   owner: persistence
@@ -325,11 +326,11 @@ modules:
   - infra.logging
   - infra.persistence.database
   - core.raise_af
-
 - id: infra.metrics
   domain: infra
   owner: infra
-  summary: Prometheus-compatible metrics export covering tickets, health, and storage status
+  summary: Prometheus-compatible metrics export covering tickets, health, and storage
+    status
   entrypoints:
   - src/actifix/metrics.py
   contracts:
@@ -341,11 +342,11 @@ modules:
   - runtime.state
   - infra.persistence.ticket_repo
   - infra.health
-
 - id: core.raise_af
   domain: core
   owner: core
-  summary: Error capture and ticket creation system (persists entries into the SQLite ticket repository)
+  summary: Error capture and ticket creation system (persists entries into the SQLite
+    ticket repository)
   entrypoints:
   - src/actifix/raise_af.py
   contracts:
@@ -358,11 +359,11 @@ modules:
   - infra.persistence.ticket_repo
   - security.ticket_throttler
   - core.webhooks
-
 - id: core.agent_voice
   domain: core
   owner: core
-  summary: Agent voice logging wrapper (records reviewable agent activity rows into SQLite)
+  summary: Agent voice logging wrapper (records reviewable agent activity rows into
+    SQLite)
   entrypoints:
   - src/actifix/agent_voice.py
   contracts:
@@ -371,7 +372,6 @@ modules:
   depends_on:
   - core.raise_af
   - infra.persistence.agent_voice_repo
-
 - id: core.webhooks
   domain: core
   owner: core
@@ -385,7 +385,6 @@ modules:
   depends_on:
   - infra.logging
   - runtime.config
-
 - id: core.completion_hooks
   domain: core
   owner: core
@@ -399,7 +398,6 @@ modules:
   depends_on:
   - infra.logging
   - runtime.config
-
 - id: core.diagnostics
   domain: core
   owner: core
@@ -416,7 +414,6 @@ modules:
   - runtime.state
   - core.do_af
   - infra.health
-
 - id: core.ingestion
   domain: core
   owner: core
@@ -430,7 +427,6 @@ modules:
   depends_on:
   - core.raise_af
   - infra.logging
-
 - id: core.do_af
   domain: core
   owner: core
@@ -448,7 +444,6 @@ modules:
   - infra.persistence.ticket_repo
   - core.webhooks
   - core.completion_hooks
-
 - id: core.quarantine
   domain: core
   owner: core
@@ -529,6 +524,20 @@ modules:
   - relaunch application via scripts/start.py with Raise_AF gate
   depends_on:
   - bootstrap.main
+- id: tooling.architecture_validator
+  domain: tooling
+  owner: tooling
+  summary: Architecture validator ensuring MAP.yaml matches code imports
+  entrypoints:
+  - src/actifix/validators/__init__.py
+  - src/actifix/validators/architecture_validator.py
+  contracts:
+  - validate MAP.yaml structure and completeness
+  - verify all entrypoints exist in codebase
+  - ensure all Python files are documented
+  - check dependency graph consistency
+  depends_on:
+  - infra.logging
 - id: core.ai_client
   domain: core
   owner: core
@@ -548,7 +557,27 @@ modules:
   - infra.logging
   - runtime.state
   - security.credentials
-
+- id: core.ai_context
+  domain: core
+  owner: core
+  summary: Long-lived AI context subsystem (Letta memory + SQLite-VSS vector store)
+  entrypoints:
+  - src/actifix/ai_context/__init__.py
+  - src/actifix/ai_context/manager.py
+  - src/actifix/ai_context/models.py
+  - src/actifix/ai_context/memory_store.py
+  - src/actifix/ai_context/vector_store.py
+  - src/actifix/ai_context/letta_store.py
+  - src/actifix/ai_context/sqlite_vss_store.py
+  contracts:
+  - provide pluggable memory + vector store interfaces
+  - auto-init storage paths and report degraded states
+  - record errors via Raise_AF and AgentVoice
+  depends_on:
+  - runtime.config
+  - runtime.state
+  - infra.logging
+  - core.raise_af
 - id: core.error_taxonomy
   domain: core
   owner: core
@@ -585,25 +614,6 @@ modules:
   - document automated repair blueprints
   - log verification hints via log_utils events
   depends_on:
-  - infra.logging
-- id: core.ai_context
-  domain: core
-  owner: core
-  summary: AI context management with vector stores and memory persistence
-  entrypoints:
-  - src/actifix/ai_context/__init__.py
-  - src/actifix/ai_context/manager.py
-  - src/actifix/ai_context/models.py
-  - src/actifix/ai_context/vector_store.py
-  - src/actifix/ai_context/memory_store.py
-  - src/actifix/ai_context/sqlite_vss_store.py
-  - src/actifix/ai_context/letta_store.py
-  contracts:
-  - manage AI conversation context and embeddings
-  - provide vector similarity search
-  - integrate with Letta and SQLite-VSS backends
-  depends_on:
-  - infra.persistence.database
   - infra.logging
 - id: security.api
   domain: security
@@ -881,15 +891,14 @@ modules:
   - expose the SuperQuiz GUI at /modules/superquiz on the runtime API server
   - support 1 to 6 players with category selection and random mode
   - use Actifix logging and error capture interfaces from the shared runtime
-  - ensure the launcher starts the module via scripts/start.py, including dependency checks and a /health probe on the configured host/port
+  - ensure the launcher starts the module via scripts/start.py, including dependency
+    checks and a /health probe on the configured host/port
   depends_on:
   - runtime.state
   - infra.logging
   - core.raise_af
   - runtime.api
   - modules.pokertool.core
-
-
 - id: modules.yahtzee
   domain: modules
   owner: modules
@@ -904,23 +913,23 @@ modules:
   - infra.logging
   - core.raise_af
   - runtime.api
-
 - id: modules.pokertool
   domain: modules
   owner: modules
-  summary: Planned PokerTool integration exposing analysis, detection, and health endpoints
+  summary: Planned PokerTool integration exposing analysis, detection, and health
+    endpoints
   entrypoints:
   - src/actifix/modules/pokertool/__init__.py
   contracts:
   - provide health and analysis stub endpoints under /modules/pokertool
   - log module lifecycle events using centralized logging and RaiseAF helpers
-  - act as the future landing surface for PokerTool real-time analysis and detection systems
+  - act as the future landing surface for PokerTool real-time analysis and detection
+    systems
   depends_on:
   - runtime.state
   - infra.logging
   - core.raise_af
   - runtime.api
-
 - id: modules.pokertool.core
   domain: modules
   owner: modules
@@ -931,11 +940,11 @@ modules:
   - evaluate hands and boards for strength and provide structured metadata
   - expose helper routines consumed by the PokerTool blueprint
   depends_on: []
-
 - id: modules.pokertool.detector
   domain: modules
   owner: modules
-  summary: Mock detector service that streams table state updates via the Pokertool API
+  summary: Mock detector service that streams table state updates via the Pokertool
+    API
   entrypoints:
   - src/actifix/modules/pokertool/detector.py
   contracts:
@@ -945,7 +954,6 @@ modules:
   - runtime.state
   - infra.logging
   - core.raise_af
-
 - id: modules.pokertool.solvers
   domain: modules
   owner: modules
@@ -959,7 +967,6 @@ modules:
   - runtime.state
   - infra.logging
   - core.raise_af
-
 - id: modules.pokertool.ml
   domain: modules
   owner: modules
@@ -973,8 +980,6 @@ modules:
   - runtime.state
   - infra.logging
   - core.raise_af
-
-
 - id: modules.dev_assistant
   domain: modules
   owner: modules
@@ -991,8 +996,6 @@ modules:
   - infra.logging
   - core.raise_af
   - runtime.api
-
-
 - id: modules.artclass
   domain: modules
   owner: modules
@@ -1008,17 +1011,19 @@ modules:
   - infra.logging
   - core.raise_af
   - runtime.api
-
 - id: modules.hollogram
   domain: modules
   owner: modules
-  summary: AI-powered medical research assistant with disclaimer, research, and history endpoints
+  summary: AI-powered medical research assistant with disclaimer, research, and history
+    endpoints
   entrypoints:
   - src/actifix/modules/hollogram/__init__.py
   contracts:
-  - expose /health, /disclaimer, /topics, /research, /history, and /history/<id> routes under /modules/hollogram
+  - expose /health, /disclaimer, /topics, /research, /history, and /history/<id> routes
+    under /modules/hollogram
   - log lifecycle metadata and errors through ModuleBase helpers and raise_af tickets
-  - keep research history in state-backed storage and enforce the local-only access rule
+  - keep research history in state-backed storage and enforce the local-only access
+    rule
   depends_on:
   - runtime.state
   - infra.logging
@@ -1027,40 +1032,37 @@ modules:
   - core.ai_client
   - modules.base
   - modules.config
-
 - id: modules.shootymcshoot
   domain: modules
   owner: modules
   summary: ShootyMcShoot React hello world holding page on localhost:8040
   entrypoints:
-    - src/actifix/modules/shootymcshoot/__init__.py
+  - src/actifix/modules/shootymcshoot/__init__.py
   contracts:
-    - expose ShootyMcShoot GUI at /modules/shootymcshoot on the runtime API server
-    - React-powered holding page with health endpoint
-    - uses ModuleBase for logging/error capture
+  - expose ShootyMcShoot GUI at /modules/shootymcshoot on the runtime API server
+  - React-powered holding page with health endpoint
+  - uses ModuleBase for logging/error capture
   depends_on:
-    - runtime.state
-    - infra.logging
-    - core.raise_af
-    - runtime.api
-
+  - runtime.state
+  - infra.logging
+  - core.raise_af
+  - runtime.api
 - id: modules.testmanifest
   domain: modules
   owner: modules
   summary: Scaffolded test manifest module produced by the module CLI workflow
   entrypoints:
-    - src/actifix/modules/testmanifest/__init__.py
+  - src/actifix/modules/testmanifest/__init__.py
   contracts:
-    - expose a lightweight GUI with index/health endpoints for module validation tooling
-    - exercise ModuleBase logging, health, and dependency helpers in a safe example
+  - expose a lightweight GUI with index/health endpoints for module validation tooling
+  - exercise ModuleBase logging, health, and dependency helpers in a safe example
   depends_on:
-    - modules.base
-    - modules.config
-    - runtime.state
-    - infra.logging
-    - core.raise_af
-    - runtime.api
-
+  - modules.base
+  - modules.config
+  - runtime.state
+  - infra.logging
+  - core.raise_af
+  - runtime.api
 contracts:
 - id: contract.logging
   summary: All modules must log via centralized logging system with correlation IDs

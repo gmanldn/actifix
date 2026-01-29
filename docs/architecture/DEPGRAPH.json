@@ -1,7 +1,7 @@
 {
   "schema_version": "arch-depgraph.v1",
   "meta": {
-    "generated_at": "2026-01-28T05:34:31.180581+00:00",
+    "generated_at": "2026-01-29T00:44:54.815412+00:00",
     "generator": "map-to-depgraph",
     "generator_version": "1.0.0",
     "source_commit": "develop",
@@ -231,6 +231,12 @@
       "domain": "tooling",
       "owner": "tooling",
       "label": "bounce"
+    },
+    {
+      "id": "tooling.architecture_validator",
+      "domain": "tooling",
+      "owner": "tooling",
+      "label": "architecture_validator"
     },
     {
       "id": "core.ai_client",
@@ -882,6 +888,11 @@
       "reason": "tooling.bounce depends on bootstrap.main"
     },
     {
+      "from": "tooling.architecture_validator",
+      "to": "infra.logging",
+      "reason": "tooling.architecture_validator depends on infra.logging"
+    },
+    {
       "from": "core.ai_client",
       "to": "runtime.config",
       "reason": "core.ai_client depends on runtime.config"
@@ -1425,6 +1436,11 @@
       "from": "modules.testmanifest",
       "to": "runtime.api",
       "reason": "modules.testmanifest depends on runtime.api"
+    },
+    {
+      "from": "runtime.api",
+      "to": "core.ai_context",
+      "reason": "runtime.api depends on core.ai_context"
     }
   ]
 }
