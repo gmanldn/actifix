@@ -313,6 +313,17 @@ class ModuleRegistry:
                 return
             self._registered[context.module_id] = (module, context)
 
+        # Clear error status after successful registration
+        current_status = self.get_status(context.module_id)
+        if current_status == "error":
+            self.mark_status(context.module_id, "active")
+            log_event(
+                "MODULE_STATUS_CLEARED",
+                f"Module error status cleared after successful registration: {context.module_id}",
+                extra={"module_id": context.module_id, "previous_status": "error", "new_status": "active"},
+                source="modules.registry.ModuleRegistry.on_registered",
+            )
+
         log_event(
             "MODULE_LIFECYCLE_REGISTERED",
             f"Module registered: {context.module_id}",

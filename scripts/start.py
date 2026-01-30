@@ -636,10 +636,12 @@ def announce_api_modules(host: str, port: int) -> None:
             )
             continue
 
+        # Use info-level logging for slow/optional modules to avoid alarming warnings
+        log_fn = log_info if name in SLOW_MODULE_PROBE_NAMES else log_warning
         if status:
-            log_warning(f"{name}: HTTP {status} ({url})")
+            log_fn(f"{name}: HTTP {status} ({url})")
         else:
-            log_warning(f"{name}: unreachable ({url}) - {err}")
+            log_fn(f"{name}: unreachable ({url}) - {err}")
         hint = None
         if name == "Dev_Assistant":
             hint = "If missing, ensure Ollama is running on http://localhost:11434."
