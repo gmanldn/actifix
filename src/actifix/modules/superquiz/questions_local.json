@@ -1,0 +1,352 @@
+[
+  {
+    "question": "What is the capital of France?",
+    "answer": "Paris",
+    "incorrect_answers": ["London", "Berlin", "Madrid"],
+    "category": "Geography",
+    "difficulty": "easy"
+  },
+  {
+    "question": "Who wrote 'Romeo and Juliet'?",
+    "answer": "William Shakespeare",
+    "incorrect_answers": ["Charles Dickens", "Jane Austen", "Mark Twain"],
+    "category": "Literature",
+    "difficulty": "easy"
+  },
+  {
+    "question": "What is the largest planet in our solar system?",
+    "answer": "Jupiter",
+    "incorrect_answers": ["Saturn", "Neptune", "Earth"],
+    "category": "Science",
+    "difficulty": "easy"
+  },
+  {
+    "question": "In what year did World War II end?",
+    "answer": "1945",
+    "incorrect_answers": ["1944", "1946", "1943"],
+    "category": "History",
+    "difficulty": "medium"
+  },
+  {
+    "question": "What is the chemical symbol for gold?",
+    "answer": "Au",
+    "incorrect_answers": ["Go", "Gd", "Ag"],
+    "category": "Science",
+    "difficulty": "medium"
+  },
+  {
+    "question": "Who painted the Mona Lisa?",
+    "answer": "Leonardo da Vinci",
+    "incorrect_answers": ["Michelangelo", "Raphael", "Donatello"],
+    "category": "Art",
+    "difficulty": "easy"
+  },
+  {
+    "question": "What is the smallest country in the world?",
+    "answer": "Vatican City",
+    "incorrect_answers": ["Monaco", "San Marino", "Liechtenstein"],
+    "category": "Geography",
+    "difficulty": "medium"
+  },
+  {
+    "question": "How many continents are there?",
+    "answer": "7",
+    "incorrect_answers": ["5", "6", "8"],
+    "category": "Geography",
+    "difficulty": "easy"
+  },
+  {
+    "question": "What is the speed of light in vacuum (approximately)?",
+    "answer": "300,000 km/s",
+    "incorrect_answers": ["150,000 km/s", "450,000 km/s", "200,000 km/s"],
+    "category": "Science",
+    "difficulty": "medium"
+  },
+  {
+    "question": "Who was the first person to walk on the moon?",
+    "answer": "Neil Armstrong",
+    "incorrect_answers": ["Buzz Aldrin", "Yuri Gagarin", "John Glenn"],
+    "category": "History",
+    "difficulty": "easy"
+  },
+  {
+    "question": "What is the largest ocean on Earth?",
+    "answer": "Pacific Ocean",
+    "incorrect_answers": ["Atlantic Ocean", "Indian Ocean", "Arctic Ocean"],
+    "category": "Geography",
+    "difficulty": "easy"
+  },
+  {
+    "question": "What programming language is known for its use in web development and runs in browsers?",
+    "answer": "JavaScript",
+    "incorrect_answers": ["Python", "Java", "C++"],
+    "category": "Technology",
+    "difficulty": "easy"
+  },
+  {
+    "question": "What is the square root of 144?",
+    "answer": "12",
+    "incorrect_answers": ["14", "10", "16"],
+    "category": "Mathematics",
+    "difficulty": "easy"
+  },
+  {
+    "question": "In which year was the first iPhone released?",
+    "answer": "2007",
+    "incorrect_answers": ["2005", "2008", "2006"],
+    "category": "Technology",
+    "difficulty": "medium"
+  },
+  {
+    "question": "What is the currency of Japan?",
+    "answer": "Yen",
+    "incorrect_answers": ["Won", "Yuan", "Rupee"],
+    "category": "General Knowledge",
+    "difficulty": "easy"
+  },
+  {
+    "question": "How many bones are in the adult human body?",
+    "answer": "206",
+    "incorrect_answers": ["195", "215", "200"],
+    "category": "Science",
+    "difficulty": "medium"
+  },
+  {
+    "question": "What is the longest river in the world?",
+    "answer": "Nile River",
+    "incorrect_answers": ["Amazon River", "Yangtze River", "Mississippi River"],
+    "category": "Geography",
+    "difficulty": "medium"
+  },
+  {
+    "question": "Who developed the theory of relativity?",
+    "answer": "Albert Einstein",
+    "incorrect_answers": ["Isaac Newton", "Galileo Galilei", "Stephen Hawking"],
+    "category": "Science",
+    "difficulty": "easy"
+  },
+  {
+    "question": "What is the capital of Australia?",
+    "answer": "Canberra",
+    "incorrect_answers": ["Sydney", "Melbourne", "Brisbane"],
+    "category": "Geography",
+    "difficulty": "medium"
+  },
+  {
+    "question": "In what year did the Titanic sink?",
+    "answer": "1912",
+    "incorrect_answers": ["1910", "1915", "1920"],
+    "category": "History",
+    "difficulty": "medium"
+  },
+  {
+    "question": "What is the hardest natural substance on Earth?",
+    "answer": "Diamond",
+    "incorrect_answers": ["Gold", "Iron", "Platinum"],
+    "category": "Science",
+    "difficulty": "easy"
+  },
+  {
+    "question": "How many strings does a standard guitar have?",
+    "answer": "6",
+    "incorrect_answers": ["4", "5", "7"],
+    "category": "Music",
+    "difficulty": "easy"
+  },
+  {
+    "question": "What is the boiling point of water at sea level in Celsius?",
+    "answer": "100°C",
+    "incorrect_answers": ["90°C", "110°C", "95°C"],
+    "category": "Science",
+    "difficulty": "easy"
+  },
+  {
+    "question": "Who wrote '1984'?",
+    "answer": "George Orwell",
+    "incorrect_answers": ["Aldous Huxley", "Ray Bradbury", "Ernest Hemingway"],
+    "category": "Literature",
+    "difficulty": "medium"
+  },
+  {
+    "question": "What is the largest mammal in the world?",
+    "answer": "Blue Whale",
+    "incorrect_answers": ["African Elephant", "Giraffe", "Polar Bear"],
+    "category": "Science",
+    "difficulty": "easy"
+  },
+  {
+    "question": "How many players are on a soccer team on the field?",
+    "answer": "11",
+    "incorrect_answers": ["9", "10", "12"],
+    "category": "Sports",
+    "difficulty": "easy"
+  },
+  {
+    "question": "What is the chemical formula for water?",
+    "answer": "H2O",
+    "incorrect_answers": ["CO2", "O2", "H2O2"],
+    "category": "Science",
+    "difficulty": "easy"
+  },
+  {
+    "question": "In which country would you find the Great Barrier Reef?",
+    "answer": "Australia",
+    "incorrect_answers": ["Brazil", "Philippines", "Indonesia"],
+    "category": "Geography",
+    "difficulty": "easy"
+  },
+  {
+    "question": "What is the smallest prime number?",
+    "answer": "2",
+    "incorrect_answers": ["1", "3", "0"],
+    "category": "Mathematics",
+    "difficulty": "easy"
+  },
+  {
+    "question": "Who invented the telephone?",
+    "answer": "Alexander Graham Bell",
+    "incorrect_answers": ["Thomas Edison", "Nikola Tesla", "Guglielmo Marconi"],
+    "category": "History",
+    "difficulty": "medium"
+  },
+  {
+    "question": "What is the main ingredient in guacamole?",
+    "answer": "Avocado",
+    "incorrect_answers": ["Tomato", "Pepper", "Onion"],
+    "category": "Food",
+    "difficulty": "easy"
+  },
+  {
+    "question": "How many sides does a hexagon have?",
+    "answer": "6",
+    "incorrect_answers": ["5", "7", "8"],
+    "category": "Mathematics",
+    "difficulty": "easy"
+  },
+  {
+    "question": "What is the largest desert in the world?",
+    "answer": "Antarctic Desert",
+    "incorrect_answers": ["Sahara Desert", "Arabian Desert", "Gobi Desert"],
+    "category": "Geography",
+    "difficulty": "hard"
+  },
+  {
+    "question": "In which year did the Berlin Wall fall?",
+    "answer": "1989",
+    "incorrect_answers": ["1987", "1991", "1985"],
+    "category": "History",
+    "difficulty": "medium"
+  },
+  {
+    "question": "What is the atomic number of carbon?",
+    "answer": "6",
+    "incorrect_answers": ["8", "12", "4"],
+    "category": "Science",
+    "difficulty": "hard"
+  },
+  {
+    "question": "Who painted 'The Starry Night'?",
+    "answer": "Vincent van Gogh",
+    "incorrect_answers": ["Pablo Picasso", "Claude Monet", "Rembrandt"],
+    "category": "Art",
+    "difficulty": "medium"
+  },
+  {
+    "question": "What is the capital of Canada?",
+    "answer": "Ottawa",
+    "incorrect_answers": ["Toronto", "Vancouver", "Montreal"],
+    "category": "Geography",
+    "difficulty": "medium"
+  },
+  {
+    "question": "How many hearts does an octopus have?",
+    "answer": "3",
+    "incorrect_answers": ["1", "2", "4"],
+    "category": "Science",
+    "difficulty": "hard"
+  },
+  {
+    "question": "What is the largest organ in the human body?",
+    "answer": "Skin",
+    "incorrect_answers": ["Liver", "Brain", "Heart"],
+    "category": "Science",
+    "difficulty": "medium"
+  },
+  {
+    "question": "Who was the first President of the United States?",
+    "answer": "George Washington",
+    "incorrect_answers": ["Thomas Jefferson", "John Adams", "Benjamin Franklin"],
+    "category": "History",
+    "difficulty": "easy"
+  },
+  {
+    "question": "What does HTTP stand for?",
+    "answer": "Hypertext Transfer Protocol",
+    "incorrect_answers": ["High Transfer Text Protocol", "Hypertext Transmission Process", "High Tech Transfer Protocol"],
+    "category": "Technology",
+    "difficulty": "medium"
+  },
+  {
+    "question": "How many teeth does an adult human typically have?",
+    "answer": "32",
+    "incorrect_answers": ["28", "30", "34"],
+    "category": "Science",
+    "difficulty": "medium"
+  },
+  {
+    "question": "What is the freezing point of water in Fahrenheit?",
+    "answer": "32°F",
+    "incorrect_answers": ["0°F", "212°F", "100°F"],
+    "category": "Science",
+    "difficulty": "easy"
+  },
+  {
+    "question": "In which city is the Eiffel Tower located?",
+    "answer": "Paris",
+    "incorrect_answers": ["London", "Rome", "Berlin"],
+    "category": "Geography",
+    "difficulty": "easy"
+  },
+  {
+    "question": "What is the powerhouse of the cell?",
+    "answer": "Mitochondria",
+    "incorrect_answers": ["Nucleus", "Ribosome", "Chloroplast"],
+    "category": "Science",
+    "difficulty": "medium"
+  },
+  {
+    "question": "How many minutes are in a full soccer match?",
+    "answer": "90",
+    "incorrect_answers": ["80", "100", "120"],
+    "category": "Sports",
+    "difficulty": "easy"
+  },
+  {
+    "question": "What is the symbol for potassium on the periodic table?",
+    "answer": "K",
+    "incorrect_answers": ["P", "Po", "Pt"],
+    "category": "Science",
+    "difficulty": "hard"
+  },
+  {
+    "question": "Who wrote 'To Kill a Mockingbird'?",
+    "answer": "Harper Lee",
+    "incorrect_answers": ["Mark Twain", "Ernest Hemingway", "F. Scott Fitzgerald"],
+    "category": "Literature",
+    "difficulty": "medium"
+  },
+  {
+    "question": "What is the tallest mountain in the world?",
+    "answer": "Mount Everest",
+    "incorrect_answers": ["K2", "Kilimanjaro", "Denali"],
+    "category": "Geography",
+    "difficulty": "easy"
+  },
+  {
+    "question": "How many planets are in our solar system?",
+    "answer": "8",
+    "incorrect_answers": ["9", "7", "10"],
+    "category": "Science",
+    "difficulty": "easy"
+  }
+]
