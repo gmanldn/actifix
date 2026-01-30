@@ -152,7 +152,10 @@ The `screenscan` module provides always-on screenshot capture with ring-buffer s
 
 **Configuration Keys**:
 - **WARNING**: Disabling breaks diagnostic debugging; only disable for scheduled maintenance.
-- **API Endpoints**:
+### Module performance budgets
+
+Modules should adhere to these performance targets to ensure responsive system operation:
+
 - **Route latency**: keep typical module endpoints under 150ms P95; anything above 300ms should trigger async/background processing.
 - **Startup time**: blueprints should register within 2 seconds; longer initialization must be deferred or cached.
 - **Memory growth**: avoid unbounded caches; retain short windows (e.g., 60s ring buffers) and prune regularly.
