@@ -324,6 +324,183 @@ python3 scripts/consolidate_ticket_buckets.py --limit 25
 python3 scripts/consolidate_ticket_buckets.py --execute
 ```
 
+## Daily Verification Steps
+
+To ensure ticket consolidation and cleanup are running correctly, perform these daily verification steps:
+
+### 1. Verify Scheduled Jobs Are Running
+
+**For Cron:**
+```bash
+# Check if consolidation cron job exists
+crontab -l | grep consolidate_ticket_buckets
+
+# View recent cron execution logs (location varies by system)
+grep consolidate_ticket_buckets /var/log/syslog  # Debian/Ubuntu
+grep consolidate_ticket_buckets /var/log/cron    # CentOS/RHEL
+```
+
+**For Systemd:**
+```bash
+# Check timer status and next run time
+systemctl status actifix-ticket-consolidation.timer
+
+# View recent execution history
+systemctl list-timers --all | grep ticket-consolidation
+
+# Check last run logs
+journalctl -u actifix-ticket-consolidation.service --since "24 hours ago"
+```
+
+### 2. Check Consolidation Output
+
+```bash
+# Review consolidation script output logs
+tail -n 50 /var/log/actifix/consolidation.log
+
+# Look for completion timestamp and ticket counts
+grep "Consolidation complete" /var/log/actifix/consolidation.log | tail -5
+```
+
+### 3. Verify Ticket Statistics
+
+```python
+from actifix.persistence.ticket_repo import get_ticket_repository
+
+repo = get_ticket_repository()
+stats = repo.get_stats()
+
+# Check for expected ranges
+print(f"Total active tickets: {stats['total']}")
+print(f"Open tickets: {stats['open']}")
+print(f"Completed tickets: {stats['completed']}")
+print(f"Deleted (cleaned up): {stats['deleted']}")
+
+# Alert if numbers seem abnormal (adjust thresholds for your environment)
+if stats['open'] > 1000:
+    print("⚠️  Warning: High open ticket count - review for duplicates")
+if stats['deleted'] > stats['total'] * 0.5:
+    print("⚠️  Warning: High deletion rate - verify retention policy is correct")
+```
+
+### 4. Check for Stuck/Old Open Tickets
+
+```bash
+# Use the Actifix CLI to find old open tickets
+export ACTIFIX_CHANGE_ORIGIN=raise_af
+python3 -m actifix.main stats --old-only
+
+# Or query directly
+python3 << 'EOF'
+from actifix.persistence.ticket_repo import get_ticket_repository
+from datetime import datetime, timedelta, timezone
+
+repo = get_ticket_repository()
+cutoff = datetime.now(timezone.utc) - timedelta(days=30)
+
+# Get tickets older than 30 days that are still open
+old_tickets = [t for t in repo.get_open_tickets()
+               if t.get('created_at') < cutoff]
+
+if old_tickets:
+    print(f"Found {len(old_tickets)} open tickets older than 30 days:")
+    for t in old_tickets[:10]:
+        print(f"  {t['id']}: {t['message'][:60]}...")
+else:
+    print("✓ No stale open tickets found")
+EOF
+```
+
+### 5. Verify Recent Consolidation Activity
+
+```bash
+# Check if consolidation ran in last 24 hours
+export ACTIFIX_CHANGE_ORIGIN=raise_af
+python3 << 'EOF'
+from pathlib import Path
+from datetime import datetime, timedelta
+
+consolidation_log = Path("logs/consolidation.log")  # Adjust path as needed
+if consolidation_log.exists():
+    mtime = datetime.fromtimestamp(consolidation_log.stat().st_mtime)
+    age = datetime.now() - mtime
+    if age < timedelta(hours=26):  # 24h + 2h buffer
+        print(f"✓ Consolidation ran {age.total_seconds() / 3600:.1f} hours ago")
+    else:
+        print(f"⚠️  Warning: Last consolidation was {age.total_seconds() / 3600:.1f} hours ago")
+else:
+    print("⚠️  Warning: No consolidation log found")
+EOF
+```
+
+### 6. Quick Health Check
+
+```bash
+# Run Actifix health check to ensure cleanup didn't break anything
+export ACTIFIX_CHANGE_ORIGIN=raise_af
+python3 -m actifix.main health
+
+# Expected output should show OK status and no errors
+```
+
+### 7. Spot Check Recent Deletions
+
+```python
+from actifix.persistence.ticket_repo import get_ticket_repository
+
+repo = get_ticket_repository()
+
+# Review recently deleted tickets to ensure retention policy is working correctly
+deleted = repo.get_deleted_tickets()[:20]  # Get last 20 deleted
+
+print(f"Recently deleted tickets: {len(deleted)}")
+for t in deleted[:5]:
+    print(f"  {t['id']}: deleted={t.get('deleted_at')} | {t['message'][:50]}...")
+
+# Verify they match expected patterns (test tickets, old completed tickets)
+```
+
+### Automated Daily Verification Script
+
+Create a daily verification script:
+
+```bash
+#!/bin/bash
+# /path/to/actifix/scripts/daily_verification.sh
+
+echo "=== Actifix Daily Verification $(date) ==="
+
+export ACTIFIX_CHANGE_ORIGIN=raise_af
+
+# 1. Check ticket stats
+echo -e "\n1. Ticket Statistics:"
+python3 -m actifix.main stats | head -20
+
+# 2. Verify consolidation ran
+echo -e "\n2. Recent Consolidation:"
+if systemctl is-active --quiet actifix-ticket-consolidation.timer; then
+    systemctl status actifix-ticket-consolidation.timer | grep -A2 "Trigger:"
+else
+    echo "Checking cron logs..."
+    grep consolidate_ticket_buckets /var/log/syslog | tail -3
+fi
+
+# 3. Check for anomalies
+echo -e "\n3. Health Check:"
+python3 -m actifix.main health | grep -E "(status|tickets|errors)"
+
+echo -e "\n=== Verification Complete ==="
+```
+
+Make it executable and run daily:
+
+```bash
+chmod +x scripts/daily_verification.sh
+
+# Add to cron
+echo "30 8 * * * /path/to/actifix/scripts/daily_verification.sh >> /var/log/actifix/daily_verification.log 2>&1" | crontab -
+```
+
 ## Best Practices
 
 1. **Always dry-run first** - Preview changes before executing
@@ -332,6 +509,8 @@ python3 scripts/consolidate_ticket_buckets.py --execute
 4. **Schedule during off-hours** - Run cleanup when system usage is low
 5. **Keep audit logs** - Soft-delete allows recovery if needed
 6. **Test ticket hygiene** - Disable test ticket creation in production
+7. **Daily verification** - Run verification checks daily to catch issues early
+8. **Alert on anomalies** - Set up monitoring to alert when ticket counts are abnormal
 
 ## Troubleshooting
 
