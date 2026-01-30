@@ -317,9 +317,13 @@ def create_tickets(tasks: List[TicketTask], dry_run: bool = False) -> None:
                 run_label=task.run_label,
                 priority=task.priority,
             )
-            ticket_id = getattr(entry, "entry_id", "unknown")
+            if entry:
+                ticket_id = entry.entry_id
+            else:
+                ticket_id = "duplicate-skipped"
             print(f"Created ticket {idx}: {ticket_id}")
         except Exception as exc:
+            print(f"ERROR: Failed to create ticket {idx}: {exc}", file=sys.stderr)
             try:
                 record_error(
                     message=f"Failed to create PokerTool ticket {idx}: {exc}",
@@ -327,8 +331,8 @@ def create_tickets(tasks: List[TicketTask], dry_run: bool = False) -> None:
                     run_label=task.run_label,
                     priority=TicketPriority.P1,
                 )
-            except Exception:
-                pass
+            except Exception as inner_exc:
+                print(f"ERROR: Failed to record error ticket: {inner_exc}", file=sys.stderr)
             raise
 
 
