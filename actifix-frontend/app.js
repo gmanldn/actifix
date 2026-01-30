@@ -845,6 +845,7 @@ const TicketsView = () => {
   const [priorityFilter, setPriorityFilter] = useState('All');
   const [statusFilter, setStatusFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedTickets, setSelectedTickets] = useState(new Set());
   const [savedViews, setSavedViews] = useState([]);
   const SAVED_VIEWS_KEY = 'actifix_saved_views_v1';
 
