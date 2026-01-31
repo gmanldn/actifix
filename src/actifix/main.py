@@ -366,6 +366,53 @@ def cmd_modules(args: argparse.Namespace) -> int:
             for module in modules.get("user", []):
                 print(f"{module['name']}: {module['status']}")
             return 0
+        if args.modules_action == "graph":
+            import json
+            depgraph_path = project_root / "docs" / "architecture" / "DEPGRAPH.json"
+            if not depgraph_path.exists():
+                print(f"Error: DEPGRAPH.json not found at {depgraph_path}")
+                return 1
+
+            with open(depgraph_path) as f:
+                depgraph = json.load(f)
+
+            # Filter to modules domain only
+            module_nodes = {
+                n["id"]: n for n in depgraph.get("nodes", [])
+                if n.get("domain") == "modules"
+            }
+            module_edges = [
+                e for e in depgraph.get("edges", [])
+                if e.get("from") in module_nodes and e.get("to") in module_nodes
+            ]
+
+            print("=== Module Dependency Graph ===")
+            print(f"Nodes: {len(module_nodes)}")
+            print(f"Edges: {len(module_edges)}\n")
+
+            # Build dependency map
+            deps_map = {}
+            for edge in module_edges:
+                from_id = edge["from"]
+                to_id = edge["to"]
+                if from_id not in deps_map:
+                    deps_map[from_id] = []
+                deps_map[from_id].append(to_id)
+
+            # Print each module and its dependencies
+            for node_id in sorted(module_nodes.keys()):
+                node = module_nodes[node_id]
+                label = node.get("label", node_id)
+                print(f"\n{node_id} ({label})")
+                if node_id in deps_map:
+                    print("  depends on:")
+                    for dep in sorted(deps_map[node_id]):
+                        dep_label = module_nodes.get(dep, {}).get("label", dep)
+                        print(f"    - {dep} ({dep_label})")
+                else:
+                    print("  (no dependencies on other modules)")
+
+            return 0
         if args.modules_action == "validate":
             from .modules.registry import (
                 _discover_module_nodes,
@@ -633,7 +680,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     modules_parser = subparsers.add_parser("modules", help="Manage module status")
     modules_parser.add_argument(
         "modules_action",
-        choices=["list", "enable", "disable", "create", "validate"],
+        choices=["list", "enable", "disable", "create", "validate", "graph"],
         help="Module action",
     )
     modules_parser.add_argument(
