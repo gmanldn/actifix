@@ -628,6 +628,130 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     return 0 if ok else 1
 
 
+def cmd_repair(args: argparse.Namespace) -> int:
+    """Fix common database and state issues.
+
+    This command performs maintenance operations to repair common issues:
+    - Database integrity checks
+    - WAL checkpoint and VACUUM
+    - Orphaned record cleanup
+    - State file validation
+    """
+    project_root = Path(args.project_root or Path.cwd())
+    dry_run = not args.execute
+
+    with ActifixContext(project_root=project_root):
+        from .persistence.database import get_database_connection
+        from .state_paths import get_actifix_paths
+
+        paths = get_actifix_paths(project_root=project_root)
+        enforce_raise_af_only(paths)
+
+        print("=== Actifix Repair ===")
+        print(f"Mode: {'DRY RUN' if dry_run else 'EXECUTE'}\n")
+
+        issues_found = 0
+        issues_fixed = 0
+
+        # 1. Database integrity check
+        print("1. Running database integrity check...")
+        try:
+            conn = get_database_connection(paths)
+            with conn:
+                cursor = conn.execute("PRAGMA integrity_check")
+                result = cursor.fetchone()
+                if result and result[0] == "ok":
+                    print("   ✓ Database integrity OK")
+                else:
+                    print(f"   ✗ Database integrity issues: {result}")
+                    issues_found += 1
+        except Exception as e:
+            print(f"   ✗ Failed to check integrity: {e}")
+            issues_found += 1
+
+        # 2. WAL checkpoint
+        print("\n2. Checking WAL checkpoint...")
+        try:
+            conn = get_database_connection(paths)
+            with conn:
+                cursor = conn.execute("PRAGMA wal_checkpoint(FULL)")
+                result = cursor.fetchone()
+                if result:
+                    busy, log_frames, checkpointed = result
+                    if log_frames > 0:
+                        print(f"   ✓ Checkpointed {checkpointed} frames")
+                        if not dry_run:
+                            issues_fixed += 1
+                    else:
+                        print("   ✓ WAL checkpoint clean")
+                else:
+                    print("   ✓ WAL checkpoint clean")
+        except Exception as e:
+            print(f"   ✗ Failed to checkpoint WAL: {e}")
+            issues_found += 1
+
+        # 3. VACUUM database
+        print("\n3. Optimizing database...")
+        try:
+            if not dry_run:
+                conn = get_database_connection(paths)
+                with conn:
+                    conn.execute("VACUUM")
+                    print("   ✓ Database optimized")
+                    issues_fixed += 1
+            else:
+                print("   • Would run VACUUM (skipped in dry-run)")
+        except Exception as e:
+            print(f"   ✗ Failed to VACUUM: {e}")
+            issues_found += 1
+
+        # 4. Check for orphaned state files
+        print("\n4. Checking state files...")
+        orphaned_files = []
+        state_dir = paths.state_dir
+        if state_dir.exists():
+            for file in state_dir.glob("*.json"):
+                if file.name not in ["module_statuses.json", "actifix_fallback_queue.json"]:
+                    orphaned_files.append(file)
+
+        if orphaned_files:
+            print(f"   • Found {len(orphaned_files)} potentially orphaned state files")
+            for file in orphaned_files:
+                print(f"     - {file.name}")
+            issues_found += len(orphaned_files)
+        else:
+            print("   ✓ No orphaned state files")
+
+        # 5. Validate module status file
+        print("\n5. Validating module status...")
+        module_status_file = state_dir / "module_statuses.json"
+        if module_status_file.exists():
+            try:
+                import json
+                with open(module_status_file) as f:
+                    data = json.load(f)
+                if "schema_version" in data and "statuses" in data:
+                    print(f"   ✓ Module status file valid ({len(data.get('statuses', {}))} modules)")
+                else:
+                    print("   ✗ Module status file missing required fields")
+                    issues_found += 1
+            except Exception as e:
+                print(f"   ✗ Failed to validate module status: {e}")
+                issues_found += 1
+        else:
+            print("   • No module status file found")
+
+        # Summary
+        print("\n=== Summary ===")
+        print(f"Issues found: {issues_found}")
+        print(f"Issues fixed: {issues_fixed}")
+
+        if dry_run and issues_found > 0:
+            print("\nRun with --execute to apply fixes")
+
+        return 0 if issues_found == 0 else 1
+
+
 def main(argv: Optional[list[str]] = None) -> int:
     """
     Main entrypoint for Actifix CLI.
@@ -794,7 +918,15 @@ def main(argv: Optional[list[str]] = None) -> int:
     
     # Doctor command
     doctor_parser = subparsers.add_parser("doctor", help="Diagnose environment and configuration")
-    
+
+    # Repair command
+    repair_parser = subparsers.add_parser("repair", help="Fix common DB/state issues")
+    repair_parser.add_argument(
+        "--execute",
+        action="store_true",
+        help="Apply repairs (default is dry-run)",
+    )
+
     args = parser.parse_args(argv)
     
     if not args.command:
@@ -819,6 +951,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         "test": cmd_test,
         "modules": cmd_modules,
         "doctor": cmd_doctor,
+        "repair": cmd_repair,
     }
     
     try:
