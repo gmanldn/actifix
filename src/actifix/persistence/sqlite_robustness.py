@@ -139,11 +139,11 @@ class SQLiteRobustness:
 
             conn.close()
 
-            log_event("sqlite:pragmas_enforced", details=pragmas)
+            log_event("sqlite:pragmas_enforced", extra=pragmas)
             record_agent_voice(
                 module_key="sqlite_robustness",
                 action="pragmas_enforced",
-                details=f"Enforced safety PRAGMAs: {', '.join(pragmas.keys())}"
+                extra=f"Enforced safety PRAGMAs: {', '.join(pragmas.keys())}"
             )
 
             return pragmas
@@ -233,7 +233,7 @@ class SQLiteRobustness:
         try:
             shutil.copy2(self.db_path, quarantine_path)
 
-            log_event("sqlite:db_quarantined", details={
+            log_event("sqlite:db_quarantined", extra={
                 "original": str(self.db_path),
                 "quarantine": str(quarantine_path),
             })
@@ -241,7 +241,7 @@ class SQLiteRobustness:
             record_agent_voice(
                 module_key="sqlite_robustness",
                 action="db_quarantined",
-                details=f"Corrupted database moved to: {quarantine_path}"
+                extra=f"Corrupted database moved to: {quarantine_path}"
             )
 
             return quarantine_path
@@ -294,7 +294,7 @@ class SQLiteRobustness:
             # Verify backup
             self._verify_backup(backup_path)
 
-            log_event("sqlite:backup_created", details={
+            log_event("sqlite:backup_created", extra={
                 "backup": str(backup_path),
                 "size_bytes": backup_path.stat().st_size,
             })
@@ -302,7 +302,7 @@ class SQLiteRobustness:
             record_agent_voice(
                 module_key="sqlite_robustness",
                 action="backup_created",
-                details=f"Database backed up to: {backup_path}"
+                extra=f"Database backed up to: {backup_path}"
             )
 
             return backup_path
@@ -356,7 +356,7 @@ class SQLiteRobustness:
                         shutil.copy2(safety_copy, self.db_path)
                         raise RuntimeError(f"Restored backup is corrupt: {report.message}")
 
-                log_event("sqlite:restore_completed", details={
+                log_event("sqlite:restore_completed", extra={
                     "backup": str(backup_path),
                     "safety_copy": str(safety_copy),
                 })
@@ -364,7 +364,7 @@ class SQLiteRobustness:
                 record_agent_voice(
                     module_key="sqlite_robustness",
                     action="restore_completed",
-                    details=f"Database restored from: {backup_path}"
+                    extra=f"Database restored from: {backup_path}"
                 )
 
         except Exception as e:
@@ -445,7 +445,7 @@ class SQLiteRobustness:
                 results['vacuum'] = False
 
         if results:
-            log_event("sqlite:maintenance_completed", details=results)
+            log_event("sqlite:maintenance_completed", extra=results)
 
         return results
 

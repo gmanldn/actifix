@@ -48,7 +48,15 @@ class AIContextManager:
         if not self._config.memory_enabled:
             return
         try:
-            self._memory_store.store(record)
+            # Apply redaction before storing to AI context
+            from ..raise_af import redact_secrets_from_text
+            redacted_record = MemoryRecord(
+                id=record.id,
+                content=redact_secrets_from_text(record.content),
+                metadata=record.metadata,
+                timestamp=record.timestamp,
+            )
+            self._memory_store.store(redacted_record)
         except Exception as exc:
             record_error(
                 message=f"AI memory store failed: {exc}",
@@ -75,7 +83,15 @@ class AIContextManager:
         if not self._config.vector_enabled:
             return
         try:
-            self._vector_store.upsert(record)
+            # Apply redaction before storing to AI context
+            from ..raise_af import redact_secrets_from_text
+            redacted_record = VectorRecord(
+                id=record.id,
+                content=redact_secrets_from_text(record.content),
+                embedding=record.embedding,
+                metadata=record.metadata,
+            )
+            self._vector_store.upsert(redacted_record)
         except Exception as exc:
             record_error(
                 message=f"AI vector upsert failed: {exc}",

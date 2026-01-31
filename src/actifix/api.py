@@ -3007,6 +3007,131 @@ def create_app(
             )
             return jsonify({'error': str(e)}), 500
 
+    @app.route('/api/tickets/summary', methods=['GET'])
+    def api_tickets_summary():
+        """Get lightweight ticket summary for dashboards."""
+        # Check authentication
+        if not _check_auth(request):
+            return jsonify({'error': 'Authorization required'}), 401
+
+        try:
+            paths = get_actifix_paths(project_root=app.config['PROJECT_ROOT'])
+            stats = get_ticket_stats(paths)
+            breaches = check_sla_breaches(paths)
+
+            # Get oldest ticket age
+            from .do_af import get_open_tickets
+            tickets = get_open_tickets(paths)
+            oldest_age_hours = 0
+            if tickets:
+                from .health import _get_ticket_age_hours
+                for ticket in tickets:
+                    age = _get_ticket_age_hours(ticket.created)
+                    if age > oldest_age_hours:
+                        oldest_age_hours = age
+
+            return jsonify({
+                'total': stats.get('total', 0),
+                'open': stats.get('open', 0),
+                'completed': stats.get('completed', 0),
+                'by_priority': stats.get('by_priority', {}),
+                'sla_breaches': len(breaches),
+                'oldest_ticket_age_hours': round(oldest_age_hours, 1),
+                'timestamp': datetime.now(timezone.utc).isoformat(),
+            })
+
+        except Exception as e:
+            record_error(
+                message=f"Tickets summary failed: {e}",
+                source="api.py:api_tickets_summary",
+                priority=TicketPriority.P3,
+            )
+            return jsonify({'error': str(e)}), 500
+
+    @app.route('/api/tickets/search', methods=['GET'])
+    def api_tickets_search():
+        """Search tickets with safe filters and pagination."""
+        # Check authentication
+        if not _check_auth(request):
+            return jsonify({'error': 'Authorization required'}), 401
+
+        try:
+            from .persistence.ticket_repo import TicketRepository
+
+            # Parse query parameters
+            priority = request.args.get('priority', None)
+            status = request.args.get('status', None)
+            limit = request.args.get('limit', 50, type=int)
+            offset = request.args.get('offset', 0, type=int)
+            search = request.args.get('search', None)
+
+            # Validate and sanitize inputs
+            limit = max(1, min(limit, 500))  # Cap at 500
+            offset = max(0, offset)
+
+            valid_priorities = ['P0', 'P1', 'P2', 'P3', 'P4']
+            if priority and priority not in valid_priorities:
+                return jsonify({'error': f'Invalid priority. Must be one of: {valid_priorities}'}), 400
+
+            valid_statuses = ['Open', 'Completed']
+            if status and status not in valid_statuses:
+                return jsonify({'error': f'Invalid status. Must be one of: {valid_statuses}'}), 400
+
+            # Query tickets
+            repo = TicketRepository()
+            all_tickets = repo.list_tickets(
+                status=status,
+                priority=priority,
+                limit=limit + offset + 1,  # Fetch extra to determine has_more
+            )
+
+            # Filter by search term if provided
+            if search and search.strip():
+                search_lower = search.strip().lower()
+                all_tickets = [
+                    t for t in all_tickets
+                    if search_lower in t.get('message', '').lower()
+                    or search_lower in t.get('source', '').lower()
+                    or search_lower in t.get('id', '').lower()
+                ]
+
+            # Apply pagination
+            has_more = len(all_tickets) > limit + offset
+            tickets = all_tickets[offset:offset + limit]
+
+            # Redact sensitive data from tickets
+            from .raise_af import redact_secrets_from_text
+            for ticket in tickets:
+                if ticket.get('message'):
+                    ticket['message'] = redact_secrets_from_text(ticket['message'])
+                if ticket.get('stack_trace'):
+                    ticket['stack_trace'] = redact_secrets_from_text(ticket['stack_trace'])
+
+            return jsonify({
+                'tickets': tickets,
+                'count': len(tickets),
+                'total_matched': len(all_tickets),
+                'has_more': has_more,
+                'pagination': {
+                    'limit': limit,
+                    'offset': offset,
+                    'next_offset': offset + limit if has_more else None,
+                },
+                'filters': {
+                    'priority': priority,
+                    'status': status,
+                    'search': search,
+                },
+            })
+
+        except Exception as e:
+            record_error(
+                message=f"Tickets search failed: {e}",
+                source="api.py:api_tickets_search",
+                priority=TicketPriority.P3,
+            )
+            return jsonify({'error': str(e)}), 500
+
     return app
 
 
