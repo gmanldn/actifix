@@ -628,6 +628,106 @@ class InstanceLock:
         self.release()
 
 
+def _validate_retention_config(fps: int, retention_seconds: int, helper: ModuleBase) -> tuple[int, int]:
+    """Validate and normalize retention configuration.
+
+    Returns: (validated_fps, validated_retention_seconds)
+    """
+    # Validate FPS
+    if fps < 1 or fps > 10:
+        helper.record_module_error(
+            message=f"Invalid FPS {fps}, must be between 1 and 10. Using default 2.",
+            source="modules/screenscan/__init__.py:_validate_retention_config",
+            error_type="ConfigValidationError",
+            priority=TicketPriority.P3,
+        )
+        fps = 2
+
+    # Validate retention
+    if retention_seconds < 10 or retention_seconds > 300:
+        helper.record_module_error(
+            message=f"Invalid retention {retention_seconds}s, must be between 10 and 300. Using default 60.",
+            source="modules/screenscan/__init__.py:_validate_retention_config",
+            error_type="ConfigValidationError",
+            priority=TicketPriority.P3,
+        )
+        retention_seconds = 60
+
+    # Check if ring buffer capacity is reasonable
+    capacity = fps * retention_seconds
+    if capacity > 600:  # More than 10 minutes at max FPS
+        helper.record_module_error(
+            message=f"Ring buffer capacity {capacity} frames may be excessive. Consider reducing fps or retention.",
+            source="modules/screenscan/__init__.py:_validate_retention_config",
+            error_type="ConfigWarning",
+            priority=TicketPriority.P4,
+        )
+
+    record_agent_voice(
+        module_key="screenscan",
+        action="config_validated",
+        details=f"Retention config validated: fps={fps}, retention={retention_seconds}s, capacity={capacity} frames",
+    )
+
+    return fps, retention_seconds
+
+
+def _migrate_retention_config(db, old_capacity: int, new_capacity: int, helper: ModuleBase) -> None:
+    """Migrate ring buffer when retention config changes."""
+    try:
+        if old_capacity == new_capacity:
+            return
+
+        conn = db.get_connection()
+        cursor = conn.cursor()
+
+        if new_capacity < old_capacity:
+            # Shrinking - delete oldest frames beyond new capacity
+            cursor.execute("SELECT COUNT(*) FROM screenscan_frames")
+            current_frames = cursor.fetchone()[0]
+
+            if current_frames > new_capacity:
+                frames_to_delete = current_frames - new_capacity
+                cursor.execute("""
+                    DELETE FROM screenscan_frames
+                    WHERE frame_seq IN (
+                        SELECT frame_seq FROM screenscan_frames
+                        ORDER BY frame_seq ASC
+                        LIMIT ?
+                    )
+                """, (frames_to_delete,))
+
+                record_agent_voice(
+                    module_key="screenscan",
+                    action="retention_migration",
+                    level="WARNING",
+                    details=f"Deleted {frames_to_delete} oldest frames during retention migration ({old_capacity} → {new_capacity})",
+                )
+
+        # Update capacity in state
+        cursor.execute(
+            "INSERT OR REPLACE INTO screenscan_state (key, value) VALUES ('capacity', ?)",
+            (new_capacity,)
+        )
+
+        conn.commit()
+        conn.close()
+
+        record_agent_voice(
+            module_key="screenscan",
+            action="retention_config_migrated",
+            details=f"Ring buffer capacity migrated from {old_capacity} to {new_capacity} frames",
+        )
+
+    except Exception as e:
+        helper.record_module_error(
+            message=f"Failed to migrate retention config: {e}",
+            source="modules/screenscan/__init__.py:_migrate_retention_config",
+            error_type=type(e).__name__,
+            priority=TicketPriority.P2,
+        )
+
+
 def _ensure_screenscan_schema(db) -> None:
     """Ensure screenscan tables exist in the database."""
     try:
@@ -998,7 +1098,7 @@ def create_blueprint(
 
 
 def start_module(project_root: Optional[Union[str, Path]] = None) -> None:
-    """Start the screenscan module."""
+    """Start the screenscan module with config validation and migration."""
     helper = _module_helper(project_root)
     try:
         # Ensure schema
@@ -1006,9 +1106,24 @@ def start_module(project_root: Optional[Union[str, Path]] = None) -> None:
         db = get_database(project_root)
         _ensure_screenscan_schema(db)
 
-        # Start worker
+        # Get and validate retention config
         fps = MODULE_DEFAULTS["fps"]
         retention = MODULE_DEFAULTS["retention_seconds"]
+        fps, retention = _validate_retention_config(fps, retention, helper)
+
+        # Check if capacity changed and migrate if needed
+        new_capacity = fps * retention
+        conn = db.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT value FROM screenscan_state WHERE key='capacity'")
+        row = cursor.fetchone()
+        old_capacity = int(row[0]) if row else new_capacity
+        conn.close()
+
+        if old_capacity != new_capacity:
+            _migrate_retention_config(db, old_capacity, new_capacity, helper)
+
+        # Start worker
         _start_capture_worker(project_root, fps, retention)
 
         record_agent_voice(
