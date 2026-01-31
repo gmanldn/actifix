@@ -949,6 +949,13 @@ def create_blueprint(
             }
             return jsonify(status)
 
+        @blueprint.route("/self-test")
+        def selftest():
+            """Run comprehensive self-test diagnostics."""
+            results = self_test(project_root)
+            status_code = 200 if results["overall_status"] == "healthy" else 503
+            return jsonify(results), status_code
+
         @blueprint.route("/stats")
         def stats():
             """Statistics endpoint."""
@@ -1146,6 +1153,146 @@ def start_module(project_root: Optional[Union[str, Path]] = None) -> None:
             priority=TicketPriority.P1,
         )
         raise
+
+
+def self_test(project_root: Optional[Union[str, Path]] = None) -> Dict[str, Any]:
+    """Run self-test diagnostics for screenscan module.
+
+    Returns a dict with test results for production diagnostics.
+    """
+    helper = _module_helper(project_root)
+    results = {
+        "overall_status": "unknown",
+        "tests": {},
+        "timestamp": time.time(),
+    }
+
+    try:
+        from actifix.persistence import get_database
+        import platform
+
+        # Test 1: Worker status
+        worker_test = {
+            "name": "Worker Running",
+            "status": "pass" if _worker_running else "fail",
+            "details": f"Worker thread alive: {_worker_thread.is_alive() if _worker_thread else False}",
+        }
+        results["tests"]["worker"] = worker_test
+
+        # Test 2: Database connectivity
+        try:
+            db = get_database(project_root)
+            conn = db.get_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) FROM screenscan_frames")
+            frame_count = cursor.fetchone()[0]
+            conn.close()
+
+            db_test = {
+                "name": "Database",
+                "status": "pass",
+                "details": f"Connected, {frame_count} frames stored",
+            }
+        except Exception as e:
+            db_test = {
+                "name": "Database",
+                "status": "fail",
+                "details": f"Database error: {str(e)[:100]}",
+            }
+        results["tests"]["database"] = db_test
+
+        # Test 3: Capture backend availability
+        platform_name = platform.system()
+        backend = _detect_capture_backend(platform_name, project_root, helper)
+        backend_test = {
+            "name": "Capture Backend",
+            "status": "pass" if backend not in ["unsupported", "linux_noop", "windows_noop"] else "warn",
+            "details": f"Platform: {platform_name}, Backend: {backend}",
+        }
+        results["tests"]["backend"] = backend_test
+
+        # Test 4: Recent capture activity
+        try:
+            db = get_database(project_root)
+            conn = db.get_connection()
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT captured_at FROM screenscan_frames ORDER BY frame_seq DESC LIMIT 1"
+            )
+            row = cursor.fetchone()
+            conn.close()
+
+            if row:
+                from datetime import datetime
+                last_capture = datetime.fromisoformat(row[0])
+                age_seconds = (datetime.utcnow() - last_capture).total_seconds()
+
+                activity_test = {
+                    "name": "Recent Activity",
+                    "status": "pass" if age_seconds < 60 else "warn" if age_seconds < 300 else "fail",
+                    "details": f"Last capture {age_seconds:.1f}s ago",
+                }
+            else:
+                activity_test = {
+                    "name": "Recent Activity",
+                    "status": "warn",
+                    "details": "No captures yet",
+                }
+        except Exception as e:
+            activity_test = {
+                "name": "Recent Activity",
+                "status": "fail",
+                "details": f"Error checking activity: {str(e)[:100]}",
+            }
+        results["tests"]["activity"] = activity_test
+
+        # Test 5: Storage health
+        try:
+            usage = _get_storage_usage(db)
+            config = helper.get_config()
+            quota = config.get("storage_quota_bytes", 50 * 1024 * 1024)
+            utilization = usage["total_db_bytes"] / quota if quota > 0 else 0
+
+            storage_test = {
+                "name": "Storage",
+                "status": "pass" if utilization < 0.8 else "warn" if utilization < 1.0 else "fail",
+                "details": f"Using {usage['total_db_bytes'] // 1024}KB / {quota // 1024}KB ({utilization:.1%})",
+            }
+        except Exception as e:
+            storage_test = {
+                "name": "Storage",
+                "status": "warn",
+                "details": f"Could not check storage: {str(e)[:100]}",
+            }
+        results["tests"]["storage"] = storage_test
+
+        # Determine overall status
+        test_statuses = [t["status"] for t in results["tests"].values()]
+        if all(s == "pass" for s in test_statuses):
+            results["overall_status"] = "healthy"
+        elif any(s == "fail" for s in test_statuses):
+            results["overall_status"] = "unhealthy"
+        else:
+            results["overall_status"] = "degraded"
+
+        record_agent_voice(
+            module_key="screenscan",
+            action="self_test_complete",
+            level="INFO" if results["overall_status"] == "healthy" else "WARNING",
+            details=f"Self-test completed: {results['overall_status']} ({len(results['tests'])} tests)",
+        )
+
+    except Exception as exc:
+        helper.record_module_error(
+            message=f"Self-test failed: {exc}",
+            source="modules/screenscan/__init__.py:self_test",
+            error_type=type(exc).__name__,
+            priority=TicketPriority.P3,
+        )
+        results["overall_status"] = "error"
+        results["error"] = str(exc)
+
+    return results
 
 
 def stop_module(project_root: Optional[Union[str, Path]] = None) -> None:
