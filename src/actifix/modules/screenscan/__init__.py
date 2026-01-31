@@ -95,6 +95,11 @@ MODULE_DEFAULTS = {
     "initial_backoff_seconds": 1,  # Initial backoff delay
     "max_backoff_seconds": 60,  # Max backoff delay
     "backoff_multiplier": 2,  # Exponential backoff multiplier
+    # API payload limits
+    "api_max_frames_per_request": 120,  # Max frames returned in single request
+    "api_max_total_bytes": 100 * 1024 * 1024,  # 100MB max total response
+    "api_request_timeout_seconds": 30,  # Max request processing time
+    "api_rate_limit_per_minute": 60,  # Max requests per minute per IP
 }
 
 ACCESS_RULE = "local-only"
@@ -124,6 +129,10 @@ _worker_running = False
 _worker_lock = threading.Lock()
 _restart_attempts: list[float] = []  # Timestamps of restart attempts
 _current_backoff = 1  # Current backoff delay in seconds
+
+# API rate limiting state (IP -> list of request timestamps)
+_api_request_log: Dict[str, list[float]] = {}
+_api_rate_lock = threading.Lock()
 
 
 def _module_helper(project_root: Optional[Union[str, Path]] = None) -> ModuleBase:
@@ -187,6 +196,43 @@ def _calculate_backoff(helper: ModuleBase) -> float:
         _current_backoff = min(_current_backoff * multiplier, max_backoff)
 
     return _current_backoff
+
+
+def _check_api_rate_limit(client_ip: str, helper: ModuleBase) -> bool:
+    """Check if client has exceeded API rate limit.
+
+    Returns True if request is allowed, False if rate limit exceeded.
+    """
+    global _api_request_log
+
+    config = helper.get_config()
+    rate_limit = config.get("api_rate_limit_per_minute", 60)
+
+    now = time.time()
+    window = 60.0  # 1 minute window
+
+    with _api_rate_lock:
+        # Clean up old requests outside the window
+        if client_ip in _api_request_log:
+            _api_request_log[client_ip] = [
+                t for t in _api_request_log[client_ip] if now - t < window
+            ]
+        else:
+            _api_request_log[client_ip] = []
+
+        # Check if limit exceeded
+        if len(_api_request_log[client_ip]) >= rate_limit:
+            record_agent_voice(
+                module_key="screenscan",
+                action="api_rate_limit_exceeded",
+                level="WARNING",
+                details=f"Rate limit exceeded for {client_ip}: {len(_api_request_log[client_ip])} requests in last minute",
+            )
+            return False
+
+        # Record this request
+        _api_request_log[client_ip].append(now)
+        return True
 
 
 def _start_capture_worker(
@@ -604,9 +650,21 @@ def create_blueprint(
                 from actifix.persistence import get_database
                 import json
 
-                # SC-026: API safeguards - enforce limits
-                MAX_LIMIT = 120
-                MAX_TOTAL_BYTES = 100 * 1024 * 1024  # 100MB max total
+                # Get client IP for rate limiting
+                client_ip = request.remote_addr or "unknown"
+
+                # Check rate limit
+                if not _check_api_rate_limit(client_ip, helper):
+                    config = helper.get_config()
+                    rate_limit = config.get("api_rate_limit_per_minute", 60)
+                    return jsonify({
+                        "error": f"Rate limit exceeded. Maximum {rate_limit} requests per minute."
+                    }), 429
+
+                # Get configurable limits
+                config = helper.get_config()
+                MAX_LIMIT = config.get("api_max_frames_per_request", 120)
+                MAX_TOTAL_BYTES = config.get("api_max_total_bytes", 100 * 1024 * 1024)
 
                 limit = min(int(request.args.get("limit", 10)), MAX_LIMIT)
                 include_data = request.args.get("include_data", "0") == "1"
@@ -639,7 +697,7 @@ def create_blueprint(
                         record_agent_voice(
                             module_key="screenscan",
                             action="payload_limit_enforced",
-                            details=f"Request would exceed {MAX_TOTAL_BYTES} bytes, truncating",
+                            details=f"Request would exceed {MAX_TOTAL_BYTES} bytes, truncating at {len(frames_list)} frames",
                         )
                         break
 
@@ -661,6 +719,7 @@ def create_blueprint(
                     "count": len(frames_list),
                     "total_bytes": total_bytes,
                     "include_data": include_data,
+                    "rate_limit_remaining": config.get("api_rate_limit_per_minute", 60) - len(_api_request_log.get(client_ip, [])),
                 })
             except Exception as e:
                 helper.record_module_error(
