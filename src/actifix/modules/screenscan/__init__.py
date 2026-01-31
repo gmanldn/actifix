@@ -89,6 +89,10 @@ MODULE_DEFAULTS = {
     "max_frame_bytes": 512 * 1024,  # Max 512KB per frame
     "enable_in_prod": False,  # SC-013: Require explicit enable in production
     "use_fake_provider": False,  # For testing (SC-016)
+    # Privacy controls
+    "privacy_opt_in_required": True,  # Require explicit opt-in for screen capture
+    "privacy_consent_env_var": "ACTIFIX_SCREENSCAN_CONSENT",  # Environment variable for consent
+    "privacy_allow_ui_access": True,  # Allow UI to show frame metadata
     "restart_policy_enabled": True,  # Auto-restart worker on crash
     "max_restart_attempts": 5,  # Max restarts within restart_window_seconds
     "restart_window_seconds": 300,  # 5 minute window for counting restarts
@@ -1105,9 +1109,24 @@ def create_blueprint(
 
 
 def start_module(project_root: Optional[Union[str, Path]] = None) -> None:
-    """Start the screenscan module with config validation and migration."""
+    """Start the screenscan module with config validation, privacy checks, and migration."""
     helper = _module_helper(project_root)
     try:
+        # Privacy consent check
+        config = helper.get_config()
+        if config.get("privacy_opt_in_required", True):
+            consent_var = config.get("privacy_consent_env_var", "ACTIFIX_SCREENSCAN_CONSENT")
+            consent = os.getenv(consent_var, "").lower() in ("1", "true", "yes")
+
+            if not consent:
+                record_agent_voice(
+                    module_key="screenscan",
+                    action="privacy_consent_required",
+                    level="WARNING",
+                    details=f"Screenscan requires privacy consent via {consent_var}=true",
+                )
+                raise RuntimeError(f"Privacy consent required. Set {consent_var}=true to enable screenscan.")
+
         # Ensure schema
         from actifix.persistence import get_database
         db = get_database(project_root)
