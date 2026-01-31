@@ -11,16 +11,18 @@ Version: 1.0.0
 """
 
 import atexit
+import base64
 import contextlib
 import os
 import json
 import sqlite3
 import sys
 import threading
+import zlib
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional, List, Dict, Any, Iterator
+from typing import Optional, List, Dict, Any, Iterator, Union
 
 from ..log_utils import log_event
 
@@ -1034,3 +1036,431 @@ def run_maintenance(pool: Optional[DatabasePool] = None, vacuum: bool = True, an
             results["success"] = False
 
     return results
+
+
+def get_database_size_info(pool: Optional[DatabasePool] = None) -> dict:
+    """
+    Get database size information and growth metrics.
+
+    Args:
+        pool: Database pool (uses global pool if None).
+
+    Returns:
+        Dict with size info: {
+            "size_bytes": int,
+            "size_mb": float,
+            "page_count": int,
+            "page_size": int,
+            "table_sizes": dict
+        }
+    """
+    if pool is None:
+        pool = get_database_pool()
+
+    try:
+        with pool.connection() as conn:
+            # Get overall database size
+            cursor = conn.execute("PRAGMA page_count")
+            page_count = cursor.fetchone()[0]
+
+            cursor = conn.execute("PRAGMA page_size")
+            page_size = cursor.fetchone()[0]
+
+            size_bytes = page_count * page_size
+            size_mb = size_bytes / (1024 * 1024)
+
+            # Get per-table sizes
+            table_sizes = {}
+            cursor = conn.execute("""
+                SELECT name FROM sqlite_master
+                WHERE type='table' AND name NOT LIKE 'sqlite_%'
+            """)
+            tables = [row[0] for row in cursor.fetchall()]
+
+            for table in tables:
+                try:
+                    cursor = conn.execute(f"SELECT COUNT(*) FROM {table}")
+                    row_count = cursor.fetchone()[0]
+                    table_sizes[table] = row_count
+                except sqlite3.Error:
+                    # Table might not be accessible
+                    table_sizes[table] = None
+
+            return {
+                "size_bytes": size_bytes,
+                "size_mb": round(size_mb, 2),
+                "page_count": page_count,
+                "page_size": page_size,
+                "table_sizes": table_sizes,
+            }
+    except Exception as e:
+        log_event(
+            "DATABASE_SIZE_CHECK_FAILED",
+            f"Failed to get database size: {e}",
+            extra={"error": str(e)},
+            source="persistence.database.get_database_size_info",
+        )
+        return {
+            "size_bytes": 0,
+            "size_mb": 0.0,
+            "page_count": 0,
+            "page_size": 0,
+            "table_sizes": {},
+        }
+
+
+def check_database_growth(
+    pool: Optional[DatabasePool] = None,
+    warn_threshold_mb: float = 100.0,
+    error_threshold_mb: float = 500.0
+) -> dict:
+    """
+    Check database size and alert on unbounded growth.
+
+    Args:
+        pool: Database pool (uses global pool if None).
+        warn_threshold_mb: Size in MB to trigger warning.
+        error_threshold_mb: Size in MB to trigger error.
+
+    Returns:
+        Dict with: {"size_mb": float, "status": str, "alert": bool, "message": str}
+    """
+    size_info = get_database_size_info(pool)
+    size_mb = size_info["size_mb"]
+
+    status = "ok"
+    alert = False
+    message = f"Database size: {size_mb}MB"
+
+    if size_mb >= error_threshold_mb:
+        status = "error"
+        alert = True
+        message = f"Database size critical: {size_mb}MB (threshold: {error_threshold_mb}MB)"
+        log_event(
+            "DATABASE_SIZE_CRITICAL",
+            message,
+            extra={
+                "size_mb": size_mb,
+                "threshold_mb": error_threshold_mb,
+                "table_sizes": size_info["table_sizes"],
+            },
+            source="persistence.database.check_database_growth",
+        )
+    elif size_mb >= warn_threshold_mb:
+        status = "warning"
+        alert = True
+        message = f"Database size warning: {size_mb}MB (threshold: {warn_threshold_mb}MB)"
+        log_event(
+            "DATABASE_SIZE_WARNING",
+            message,
+            extra={
+                "size_mb": size_mb,
+                "threshold_mb": warn_threshold_mb,
+                "table_sizes": size_info["table_sizes"],
+            },
+            source="persistence.database.check_database_growth",
+        )
+
+    return {
+        "size_mb": size_mb,
+        "status": status,
+        "alert": alert,
+        "message": message,
+        "table_sizes": size_info["table_sizes"],
+    }
+
+
+# Required indexes for optimal query performance
+REQUIRED_INDEXES = {
+    "tickets": [
+        ("idx_tickets_status", "CREATE INDEX IF NOT EXISTS idx_tickets_status ON tickets(status)"),
+        ("idx_tickets_priority", "CREATE INDEX IF NOT EXISTS idx_tickets_priority ON tickets(priority)"),
+        ("idx_tickets_created", "CREATE INDEX IF NOT EXISTS idx_tickets_created ON tickets(created_at DESC)"),
+        ("idx_tickets_status_priority", "CREATE INDEX IF NOT EXISTS idx_tickets_status_priority ON tickets(status, priority)"),
+        ("idx_tickets_duplicate_guard", "CREATE UNIQUE INDEX IF NOT EXISTS idx_tickets_duplicate_guard ON tickets(duplicate_guard) WHERE duplicate_guard IS NOT NULL"),
+    ],
+    "event_log": [
+        ("idx_event_log_timestamp", "CREATE INDEX IF NOT EXISTS idx_event_log_timestamp ON event_log(timestamp DESC)"),
+        ("idx_event_log_type", "CREATE INDEX IF NOT EXISTS idx_event_log_type ON event_log(event_type)"),
+        ("idx_event_log_ticket", "CREATE INDEX IF NOT EXISTS idx_event_log_ticket ON event_log(ticket_id) WHERE ticket_id IS NOT NULL"),
+        ("idx_event_log_correlation", "CREATE INDEX IF NOT EXISTS idx_event_log_correlation ON event_log(correlation_id) WHERE correlation_id IS NOT NULL"),
+    ],
+    "agent_voice": [
+        ("idx_agent_voice_timestamp", "CREATE INDEX IF NOT EXISTS idx_agent_voice_timestamp ON agent_voice(timestamp DESC)"),
+        ("idx_agent_voice_agent", "CREATE INDEX IF NOT EXISTS idx_agent_voice_agent ON agent_voice(agent_id)"),
+        ("idx_agent_voice_level", "CREATE INDEX IF NOT EXISTS idx_agent_voice_level ON agent_voice(level)"),
+    ],
+}
+
+
+def verify_and_create_indexes(pool: Optional[DatabasePool] = None) -> dict:
+    """
+    Verify required indexes exist and create missing ones on startup.
+
+    Args:
+        pool: Database pool (uses global pool if None).
+
+    Returns:
+        Dict with: {"verified": int, "created": int, "failed": list}
+    """
+    if pool is None:
+        pool = get_database_pool()
+
+    verified = 0
+    created = 0
+    failed = []
+
+    try:
+        with pool.connection() as conn:
+            # Get existing indexes
+            cursor = conn.execute("""
+                SELECT name, tbl_name FROM sqlite_master
+                WHERE type='index' AND name NOT LIKE 'sqlite_%'
+            """)
+            existing = {row[0]: row[1] for row in cursor.fetchall()}
+
+            # Check and create required indexes
+            for table, indexes in REQUIRED_INDEXES.items():
+                for idx_name, create_sql in indexes:
+                    if idx_name in existing:
+                        verified += 1
+                    else:
+                        try:
+                            conn.execute(create_sql)
+                            created += 1
+                            log_event(
+                                "INDEX_CREATED",
+                                f"Created missing index: {idx_name} on {table}",
+                                extra={"index": idx_name, "table": table},
+                                source="persistence.database.verify_and_create_indexes",
+                            )
+                        except sqlite3.Error as e:
+                            failed.append(f"{idx_name}: {e}")
+                            log_event(
+                                "INDEX_CREATE_FAILED",
+                                f"Failed to create index {idx_name}: {e}",
+                                extra={"index": idx_name, "table": table, "error": str(e)},
+                                source="persistence.database.verify_and_create_indexes",
+                            )
+
+            conn.commit()
+
+            if created > 0:
+                log_event(
+                    "INDEX_VERIFICATION_COMPLETE",
+                    f"Index verification: {verified} verified, {created} created, {len(failed)} failed",
+                    extra={"verified": verified, "created": created, "failed_count": len(failed)},
+                    source="persistence.database.verify_and_create_indexes",
+                )
+
+    except Exception as e:
+        log_event(
+            "INDEX_VERIFICATION_ERROR",
+            f"Index verification failed: {e}",
+            extra={"error": str(e)},
+            source="persistence.database.verify_and_create_indexes",
+        )
+        failed.append(f"verification_error: {e}")
+
+    return {
+        "verified": verified,
+        "created": created,
+        "failed": failed,
+    }
+
+
+def compact_json_encode(data: Union[dict, list, str], compress: bool = True) -> str:
+    """
+    Compact JSON encoding for large context fields.
+
+    Removes whitespace and optionally compresses with zlib for storage efficiency.
+
+    Args:
+        data: Data to encode (dict, list, or already-encoded JSON string).
+        compress: Whether to apply zlib compression (for data >1KB).
+
+    Returns:
+        Compact JSON string, optionally prefixed with 'z:' if compressed.
+    """
+    # Handle already-encoded JSON strings
+    if isinstance(data, str):
+        try:
+            parsed = json.loads(data)
+            compact_json = json.dumps(parsed, separators=(',', ':'), ensure_ascii=False)
+        except json.JSONDecodeError:
+            # Not valid JSON, return as-is
+            return data
+    else:
+        compact_json = json.dumps(data, separators=(',', ':'), ensure_ascii=False)
+
+    # Only compress if beneficial (>1KB and compression enabled)
+    if compress and len(compact_json) > 1024:
+        try:
+            compressed = zlib.compress(compact_json.encode('utf-8'), level=6)
+            # Only use compression if it actually saves space
+            if len(compressed) < len(compact_json):
+                encoded = base64.b64encode(compressed).decode('ascii')
+                return f"z:{encoded}"
+        except Exception:
+            pass  # Fall through to uncompressed
+
+    return compact_json
+
+
+def compact_json_decode(encoded: str) -> Union[dict, list, str]:
+    """
+    Decode compact JSON, decompressing if needed.
+
+    Args:
+        encoded: Encoded string (may be prefixed with 'z:' if compressed).
+
+    Returns:
+        Decoded data (dict, list, or original string if not JSON).
+    """
+    if not encoded:
+        return encoded
+
+    # Handle compressed format
+    if encoded.startswith("z:"):
+        try:
+            compressed = base64.b64decode(encoded[2:])
+            decompressed = zlib.decompress(compressed).decode('utf-8')
+            return json.loads(decompressed)
+        except Exception:
+            return encoded  # Return as-is if decompression fails
+
+    # Handle regular compact JSON
+    try:
+        return json.loads(encoded)
+    except json.JSONDecodeError:
+        return encoded  # Not JSON, return as-is
+
+
+def journal_state_change(
+    table_name: str,
+    operation: str,
+    record_id: str,
+    old_state: Optional[dict] = None,
+    new_state: Optional[dict] = None,
+    description: str = "",
+    user_context: Optional[str] = None,
+    pool: Optional[DatabasePool] = None,
+) -> bool:
+    """
+    Journal critical state changes for auditability.
+
+    Args:
+        table_name: Table where change occurred.
+        operation: Operation type (INSERT, UPDATE, DELETE).
+        record_id: ID of affected record.
+        old_state: Previous state (for UPDATE/DELETE).
+        new_state: New state (for INSERT/UPDATE).
+        description: Human-readable change description.
+        user_context: User/agent making change.
+        pool: Database pool (uses global pool if None).
+
+    Returns:
+        True if journaled successfully.
+    """
+    if pool is None:
+        pool = get_database_pool()
+
+    try:
+        # Use compact encoding for state dicts
+        old_values_json = compact_json_encode(old_state) if old_state else None
+        new_values_json = compact_json_encode(new_state) if new_state else None
+
+        with pool.transaction() as conn:
+            conn.execute(
+                """
+                INSERT INTO database_audit_log (
+                    table_name, operation, record_id, user_context,
+                    old_values, new_values, change_description
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    table_name,
+                    operation,
+                    record_id,
+                    user_context or "system",
+                    old_values_json,
+                    new_values_json,
+                    description,
+                )
+            )
+
+        log_event(
+            "STATE_CHANGE_JOURNALED",
+            f"Journaled {operation} on {table_name}: {record_id}",
+            extra={
+                "table": table_name,
+                "operation": operation,
+                "record_id": record_id,
+                "description": description,
+            },
+            source="persistence.database.journal_state_change",
+        )
+        return True
+
+    except Exception as e:
+        log_event(
+            "STATE_JOURNAL_FAILED",
+            f"Failed to journal state change: {e}",
+            extra={
+                "table": table_name,
+                "operation": operation,
+                "record_id": record_id,
+                "error": str(e),
+            },
+            source="persistence.database.journal_state_change",
+        )
+        return False
+
+
+def get_state_change_history(
+    table_name: Optional[str] = None,
+    record_id: Optional[str] = None,
+    operation: Optional[str] = None,
+    limit: int = 100,
+    pool: Optional[DatabasePool] = None,
+) -> List[Dict[str, Any]]:
+    """
+    Get state change history from audit log.
+
+    Args:
+        table_name: Filter by table (optional).
+        record_id: Filter by record ID (optional).
+        operation: Filter by operation type (optional).
+        limit: Maximum records to return.
+        pool: Database pool (uses global pool if None).
+
+    Returns:
+        List of audit log entries.
+    """
+    if pool is None:
+        pool = get_database_pool()
+
+    query = "SELECT * FROM database_audit_log WHERE 1=1"
+    params = []
+
+    if table_name:
+        query += " AND table_name = ?"
+        params.append(table_name)
+
+    if record_id:
+        query += " AND record_id = ?"
+        params.append(record_id)
+
+    if operation:
+        query += " AND operation = ?"
+        params.append(operation)
+
+    query += " ORDER BY timestamp DESC LIMIT ?"
+    params.append(limit)
+
+    try:
+        with pool.connection() as conn:
+            cursor = conn.execute(query, params)
+            return [dict(row) for row in cursor.fetchall()]
+    except Exception:
+        return []

@@ -229,8 +229,28 @@ def get_health(paths: Optional[ActifixPaths] = None) -> ActifixHealthCheck:
         elif data_disk > disk_threshold_warn:
             warnings.append(f"data/ disk usage high: {data_disk:.1f}%")
 
+    # Check database size growth
+    try:
+        from .persistence.database import check_database_growth
+        db_growth = check_database_growth(
+            warn_threshold_mb=100.0,
+            error_threshold_mb=500.0
+        )
+        if db_growth["status"] == "error":
+            errors.append(db_growth["message"])
+            record_error(
+                message=f"Database size critical: {db_growth['size_mb']}MB",
+                source="health.get_health",
+                error_type="DatabaseGrowthCritical",
+                priority=TicketPriority.P1,
+                capture_context=False,
+            )
+        elif db_growth["status"] == "warning":
+            warnings.append(db_growth["message"])
+    except Exception as e:
+        warnings.append(f"Database size check failed: {e}")
 
-    
+
     # Get ticket stats
     stats = get_ticket_stats(paths)
     open_tickets = stats.get("open", 0)

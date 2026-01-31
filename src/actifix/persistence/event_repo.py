@@ -12,7 +12,9 @@ Version: 2.0.0
 
 import json
 import sqlite3
-from dataclasses import dataclass
+import threading
+import time
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
 
@@ -304,3 +306,171 @@ def reset_event_repository() -> None:
     """Reset the global EventRepository (for testing)."""
     global _global_event_repo
     _global_event_repo = None
+
+
+@dataclass
+class BatchedEventWriter:
+    """
+    Batched event writer for high-volume event logging.
+
+    Accumulates events and writes them in batches to reduce I/O overhead.
+    Thread-safe with automatic flushing on batch size or time interval.
+    """
+
+    batch_size: int = 100
+    flush_interval_seconds: float = 5.0
+    _batch: List[Dict[str, Any]] = field(default_factory=list)
+    _lock: threading.Lock = field(default_factory=threading.Lock)
+    _last_flush: float = field(default_factory=time.time)
+    _flush_thread: Optional[threading.Thread] = None
+    _stop_event: threading.Event = field(default_factory=threading.Event)
+
+    def __post_init__(self):
+        """Start background flush thread."""
+        self._start_flush_thread()
+
+    def _start_flush_thread(self):
+        """Start background thread for periodic flushing."""
+        def flush_loop():
+            while not self._stop_event.wait(self.flush_interval_seconds):
+                self._flush_if_needed(force=False)
+
+        self._flush_thread = threading.Thread(target=flush_loop, daemon=True)
+        self._flush_thread.start()
+
+    def add_event(
+        self,
+        event_type: str,
+        message: str,
+        ticket_id: Optional[str] = None,
+        correlation_id: Optional[str] = None,
+        extra_json: Optional[str] = None,
+        source: Optional[str] = None,
+        level: str = 'INFO',
+        timestamp: Optional[datetime] = None,
+    ) -> None:
+        """
+        Add event to batch (non-blocking).
+
+        Will flush automatically when batch_size reached or flush_interval elapsed.
+        """
+        ts = timestamp or datetime.now(timezone.utc)
+
+        event = {
+            'timestamp': serialize_timestamp(ts),
+            'event_type': event_type,
+            'message': message,
+            'ticket_id': ticket_id,
+            'correlation_id': correlation_id,
+            'extra_json': extra_json,
+            'source': source,
+            'level': level,
+        }
+
+        with self._lock:
+            self._batch.append(event)
+            should_flush = len(self._batch) >= self.batch_size
+
+        if should_flush:
+            self._flush_if_needed(force=True)
+
+    def _flush_if_needed(self, force: bool = False) -> int:
+        """
+        Flush batch if needed.
+
+        Args:
+            force: Force flush regardless of size/time checks.
+
+        Returns:
+            Number of events flushed.
+        """
+        with self._lock:
+            now = time.time()
+            should_flush = (
+                force or
+                len(self._batch) >= self.batch_size or
+                (now - self._last_flush) >= self.flush_interval_seconds
+            )
+
+            if not should_flush or not self._batch:
+                return 0
+
+            batch_to_write = self._batch[:]
+            self._batch.clear()
+            self._last_flush = now
+
+        # Write batch outside lock
+        return self._write_batch(batch_to_write)
+
+    def _write_batch(self, batch: List[Dict[str, Any]]) -> int:
+        """Write batch to database."""
+        if not batch:
+            return 0
+
+        try:
+            pool = get_database_pool()
+            with pool.transaction() as conn:
+                conn.executemany(
+                    """
+                    INSERT INTO event_log
+                    (timestamp, event_type, message, ticket_id, correlation_id, extra_json, source, level)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    [
+                        (
+                            e['timestamp'],
+                            e['event_type'],
+                            e['message'],
+                            e['ticket_id'],
+                            e['correlation_id'],
+                            e['extra_json'],
+                            e['source'],
+                            e['level'],
+                        )
+                        for e in batch
+                    ]
+                )
+            return len(batch)
+        except Exception:
+            # Silently fail to avoid recursive logging errors
+            return 0
+
+    def flush(self) -> int:
+        """Force immediate flush of all pending events."""
+        return self._flush_if_needed(force=True)
+
+    def shutdown(self) -> None:
+        """Shutdown batch writer and flush remaining events."""
+        self._stop_event.set()
+        if self._flush_thread:
+            self._flush_thread.join(timeout=2)
+        self.flush()
+
+
+_global_batched_writer: Optional[BatchedEventWriter] = None
+_batched_writer_lock = threading.Lock()
+
+
+def get_batched_event_writer(
+    batch_size: int = 100,
+    flush_interval: float = 5.0
+) -> BatchedEventWriter:
+    """
+    Get or create the global batched event writer.
+
+    Args:
+        batch_size: Number of events to batch before flushing.
+        flush_interval: Seconds between automatic flushes.
+
+    Returns:
+        BatchedEventWriter singleton.
+    """
+    global _global_batched_writer
+
+    with _batched_writer_lock:
+        if _global_batched_writer is None:
+            _global_batched_writer = BatchedEventWriter(
+                batch_size=batch_size,
+                flush_interval_seconds=flush_interval
+            )
+        return _global_batched_writer
