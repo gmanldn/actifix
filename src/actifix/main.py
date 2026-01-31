@@ -628,6 +628,120 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     return 0 if ok else 1
 
 
+def cmd_prune(args: argparse.Namespace) -> int:
+    """Prune old tickets, logs, and quarantine entries.
+
+    This command removes old data to keep the system lean:
+    - Completed tickets older than specified age
+    - Old log entries
+    - Quarantine entries
+    - Shows summaries before/after pruning
+    """
+    project_root = Path(args.project_root or Path.cwd())
+    dry_run = not args.execute
+    max_age_days = args.max_age_days
+
+    with ActifixContext(project_root=project_root):
+        from .state_paths import get_actifix_paths
+        from datetime import datetime, timezone, timedelta
+
+        paths = get_actifix_paths(project_root=project_root)
+        enforce_raise_af_only(paths)
+
+        print("=== Actifix Prune ===")
+        print(f"Mode: {'DRY RUN' if dry_run else 'EXECUTE'}")
+        print(f"Max age: {max_age_days} days\n")
+
+        cutoff_date = datetime.now(timezone.utc) - timedelta(days=max_age_days)
+
+        # Get statistics before pruning
+        stats_before = get_ticket_stats()
+
+        # 1. Find old completed tickets
+        print("1. Scanning completed tickets...")
+        import sqlite3
+        from .persistence.database import get_database_connection
+
+        conn = get_database_connection(paths)
+        try:
+            cursor = conn.execute(
+                """
+                SELECT id, created_at, updated_at
+                FROM tickets
+                WHERE status = 'Completed'
+                AND completed = 1
+                AND datetime(COALESCE(updated_at, created_at)) < datetime(?)
+                ORDER BY updated_at DESC
+                """,
+                (cutoff_date.isoformat(),)
+            )
+            old_tickets = cursor.fetchall()
+
+            if old_tickets:
+                print(f"   Found {len(old_tickets)} old completed tickets")
+                if args.show_tickets:
+                    for ticket_id, created, updated in old_tickets[:10]:
+                        print(f"   - {ticket_id} (updated: {updated or created})")
+                    if len(old_tickets) > 10:
+                        print(f"   ... and {len(old_tickets) - 10} more")
+
+                if not dry_run:
+                    ticket_ids = [t[0] for t in old_tickets]
+                    placeholders = ','.join('?' * len(ticket_ids))
+                    conn.execute(
+                        f"DELETE FROM tickets WHERE id IN ({placeholders})",
+                        ticket_ids
+                    )
+                    conn.commit()
+                    print(f"   ✓ Deleted {len(old_tickets)} old tickets")
+                else:
+                    print(f"   • Would delete {len(old_tickets)} tickets")
+            else:
+                print("   ✓ No old completed tickets found")
+
+            # 2. Prune quarantine
+            print("\n2. Scanning quarantine...")
+            quarantine_dir = paths.base_dir / "quarantine"
+            quarantine_count = 0
+            if quarantine_dir.exists():
+                for item in quarantine_dir.glob("*"):
+                    if item.is_file():
+                        mtime = datetime.fromtimestamp(item.stat().st_mtime, tz=timezone.utc)
+                        if mtime < cutoff_date:
+                            quarantine_count += 1
+                            if not dry_run:
+                                item.unlink()
+
+            if quarantine_count > 0:
+                if not dry_run:
+                    print(f"   ✓ Deleted {quarantine_count} old quarantine entries")
+                else:
+                    print(f"   • Would delete {quarantine_count} quarantine entries")
+            else:
+                print("   ✓ No old quarantine entries found")
+
+            # 3. Summary
+            print("\n=== Summary ===")
+            stats_after = get_ticket_stats()
+
+            print(f"Tickets before: {stats_before['total']}")
+            if not dry_run:
+                print(f"Tickets after: {stats_after['total']}")
+                print(f"Tickets deleted: {stats_before['total'] - stats_after['total']}")
+            else:
+                print(f"Tickets to delete: {len(old_tickets)}")
+
+            print(f"\nQuarantine entries: {quarantine_count}")
+
+            if dry_run:
+                print("\nRun with --execute to apply changes")
+
+            return 0
+
+        finally:
+            conn.close()
+
+
 def cmd_repair(args: argparse.Namespace) -> int:
     """Fix common database and state issues.
 
@@ -927,6 +1041,25 @@ def main(argv: Optional[list[str]] = None) -> int:
         help="Apply repairs (default is dry-run)",
     )
 
+    # Prune command
+    prune_parser = subparsers.add_parser("prune", help="Prune old tickets and data")
+    prune_parser.add_argument(
+        "--max-age-days",
+        type=int,
+        default=90,
+        help="Maximum age in days for completed tickets (default: 90)",
+    )
+    prune_parser.add_argument(
+        "--execute",
+        action="store_true",
+        help="Apply pruning (default is dry-run)",
+    )
+    prune_parser.add_argument(
+        "--show-tickets",
+        action="store_true",
+        help="Show ticket IDs that will be pruned",
+    )
+
     args = parser.parse_args(argv)
     
     if not args.command:
@@ -952,6 +1085,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         "modules": cmd_modules,
         "doctor": cmd_doctor,
         "repair": cmd_repair,
+        "prune": cmd_prune,
     }
     
     try:
