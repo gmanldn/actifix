@@ -250,6 +250,15 @@ def get_health(paths: Optional[ActifixPaths] = None) -> ActifixHealthCheck:
     except Exception as e:
         warnings.append(f"Database size check failed: {e}")
 
+    # Check database connection pool health
+    try:
+        from .persistence.database import get_database_pool
+        pool = get_database_pool()
+        pool_metrics = pool.get_pool_metrics()
+        if not pool_metrics.get("connection_healthy"):
+            errors.append(f"Database connection unhealthy: {pool_metrics.get('connection_error', 'unknown')}")
+    except Exception as e:
+        warnings.append(f"Connection pool check failed: {e}")
 
     # Get ticket stats
     stats = get_ticket_stats(paths)

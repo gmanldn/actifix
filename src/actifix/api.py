@@ -2670,6 +2670,145 @@ def create_app(
             )
             return jsonify({'error': 'Failed to export schema'}), 500
 
+    @app.route('/api/admin/recover', methods=['POST'])
+    def api_admin_recover():
+        """Safe recovery actions (local-only)."""
+        # Enforce local-only access
+        client_ip = request.remote_addr
+        if client_ip not in ('127.0.0.1', '::1', 'localhost'):
+            return jsonify({'error': 'Admin recovery only available from localhost'}), 403
+
+        try:
+            data = request.get_json() or {}
+            action = data.get('action', '')
+
+            results = {
+                'timestamp': datetime.now(timezone.utc).isoformat(),
+                'action': action,
+                'success': False,
+            }
+
+            if action == 'vacuum':
+                from .persistence.database import run_vacuum
+                results['success'] = run_vacuum()
+                results['message'] = 'Database VACUUM completed' if results['success'] else 'VACUUM failed'
+
+            elif action == 'analyze':
+                from .persistence.database import run_analyze
+                results['success'] = run_analyze()
+                results['message'] = 'Database ANALYZE completed' if results['success'] else 'ANALYZE failed'
+
+            elif action == 'verify_indexes':
+                from .persistence.database import verify_and_create_indexes
+                index_results = verify_and_create_indexes()
+                results['success'] = len(index_results.get('failed', [])) == 0
+                results['indexes'] = index_results
+                results['message'] = f"Verified {index_results['verified']}, created {index_results['created']}"
+
+            elif action == 'checkpoint_wal':
+                from .persistence.database import get_database_pool
+                pool = get_database_pool()
+                with pool.connection() as conn:
+                    cursor = conn.execute("PRAGMA wal_checkpoint(FULL)")
+                    result = cursor.fetchone()
+                    results['success'] = True
+                    results['wal_checkpoint'] = {
+                        'busy': result[0],
+                        'log_frames': result[1],
+                        'checkpointed': result[2],
+                    }
+                    results['message'] = 'WAL checkpoint completed'
+
+            else:
+                results['message'] = f'Unknown action: {action}'
+                results['available_actions'] = ['vacuum', 'analyze', 'verify_indexes', 'checkpoint_wal']
+
+            return jsonify(results)
+
+        except Exception as e:
+            record_error(
+                message=f"Admin recover failed: {e}",
+                source="api.py:api_admin_recover",
+                priority=TicketPriority.P2,
+            )
+            return jsonify({'error': str(e)}), 500
+
+    @app.route('/api/diagnostics', methods=['GET'])
+    def api_diagnostics():
+        """Runtime environment snapshot (redacted)."""
+        try:
+            from .raise_af import redact_secrets_from_text
+            from .persistence.database import get_database_pool
+            import sys
+            import platform as plat
+
+            diagnostics = {
+                'timestamp': datetime.now(timezone.utc).isoformat(),
+                'platform': {
+                    'system': plat.system(),
+                    'release': plat.release(),
+                    'python_version': sys.version,
+                    'machine': plat.machine(),
+                },
+                'database': {},
+                'health': {},
+                'config': {},
+            }
+
+            # Database pool metrics
+            try:
+                pool = get_database_pool()
+                pool_metrics = pool.get_pool_metrics()
+                diagnostics['database'] = {
+                    'connection_healthy': pool_metrics.get('connection_healthy'),
+                    'db_size_mb': pool_metrics.get('db_size_mb'),
+                    'wal_enabled': pool_metrics.get('wal_enabled'),
+                }
+            except Exception:
+                diagnostics['database'] = {'error': 'Unable to get pool metrics'}
+
+            # Health summary
+            try:
+                health = get_health()
+                diagnostics['health'] = {
+                    'healthy': health.healthy,
+                    'status': health.status,
+                    'open_tickets': health.open_tickets,
+                    'sla_breaches': health.sla_breaches,
+                }
+            except Exception:
+                diagnostics['health'] = {'error': 'Unable to get health'}
+
+            # Config summary (redacted)
+            try:
+                config = get_config()
+                diagnostics['config'] = {
+                    'ai_enabled': config.ai_enabled,
+                    'ai_provider': redact_secrets_from_text(config.ai_provider or ''),
+                    'webhook_enabled': config.webhook_enabled,
+                }
+            except Exception:
+                diagnostics['config'] = {'error': 'Unable to get config'}
+
+            # Environment variables (redacted)
+            env_vars = {}
+            for key, value in os.environ.items():
+                if any(secret_word in key.upper() for secret_word in ['KEY', 'SECRET', 'TOKEN', 'PASSWORD']):
+                    env_vars[key] = '[REDACTED]'
+                elif key.startswith('ACTIFIX_'):
+                    env_vars[key] = redact_secrets_from_text(value)
+            diagnostics['env'] = env_vars
+
+            return jsonify(diagnostics)
+
+        except Exception as e:
+            record_error(
+                message=f"Diagnostics failed: {e}",
+                source="api.py:api_diagnostics",
+                priority=TicketPriority.P3,
+            )
+            return jsonify({'error': str(e)}), 500
+
     return app
 
 

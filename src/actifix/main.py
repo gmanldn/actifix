@@ -628,6 +628,112 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     return 0 if ok else 1
 
 
+def cmd_archive(args: argparse.Namespace) -> int:
+    """Archive old completed tickets with checksum verification."""
+    project_root = Path(args.project_root or Path.cwd())
+    output_path = Path(args.output) if args.output else Path("actifix_archive.json")
+    min_age_days = args.min_age_days
+
+    with ActifixContext(project_root=project_root):
+        from .state_paths import get_actifix_paths
+        from .persistence.database import get_database_pool
+        from .raise_af import redact_secrets_from_text
+        from datetime import datetime, timezone, timedelta
+        import json
+        import hashlib
+
+        paths = get_actifix_paths(project_root=project_root)
+        enforce_raise_af_only(paths)
+
+        print("=== Actifix Archive ===")
+        print(f"Output: {output_path}")
+        print(f"Min age: {min_age_days} days\n")
+
+        cutoff_date = datetime.now(timezone.utc) - timedelta(days=min_age_days)
+        pool = get_database_pool(db_path=paths.project_root / "data" / "actifix.db")
+
+        archive_data = {
+            "archived_at": datetime.now(timezone.utc).isoformat(),
+            "version": "1.0",
+            "min_age_days": min_age_days,
+            "cutoff_date": cutoff_date.isoformat(),
+            "tickets": [],
+        }
+
+        with pool.connection() as conn:
+            # Get old completed tickets
+            print("1. Finding old completed tickets...")
+            cursor = conn.execute(
+                """
+                SELECT id, priority, error_type, message, source, created_at,
+                       updated_at, status, completion_summary, documented,
+                       functioning, tested, completed
+                FROM tickets
+                WHERE status = 'Completed' AND created_at < ?
+                ORDER BY created_at DESC
+                """,
+                (cutoff_date.isoformat(),)
+            )
+
+            tickets = []
+            for row in cursor.fetchall():
+                ticket = {
+                    "id": row[0],
+                    "priority": row[1],
+                    "error_type": row[2],
+                    "message": redact_secrets_from_text(row[3]) if row[3] else None,
+                    "source": row[4],
+                    "created_at": row[5],
+                    "updated_at": row[6],
+                    "status": row[7],
+                    "completion_summary": row[8],
+                    "documented": bool(row[9]),
+                    "functioning": bool(row[10]),
+                    "tested": bool(row[11]),
+                    "completed": bool(row[12]),
+                }
+                tickets.append(ticket)
+
+            archive_data["tickets"] = tickets
+            print(f"   ✓ Found {len(tickets)} tickets to archive")
+
+            if len(tickets) == 0:
+                print("\nNo tickets to archive.")
+                return 0
+
+            # Calculate checksum
+            print("\n2. Calculating checksum...")
+            tickets_json = json.dumps(tickets, sort_keys=True)
+            checksum = hashlib.sha256(tickets_json.encode()).hexdigest()
+            archive_data["checksum"] = checksum
+            print(f"   ✓ Checksum: {checksum[:16]}...")
+
+            # Write archive file
+            print("\n3. Writing archive...")
+            with open(output_path, 'w') as f:
+                json.dump(archive_data, f, indent=2)
+            print(f"   ✓ Wrote {output_path}")
+
+            # Delete archived tickets if requested
+            if args.delete_after_archive:
+                print("\n4. Deleting archived tickets...")
+                ticket_ids = [t["id"] for t in tickets]
+                placeholders = ','.join('?' * len(ticket_ids))
+                cursor = conn.execute(
+                    f"DELETE FROM tickets WHERE id IN ({placeholders})",
+                    ticket_ids
+                )
+                conn.commit()
+                print(f"   ✓ Deleted {cursor.rowcount} tickets")
+
+        print("\n=== Archive Complete ===")
+        print(f"Archived: {len(tickets)} tickets")
+        print(f"File: {output_path}")
+        print(f"Checksum: {checksum}")
+
+        return 0
+
+
 def cmd_export(args: argparse.Namespace) -> int:
     """Export tickets and events to a file with redaction.
 
@@ -1222,6 +1328,25 @@ def main(argv: Optional[list[str]] = None) -> int:
         help="Skip ANALYZE operation",
     )
 
+    # Archive command
+    archive_parser = subparsers.add_parser("archive", help="Archive old completed tickets with checksum")
+    archive_parser.add_argument(
+        "--output",
+        type=str,
+        help="Output file path (default: actifix_archive.json)",
+    )
+    archive_parser.add_argument(
+        "--min-age-days",
+        type=int,
+        default=90,
+        help="Minimum age in days for tickets to archive (default: 90)",
+    )
+    archive_parser.add_argument(
+        "--delete-after-archive",
+        action="store_true",
+        help="Delete tickets from database after archiving",
+    )
+
     # Export command
     export_parser = subparsers.add_parser("export", help="Export tickets and events to JSON")
     export_parser.add_argument(
@@ -1258,6 +1383,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         "repair": cmd_repair,
         "prune": cmd_prune,
         "maintenance": cmd_maintenance,
+        "archive": cmd_archive,
         "export": cmd_export,
     }
     

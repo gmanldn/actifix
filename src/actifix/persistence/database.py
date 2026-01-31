@@ -699,6 +699,55 @@ class DatabasePool:
             conn.rollback()
             raise
     
+    def get_pool_metrics(self) -> Dict[str, Any]:
+        """
+        Get database connection pool health metrics.
+
+        Returns:
+            Dict with pool statistics and health indicators.
+        """
+        metrics = {
+            "initialized": self._initialized,
+            "has_connection": hasattr(self._local, 'connection') and self._local.connection is not None,
+            "db_path": str(self.config.db_path),
+            "wal_enabled": self.config.enable_wal,
+        }
+
+        # Add database file size if it exists
+        if self.config.db_path.exists():
+            metrics["db_size_bytes"] = self.config.db_path.stat().st_size
+            metrics["db_size_mb"] = round(metrics["db_size_bytes"] / (1024 * 1024), 2)
+
+        # Test connection health
+        try:
+            with self.connection() as conn:
+                cursor = conn.execute("SELECT 1")
+                if cursor.fetchone():
+                    metrics["connection_healthy"] = True
+                else:
+                    metrics["connection_healthy"] = False
+        except Exception as e:
+            metrics["connection_healthy"] = False
+            metrics["connection_error"] = str(e)
+
+        # Get WAL stats if WAL mode is enabled
+        if self.config.enable_wal and metrics["has_connection"]:
+            try:
+                with self.connection() as conn:
+                    cursor = conn.execute("PRAGMA wal_checkpoint(PASSIVE)")
+                    result = cursor.fetchone()
+                    if result:
+                        busy, log_frames, checkpointed = result
+                        metrics["wal_checkpoint"] = {
+                            "busy": busy,
+                            "log_frames": log_frames,
+                            "checkpointed": checkpointed,
+                        }
+            except Exception:
+                pass
+
+        return metrics
+
     def close(self) -> None:
         """Close connection for current thread."""
         if hasattr(self._local, 'connection') and self._local.connection:

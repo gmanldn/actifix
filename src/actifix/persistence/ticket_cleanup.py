@@ -18,6 +18,15 @@ logger = logging.getLogger(__name__)
 DEFAULT_RETENTION_DAYS = 90  # Keep completed tickets for 90 days
 DEFAULT_TEST_TICKET_RETENTION_DAYS = 7  # Keep test tickets for only 7 days
 
+# Priority-based retention policies (days)
+PRIORITY_RETENTION_DAYS = {
+    'P0': 365,  # Critical tickets: 1 year
+    'P1': 180,  # High priority: 6 months
+    'P2': 90,   # Medium priority: 3 months
+    'P3': 60,   # Low priority: 2 months
+    'P4': 30,   # Lowest priority: 1 month
+}
+
 
 # Test/automation ticket patterns
 TEST_SOURCES = {
@@ -110,19 +119,22 @@ def apply_retention_policy(
     repo,
     retention_days: int = DEFAULT_RETENTION_DAYS,
     test_ticket_retention_days: int = DEFAULT_TEST_TICKET_RETENTION_DAYS,
+    use_priority_policies: bool = True,
     dry_run: bool = True
 ) -> Dict[str, int]:
     """
     Apply retention policy to completed tickets.
 
     This will soft-delete old completed tickets based on retention policies:
+    - Priority-based retention (if use_priority_policies=True)
     - Regular completed tickets older than retention_days
     - Test/automation tickets older than test_ticket_retention_days
 
     Args:
         repo: TicketRepository instance.
-        retention_days: Days to keep regular completed tickets.
+        retention_days: Days to keep regular completed tickets (fallback).
         test_ticket_retention_days: Days to keep test/automation tickets.
+        use_priority_policies: Use priority-based retention (P0=365d, P4=30d).
         dry_run: If True, don't actually delete, just report.
 
     Returns:
@@ -134,6 +146,7 @@ def apply_retention_policy(
         'completed_expired': 0,
         'test_tickets_expired': 0,
         'total_deleted': 0,
+        'by_priority': {},
     }
 
     # Get all completed tickets
@@ -144,12 +157,19 @@ def apply_retention_policy(
     for ticket in completed_tickets:
         age_days = get_ticket_age_days(ticket)
         is_test = is_test_ticket(ticket)
+        priority = ticket.get('priority', 'P2')
 
         should_delete = False
 
         if is_test and age_days > test_ticket_retention_days:
             stats['test_tickets_expired'] += 1
             should_delete = True
+        elif use_priority_policies and priority in PRIORITY_RETENTION_DAYS:
+            # Use priority-based retention
+            priority_retention = PRIORITY_RETENTION_DAYS[priority]
+            if age_days > priority_retention:
+                stats['by_priority'][priority] = stats['by_priority'].get(priority, 0) + 1
+                should_delete = True
         elif not is_test and age_days > retention_days:
             stats['completed_expired'] += 1
             should_delete = True
