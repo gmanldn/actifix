@@ -100,6 +100,11 @@ MODULE_DEFAULTS = {
     "api_max_total_bytes": 100 * 1024 * 1024,  # 100MB max total response
     "api_request_timeout_seconds": 30,  # Max request processing time
     "api_rate_limit_per_minute": 60,  # Max requests per minute per IP
+    # Storage quota enforcement
+    "storage_quota_bytes": 50 * 1024 * 1024,  # 50MB max storage for screenscan data
+    "storage_quota_warning_threshold": 0.8,  # Warn at 80% of quota
+    "cleanup_check_interval_seconds": 300,  # Check storage every 5 minutes
+    "vacuum_on_cleanup": True,  # Run VACUUM to reclaim space
 }
 
 ACCESS_RULE = "local-only"
@@ -235,6 +240,157 @@ def _check_api_rate_limit(client_ip: str, helper: ModuleBase) -> bool:
         return True
 
 
+def _get_storage_usage(db) -> Dict[str, Any]:
+    """Get current storage usage for screenscan tables."""
+    try:
+        conn = db.get_connection()
+        cursor = conn.cursor()
+
+        # Get page count and page size
+        cursor.execute("PRAGMA page_count")
+        page_count = cursor.fetchone()[0]
+
+        cursor.execute("PRAGMA page_size")
+        page_size = cursor.fetchone()[0]
+
+        total_db_bytes = page_count * page_size
+
+        # Get screenscan-specific table sizes
+        cursor.execute("SELECT SUM(bytes) FROM screenscan_frames")
+        row = cursor.fetchone()
+        frames_bytes = row[0] if row and row[0] else 0
+
+        cursor.execute("SELECT COUNT(*) FROM screenscan_frames")
+        frame_count = cursor.fetchone()[0]
+
+        conn.close()
+
+        return {
+            "total_db_bytes": total_db_bytes,
+            "frames_bytes": frames_bytes,
+            "frame_count": frame_count,
+            "estimated_overhead": total_db_bytes - frames_bytes,
+        }
+    except Exception as e:
+        helper = _module_helper()
+        helper.record_module_error(
+            message=f"Failed to get storage usage: {e}",
+            source="modules/screenscan/__init__.py:_get_storage_usage",
+            error_type=type(e).__name__,
+            priority=TicketPriority.P3,
+        )
+        return {
+            "total_db_bytes": 0,
+            "frames_bytes": 0,
+            "frame_count": 0,
+            "estimated_overhead": 0,
+        }
+
+
+def _enforce_storage_quota(db, helper: ModuleBase) -> None:
+    """Enforce storage quota by cleaning up old data and running VACUUM if needed."""
+    try:
+        config = helper.get_config()
+        quota_bytes = config.get("storage_quota_bytes", 50 * 1024 * 1024)
+        warning_threshold = config.get("storage_quota_warning_threshold", 0.8)
+        vacuum_enabled = config.get("vacuum_on_cleanup", True)
+
+        usage = _get_storage_usage(db)
+        current_bytes = usage["total_db_bytes"]
+        utilization = current_bytes / quota_bytes if quota_bytes > 0 else 0
+
+        # Check if we're approaching or exceeding quota
+        if utilization >= 1.0:
+            # Quota exceeded - force cleanup
+            helper.record_module_error(
+                message=f"Storage quota exceeded: {current_bytes}/{quota_bytes} bytes ({utilization:.1%})",
+                source="modules/screenscan/__init__.py:_enforce_storage_quota",
+                error_type="QuotaExceeded",
+                priority=TicketPriority.P2,
+            )
+
+            record_agent_voice(
+                module_key="screenscan",
+                action="storage_quota_exceeded",
+                level="ERROR",
+                details=f"Storage quota exceeded: {current_bytes}/{quota_bytes} bytes, triggering cleanup",
+            )
+
+            # Delete oldest frames to free space
+            conn = db.get_connection()
+            cursor = conn.cursor()
+
+            # Keep only the newest 50% of frames
+            cursor.execute("SELECT COUNT(*) FROM screenscan_frames")
+            total_frames = cursor.fetchone()[0]
+            frames_to_delete = total_frames // 2
+
+            if frames_to_delete > 0:
+                cursor.execute("""
+                    DELETE FROM screenscan_frames
+                    WHERE frame_seq IN (
+                        SELECT frame_seq FROM screenscan_frames
+                        ORDER BY frame_seq ASC
+                        LIMIT ?
+                    )
+                """, (frames_to_delete,))
+                conn.commit()
+
+                record_agent_voice(
+                    module_key="screenscan",
+                    action="quota_cleanup",
+                    level="WARNING",
+                    details=f"Deleted {frames_to_delete} oldest frames to reclaim storage",
+                )
+
+            conn.close()
+
+            # Run VACUUM to reclaim space
+            if vacuum_enabled:
+                _vacuum_database(db, helper)
+
+        elif utilization >= warning_threshold:
+            # Approaching quota - warn
+            record_agent_voice(
+                module_key="screenscan",
+                action="storage_quota_warning",
+                level="WARNING",
+                details=f"Storage approaching quota: {current_bytes}/{quota_bytes} bytes ({utilization:.1%})",
+            )
+
+    except Exception as e:
+        helper.record_module_error(
+            message=f"Failed to enforce storage quota: {e}",
+            source="modules/screenscan/__init__.py:_enforce_storage_quota",
+            error_type=type(e).__name__,
+            priority=TicketPriority.P3,
+        )
+
+
+def _vacuum_database(db, helper: ModuleBase) -> None:
+    """Run VACUUM to reclaim deleted space."""
+    try:
+        conn = db.get_connection()
+        # VACUUM must be run outside a transaction
+        conn.isolation_level = None
+        cursor = conn.cursor()
+        cursor.execute("VACUUM")
+        conn.close()
+
+        record_agent_voice(
+            module_key="screenscan",
+            action="vacuum_complete",
+            details="Database VACUUM completed successfully",
+        )
+    except Exception as e:
+        helper.record_module_error(
+            message=f"Failed to VACUUM database: {e}",
+            source="modules/screenscan/__init__.py:_vacuum_database",
+            error_type=type(e).__name__,
+            priority=TicketPriority.P3,
+        )
+
+
 def _start_capture_worker(
     project_root: Optional[Union[str, Path]] = None,
     fps: int = 2,
@@ -314,6 +470,9 @@ def _run_capture_loop(
     platform_name = platform.system()
     backend = _detect_capture_backend(platform_name, project_root, helper)
 
+    config = helper.get_config()
+    cleanup_interval = config.get("cleanup_check_interval_seconds", 300)
+
     record_agent_voice(
         module_key="screenscan",
         action="worker_start",
@@ -321,10 +480,13 @@ def _run_capture_loop(
     )
 
     last_capture = time.time()
+    last_cleanup_check = time.time()
     frame_count = 0
 
     while _worker_running:
         now = time.time()
+
+        # Capture frames
         if now - last_capture >= interval:
             try:
                 frame_data = _capture_frame(backend, project_root, helper)
@@ -339,6 +501,19 @@ def _run_capture_loop(
                     priority=TicketPriority.P3,
                 )
             last_capture = now
+
+        # Periodic storage quota check
+        if now - last_cleanup_check >= cleanup_interval:
+            try:
+                _enforce_storage_quota(db, helper)
+            except Exception as e:
+                helper.record_module_error(
+                    message=f"Storage quota enforcement failed: {e}",
+                    source="modules/screenscan/__init__.py:worker",
+                    error_type=type(e).__name__,
+                    priority=TicketPriority.P3,
+                )
+            last_cleanup_check = now
 
         time.sleep(0.01)  # 10ms sleep to avoid busy-waiting
 
@@ -639,11 +814,23 @@ def create_blueprint(
 
                 conn.close()
 
+                # Get storage usage
+                usage = _get_storage_usage(db)
+                config = helper.get_config()
+                quota = config.get("storage_quota_bytes", 50 * 1024 * 1024)
+
                 return jsonify({
                     "frames": frame_count,
                     "last_capture": last_capture,
                     "fps": MODULE_DEFAULTS["fps"],
                     "retention_seconds": MODULE_DEFAULTS["retention_seconds"],
+                    "storage": {
+                        "used_bytes": usage["total_db_bytes"],
+                        "quota_bytes": quota,
+                        "utilization": usage["total_db_bytes"] / quota if quota > 0 else 0,
+                        "frames_bytes": usage["frames_bytes"],
+                        "frame_count": usage["frame_count"],
+                    }
                 })
             except Exception as e:
                 return jsonify({"error": str(e)}), 500
