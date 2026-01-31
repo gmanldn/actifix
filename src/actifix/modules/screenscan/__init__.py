@@ -597,9 +597,14 @@ def create_blueprint(
     """Create the Flask blueprint that serves screenscan API endpoints."""
     helper = _module_helper(project_root)
     try:
-        from flask import Blueprint, jsonify, request
+        from flask import Blueprint, jsonify, request, Response
 
         blueprint = Blueprint("screenscan", __name__, url_prefix=url_prefix)
+
+        @blueprint.route("/")
+        def index():
+            """Serve the screenscan UI panel."""
+            return Response(_HTML_PAGE, mimetype="text/html")
 
         @blueprint.route("/health")
         def health():
@@ -828,3 +833,263 @@ def stop_module(project_root: Optional[Union[str, Path]] = None) -> None:
             error_type=type(exc).__name__,
             priority=TicketPriority.P1,
         )
+
+
+# HTML page for screenscan UI panel
+_HTML_PAGE = """<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Screenscan Monitor</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: #1a202c;
+      padding: 24px;
+      min-height: 100vh;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    header {
+      background: white;
+      border-radius: 12px;
+      padding: 24px 32px;
+      margin-bottom: 24px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    h1 {
+      font-size: 28px;
+      font-weight: 700;
+      color: #2d3748;
+      margin-bottom: 8px;
+    }
+    .subtitle {
+      color: #718096;
+      font-size: 14px;
+    }
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .stat-card {
+      background: white;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    .stat-label {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #a0aec0;
+      margin-bottom: 8px;
+      font-weight: 600;
+    }
+    .stat-value {
+      font-size: 32px;
+      font-weight: 700;
+      color: #2d3748;
+    }
+    .stat-unit {
+      font-size: 14px;
+      color: #718096;
+      margin-left: 4px;
+    }
+    .frames-panel {
+      background: white;
+      border-radius: 12px;
+      padding: 24px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    .panel-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: #2d3748;
+      margin-bottom: 16px;
+    }
+    .frames-list {
+      max-height: 400px;
+      overflow-y: auto;
+    }
+    .frame-item {
+      border-bottom: 1px solid #e2e8f0;
+      padding: 12px 0;
+      display: grid;
+      grid-template-columns: 80px 150px 100px 100px 1fr;
+      gap: 16px;
+      align-items: center;
+      font-size: 14px;
+    }
+    .frame-item:last-child {
+      border-bottom: none;
+    }
+    .frame-seq {
+      font-weight: 600;
+      color: #667eea;
+    }
+    .frame-time {
+      color: #718096;
+      font-size: 12px;
+    }
+    .frame-size {
+      color: #4a5568;
+    }
+    .frame-dims {
+      color: #718096;
+      font-size: 12px;
+    }
+    .status-dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-right: 6px;
+    }
+    .status-running { background-color: #48bb78; }
+    .status-stopped { background-color: #f56565; }
+    .refresh-btn {
+      background: #667eea;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+      margin-top: 16px;
+    }
+    .refresh-btn:hover {
+      background: #5a67d8;
+    }
+    .error {
+      background: #fed7d7;
+      color: #c53030;
+      padding: 12px 16px;
+      border-radius: 6px;
+      margin-bottom: 16px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Screenscan Monitor</h1>
+      <p class="subtitle">Real-time screen capture monitoring and frame statistics</p>
+    </header>
+
+    <div id="error-container"></div>
+
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">Worker Status</div>
+        <div class="stat-value" id="worker-status">
+          <span class="status-dot status-stopped"></span>
+          <span id="status-text">Loading...</span>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Total Frames</div>
+        <div class="stat-value">
+          <span id="frame-count">-</span>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Capture Rate</div>
+        <div class="stat-value">
+          <span id="fps">-</span>
+          <span class="stat-unit">fps</span>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Retention</div>
+        <div class="stat-value">
+          <span id="retention">-</span>
+          <span class="stat-unit">sec</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="frames-panel">
+      <div class="panel-title">Recent Frames</div>
+      <div class="frames-list" id="frames-list">
+        <p style="color: #a0aec0; text-align: center; padding: 32px;">Loading frames...</p>
+      </div>
+      <button class="refresh-btn" onclick="loadData()">Refresh</button>
+    </div>
+  </div>
+
+  <script>
+    async function loadData() {
+      try {
+        // Load stats
+        const statsResp = await fetch('/modules/screenscan/stats');
+        const stats = await statsResp.json();
+
+        document.getElementById('frame-count').textContent = stats.frames || 0;
+        document.getElementById('fps').textContent = stats.fps || 2;
+        document.getElementById('retention').textContent = stats.retention_seconds || 60;
+
+        // Load health
+        const healthResp = await fetch('/modules/screenscan/health');
+        const health = await healthResp.json();
+
+        const statusDot = document.querySelector('.status-dot');
+        const statusText = document.getElementById('status-text');
+
+        if (health.worker_running) {
+          statusDot.className = 'status-dot status-running';
+          statusText.textContent = 'Running';
+        } else {
+          statusDot.className = 'status-dot status-stopped';
+          statusText.textContent = 'Stopped';
+        }
+
+        // Load frames (metadata only)
+        const framesResp = await fetch('/modules/screenscan/frames?limit=20&include_data=0');
+        const framesData = await framesResp.json();
+
+        const framesList = document.getElementById('frames-list');
+        if (framesData.frames && framesData.frames.length > 0) {
+          framesList.innerHTML = framesData.frames.map(f => {
+            const time = new Date(f.captured_at).toLocaleTimeString();
+            const size = (f.bytes / 1024).toFixed(1);
+            const dims = f.width && f.height ? `${f.width}×${f.height}` : 'N/A';
+            return `
+              <div class="frame-item">
+                <div class="frame-seq">#${f.frame_seq}</div>
+                <div class="frame-time">${time}</div>
+                <div class="frame-size">${size} KB</div>
+                <div class="frame-dims">${dims}</div>
+                <div>${f.format.toUpperCase()}</div>
+              </div>
+            `;
+          }).join('');
+        } else {
+          framesList.innerHTML = '<p style="color: #a0aec0; text-align: center; padding: 32px;">No frames captured yet</p>';
+        }
+
+        // Clear errors
+        document.getElementById('error-container').innerHTML = '';
+      } catch (err) {
+        document.getElementById('error-container').innerHTML = `
+          <div class="error">Failed to load screenscan data: ${err.message}</div>
+        `;
+      }
+    }
+
+    // Load data on page load
+    loadData();
+
+    // Auto-refresh every 5 seconds
+    setInterval(loadData, 5000);
+  </script>
+</body>
+</html>
+"""
