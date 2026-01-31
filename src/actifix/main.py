@@ -44,6 +44,40 @@ def cmd_health(args: argparse.Namespace) -> int:
         return 0 if health.healthy else 1
 
 
+def cmd_status(args: argparse.Namespace) -> int:
+    """Show concise runtime summary."""
+    with ActifixContext(project_root=Path(args.project_root or Path.cwd())):
+        from datetime import datetime, timezone
+
+        # Get ticket stats
+        stats = get_ticket_stats()
+
+        # Get health summary
+        health = run_health_check(print_report=False)
+
+        print("=== Actifix Runtime Status ===")
+        print(f"Timestamp: {datetime.now(timezone.utc).isoformat()}")
+        print(f"Health: {'OK' if health.healthy else 'DEGRADED'}")
+        print()
+
+        print("--- Tickets ---")
+        print(f"Open: {stats.get('open', 0)}")
+        print(f"Completed: {stats.get('completed', 0)}")
+        print(f"In Progress: {stats.get('in_progress', 0)}")
+
+        if health.sla_breaches and health.sla_breaches > 0:
+            print(f"\n⚠ SLA Breaches: {health.sla_breaches}")
+
+        print("\n--- By Priority ---")
+        by_priority = stats.get('by_priority', {})
+        for priority in ['P0', 'P1', 'P2', 'P3', 'P4']:
+            count = by_priority.get(priority, 0)
+            if count > 0:
+                print(f"{priority}: {count}")
+
+        return 0 if health.healthy else 1
+
+
 def cmd_record(args: argparse.Namespace) -> int:
     """Record an error manually."""
     with ActifixContext(project_root=Path(args.project_root or Path.cwd())):
@@ -576,7 +610,10 @@ def main(argv: Optional[list[str]] = None) -> int:
     
     # Health command
     health_parser = subparsers.add_parser("health", help="Run health check")
-    
+
+    # Status command
+    status_parser = subparsers.add_parser("status", help="Show concise runtime summary")
+
     # Record command
     record_parser = subparsers.add_parser("record", help="Record an error")
     record_parser.add_argument("error_type", help="Error type")
@@ -719,6 +756,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     commands = {
         "init": cmd_init,
         "health": cmd_health,
+        "status": cmd_status,
         "record": cmd_record,
         "process": cmd_process,
         "stats": cmd_stats,
