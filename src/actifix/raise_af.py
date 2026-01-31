@@ -336,7 +336,19 @@ def enforce_raise_af_only(
     origin = (change_origin or os.getenv(ACTIFIX_CHANGE_ORIGIN_ENV, "")).strip().lower()
     if origin != "raise_af":
         raise PermissionError(
-            "Raise_AF policy enforced: set ACTIFIX_CHANGE_ORIGIN=raise_af and begin changes via actifix.raise_af.record_error()."
+            "\n" + "="*80 + "\n"
+            "ACTIFIX CHANGE GATE VIOLATION\n"
+            + "="*80 + "\n\n"
+            "All operations that modify Actifix require ACTIFIX_CHANGE_ORIGIN=raise_af\n\n"
+            "This gate ensures:\n"
+            "  • Every change is tracked via a Raise_AF ticket\n"
+            "  • Changes are documented and auditable\n"
+            "  • AI assistants have context for improvements\n\n"
+            "To fix:\n"
+            "  export ACTIFIX_CHANGE_ORIGIN=raise_af\n\n"
+            "Or for a single command:\n"
+            "  ACTIFIX_CHANGE_ORIGIN=raise_af python your_script.py\n"
+            + "="*80
         )
 
 

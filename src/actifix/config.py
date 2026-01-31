@@ -516,3 +516,51 @@ def reset_config() -> None:
     """Reset the global configuration to None."""
     global _config
     _config = None
+
+
+# Runtime toggles for safe mode and debug logging
+def is_safe_mode() -> bool:
+    """Check if safe mode is enabled (disables optional modules)."""
+    import os
+    return os.getenv("ACTIFIX_SAFE_MODE", "").lower() in ("1", "true", "yes")
+
+
+def get_debug_level() -> str:
+    """Get debug logging level from environment."""
+    import os
+    return os.getenv("ACTIFIX_DEBUG_LEVEL", "INFO").upper()
+
+
+def is_debug_enabled(component: str = "") -> bool:
+    """Check if debug logging is enabled for a component."""
+    import os
+    debug_components = os.getenv("ACTIFIX_DEBUG", "").lower()
+    if debug_components in ("1", "true", "all", "*"):
+        return True
+    if component and component.lower() in debug_components.split(","):
+        return True
+    return False
+
+
+def log_config_overrides() -> None:
+    """Log all active config overrides at startup."""
+    import os
+    from actifix.log_utils import log_event
+    
+    overrides = {}
+    env_prefixes = ["ACTIFIX_", "FLASK_", "PYTHON"]
+    
+    for key, value in os.environ.items():
+        if any(key.startswith(prefix) for prefix in env_prefixes):
+            # Redact sensitive values
+            if any(secret in key.upper() for secret in ["KEY", "SECRET", "PASSWORD", "TOKEN"]):
+                value = "***REDACTED***"
+            overrides[key] = value
+    
+    if overrides:
+        log_event(
+            "CONFIG_OVERRIDES_DETECTED",
+            f"Detected {len(overrides)} config overrides",
+            extra={"overrides": overrides},
+            source="config.py:log_config_overrides"
+        )
