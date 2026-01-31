@@ -89,6 +89,12 @@ MODULE_DEFAULTS = {
     "max_frame_bytes": 512 * 1024,  # Max 512KB per frame
     "enable_in_prod": False,  # SC-013: Require explicit enable in production
     "use_fake_provider": False,  # For testing (SC-016)
+    "restart_policy_enabled": True,  # Auto-restart worker on crash
+    "max_restart_attempts": 5,  # Max restarts within restart_window_seconds
+    "restart_window_seconds": 300,  # 5 minute window for counting restarts
+    "initial_backoff_seconds": 1,  # Initial backoff delay
+    "max_backoff_seconds": 60,  # Max backoff delay
+    "backoff_multiplier": 2,  # Exponential backoff multiplier
 }
 
 ACCESS_RULE = "local-only"
@@ -116,6 +122,8 @@ MODULE_DEPENDENCIES = [
 _worker_thread: Optional[threading.Thread] = None
 _worker_running = False
 _worker_lock = threading.Lock()
+_restart_attempts: list[float] = []  # Timestamps of restart attempts
+_current_backoff = 1  # Current backoff delay in seconds
 
 
 def _module_helper(project_root: Optional[Union[str, Path]] = None) -> ModuleBase:
@@ -128,13 +136,66 @@ def _module_helper(project_root: Optional[Union[str, Path]] = None) -> ModuleBas
     )
 
 
+def _should_restart_worker(helper: ModuleBase) -> bool:
+    """Check if worker should be restarted based on restart policy."""
+    global _restart_attempts, _current_backoff
+
+    config = helper.get_config()
+    if not config.get("restart_policy_enabled", True):
+        return False
+
+    max_attempts = config.get("max_restart_attempts", 5)
+    window_seconds = config.get("restart_window_seconds", 300)
+
+    # Clean up old restart attempts outside the window
+    now = time.time()
+    _restart_attempts = [t for t in _restart_attempts if now - t < window_seconds]
+
+    # Check if we've exceeded max restarts in the window
+    if len(_restart_attempts) >= max_attempts:
+        helper.record_module_error(
+            message=f"Screenscan worker exceeded {max_attempts} restarts in {window_seconds}s window. Restart policy disabled.",
+            source="modules/screenscan/__init__.py:_should_restart_worker",
+            error_type="RestartLimitExceeded",
+            priority=TicketPriority.P1,
+        )
+        record_agent_voice(
+            module_key="screenscan",
+            action="restart_limit_exceeded",
+            level="ERROR",
+            details=f"Worker restart limit exceeded: {len(_restart_attempts)} attempts in {window_seconds}s",
+        )
+        return False
+
+    return True
+
+
+def _calculate_backoff(helper: ModuleBase) -> float:
+    """Calculate exponential backoff delay for worker restart."""
+    global _current_backoff
+
+    config = helper.get_config()
+    initial_backoff = config.get("initial_backoff_seconds", 1)
+    max_backoff = config.get("max_backoff_seconds", 60)
+    multiplier = config.get("backoff_multiplier", 2)
+
+    # First restart uses initial backoff
+    if not _restart_attempts:
+        _current_backoff = initial_backoff
+    else:
+        # Exponential backoff with multiplier
+        _current_backoff = min(_current_backoff * multiplier, max_backoff)
+
+    return _current_backoff
+
+
 def _start_capture_worker(
     project_root: Optional[Union[str, Path]] = None,
     fps: int = 2,
     retention_seconds: int = 60,
 ) -> None:
-    """Start the background capture worker thread."""
-    global _worker_thread, _worker_running
+    """Start the background capture worker thread with restart policy."""
+    global _worker_thread, _worker_running, _restart_attempts
 
     with _worker_lock:
         if _worker_running:
@@ -143,69 +204,103 @@ def _start_capture_worker(
         _worker_running = True
         helper = _module_helper(project_root)
 
-        def worker():
-            """Background worker that captures screenshots periodically."""
-            global _worker_running
-            try:
-                from actifix.persistence import get_database
-                import platform
+        def worker_with_restart():
+            """Background worker wrapper with automatic restart policy."""
+            global _worker_running, _restart_attempts, _current_backoff
 
-                db = get_database(project_root)
+            while _worker_running:
+                try:
+                    _run_capture_loop(project_root, fps, retention_seconds, helper)
+                except Exception as exc:
+                    helper.record_module_error(
+                        message=f"Screenscan worker crashed: {exc}",
+                        source="modules/screenscan/__init__.py:worker",
+                        error_type=type(exc).__name__,
+                        priority=TicketPriority.P1,
+                    )
 
-                # Ensure schema exists
-                _ensure_screenscan_schema(db)
+                    if not _worker_running:
+                        break
 
-                interval = 1.0 / fps
-                platform_name = platform.system()
-                backend = _detect_capture_backend(platform_name, project_root, helper)
+                    # Check restart policy
+                    if not _should_restart_worker(helper):
+                        with _worker_lock:
+                            _worker_running = False
+                        break
 
-                record_agent_voice(
-                    module_key="screenscan",
-                    action="worker_start",
-                    details=f"Starting screenscan worker (fps={fps}, retention={retention_seconds}s, backend={backend})",
-                )
+                    # Record restart attempt
+                    _restart_attempts.append(time.time())
+                    backoff = _calculate_backoff(helper)
 
-                last_capture = time.time()
-                frame_count = 0
+                    record_agent_voice(
+                        module_key="screenscan",
+                        action="worker_restart",
+                        level="WARNING",
+                        details=f"Restarting screenscan worker after crash. Backoff: {backoff}s, attempt {len(_restart_attempts)}",
+                    )
 
-                while _worker_running:
-                    now = time.time()
-                    if now - last_capture >= interval:
-                        try:
-                            frame_data = _capture_frame(backend, project_root, helper)
-                            if frame_data:
-                                _store_frame(db, frame_data, retention_seconds, fps)
-                                frame_count += 1
-                        except Exception as e:
-                            helper.record_module_error(
-                                message=f"Frame capture failed: {e}",
-                                source="modules/screenscan/__init__.py:worker",
-                                error_type=type(e).__name__,
-                                priority=TicketPriority.P3,
-                            )
-                        last_capture = now
+                    # Wait with backoff before restarting
+                    time.sleep(backoff)
 
-                    time.sleep(0.01)  # 10ms sleep to avoid busy-waiting
+            with _worker_lock:
+                _worker_running = False
 
-                record_agent_voice(
-                    module_key="screenscan",
-                    action="worker_stop",
-                    details=f"Screenscan worker stopped after {frame_count} frames",
-                )
-            except Exception as exc:
-                helper = _module_helper(project_root)
-                helper.record_module_error(
-                    message=f"Screenscan worker crashed: {exc}",
-                    source="modules/screenscan/__init__.py:worker",
-                    error_type=type(exc).__name__,
-                    priority=TicketPriority.P1,
-                )
-            finally:
-                with _worker_lock:
-                    _worker_running = False
-
-        _worker_thread = threading.Thread(target=worker, daemon=True, name="screenscan-worker")
+        _worker_thread = threading.Thread(target=worker_with_restart, daemon=True, name="screenscan-worker")
         _worker_thread.start()
+
+
+def _run_capture_loop(
+    project_root: Optional[Union[str, Path]],
+    fps: int,
+    retention_seconds: int,
+    helper: ModuleBase,
+) -> None:
+    """Run the main capture loop (extracted for restart policy)."""
+    from actifix.persistence import get_database
+    import platform
+
+    db = get_database(project_root)
+
+    # Ensure schema exists
+    _ensure_screenscan_schema(db)
+
+    interval = 1.0 / fps
+    platform_name = platform.system()
+    backend = _detect_capture_backend(platform_name, project_root, helper)
+
+    record_agent_voice(
+        module_key="screenscan",
+        action="worker_start",
+        details=f"Starting screenscan worker (fps={fps}, retention={retention_seconds}s, backend={backend})",
+    )
+
+    last_capture = time.time()
+    frame_count = 0
+
+    while _worker_running:
+        now = time.time()
+        if now - last_capture >= interval:
+            try:
+                frame_data = _capture_frame(backend, project_root, helper)
+                if frame_data:
+                    _store_frame(db, frame_data, retention_seconds, fps)
+                    frame_count += 1
+            except Exception as e:
+                helper.record_module_error(
+                    message=f"Frame capture failed: {e}",
+                    source="modules/screenscan/__init__.py:worker",
+                    error_type=type(e).__name__,
+                    priority=TicketPriority.P3,
+                )
+            last_capture = now
+
+        time.sleep(0.01)  # 10ms sleep to avoid busy-waiting
+
+    record_agent_voice(
+        module_key="screenscan",
+        action="worker_stop",
+        details=f"Screenscan worker stopped after {frame_count} frames",
+    )
 
 
 def _stop_capture_worker() -> None:
