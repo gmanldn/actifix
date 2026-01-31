@@ -628,6 +628,118 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     return 0 if ok else 1
 
 
+def cmd_export(args: argparse.Namespace) -> int:
+    """Export tickets and events to a file with redaction.
+
+    This command exports data in JSON format for backup/analysis:
+    - Tickets with metadata
+    - Event logs
+    - Redacts sensitive information (secrets, tokens, etc.)
+    """
+    project_root = Path(args.project_root or Path.cwd())
+    output_path = Path(args.output) if args.output else Path("actifix_export.json")
+
+    with ActifixContext(project_root=project_root):
+        from .state_paths import get_actifix_paths
+        from .persistence.database import get_database_connection
+        from .raise_af import redact_secrets_from_text
+        from datetime import datetime, timezone
+        import json
+
+        paths = get_actifix_paths(project_root=project_root)
+        enforce_raise_af_only(paths)
+
+        print("=== Actifix Export ===")
+        print(f"Output: {output_path}\n")
+
+        export_data = {
+            "exported_at": datetime.now(timezone.utc).isoformat(),
+            "version": "1.0",
+            "tickets": [],
+            "events": [],
+        }
+
+        conn = get_database_connection(paths)
+        try:
+            # Export tickets
+            print("1. Exporting tickets...")
+            cursor = conn.execute(
+                """
+                SELECT id, priority, error_type, message, source, created_at,
+                       updated_at, status, documented, functioning, tested, completed
+                FROM tickets
+                ORDER BY created_at DESC
+                """
+            )
+
+            tickets = []
+            for row in cursor.fetchall():
+                ticket = {
+                    "id": row[0],
+                    "priority": row[1],
+                    "error_type": row[2],
+                    "message": redact_secrets_from_text(row[3]) if row[3] else None,
+                    "source": row[4],
+                    "created_at": row[5],
+                    "updated_at": row[6],
+                    "status": row[7],
+                    "documented": bool(row[8]),
+                    "functioning": bool(row[9]),
+                    "tested": bool(row[10]),
+                    "completed": bool(row[11]),
+                }
+                tickets.append(ticket)
+
+            export_data["tickets"] = tickets
+            print(f"   ✓ Exported {len(tickets)} tickets")
+
+            # Export events (if table exists)
+            print("\n2. Exporting events...")
+            try:
+                cursor = conn.execute(
+                    """
+                    SELECT event_type, message, level, source, timestamp
+                    FROM events
+                    ORDER BY timestamp DESC
+                    LIMIT 1000
+                    """
+                )
+
+                events = []
+                for row in cursor.fetchall():
+                    event = {
+                        "event_type": row[0],
+                        "message": redact_secrets_from_text(row[1]) if row[1] else None,
+                        "level": row[2],
+                        "source": row[3],
+                        "timestamp": row[4],
+                    }
+                    events.append(event)
+
+                export_data["events"] = events
+                print(f"   ✓ Exported {len(events)} events (limited to 1000)")
+            except Exception as e:
+                print(f"   • Events table not available: {e}")
+
+            # Write to file
+            print("\n3. Writing export file...")
+            with open(output_path, 'w') as f:
+                json.dump(export_data, f, indent=2)
+
+            print(f"   ✓ Export written to {output_path}")
+
+            # Summary
+            print("\n=== Summary ===")
+            print(f"Tickets exported: {len(export_data['tickets'])}")
+            print(f"Events exported: {len(export_data['events'])}")
+            print(f"File size: {output_path.stat().st_size:,} bytes")
+
+            return 0
+
+        finally:
+            conn.close()
+
+
 def cmd_prune(args: argparse.Namespace) -> int:
     """Prune old tickets, logs, and quarantine entries.
 
@@ -1060,6 +1172,15 @@ def main(argv: Optional[list[str]] = None) -> int:
         help="Show ticket IDs that will be pruned",
     )
 
+    # Export command
+    export_parser = subparsers.add_parser("export", help="Export tickets and events to JSON")
+    export_parser.add_argument(
+        "--output",
+        "-o",
+        type=str,
+        help="Output file path (default: actifix_export.json)",
+    )
+
     args = parser.parse_args(argv)
     
     if not args.command:
@@ -1086,6 +1207,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         "doctor": cmd_doctor,
         "repair": cmd_repair,
         "prune": cmd_prune,
+        "export": cmd_export,
     }
     
     try:
