@@ -105,6 +105,10 @@ MODULE_DEFAULTS = {
     "storage_quota_warning_threshold": 0.8,  # Warn at 80% of quota
     "cleanup_check_interval_seconds": 300,  # Check storage every 5 minutes
     "vacuum_on_cleanup": True,  # Run VACUUM to reclaim space
+    # Alerting thresholds
+    "lag_alert_threshold_seconds": 5.0,  # Alert if capture lags behind by this much
+    "failure_alert_threshold": 10,  # Alert after N consecutive capture failures
+    "restart_alert_enabled": True,  # Alert on worker restarts
 }
 
 ACCESS_RULE = "local-only"
@@ -138,6 +142,10 @@ _current_backoff = 1  # Current backoff delay in seconds
 # API rate limiting state (IP -> list of request timestamps)
 _api_request_log: Dict[str, list[float]] = {}
 _api_rate_lock = threading.Lock()
+
+# Capture health tracking
+_consecutive_failures = 0
+_last_lag_alert = 0.0  # Timestamp of last lag alert
 
 
 def _module_helper(project_root: Optional[Union[str, Path]] = None) -> ModuleBase:
@@ -457,7 +465,9 @@ def _run_capture_loop(
     retention_seconds: int,
     helper: ModuleBase,
 ) -> None:
-    """Run the main capture loop (extracted for restart policy)."""
+    """Run the main capture loop with lag detection and alerting."""
+    global _consecutive_failures, _last_lag_alert
+
     from actifix.persistence import get_database
     import platform
 
@@ -472,6 +482,8 @@ def _run_capture_loop(
 
     config = helper.get_config()
     cleanup_interval = config.get("cleanup_check_interval_seconds", 300)
+    lag_threshold = config.get("lag_alert_threshold_seconds", 5.0)
+    failure_threshold = config.get("failure_alert_threshold", 10)
 
     record_agent_voice(
         module_key="screenscan",
@@ -481,6 +493,7 @@ def _run_capture_loop(
 
     last_capture = time.time()
     last_cleanup_check = time.time()
+    expected_capture_time = time.time()
     frame_count = 0
 
     while _worker_running:
@@ -488,19 +501,64 @@ def _run_capture_loop(
 
         # Capture frames
         if now - last_capture >= interval:
+            # Check for lag (actual time vs expected time)
+            lag = now - expected_capture_time
+            if lag > lag_threshold:
+                # Alert on excessive lag (but rate-limit to once per minute)
+                if now - _last_lag_alert > 60.0:
+                    helper.record_module_error(
+                        message=f"Screenscan capture lag detected: {lag:.2f}s behind schedule",
+                        source="modules/screenscan/__init__.py:worker",
+                        error_type="CaptureLag",
+                        priority=TicketPriority.P3,
+                    )
+
+                    record_agent_voice(
+                        module_key="screenscan",
+                        action="capture_lag_detected",
+                        level="WARNING",
+                        details=f"Capture lagging {lag:.2f}s behind schedule (threshold: {lag_threshold}s)",
+                    )
+                    _last_lag_alert = now
+
             try:
                 frame_data = _capture_frame(backend, project_root, helper)
                 if frame_data:
                     _store_frame(db, frame_data, retention_seconds, fps)
                     frame_count += 1
+                    _consecutive_failures = 0  # Reset failure counter on success
+                else:
+                    _consecutive_failures += 1
             except Exception as e:
+                _consecutive_failures += 1
                 helper.record_module_error(
                     message=f"Frame capture failed: {e}",
                     source="modules/screenscan/__init__.py:worker",
                     error_type=type(e).__name__,
                     priority=TicketPriority.P3,
                 )
+
+            # Alert on consecutive failures
+            if _consecutive_failures >= failure_threshold:
+                helper.record_module_error(
+                    message=f"Screenscan capture failing consistently: {_consecutive_failures} consecutive failures",
+                    source="modules/screenscan/__init__.py:worker",
+                    error_type="ConsecutiveFailures",
+                    priority=TicketPriority.P2,
+                )
+
+                record_agent_voice(
+                    module_key="screenscan",
+                    action="consecutive_failures_alert",
+                    level="ERROR",
+                    details=f"{_consecutive_failures} consecutive capture failures (threshold: {failure_threshold})",
+                )
+
+                # Reset counter after alerting to avoid spam
+                _consecutive_failures = 0
+
             last_capture = now
+            expected_capture_time += interval
 
         # Periodic storage quota check
         if now - last_cleanup_check >= cleanup_interval:
