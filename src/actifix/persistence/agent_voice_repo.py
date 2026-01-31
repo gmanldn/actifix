@@ -118,6 +118,88 @@ class AgentVoiceRepository:
             for r in rows
         ]
 
+    def list_paginated(
+        self,
+        limit: int = 50,
+        cursor: Optional[int] = None,
+        agent_id: Optional[str] = None,
+        level: Optional[str] = None,
+    ) -> tuple[list[AgentVoiceEntry], Optional[int]]:
+        """
+        List agent voice entries with keyset pagination.
+
+        Args:
+            limit: Number of entries to return (max 1000).
+            cursor: ID cursor for pagination (entries with id < cursor).
+            agent_id: Optional filter by agent_id.
+            level: Optional filter by level (INFO, WARNING, ERROR).
+
+        Returns:
+            Tuple of (entries list, next_cursor). next_cursor is None if no more results.
+        """
+        limit = max(1, min(int(limit), 1000))
+        pool = get_database_pool()
+
+        # Build query with filters
+        conditions = []
+        params = []
+
+        if cursor is not None:
+            conditions.append("id < ?")
+            params.append(int(cursor))
+
+        if agent_id:
+            conditions.append("agent_id = ?")
+            params.append(agent_id)
+
+        if level:
+            conditions.append("level = ?")
+            params.append(level.upper())
+
+        where_clause = ""
+        if conditions:
+            where_clause = "WHERE " + " AND ".join(conditions)
+
+        # Fetch limit + 1 to determine if there are more results
+        fetch_limit = limit + 1
+        params.append(fetch_limit)
+
+        with pool.connection() as conn:
+            rows = conn.execute(
+                f"""
+                SELECT id, created_at, agent_id, run_label, level, thought, extra_json, correlation_id
+                FROM agent_voice
+                {where_clause}
+                ORDER BY id DESC
+                LIMIT ?
+                """,
+                params,
+            ).fetchall()
+
+        # Check if there are more results
+        has_more = len(rows) > limit
+        if has_more:
+            rows = rows[:limit]
+
+        entries = [
+            AgentVoiceEntry(
+                id=int(r["id"]),
+                created_at=str(r["created_at"]),
+                agent_id=str(r["agent_id"]),
+                run_label=r["run_label"],
+                level=str(r["level"]),
+                thought=str(r["thought"]),
+                extra_json=r["extra_json"],
+                correlation_id=r["correlation_id"],
+            )
+            for r in rows
+        ]
+
+        # Next cursor is the last entry's id if there are more results
+        next_cursor = entries[-1].id if has_more and entries else None
+
+        return entries, next_cursor
+
     def _prune_locked(self, conn) -> None:
         """Prune to max_rows using the provided (write-locked) connection."""
         # Find the minimum id among the newest max_rows entries; delete anything older.

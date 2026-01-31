@@ -815,14 +815,27 @@ def _load_modules(project_root: Path) -> Dict[str, List[Dict[str, str]]]:
 def _annotate_modules_with_runtime_contexts(
     modules_payload: Dict[str, List[Dict[str, str]]],
     registry: Optional[ModuleRegistry],
+    status_payload: Optional[Dict] = None,
 ) -> None:
-    """Enrich module metadata with runtime context such as host/port."""
+    """Enrich module metadata with runtime context such as host/port and status."""
     if not registry or not modules_payload:
         return
     contexts = registry.registered_contexts()
     metadata_map = registry.registered_metadata()
     if not contexts:
         return
+
+    # Extract status information
+    statuses = {}
+    if status_payload:
+        status_data = status_payload.get("statuses", {})
+        for module_id in status_data.get("active", []):
+            statuses[module_id] = "active"
+        for module_id in status_data.get("disabled", []):
+            statuses[module_id] = "disabled"
+        for module_id in status_data.get("error", []):
+            statuses[module_id] = "error"
+
     for bucket in modules_payload.values():
         for module in bucket:
             module_id = module.get("name")
@@ -837,6 +850,11 @@ def _annotate_modules_with_runtime_contexts(
                 version = metadata.get("version")
                 if version:
                     module["version"] = str(version)
+            # Add status if available
+            if module_id in statuses:
+                module["status"] = statuses[module_id]
+            else:
+                module["status"] = "unknown"
 
 
 def _collect_ai_feedback(limit: int = 40) -> List[str]:
@@ -1420,7 +1438,38 @@ def create_app(
             "state_dir": str(paths.state_dir),
         }
         health = get_health(paths)
-        
+
+        # Module liveness and key metrics
+        module_health = {}
+        try:
+            registry = app.extensions.get("actifix_module_registry")
+            if registry:
+                status_file = paths.state_dir / "module_statuses.json"
+                status_payload = _read_module_status_payload(status_file)
+                statuses = status_payload.get("statuses", {})
+
+                module_health = {
+                    'active_count': len(statuses.get('active', [])),
+                    'disabled_count': len(statuses.get('disabled', [])),
+                    'error_count': len(statuses.get('error', [])),
+                    'modules': {
+                        'active': statuses.get('active', []),
+                        'disabled': statuses.get('disabled', []),
+                        'error': statuses.get('error', []),
+                    },
+                }
+        except Exception:
+            module_health = {'error': 'Unable to query module status'}
+
+        # Database pool metrics
+        pool_metrics = {}
+        try:
+            from .persistence.database import get_database_pool
+            pool = get_database_pool()
+            pool_metrics = pool.get_pool_metrics()
+        except Exception:
+            pool_metrics = {'error': 'Unable to query pool metrics'}
+
         return jsonify({
             'healthy': health.healthy,
             'status': health.status,
@@ -1435,6 +1484,8 @@ def create_app(
                 'files_exist': health.files_exist,
                 'files_writable': health.files_writable,
             },
+            'modules': module_health,
+            'database': pool_metrics,
             'warnings': health.warnings,
             'errors': health.errors,
             'details': health.details,
@@ -1561,7 +1612,8 @@ def create_app(
             stats = get_ticket_stats(paths)
             modules = _load_modules(root)
             registry = app.extensions.get("actifix_module_registry")
-            _annotate_modules_with_runtime_contexts(modules, registry)
+            status_payload = _read_module_status_payload(paths.state_dir / "module_statuses.json")
+            _annotate_modules_with_runtime_contexts(modules, registry, status_payload)
             version_info = _gather_version_info(root)
         except Exception as exc:
             record_error(
@@ -1997,7 +2049,12 @@ def create_app(
         
         modules = _load_modules(app.config['PROJECT_ROOT'])
         registry = app.extensions.get("actifix_module_registry")
-        _annotate_modules_with_runtime_contexts(modules, registry)
+
+        # Load module status for annotation
+        paths = get_actifix_paths(project_root=app.config['PROJECT_ROOT'])
+        status_payload = _read_module_status_payload(paths.state_dir / "module_statuses.json")
+
+        _annotate_modules_with_runtime_contexts(modules, registry, status_payload)
         return jsonify(modules)
 
     @app.route('/api/modules/<module_id>/health', methods=['GET'])
@@ -2805,6 +2862,147 @@ def create_app(
             record_error(
                 message=f"Diagnostics failed: {e}",
                 source="api.py:api_diagnostics",
+                priority=TicketPriority.P3,
+            )
+            return jsonify({'error': str(e)}), 500
+
+    @app.route('/api/agent_voice', methods=['GET'])
+    def api_agent_voice():
+        """Query agent voice entries with keyset pagination."""
+        # Check authentication
+        if not _check_auth(request):
+            return jsonify({'error': 'Authorization required'}), 401
+
+        try:
+            from .persistence.agent_voice_repo import get_agent_voice_repository
+
+            limit = request.args.get('limit', 50, type=int)
+            cursor = request.args.get('cursor', None, type=int)
+            agent_id = request.args.get('agent_id', None)
+            level = request.args.get('level', None)
+
+            repo = get_agent_voice_repository()
+            entries, next_cursor = repo.list_paginated(
+                limit=limit,
+                cursor=cursor,
+                agent_id=agent_id,
+                level=level,
+            )
+
+            return jsonify({
+                'entries': [
+                    {
+                        'id': e.id,
+                        'created_at': e.created_at,
+                        'agent_id': e.agent_id,
+                        'run_label': e.run_label,
+                        'level': e.level,
+                        'thought': e.thought,
+                        'extra': json.loads(e.extra_json) if e.extra_json else None,
+                        'correlation_id': e.correlation_id,
+                    }
+                    for e in entries
+                ],
+                'pagination': {
+                    'limit': limit,
+                    'cursor': cursor,
+                    'next_cursor': next_cursor,
+                    'has_more': next_cursor is not None,
+                },
+            })
+
+        except Exception as e:
+            record_error(
+                message=f"Agent voice query failed: {e}",
+                source="api.py:api_agent_voice",
+                priority=TicketPriority.P3,
+            )
+            return jsonify({'error': str(e)}), 500
+
+    @app.route('/api/events', methods=['GET'])
+    def api_events():
+        """Query event log with filters."""
+        # Check authentication
+        if not _check_auth(request):
+            return jsonify({'error': 'Authorization required'}), 401
+
+        try:
+            from .persistence.event_repo import get_event_repository, EventFilter
+
+            limit = request.args.get('limit', 100, type=int)
+            event_type = request.args.get('event_type', None)
+            source = request.args.get('source', None)
+            priority = request.args.get('priority', None)
+            start_time = request.args.get('start_time', None)
+            end_time = request.args.get('end_time', None)
+
+            event_filter = EventFilter(
+                event_type=event_type,
+                source=source,
+                priority=priority,
+                start_time=start_time,
+                end_time=end_time,
+            )
+
+            repo = get_event_repository()
+            events = repo.query_events(event_filter, limit=min(limit, 1000))
+
+            return jsonify({
+                'events': events,
+                'count': len(events),
+                'filters': {
+                    'event_type': event_type,
+                    'source': source,
+                    'priority': priority,
+                    'start_time': start_time,
+                    'end_time': end_time,
+                    'limit': limit,
+                },
+            })
+
+        except Exception as e:
+            record_error(
+                message=f"Events query failed: {e}",
+                source="api.py:api_events",
+                priority=TicketPriority.P3,
+            )
+            return jsonify({'error': str(e)}), 500
+
+    @app.route('/api/config', methods=['GET'])
+    def api_config():
+        """Get readonly config view with secret redaction."""
+        # Check authentication
+        if not _check_auth(request):
+            return jsonify({'error': 'Authorization required'}), 401
+
+        try:
+            from .raise_af import redact_secrets_from_text
+
+            config = get_config()
+
+            # Build redacted config dict
+            config_dict = {
+                'ai_enabled': config.ai_enabled,
+                'ai_provider': redact_secrets_from_text(config.ai_provider or ''),
+                'ai_model': redact_secrets_from_text(config.ai_model or ''),
+                'webhook_enabled': config.webhook_enabled,
+                'webhook_url': redact_secrets_from_text(config.webhook_url or ''),
+                'max_ticket_message_length': config.max_ticket_message_length,
+                'max_file_context_size_bytes': config.max_file_context_size_bytes,
+                'enable_secret_redaction': config.enable_secret_redaction,
+                'duplicate_guard_ttl_seconds': config.duplicate_guard_ttl_seconds,
+            }
+
+            return jsonify({
+                'config': config_dict,
+                'readonly': True,
+                'timestamp': datetime.now(timezone.utc).isoformat(),
+            })
+
+        except Exception as e:
+            record_error(
+                message=f"Config query failed: {e}",
+                source="api.py:api_config",
                 priority=TicketPriority.P3,
             )
             return jsonify({'error': str(e)}), 500
