@@ -226,3 +226,152 @@ class ModuleBase:
             error_type=error_type,
             priority=priority,
         )
+
+
+# Port conflict handling utilities
+
+def check_port_available(port: int, host: str = "127.0.0.1") -> bool:
+    """Check if a port is available for binding."""
+    import socket
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        sock.bind((host, port))
+        sock.close()
+        return True
+    except OSError:
+        return False
+
+
+def find_process_on_port(port: int) -> Optional[dict]:
+    """Find the process using a specific port.
+    
+    Returns dict with pid, process_name, command, or None if not found.
+    """
+    import subprocess
+    import platform
+    
+    try:
+        system = platform.system()
+        if system == "Darwin" or system == "Linux":
+            # Use lsof on Unix-like systems
+            result = subprocess.run(
+                ["lsof", "-i", f":{port}", "-sTCP:LISTEN"],
+                capture_output=True,
+                text=True,
+                timeout=2
+            )
+            
+            if result.returncode == 0 and result.stdout.strip():
+                lines = result.stdout.strip().split("\n")
+                if len(lines) > 1:
+                    # Parse lsof output (skip header)
+                    parts = lines[1].split()
+                    return {
+                        "pid": int(parts[1]),
+                        "process_name": parts[0],
+                        "command": " ".join(parts[8:]) if len(parts) > 8 else parts[0],
+                    }
+        elif system == "Windows":
+            # Use netstat on Windows
+            result = subprocess.run(
+                ["netstat", "-ano"],
+                capture_output=True,
+                text=True,
+                timeout=2
+            )
+            
+            if result.returncode == 0:
+                for line in result.stdout.split("\n"):
+                    if f":{port}" in line and "LISTENING" in line:
+                        parts = line.split()
+                        if parts:
+                            return {
+                                "pid": int(parts[-1]),
+                                "process_name": "unknown",
+                                "command": f"Process on port {port}",
+                            }
+    except (subprocess.TimeoutExpired, subprocess.CalledProcessError, ValueError, IndexError):
+        pass
+    
+    return None
+
+
+def handle_port_conflict(
+    port: int,
+    host: str = "127.0.0.1",
+    module_name: str = "unknown",
+    auto_kill: bool = False
+) -> tuple[bool, Optional[str]]:
+    """Handle port conflict with remediation.
+    
+    Args:
+        port: Port number to check
+        host: Host address
+        module_name: Name of module trying to bind
+        auto_kill: If True, attempt to kill conflicting process
+    
+    Returns:
+        (success: bool, message: Optional[str])
+    """
+    if check_port_available(port, host):
+        return True, None
+    
+    # Port is in use - find the process
+    process_info = find_process_on_port(port)
+    
+    if process_info:
+        message = (
+            f"Port {port} is already in use by {process_info['process_name']} "
+            f"(PID: {process_info['pid']})"
+        )
+        
+        record_error(
+            message=f"{module_name}: {message}",
+            source=f"modules/{module_name}/port_conflict",
+            error_type="PortConflict",
+            priority=TicketPriority.P2,
+        )
+        
+        if auto_kill:
+            try:
+                import os
+                import signal
+                import platform
+                
+                if platform.system() == "Windows":
+                    subprocess.run(["taskkill", "/F", "/PID", str(process_info["pid"])], check=True)
+                else:
+                    os.kill(process_info["pid"], signal.SIGTERM)
+                
+                # Wait a moment and check if port is now available
+                import time
+                time.sleep(0.5)
+                
+                if check_port_available(port, host):
+                    return True, f"Killed conflicting process {process_info['pid']}"
+                else:
+                    return False, f"{message}. Failed to free port after killing process."
+            except Exception as e:
+                return False, f"{message}. Failed to kill process: {e}"
+        else:
+            remediation = (
+                f"\n\nRemediation options:\n"
+                f"1. Kill the process: kill {process_info['pid']}\n"
+                f"2. Use a different port via config\n"
+                f"3. Stop the conflicting service"
+            )
+            return False, message + remediation
+    else:
+        message = f"Port {port} is already in use (could not identify process)"
+        record_error(
+            message=f"{module_name}: {message}",
+            source=f"modules/{module_name}/port_conflict",
+            error_type="PortConflict",
+            priority=TicketPriority.P2,
+        )
+        remediation = (
+            f"\n\nRemediation options:\n"
+            f"1. Check running processes manually: lsof -i :{port}\n"
+            f"2. Use a different port via config"
+        )
+        return False, message + remediation
