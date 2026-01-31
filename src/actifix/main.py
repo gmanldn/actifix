@@ -78,6 +78,52 @@ def cmd_status(args: argparse.Namespace) -> int:
         return 0 if health.healthy else 1
 
 
+def cmd_metrics(args: argparse.Namespace) -> int:
+    """Show quick operational metrics."""
+    with ActifixContext(project_root=Path(args.project_root or Path.cwd())):
+        from datetime import datetime, timezone
+
+        # Get ticket stats
+        stats = get_ticket_stats()
+
+        # Get health
+        health = run_health_check(print_report=False)
+
+        print("=== Actifix Operational Metrics ===")
+        print(f"Generated: {datetime.now(timezone.utc).isoformat()}")
+        print()
+
+        # Ticket metrics
+        total = stats.get('total', 0)
+        open_count = stats.get('open', 0)
+        completed = stats.get('completed', 0)
+        in_progress = stats.get('in_progress', 0)
+
+        print("--- Ticket Metrics ---")
+        print(f"Total Tickets: {total}")
+        print(f"Open: {open_count} ({100 * open_count / total:.1f}%)" if total > 0 else "Open: 0")
+        print(f"Completed: {completed} ({100 * completed / total:.1f}%)" if total > 0 else "Completed: 0")
+        print(f"In Progress: {in_progress}")
+
+        # Priority distribution
+        print("\n--- Priority Distribution ---")
+        by_priority = stats.get('by_priority', {})
+        for priority in ['P0', 'P1', 'P2', 'P3', 'P4']:
+            count = by_priority.get(priority, 0)
+            pct = (100 * count / total) if total > 0 else 0
+            print(f"{priority}: {count} ({pct:.1f}%)")
+
+        # Health metrics
+        print("\n--- Health Metrics ---")
+        print(f"System Health: {'OK' if health.healthy else 'DEGRADED'}")
+        print(f"SLA Breaches: {health.sla_breaches or 0}")
+
+        if hasattr(health, 'oldest_ticket_age_hours') and health.oldest_ticket_age_hours:
+            print(f"Oldest Ticket Age: {health.oldest_ticket_age_hours:.1f}h")
+
+        return 0
+
+
 def cmd_record(args: argparse.Namespace) -> int:
     """Record an error manually."""
     with ActifixContext(project_root=Path(args.project_root or Path.cwd())):
@@ -614,6 +660,9 @@ def main(argv: Optional[list[str]] = None) -> int:
     # Status command
     status_parser = subparsers.add_parser("status", help="Show concise runtime summary")
 
+    # Metrics command
+    metrics_parser = subparsers.add_parser("metrics", help="Show quick operational metrics")
+
     # Record command
     record_parser = subparsers.add_parser("record", help="Record an error")
     record_parser.add_argument("error_type", help="Error type")
@@ -757,6 +806,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         "init": cmd_init,
         "health": cmd_health,
         "status": cmd_status,
+        "metrics": cmd_metrics,
         "record": cmd_record,
         "process": cmd_process,
         "stats": cmd_stats,
