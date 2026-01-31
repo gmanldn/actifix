@@ -654,6 +654,47 @@ def announce_api_modules(host: str, port: int) -> None:
         )
 
 
+def print_startup_summary(args: argparse.Namespace, host: str = "127.0.0.1") -> None:
+    """Print startup summary with module status and health checks."""
+    print()
+    print(f"{Color.BOLD}{Color.CYAN}=== STARTUP SUMMARY ==={Color.RESET}")
+    print()
+
+    # Module health checks
+    try:
+        from actifix.health import get_health
+        health = get_health()
+        db_status = "OK" if health.database_ok else "ERROR"
+        db_color = Color.GREEN if health.database_ok else Color.RED
+        print(f"  {Color.BOLD}Database:{Color.RESET} {db_color}{db_status}{Color.RESET}")
+
+        storage_status = "OK" if health.storage_ok else "ERROR"
+        storage_color = Color.GREEN if health.storage_ok else Color.RED
+        print(f"  {Color.BOLD}Storage:{Color.RESET} {storage_color}{storage_status}{Color.RESET}")
+    except Exception:
+        print(f"  {Color.YELLOW}Health check unavailable{Color.RESET}")
+
+    # Module registry status
+    try:
+        from actifix.modules.registry import ModuleRegistry
+        registry = ModuleRegistry()
+        statuses = registry.statuses()
+        active_count = len(statuses.get("active", []))
+        disabled_count = len(statuses.get("disabled", []))
+        error_count = len(statuses.get("error", []))
+
+        print(f"  {Color.BOLD}Modules:{Color.RESET}")
+        print(f"    {Color.GREEN}Active:{Color.RESET} {active_count}")
+        if disabled_count > 0:
+            print(f"    {Color.YELLOW}Disabled:{Color.RESET} {disabled_count}")
+        if error_count > 0:
+            print(f"    {Color.RED}Error:{Color.RESET} {error_count}")
+    except Exception:
+        pass
+
+    print()
+
+
 def report_runtime_status(args: argparse.Namespace, host: str = "127.0.0.1") -> None:
     """Print a consistent status line for every managed service/module."""
     log_info("Runtime status:")
@@ -1302,6 +1343,18 @@ def main(argv: Optional[list[str]] = None) -> int:
         log_error("--run-duration must be greater than zero")
         return 1
 
+    # Register signal handlers for graceful shutdown
+    shutdown_flag = threading.Event()
+
+    def signal_handler(signum, frame):
+        signame = signal.Signals(signum).name
+        log_warning(f"Received {signame}, initiating graceful shutdown")
+        shutdown_flag.set()
+        raise KeyboardInterrupt()  # Reuse existing cleanup logic
+
+    signal.signal(signal.SIGTERM, signal_handler)
+    signal.signal(signal.SIGINT, signal_handler)
+
     # Print startup banner
     print_banner("ACTIFIX STARTUP")
 
@@ -1561,6 +1614,9 @@ def main(argv: Optional[list[str]] = None) -> int:
 
     # Success banner
     print_banner("ACTIFIX IS READY!")
+
+    # Display startup summary with module status and health checks
+    print_startup_summary(args, host="127.0.0.1")
 
     # Display access information (stable, concise) and a status snapshot for review.
     url = f"http://localhost:{args.frontend_port}"

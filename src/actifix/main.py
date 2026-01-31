@@ -740,6 +740,43 @@ def cmd_export(args: argparse.Namespace) -> int:
             conn.close()
 
 
+def cmd_maintenance(args: argparse.Namespace) -> int:
+    """Run database maintenance (VACUUM and/or ANALYZE)."""
+    from .persistence.database import run_maintenance
+    from .state_paths import get_actifix_paths
+
+    paths = get_actifix_paths(project_root=Path(args.project_root or Path.cwd()))
+    enforce_raise_af_only(paths)
+
+    print("=== Database Maintenance ===")
+    print()
+
+    vacuum = not args.no_vacuum
+    analyze = not args.no_analyze
+
+    if not vacuum and not analyze:
+        print("Nothing to do (both --no-vacuum and --no-analyze specified)")
+        return 0
+
+    if vacuum:
+        print("Running VACUUM...")
+    if analyze:
+        print("Running ANALYZE...")
+
+    results = run_maintenance(vacuum=vacuum, analyze=analyze)
+
+    print()
+    print("=== Results ===")
+    if vacuum:
+        status = "✓ OK" if results.get("vacuum") else "✗ FAILED"
+        print(f"VACUUM: {status}")
+    if analyze:
+        status = "✓ OK" if results.get("analyze") else "✗ FAILED"
+        print(f"ANALYZE: {status}")
+
+    return 0 if results.get("success") else 1
+
+
 def cmd_prune(args: argparse.Namespace) -> int:
     """Prune old tickets, logs, and quarantine entries.
 
@@ -1172,6 +1209,19 @@ def main(argv: Optional[list[str]] = None) -> int:
         help="Show ticket IDs that will be pruned",
     )
 
+    # Maintenance command
+    maintenance_parser = subparsers.add_parser("maintenance", help="Run database maintenance")
+    maintenance_parser.add_argument(
+        "--no-vacuum",
+        action="store_true",
+        help="Skip VACUUM operation",
+    )
+    maintenance_parser.add_argument(
+        "--no-analyze",
+        action="store_true",
+        help="Skip ANALYZE operation",
+    )
+
     # Export command
     export_parser = subparsers.add_parser("export", help="Export tickets and events to JSON")
     export_parser.add_argument(
@@ -1207,6 +1257,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         "doctor": cmd_doctor,
         "repair": cmd_repair,
         "prune": cmd_prune,
+        "maintenance": cmd_maintenance,
         "export": cmd_export,
     }
     

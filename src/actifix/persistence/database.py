@@ -921,3 +921,116 @@ def log_database_audit(
         )
         print(f"Failed to log database audit: {e}", file=sys.stderr)
         return False
+
+
+def run_vacuum(pool: Optional[DatabasePool] = None) -> bool:
+    """
+    Run VACUUM command to reclaim space and defragment the database.
+
+    Args:
+        pool: Database pool (uses global pool if None).
+
+    Returns:
+        True if vacuum succeeded, False otherwise.
+    """
+    if pool is None:
+        pool = get_database_pool()
+
+    try:
+        log_event(
+            "DATABASE_VACUUM_STARTED",
+            "Starting database VACUUM operation",
+            source="persistence.database.run_vacuum",
+        )
+        start_time = datetime.now(timezone.utc)
+
+        with pool.connection() as conn:
+            conn.execute("VACUUM")
+
+        duration_ms = (datetime.now(timezone.utc) - start_time).total_seconds() * 1000
+        log_event(
+            "DATABASE_VACUUM_COMPLETED",
+            f"Database VACUUM completed in {duration_ms:.0f}ms",
+            extra={"duration_ms": round(duration_ms, 2)},
+            source="persistence.database.run_vacuum",
+        )
+        return True
+    except Exception as e:
+        log_event(
+            "DATABASE_VACUUM_FAILED",
+            f"Database VACUUM failed: {e}",
+            extra={"error": str(e)},
+            source="persistence.database.run_vacuum",
+        )
+        print(f"Failed to run database VACUUM: {e}", file=sys.stderr)
+        return False
+
+
+def run_analyze(pool: Optional[DatabasePool] = None) -> bool:
+    """
+    Run ANALYZE command to update query planner statistics.
+
+    Args:
+        pool: Database pool (uses global pool if None).
+
+    Returns:
+        True if analyze succeeded, False otherwise.
+    """
+    if pool is None:
+        pool = get_database_pool()
+
+    try:
+        log_event(
+            "DATABASE_ANALYZE_STARTED",
+            "Starting database ANALYZE operation",
+            source="persistence.database.run_analyze",
+        )
+        start_time = datetime.now(timezone.utc)
+
+        with pool.connection() as conn:
+            conn.execute("ANALYZE")
+
+        duration_ms = (datetime.now(timezone.utc) - start_time).total_seconds() * 1000
+        log_event(
+            "DATABASE_ANALYZE_COMPLETED",
+            f"Database ANALYZE completed in {duration_ms:.0f}ms",
+            extra={"duration_ms": round(duration_ms, 2)},
+            source="persistence.database.run_analyze",
+        )
+        return True
+    except Exception as e:
+        log_event(
+            "DATABASE_ANALYZE_FAILED",
+            f"Database ANALYZE failed: {e}",
+            extra={"error": str(e)},
+            source="persistence.database.run_analyze",
+        )
+        print(f"Failed to run database ANALYZE: {e}", file=sys.stderr)
+        return False
+
+
+def run_maintenance(pool: Optional[DatabasePool] = None, vacuum: bool = True, analyze: bool = True) -> dict:
+    """
+    Run database maintenance operations (VACUUM and/or ANALYZE).
+
+    Args:
+        pool: Database pool (uses global pool if None).
+        vacuum: Whether to run VACUUM.
+        analyze: Whether to run ANALYZE.
+
+    Returns:
+        Dict with results: {"vacuum": bool, "analyze": bool, "success": bool}
+    """
+    results = {"vacuum": None, "analyze": None, "success": True}
+
+    if vacuum:
+        results["vacuum"] = run_vacuum(pool)
+        if not results["vacuum"]:
+            results["success"] = False
+
+    if analyze:
+        results["analyze"] = run_analyze(pool)
+        if not results["analyze"]:
+            results["success"] = False
+
+    return results

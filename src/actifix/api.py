@@ -9,6 +9,7 @@ import json
 import logging
 import os
 import platform
+import signal
 import subprocess
 import sys
 import time
@@ -2690,6 +2691,23 @@ def run_api_server(
     app = create_app(project_root, host=host, port=port)
     registry = app.extensions.get("actifix_module_registry")
     socketio = app.extensions.get("socketio")
+
+    # Register signal handlers for graceful shutdown
+    def signal_handler(signum, frame):
+        signame = signal.Signals(signum).name
+        log_event(
+            "API_SIGNAL_RECEIVED",
+            f"Received {signame}, initiating graceful shutdown",
+            extra={"signal": signame, "host": host, "port": port},
+            source="api.run_api_server",
+        )
+        if isinstance(registry, ModuleRegistry):
+            registry.shutdown()
+        sys.exit(0)
+
+    signal.signal(signal.SIGTERM, signal_handler)
+    signal.signal(signal.SIGINT, signal_handler)
+
     try:
         if socketio is not None:
             socketio.run(app, host=host, port=port, debug=debug)

@@ -5,6 +5,7 @@ from __future__ import annotations
 import importlib
 import json
 import re
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from threading import RLock
@@ -162,8 +163,35 @@ def _discover_module_nodes(project_root: Path) -> list[dict[str, Any]]:
 
 def _lazy_import_module(module_label: str) -> tuple[str, object, Optional[dict[str, Any]]]:
     module_path = f"actifix.modules.{module_label}"
+    start_time = time.time()
     module = importlib.import_module(module_path)
+    import_duration_ms = (time.time() - start_time) * 1000
     metadata = getattr(module, "MODULE_METADATA", None)
+
+    log_event(
+        "MODULE_IMPORT_TIMING",
+        f"Module import: {module_label}",
+        extra={
+            "module_label": module_label,
+            "module_path": module_path,
+            "duration_ms": round(import_duration_ms, 2),
+        },
+        source="modules.registry._lazy_import_module",
+    )
+
+    # Warn if import took >2 seconds (per FRAMEWORK_OVERVIEW.md performance budget)
+    if import_duration_ms > 2000:
+        log_event(
+            "MODULE_IMPORT_SLOW",
+            f"Module import exceeded 2s threshold: {module_label} ({import_duration_ms:.0f}ms)",
+            extra={
+                "module_label": module_label,
+                "duration_ms": round(import_duration_ms, 2),
+                "threshold_ms": 2000,
+            },
+            source="modules.registry._lazy_import_module",
+        )
+
     return module_path, module, metadata
 
 
@@ -308,6 +336,8 @@ class ModuleRegistry:
         return _lazy_import_module(module_label)
 
     def on_registered(self, module: object, context: ModuleRuntimeContext, *, app: Any, blueprint: Any) -> None:
+        start_time = time.time()
+
         with self._lock:
             if self._shutdown:
                 return
@@ -324,6 +354,10 @@ class ModuleRegistry:
                 source="modules.registry.ModuleRegistry.on_registered",
             )
 
+        _call_module_hook(module, "module_register", context=context, app=app, blueprint=blueprint)
+
+        registration_duration_ms = (time.time() - start_time) * 1000
+
         log_event(
             "MODULE_LIFECYCLE_REGISTERED",
             f"Module registered: {context.module_id}",
@@ -332,13 +366,31 @@ class ModuleRegistry:
                 "module_path": context.module_path,
                 "host": context.host,
                 "port": context.port,
+                "registration_duration_ms": round(registration_duration_ms, 2),
             },
             source="modules.registry.ModuleRegistry.on_registered",
         )
 
-        _call_module_hook(module, "module_register", context=context, app=app, blueprint=blueprint)
+        # Warn if registration took >2 seconds
+        if registration_duration_ms > 2000:
+            log_event(
+                "MODULE_REGISTRATION_SLOW",
+                f"Module registration exceeded 2s threshold: {context.module_id} ({registration_duration_ms:.0f}ms)",
+                extra={
+                    "module_id": context.module_id,
+                    "duration_ms": round(registration_duration_ms, 2),
+                    "threshold_ms": 2000,
+                },
+                source="modules.registry.ModuleRegistry.on_registered",
+            )
 
-    def shutdown(self) -> None:
+    def shutdown(self, timeout_per_module: float = 5.0) -> None:
+        """
+        Gracefully shut down all registered modules with timeouts.
+
+        Args:
+            timeout_per_module: Maximum seconds to wait for each module to unregister.
+        """
         with self._lock:
             if self._shutdown:
                 return
@@ -346,15 +398,49 @@ class ModuleRegistry:
             items = list(self._registered.items())
             self._registered.clear()
 
+        import concurrent.futures
+        import threading
+
         for module_id, (module, context) in reversed(items):
-            try:
+            start_time = time.time()
+
+            def unregister_module():
                 _call_module_hook(module, "module_unregister", context=context)
-                log_event(
-                    "MODULE_LIFECYCLE_UNREGISTERED",
-                    f"Module unregistered: {module_id}",
-                    extra={"module_id": module_id, "module_path": context.module_path},
-                    source="modules.registry.ModuleRegistry.shutdown",
-                )
+
+            try:
+                # Run unregister hook with timeout
+                with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                    future = executor.submit(unregister_module)
+                    try:
+                        future.result(timeout=timeout_per_module)
+                        elapsed_ms = (time.time() - start_time) * 1000
+                        log_event(
+                            "MODULE_LIFECYCLE_UNREGISTERED",
+                            f"Module unregistered: {module_id}",
+                            extra={
+                                "module_id": module_id,
+                                "module_path": context.module_path,
+                                "duration_ms": round(elapsed_ms, 2),
+                            },
+                            source="modules.registry.ModuleRegistry.shutdown",
+                        )
+                    except concurrent.futures.TimeoutError:
+                        log_event(
+                            "MODULE_UNREGISTER_TIMEOUT",
+                            f"Module unregister timeout: {module_id} (>{timeout_per_module}s)",
+                            extra={
+                                "module_id": module_id,
+                                "timeout_seconds": timeout_per_module,
+                            },
+                            source="modules.registry.ModuleRegistry.shutdown",
+                        )
+                        record_error(
+                            message=f"Module unregister timeout for {module_id} after {timeout_per_module}s",
+                            source="modules.registry.ModuleRegistry.shutdown",
+                            error_type="TimeoutError",
+                            priority=TicketPriority.P2,
+                            capture_context=False,
+                        )
             except Exception as exc:
                 record_error(
                     message=f"Module unregister hook failed for {module_id}: {exc}",
