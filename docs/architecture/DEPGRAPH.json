@@ -461,6 +461,12 @@
       "label": "shootymcshoot"
     },
     {
+      "id": "modules.bgjobs",
+      "domain": "modules",
+      "owner": "modules",
+      "label": "bgjobs"
+    },
+    {
       "id": "modules.testmanifest",
       "domain": "modules",
       "owner": "modules",
@@ -1412,6 +1418,36 @@
       "from": "modules.shootymcshoot",
       "to": "runtime.api",
       "reason": "modules.shootymcshoot depends on runtime.api"
+    },
+    {
+      "from": "modules.bgjobs",
+      "to": "modules.base",
+      "reason": "modules.bgjobs depends on modules.base"
+    },
+    {
+      "from": "modules.bgjobs",
+      "to": "modules.config",
+      "reason": "modules.bgjobs depends on modules.config"
+    },
+    {
+      "from": "modules.bgjobs",
+      "to": "runtime.state",
+      "reason": "modules.bgjobs depends on runtime.state"
+    },
+    {
+      "from": "modules.bgjobs",
+      "to": "infra.logging",
+      "reason": "modules.bgjobs depends on infra.logging"
+    },
+    {
+      "from": "modules.bgjobs",
+      "to": "core.raise_af",
+      "reason": "modules.bgjobs depends on core.raise_af"
+    },
+    {
+      "from": "modules.bgjobs",
+      "to": "runtime.api",
+      "reason": "modules.bgjobs depends on runtime.api"
     },
     {
       "from": "modules.testmanifest",

@@ -1,0 +1,26 @@
+{
+  "id": "modules.bgjobs",
+  "version": "0.1.0",
+  "domain": "modules",
+  "description": "Example module demonstrating safe background job processing with persistence",
+  "dependencies": [
+    "modules.base",
+    "modules.config",
+    "runtime.state",
+    "infra.logging",
+    "core.raise_af",
+    "runtime.api"
+  ],
+  "capabilities": {
+    "gui": true,
+    "health": true,
+    "background_workers": true
+  },
+  "features": [
+    "Thread-safe job queue with persistence",
+    "Atomic file writes for job state",
+    "Error capture via Raise_AF",
+    "Health monitoring with statistics",
+    "RESTful API for job management"
+  ]
+}

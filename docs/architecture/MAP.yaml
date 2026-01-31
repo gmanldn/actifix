@@ -1060,6 +1060,24 @@ modules:
   - infra.logging
   - core.raise_af
   - runtime.api
+- id: modules.bgjobs
+  domain: modules
+  owner: modules
+  summary: Background jobs example module demonstrating safe persistence patterns
+  entrypoints:
+  - src/actifix/modules/bgjobs/__init__.py
+  contracts:
+  - demonstrate thread-safe background job processing with persistence
+  - use atomic file writes for job state durability
+  - capture errors via Raise_AF and AgentVoice
+  - provide RESTful API for job management with health monitoring
+  depends_on:
+  - modules.base
+  - modules.config
+  - runtime.state
+  - infra.logging
+  - core.raise_af
+  - runtime.api
 - id: modules.testmanifest
   domain: modules
   owner: modules
